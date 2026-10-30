@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Entrar · Meu Fiscal</title>
+<!--MF_CONFIG-->
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0F172A;--navy-2:#1E293B;--ink:#0F172A;--muted:#64748B;--line:#E2E8F0;--bg:#F8FAFC;--surface:#fff;--accent:#059669;--accent-h:#047857;--crit:#DC2626;--warn:#B45309;--ok:#059669}
+*{box-sizing:border-box;margin:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
+.wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:100vh}
+.lado{background:var(--navy);color:#E2E8F0;padding:48px;display:flex;flex-direction:column;justify-content:space-between;gap:32px}
+.marca{display:flex;align-items:center;gap:12px;font-weight:700;font-size:18px;color:#fff}
+.marca i{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#059669,#0d9488);display:grid;place-items:center;font-style:normal;font-size:15px}
+.lado h1{font-size:30px;line-height:1.2;color:#fff;letter-spacing:-.02em;max-width:18ch}
+.lado ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:12px;color:#CBD5E1;font-size:14.5px}
+.lado li{display:flex;gap:10px}.lado li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:8px;flex:none}
+.lado small{color:#94A3B8;font-size:12px}
+.form{display:flex;align-items:center;justify-content:center;padding:32px 20px}
+.caixa{width:100%;max-width:400px;display:flex;flex-direction:column;gap:18px}
+.caixa h2{font-size:24px;letter-spacing:-.01em}.caixa p.sub{color:var(--muted);font-size:14px;line-height:1.5;margin-top:4px}
+label{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:#334155}
+.campo{position:relative}
+input[type=email],input[type=password],input[type=text]{width:100%;font:inherit;font-size:15px;padding:11px 12px;border:1px solid #CBD5E1;border-radius:8px;background:#fff;color:var(--ink)}
+input:focus{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--accent)}
+.olho{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:none;padding:6px;cursor:pointer;color:var(--muted)}
+.olho svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:2}
+.dica{display:flex;justify-content:space-between;font-size:12px;font-weight:500;color:var(--muted)}
+.linha{display:flex;justify-content:space-between;align-items:center;gap:12px;font-size:13.5px}
+.chk{flex-direction:row;align-items:center;gap:8px;font-weight:500;color:var(--ink)}
+a,.link{color:var(--accent);font-weight:600;text-decoration:none;background:none;border:0;font:inherit;font-size:13.5px;cursor:pointer;padding:0}
+a:hover,.link:hover{text-decoration:underline}
+.cta{width:100%;font:inherit;font-size:15px;font-weight:700;padding:12px;border-radius:8px;border:0;background:var(--accent);color:#fff;cursor:pointer;box-shadow:0 1px 2px rgba(5,150,105,.25)}
+.cta:hover{background:var(--accent-h)}.cta:disabled{opacity:.55;cursor:not-allowed}
+.aviso{padding:12px 14px;border-radius:8px;font-size:13.5px;line-height:1.45;border:1px solid}
+.aviso.err{background:#FEF2F2;border-color:#FECACA;color:#991B1B}.aviso.ok{background:#ECFDF5;border-color:#A7F3D0;color:#065F46}.aviso.info{background:#F1F5F9;border-color:var(--line);color:#334155}
+.rodape{font-size:12.5px;color:var(--muted);text-align:center}
+/* Painel: tema escuro e sem "lembrar de mim" */
+body.painel{background:var(--navy);color:#E2E8F0}
+body.painel .wrap{grid-template-columns:1fr}
+body.painel .lado{display:none}
+body.painel .caixa{background:var(--navy-2);border:1px solid #334155;border-radius:14px;padding:32px;max-width:420px}
+body.painel .caixa h2{color:#fff}body.painel label{color:#CBD5E1}body.painel .chk{color:#E2E8F0}
+body.painel input{background:#0F172A;border-color:#475569;color:#fff}
+body.painel .aviso.info{background:#0F172A;border-color:#334155;color:#CBD5E1}
+body.painel .rodape,body.painel p.sub{color:#94A3B8}
+.selo-painel{display:none}body.painel .selo-painel{display:flex;align-items:center;gap:10px;font-size:12px;color:#94A3B8;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+@media (max-width:860px){.wrap{grid-template-columns:1fr}.lado{padding:28px 20px;gap:16px}.lado ul,.lado small{display:none}.lado h1{font-size:22px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside class="lado">
+    <div class="marca"><i>MF</i>Meu Fiscal</div>
+    <div style="display:flex;flex-direction:column;gap:20px">
+      <h1>Sua contabilidade, organizada e no prazo.</h1>
+      <ul><li>Guias de impostos liberadas pelo escritório assim que ficam prontas</li><li>Envio de notas fiscais de saída, documentos e pedidos em um só lugar</li><li>Funcionários, folha e admissões acompanhados mês a mês</li></ul>
+    </div>
+    <small>Acesso exclusivo para clientes do escritório.</small>
+  </aside>
+  <main class="form"><div class="caixa" id="caixa" aria-live="polite"></div></main>
+</div>
+<script>
+(function(){
+  const SITE=(window.MF&&window.MF.site)||'cliente', PAINEL=SITE==='painel';
+  const HOME=PAINEL?'/admin/dashboard':'/dashboard', LOGIN=PAINEL?'/admin/login':'/login';
+  const SENHA=/^[A-Za-z0-9]{8}$/;
+  if(PAINEL){document.body.classList.add('painel');document.title='Painel Contábil · Meu Fiscal'}
+  const $=s=>document.querySelector(s), caixa=$('#caixa');
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const q=new URLSearchParams(location.search);
+  const olhoSvg='<svg viewBox="0 0 24 24"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  async function api(metodo,caminho,corpo){
+    const r=await fetch(caminho,{method:metodo,credentials:'same-origin',headers:{'X-MF-Site':SITE,...(corpo?{'Content-Type':'application/json'}:{})},body:corpo?JSON.stringify(corpo):undefined});
+    let j={};try{j=await r.json()}catch(e){}
+    return {status:r.status,ok:r.ok,j};
+  }
+  const aviso=(t,m)=>m?`<div class="aviso ${t}">${m}</div>`:'';
+  const topo=(t,s)=>`<div class="selo-painel"><span class="marca" style="font-size:15px;color:#fff;text-transform:none;letter-spacing:0"><i style="width:30px;height:30px;font-size:12px">MF</i>Meu Fiscal</span><span>· Painel Contábil</span></div><div><h2>${t}</h2>${s?`<p class="sub">${s}</p>`:''}</div>`;
+  const campoSenha=(id,rot,ac)=>`<label>${rot}<span class="campo"><input type="password" id="${id}" maxlength="8" autocomplete="${ac}" required><button type="button" class="olho" data-olho="${id}" aria-label="Mostrar senha">${olhoSvg}</button></span><span class="dica"><span>8 letras ou números</span><span id="${id}-n">0/8</span></span></label>`;
+  let estado={msg:null};
+
+  function telaEntrar(){
+    caixa.innerHTML=`${topo(PAINEL?'Entrar no painel':'Entrar no Portal do Cliente',PAINEL?'Acesso da equipe do escritório com e-mail corporativo.':'Use o e-mail cadastrado pelo escritório.')}
+    ${estado.msg?aviso(estado.msg[0],estado.msg[1]):''}
+    <form id="f-entrar" novalidate style="display:flex;flex-direction:column;gap:16px">
+      <label>E-mail${PAINEL?' corporativo':''}<input type="email" id="email" autocomplete="username" required value="${esc(estado.email||'')}"></label>
+      ${campoSenha('senha','Senha','current-password')}
+      <div class="linha">${PAINEL?'<span></span>':'<label class="chk"><input type="checkbox" id="lembrar"> Lembrar de mim</label>'}<button type="button" class="link" data-ir="esqueci">Esqueci minha senha</button></div>
+      <button class="cta" id="cta" disabled>Entrar</button>
+    </form>
+    <p class="rodape">${PAINEL?'Área restrita. Os acessos são registrados.':'Primeiro acesso? <button class="link" data-ir="primeiro">Veja como criar sua senha</button>'}</p>`;
+    validar();
+  }
+  function telaEsqueci(){
+    caixa.innerHTML=`${topo('Recuperar senha','Enviaremos um link para o seu e-mail. Ele vale por 30 minutos.')}
+    ${estado.msg?aviso(estado.msg[0],estado.msg[1]):''}
+    <form id="f-esqueci" novalidate style="display:flex;flex-direction:column;gap:16px"><label>E-mail<input type="email" id="email" autocomplete="username" required value="${esc(estado.email||'')}"></label><button class="cta" id="cta" disabled>Enviar link</button></form>
+    <p class="rodape"><button class="link" data-ir="entrar">Voltar para o login</button></p>`;
+    validar();
+  }
+  function telaPrimeiro(){
+    caixa.innerHTML=`${topo('Primeiro acesso','O acesso ao portal é liberado pelo escritório de contabilidade.')}
+    <div class="aviso info">Quando o escritório liberar sua empresa, você recebe um e-mail com o link <b>“Criar minha senha”</b>. O link vale por 72 horas. Não recebeu ou venceu? Peça um novo convite ao escritório.</div>
+    <p class="rodape"><button class="link" data-ir="entrar">Voltar para o login</button></p>`;
+  }
+  async function telaDefinir(){
+    const token=q.get('token')||'';
+    caixa.innerHTML=topo('Conferindo o link…','');
+    const r=await api('GET',`/api/${SITE}/token?token=${encodeURIComponent(token)}`);
+    if(!r.ok){caixa.innerHTML=`${topo('Link expirado','')}${aviso('err',esc(r.j.erro||'Este link expirou ou já foi usado.'))}<p class="rodape"><button class="link" data-ir="esqueci">Pedir um novo link</button> · <a href="${LOGIN}">Ir para o login</a></p>`;return}
+    const convite=r.j.tipo==='convite';
+    caixa.innerHTML=`${topo(convite?`Bem-vindo, ${esc(r.j.nome.split(' ')[0])}`:'Criar nova senha',`${convite?'Crie a senha do seu acesso':'Nova senha para'} <b>${esc(r.j.email)}</b>. Use exatamente 8 letras ou números.`)}
+    <div id="msg"></div>
+    <form id="f-definir" novalidate style="display:flex;flex-direction:column;gap:16px">${campoSenha('nova','Nova senha','new-password')}${campoSenha('conf','Confirme a senha','new-password')}<button class="cta" id="cta" disabled>${convite?'Ativar meu acesso':'Salvar nova senha'}</button></form>`;
+    caixa.dataset.token=token; validar();
+  }
+  function validar(){
+    const c=$('#cta'); if(!c)return;
+    const em=$('#email')?.value.trim()||'', s=$('#senha')?.value||'', n=$('#nova')?.value||'', cf=$('#conf')?.value||'';
+    ['senha','nova','conf'].forEach(id=>{const e=$('#'+id+'-n');if(e)e.textContent=($('#'+id).value.length)+'/8'});
+    if($('#f-entrar'))c.disabled=!(/\S+@\S+\.\S+/.test(em)&&SENHA.test(s));
+    if($('#f-esqueci'))c.disabled=!/\S+@\S+\.\S+/.test(em);
+    if($('#f-definir'))c.disabled=!(SENHA.test(n)&&n===cf);
+  }
+  document.addEventListener('input',e=>{if(['senha','nova','conf'].includes(e.target.id))e.target.value=e.target.value.replace(/[^A-Za-z0-9]/g,'').slice(0,8);validar()});
+  document.addEventListener('click',e=>{
+    const o=e.target.closest('[data-olho]');if(o){const i=$('#'+o.dataset.olho);i.type=i.type==='password'?'text':'password';o.setAttribute('aria-label',i.type==='password'?'Mostrar senha':'Ocultar senha');return}
+    const ir=e.target.closest('[data-ir]');if(ir){estado.email=$('#email')?.value||estado.email;estado.msg=null;({entrar:telaEntrar,esqueci:telaEsqueci,primeiro:telaPrimeiro})[ir.dataset.ir]();}
+  });
+  document.addEventListener('submit',async e=>{
+    e.preventDefault(); const c=$('#cta'); if(c.disabled)return; const rot=c.textContent; c.disabled=true; c.textContent='Aguarde…';
+    try{
+      if(e.target.id==='f-entrar'){
+        const r=await api('POST',`/api/${SITE}/entrar`,{email:$('#email').value.trim(),senha:$('#senha').value,lembrar:!!$('#lembrar')?.checked});
+        if(r.ok){const v=q.get('voltar');location.replace(HOME+(v&&v.startsWith('#')?v:''));return}
+        estado.email=$('#email').value; estado.msg=['err',esc(r.j.erro||'Não foi possível entrar.')]; telaEntrar(); $('#senha').focus();
+      }
+      if(e.target.id==='f-esqueci'){
+        await api('POST',`/api/${SITE}/esqueci`,{email:$('#email').value.trim()});
+        estado.msg=['ok','Se o e-mail estiver cadastrado, enviamos um link para criar uma nova senha. Confira também a caixa de spam.']; telaEntrar();
+      }
+      if(e.target.id==='f-definir'){
+        const r=await api('POST',`/api/${SITE}/definir-senha`,{token:caixa.dataset.token,senha:$('#nova').value});
+        if(r.ok){history.replaceState(null,'',LOGIN);estado.msg=['ok','Senha criada. Entre com seu e-mail e a nova senha.'];telaEntrar();return}
+        $('#msg').innerHTML=aviso('err',esc(r.j.erro||'Não foi possível salvar.')); c.disabled=false; c.textContent=rot;
+      }
+    }catch(err){estado.msg=['err','Sem conexão com o servidor. Se o serviço gratuito estava em repouso, aguarde alguns segundos e tente de novo.'];telaEntrar()}
+  });
+  // abre a tela certa pela rota
+  if(/definir-senha/.test(location.pathname)) telaDefinir();
+  else if(q.has('primeiro-acesso')) telaPrimeiro();
+  else { telaEntrar(); api('GET','/api/eu').then(r=>{if(r.ok)location.replace(HOME)}).catch(()=>{}); }
+})();
+</script>
+</body>
+</html>

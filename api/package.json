@@ -1,0 +1,16 @@
+{
+  "name": "meu-fiscal-api",
+  "private": true,
+  "type": "module",
+  "description": "API única do Meu Fiscal: atende o Portal do Cliente e o Painel Contábil. Sem dependências externas.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node scripts/aplicar-schema.mjs && node src/servidor.js",
+    "dev": "node --watch src/servidor.js",
+    "db:schema": "node scripts/aplicar-schema.mjs",
+    "criar-master": "node scripts/criar-master.mjs",
+    "importar": "node scripts/importar.mjs"
+  }
+}

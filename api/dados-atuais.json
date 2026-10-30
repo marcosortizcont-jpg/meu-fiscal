@@ -1,0 +1,4614 @@
+{
+ "conversas": [
+  {
+   "atendenteId": null,
+   "criadoEm": "2026-10-30T15:37:13.991Z",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "tgursvc4ybrb",
+   "mensagens": [
+    {
+     "de": "cliente",
+     "em": "2026-10-30T15:37:13.991Z",
+     "texto": "Recebi uma intimação no e-CAC sobre o Simples. O que eu faço?"
+    },
+    {
+     "confianca": "baixa",
+     "de": "ia",
+     "em": "2026-10-30T15:37:13.991Z",
+     "texto": "Essa intimação costuma tratar de DAS em aberto. Vejo aqui que o DAS de set/2026 ainda não foi pago. Como envolve prazo de resposta e possível parcelamento, vou passar sua conversa para a equipe."
+    },
+    {
+     "de": "sistema",
+     "em": "2026-10-30T15:37:13.991Z",
+     "texto": "Conversa encaminhada para atendimento humano."
+    }
+   ],
+   "status": "aguardando_humano"
+  }
+ ],
+ "servicos": [
+  {
+   "aliqISS": 2,
+   "cTribNac": "170601",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "7g659dg4ybr9",
+   "itemLC116": "17.06"
+  },
+  {
+   "aliqISS": 0,
+   "cTribNac": "060101",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "h6b3jt74ybr9",
+   "itemLC116": "06.01"
+  },
+  {
+   "aliqISS": 2,
+   "cTribNac": "010601",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "zbow7js4ybr9",
+   "itemLC116": "01.06"
+  }
+ ],
+ "certificados": [
+  {
+   "cnpjCert": "45321877000112",
+   "emissor": "AC de exemplo",
+   "empresaId": "e1",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "a5joej04ybra",
+   "lembretes": [],
+   "titular": "STUDIO PANTANAL DESIGN LTDA",
+   "validade": "2026-11-24",
+   "validadeInicio": "2025-11-24"
+  },
+  {
+   "cnpjCert": "32887654000175",
+   "emissor": "AC de exemplo",
+   "empresaId": "e2",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "ntw61044ybra",
+   "lembretes": [],
+   "titular": "MERCEARIA BOM PRECO LTDA",
+   "validade": "2027-02-27",
+   "validadeInicio": "2026-02-27"
+  },
+  {
+   "cnpjCert": "29887123000178",
+   "emissor": "AC de exemplo",
+   "empresaId": "e4",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "gnzpcda4ybra",
+   "lembretes": [],
+   "titular": "TECHSUL CONSULTORIA EM TI LTDA",
+   "validade": "2026-11-05",
+   "validadeInicio": "2025-11-05"
+  }
+ ],
+ "faturas": [
+  {
+   "comp": "2026-08",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "qse64d94ybrb",
+   "itens": [
+    {
+     "desc": "Honorários Serviços Essencial",
+     "valor": 690
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": "2026-08-10",
+   "status": "paga",
+   "valor": 690,
+   "venc": "2026-08-10"
+  },
+  {
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "wlq0jvc4ybrb",
+   "itens": [
+    {
+     "desc": "Honorários Serviços Essencial",
+     "valor": 690
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": "2026-09-10",
+   "status": "paga",
+   "valor": 690,
+   "venc": "2026-09-10"
+  },
+  {
+   "comp": "2026-10",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "89i6ckb4ybrb",
+   "itens": [
+    {
+     "desc": "Honorários Serviços Essencial",
+     "valor": 690
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": "2026-10-10",
+   "status": "paga",
+   "valor": 690,
+   "venc": "2026-10-10"
+  },
+  {
+   "comp": "2026-08",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "6ajfj0s4ybrb",
+   "itens": [
+    {
+     "desc": "Honorários Comércio Plus",
+     "valor": 890
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": "2026-08-10",
+   "status": "paga",
+   "valor": 890,
+   "venc": "2026-08-10"
+  },
+  {
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "qe7cvjx4ybrb",
+   "itens": [
+    {
+     "desc": "Honorários Comércio Plus",
+     "valor": 890
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": "2026-09-10",
+   "status": "paga",
+   "valor": 890,
+   "venc": "2026-09-10"
+  },
+  {
+   "comp": "2026-10",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "a5hfev54ybrb",
+   "itens": [
+    {
+     "desc": "Honorários Comércio Plus",
+     "valor": 890
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": null,
+   "status": "aberta",
+   "valor": 890,
+   "venc": "2026-10-10"
+  },
+  {
+   "comp": "2026-08",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "cpqm0u04ybrb",
+   "itens": [
+    {
+     "desc": "Honorários MEI Tranquilo",
+     "valor": 99
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": "2026-08-10",
+   "status": "paga",
+   "valor": 99,
+   "venc": "2026-08-10"
+  },
+  {
+   "comp": "2026-09",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "v6aig5c4ybrb",
+   "itens": [
+    {
+     "desc": "Honorários MEI Tranquilo",
+     "valor": 99
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": "2026-09-10",
+   "status": "paga",
+   "valor": 99,
+   "venc": "2026-09-10"
+  },
+  {
+   "comp": "2026-10",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "3t8aps94ybrb",
+   "itens": [
+    {
+     "desc": "Honorários MEI Tranquilo",
+     "valor": 99
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": "2026-10-10",
+   "status": "paga",
+   "valor": 99,
+   "venc": "2026-10-10"
+  },
+  {
+   "comp": "2026-08",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "04hmpu74ybrb",
+   "itens": [
+    {
+     "desc": "Honorários Serviços Essencial",
+     "valor": 690
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": null,
+   "status": "aberta",
+   "valor": 690,
+   "venc": "2026-08-10"
+  },
+  {
+   "comp": "2026-09",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "6kqiaae4ybrb",
+   "itens": [
+    {
+     "desc": "Honorários Serviços Essencial",
+     "valor": 690
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": null,
+   "status": "aberta",
+   "valor": 690,
+   "venc": "2026-09-10"
+  },
+  {
+   "comp": "2026-10",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "gcwbogk4ybrb",
+   "itens": [
+    {
+     "desc": "Honorários Serviços Essencial",
+     "valor": 690
+    }
+   ],
+   "lembretes": [],
+   "notaArquivo": null,
+   "pagaEm": null,
+   "status": "aberta",
+   "valor": 690,
+   "venc": "2026-10-10"
+  }
+ ],
+ "ecac": [
+  {
+   "assunto": "Termo de intimação: débito do Simples Nacional em aberto",
+   "data": "2026-10-29",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "7h5opxz4ybra",
+   "lida": false,
+   "relevancia": "alta"
+  },
+  {
+   "assunto": "Aviso de pendência na DCTFWeb",
+   "data": "2026-10-24",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "nbpatyz4ybra",
+   "lida": false,
+   "relevancia": "alta"
+  },
+  {
+   "assunto": "Comunicado: novas regras da NFS-e no padrão nacional",
+   "data": "2026-10-15",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "5t9sue44ybra",
+   "lida": true,
+   "relevancia": "normal"
+  }
+ ],
+ "cnds": [
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e1",
+   "esfera": "Federal",
+   "exemplo": true,
+   "id": "ibpsssg4ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e1",
+   "esfera": "Estadual",
+   "exemplo": true,
+   "id": "nzavsc64ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e1",
+   "esfera": "Municipal",
+   "exemplo": true,
+   "id": "f50fwus4ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e1",
+   "esfera": "FGTS",
+   "exemplo": true,
+   "id": "nlgicw64ybra",
+   "situacao": "negativa",
+   "validade": "2026-11-09"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-28",
+   "empresaId": "e2",
+   "esfera": "Federal",
+   "exemplo": true,
+   "id": "qpsfkb64ybra",
+   "situacao": "positiva",
+   "validade": "2026-10-30"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e2",
+   "esfera": "Estadual",
+   "exemplo": true,
+   "id": "rjshp724ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e2",
+   "esfera": "Municipal",
+   "exemplo": true,
+   "id": "j35fmfi4ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e2",
+   "esfera": "FGTS",
+   "exemplo": true,
+   "id": "kttx7n34ybra",
+   "situacao": "negativa",
+   "validade": "2026-11-09"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e4",
+   "esfera": "Federal",
+   "exemplo": true,
+   "id": "fzc6gqj4ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e4",
+   "esfera": "Estadual",
+   "exemplo": true,
+   "id": "jgmim0k4ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e4",
+   "esfera": "Municipal",
+   "exemplo": true,
+   "id": "qho0uwp4ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e4",
+   "esfera": "FGTS",
+   "exemplo": true,
+   "id": "gpteqrp4ybra",
+   "situacao": "negativa",
+   "validade": "2026-11-09"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e3",
+   "esfera": "Federal",
+   "exemplo": true,
+   "id": "pzixrvh4ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e3",
+   "esfera": "Estadual",
+   "exemplo": true,
+   "id": "xzabk914ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e3",
+   "esfera": "Municipal",
+   "exemplo": true,
+   "id": "uo0aobb4ybra",
+   "situacao": "negativa",
+   "validade": "2027-04-08"
+  },
+  {
+   "arquivo": null,
+   "emitidaEm": "2026-10-10",
+   "empresaId": "e3",
+   "esfera": "FGTS",
+   "exemplo": true,
+   "id": "iiije854ybra",
+   "situacao": "negativa",
+   "validade": "2026-11-09"
+  }
+ ],
+ "fechamentos": [],
+ "operadores": [
+  {
+   "depto": "Contábil",
+   "id": "op1",
+   "nome": "Marcos Ortiz",
+   "papel": "Contador responsável"
+  },
+  {
+   "depto": "Fiscal",
+   "id": "op2",
+   "nome": "Analista Fiscal",
+   "papel": "Analista"
+  },
+  {
+   "depto": "Pessoal",
+   "id": "op3",
+   "nome": "Analista de DP",
+   "papel": "Analista"
+  },
+  {
+   "depto": "Legalização",
+   "id": "op4",
+   "nome": "Legalização",
+   "papel": "Assistente"
+  }
+ ],
+ "obrigacoes": [
+  {
+   "comp": "2026-09",
+   "depto": "Fiscal",
+   "empresaId": "e1",
+   "entregueEm": "2026-10-30T16:04:26.337Z",
+   "entreguePor": "u_Q9VRdbo0IiGHhoEpGdRPmQ",
+   "exemplo": true,
+   "id": "8y8ufko4ybra",
+   "prazo": "2026-10-20",
+   "responsavel": "op2",
+   "status": "entregue",
+   "tipo": "PGDAS-D"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Contábil",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "bkm7y8d4ybra",
+   "prazo": "2026-11-15",
+   "responsavel": "op2",
+   "status": "em_andamento",
+   "tipo": "Contabilidade"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "abfoytd4ybra",
+   "prazo": "2026-10-15",
+   "responsavel": "op2",
+   "status": "entregue",
+   "tipo": "eSocial"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "69seooq4ybra",
+   "prazo": "2026-10-20",
+   "responsavel": "op2",
+   "status": "entregue",
+   "tipo": "DCTFWeb"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "an0vbad4ybra",
+   "prazo": "2026-10-20",
+   "responsavel": "op2",
+   "status": "entregue",
+   "tipo": "FGTS Digital"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Fiscal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "efrpyp64ybra",
+   "prazo": "2026-10-20",
+   "responsavel": "op2",
+   "status": "entregue",
+   "tipo": "PGDAS-D"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Contábil",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "rdhxx204ybra",
+   "prazo": "2026-11-15",
+   "responsavel": "op2",
+   "status": "pendente",
+   "tipo": "Contabilidade"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "ti1lwv34ybra",
+   "prazo": "2026-10-15",
+   "responsavel": "op2",
+   "status": "pendente",
+   "tipo": "eSocial"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "i3x8neo4ybra",
+   "prazo": "2026-10-20",
+   "responsavel": "op2",
+   "status": "pendente",
+   "tipo": "DCTFWeb"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "kkqxq424ybra",
+   "prazo": "2026-10-20",
+   "responsavel": "op2",
+   "status": "pendente",
+   "tipo": "FGTS Digital"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Fiscal",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "zdntxh64ybra",
+   "prazo": "2026-10-20",
+   "responsavel": "op4",
+   "status": "entregue",
+   "tipo": "DAS-MEI"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Fiscal",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "s1hkj7t4ybra",
+   "prazo": "2026-10-20",
+   "responsavel": null,
+   "status": "entregue",
+   "tipo": "PGDAS-D"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Contábil",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "dn2d2t24ybra",
+   "prazo": "2026-11-15",
+   "responsavel": null,
+   "status": "em_andamento",
+   "tipo": "Contabilidade"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "8vktuuh4ybra",
+   "prazo": "2026-10-15",
+   "responsavel": null,
+   "status": "entregue",
+   "tipo": "eSocial"
+  },
+  {
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "pgo9wur4ybra",
+   "prazo": "2026-10-20",
+   "responsavel": null,
+   "status": "entregue",
+   "tipo": "DCTFWeb"
+  }
+ ],
+ "guias": [
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "depto": "Fiscal",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "8pk1e8p4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-08-20",
+   "status": "paga",
+   "tipo": "DAS",
+   "valor": 2693.97,
+   "venc": "2026-08-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "depto": "Pessoal",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "n5czp884ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-08-20",
+   "status": "paga",
+   "tipo": "FGTS",
+   "valor": 408,
+   "venc": "2026-08-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "depto": "Fiscal",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "zxv22bh4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-09-21",
+   "status": "paga",
+   "tipo": "DAS",
+   "valor": 2489.5,
+   "venc": "2026-09-21"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "depto": "Pessoal",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "r1tdi7j4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-09-18",
+   "status": "paga",
+   "tipo": "FGTS",
+   "valor": 408,
+   "venc": "2026-09-18"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "depto": "Fiscal",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "oxrtmit4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-10-20",
+   "status": "paga",
+   "tipo": "DAS",
+   "valor": 2565.14,
+   "venc": "2026-10-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "7xqf5xm4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-10-20",
+   "status": "paga",
+   "tipo": "FGTS",
+   "valor": 408,
+   "venc": "2026-10-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "depto": "Fiscal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "qmyjwj74ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-08-20",
+   "status": "paga",
+   "tipo": "DAS",
+   "valor": 5875.12,
+   "venc": "2026-08-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "depto": "Pessoal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "dxukh8a4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-08-20",
+   "status": "paga",
+   "tipo": "FGTS",
+   "valor": 572,
+   "venc": "2026-08-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "depto": "Fiscal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "r82f5ep4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-09-21",
+   "status": "paga",
+   "tipo": "DAS",
+   "valor": 5846.64,
+   "venc": "2026-09-21"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "depto": "Pessoal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "0pi82o44ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-09-18",
+   "status": "paga",
+   "tipo": "FGTS",
+   "valor": 572,
+   "venc": "2026-09-18"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "depto": "Fiscal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "r5jd6fs4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": null,
+   "status": "liberada",
+   "tipo": "DAS",
+   "valor": 5680.43,
+   "venc": "2026-10-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "depto": "Pessoal",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "iz5bv014ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-10-20",
+   "status": "paga",
+   "tipo": "FGTS",
+   "valor": 572,
+   "venc": "2026-10-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "depto": "Fiscal",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "lqrt01k4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-08-20",
+   "status": "paga",
+   "tipo": "DAS-MEI",
+   "valor": 86.05,
+   "venc": "2026-08-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "depto": "Fiscal",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "4tyawmk4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-09-21",
+   "status": "paga",
+   "tipo": "DAS-MEI",
+   "valor": 86.05,
+   "venc": "2026-09-21"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "depto": "Fiscal",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "72cdw234ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-10-20",
+   "status": "paga",
+   "tipo": "DAS-MEI",
+   "valor": 86.05,
+   "venc": "2026-10-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "depto": "Fiscal",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "xc0k3er4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-08-20",
+   "status": "paga",
+   "tipo": "DAS",
+   "valor": 8062.2,
+   "venc": "2026-08-20"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "depto": "Fiscal",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "ebj6wyc4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-09-21",
+   "status": "paga",
+   "tipo": "DAS",
+   "valor": 7383,
+   "venc": "2026-09-21"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "depto": "Fiscal",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "98t8mzd4ybr9",
+   "liberadaEm": "2026-10-30T15:37:13.989Z",
+   "pagaEm": "2026-10-20",
+   "status": "paga",
+   "tipo": "DAS",
+   "valor": 6940.49,
+   "venc": "2026-10-20"
+  }
+ ],
+ "documentos": [
+  {
+   "arquivo": null,
+   "categoria": "Contrato Social",
+   "empresaId": "e1",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "kocj1yg4ybra",
+   "nome": "Contrato social consolidado.pdf",
+   "validade": null
+  },
+  {
+   "arquivo": null,
+   "categoria": "Cartão CNPJ",
+   "empresaId": "e1",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "ativ9fj4ybra",
+   "nome": "Cartão CNPJ.pdf",
+   "validade": null
+  },
+  {
+   "arquivo": null,
+   "categoria": "Alvarás e Licenças",
+   "empresaId": "e1",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "1ctmxm74ybra",
+   "nome": "Alvará de funcionamento 2026.pdf",
+   "validade": "2026-11-20"
+  },
+  {
+   "arquivo": null,
+   "categoria": "Inscrição Municipal",
+   "empresaId": "e1",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "y6s67n24ybra",
+   "nome": "Inscrição municipal.pdf",
+   "validade": null
+  },
+  {
+   "arquivo": null,
+   "categoria": "Contrato Social",
+   "empresaId": "e2",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "y5mepru4ybra",
+   "nome": "Contrato social.pdf",
+   "validade": null
+  },
+  {
+   "arquivo": null,
+   "categoria": "Alterações Contratuais",
+   "empresaId": "e2",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "aoqlryq4ybra",
+   "nome": "3ª alteração contratual.pdf",
+   "validade": null
+  },
+  {
+   "arquivo": null,
+   "categoria": "Inscrição Estadual",
+   "empresaId": "e2",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "8jrwzlc4ybra",
+   "nome": "Inscrição estadual.pdf",
+   "validade": null
+  },
+  {
+   "arquivo": null,
+   "categoria": "Alvarás e Licenças",
+   "empresaId": "e2",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "mmvtwon4ybra",
+   "nome": "Licença sanitária.pdf",
+   "validade": "2026-10-26"
+  },
+  {
+   "arquivo": null,
+   "categoria": "Alvarás e Licenças",
+   "empresaId": "e2",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "ufqxqmn4ybra",
+   "nome": "Alvará do Corpo de Bombeiros.pdf",
+   "validade": "2027-03-19"
+  },
+  {
+   "arquivo": null,
+   "categoria": "Cartão CNPJ",
+   "empresaId": "e3",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "xdv7bij4ybra",
+   "nome": "CCMEI.pdf",
+   "validade": null
+  },
+  {
+   "arquivo": null,
+   "categoria": "Contrato Social",
+   "empresaId": "e4",
+   "enviadoEm": "2026-10-30T15:37:13.990Z",
+   "exemplo": true,
+   "id": "zassq424ybra",
+   "nome": "Contrato social.pdf",
+   "validade": null
+  }
+ ],
+ "faturamento": [
+  {
+   "comp": "2025-01",
+   "empresaId": "e1",
+   "id": "622n5ms4ybr8",
+   "origem": "declarado",
+   "receita": 20970
+  },
+  {
+   "comp": "2025-02",
+   "empresaId": "e1",
+   "id": "zho3okz4ybr8",
+   "origem": "declarado",
+   "receita": 26500
+  },
+  {
+   "comp": "2025-03",
+   "empresaId": "e1",
+   "id": "tdo4mrt4ybr8",
+   "origem": "declarado",
+   "receita": 24900
+  },
+  {
+   "comp": "2025-04",
+   "empresaId": "e1",
+   "id": "sanms104ybr8",
+   "origem": "declarado",
+   "receita": 25960
+  },
+  {
+   "comp": "2025-05",
+   "empresaId": "e1",
+   "id": "36xsf5p4ybr8",
+   "origem": "declarado",
+   "receita": 30020
+  },
+  {
+   "comp": "2025-06",
+   "empresaId": "e1",
+   "id": "m5hv6a64ybr8",
+   "origem": "declarado",
+   "receita": 29310
+  },
+  {
+   "comp": "2025-07",
+   "empresaId": "e1",
+   "id": "79ad2qq4ybr8",
+   "origem": "declarado",
+   "receita": 27720
+  },
+  {
+   "comp": "2025-08",
+   "empresaId": "e1",
+   "id": "a0kon6w4ybr8",
+   "origem": "declarado",
+   "receita": 28950
+  },
+  {
+   "comp": "2025-09",
+   "empresaId": "e1",
+   "id": "9cxzd294ybr8",
+   "origem": "declarado",
+   "receita": 27330
+  },
+  {
+   "comp": "2025-10",
+   "empresaId": "e1",
+   "id": "0u407q94ybr8",
+   "origem": "declarado",
+   "receita": 24650
+  },
+  {
+   "comp": "2025-11",
+   "empresaId": "e1",
+   "id": "ivhuzmr4ybr8",
+   "origem": "declarado",
+   "receita": 24160
+  },
+  {
+   "comp": "2025-12",
+   "empresaId": "e1",
+   "id": "zu8son54ybr8",
+   "origem": "declarado",
+   "receita": 28310
+  },
+  {
+   "comp": "2026-01",
+   "empresaId": "e1",
+   "id": "4aq5g4o4ybr8",
+   "origem": "declarado",
+   "receita": 26760
+  },
+  {
+   "comp": "2026-02",
+   "empresaId": "e1",
+   "id": "mvcykwz4ybr8",
+   "origem": "declarado",
+   "receita": 25030
+  },
+  {
+   "comp": "2026-03",
+   "empresaId": "e1",
+   "id": "bgwl52p4ybr8",
+   "origem": "declarado",
+   "receita": 27370
+  },
+  {
+   "comp": "2026-04",
+   "empresaId": "e1",
+   "id": "eb0vjk64ybr8",
+   "origem": "declarado",
+   "receita": 31000
+  },
+  {
+   "comp": "2026-05",
+   "empresaId": "e1",
+   "id": "y7mcg894ybr8",
+   "origem": "declarado",
+   "receita": 32230
+  },
+  {
+   "comp": "2026-06",
+   "empresaId": "e1",
+   "id": "dlvp9j44ybr8",
+   "origem": "declarado",
+   "receita": 28640
+  },
+  {
+   "comp": "2026-07",
+   "empresaId": "e1",
+   "id": "vgtm4zn4ybr8",
+   "origem": "declarado",
+   "receita": 32140
+  },
+  {
+   "comp": "2026-08",
+   "empresaId": "e1",
+   "id": "93n44g14ybr8",
+   "origem": "declarado",
+   "receita": 29570
+  },
+  {
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "id": "fulnuob4ybr8",
+   "origem": "declarado",
+   "receita": 30450
+  },
+  {
+   "comp": "2025-01",
+   "empresaId": "e2",
+   "id": "d3893ec4ybr8",
+   "origem": "declarado",
+   "receita": 58970
+  },
+  {
+   "comp": "2025-02",
+   "empresaId": "e2",
+   "id": "gfd9ouf4ybr8",
+   "origem": "declarado",
+   "receita": 53880
+  },
+  {
+   "comp": "2025-03",
+   "empresaId": "e2",
+   "id": "1dio7hf4ybr8",
+   "origem": "declarado",
+   "receita": 62160
+  },
+  {
+   "comp": "2025-04",
+   "empresaId": "e2",
+   "id": "vvgu0dw4ybr8",
+   "origem": "declarado",
+   "receita": 71280
+  },
+  {
+   "comp": "2025-05",
+   "empresaId": "e2",
+   "id": "roxt3ae4ybr8",
+   "origem": "declarado",
+   "receita": 71020
+  },
+  {
+   "comp": "2025-06",
+   "empresaId": "e2",
+   "id": "eiyo2wl4ybr8",
+   "origem": "declarado",
+   "receita": 71440
+  },
+  {
+   "comp": "2025-07",
+   "empresaId": "e2",
+   "id": "tdox5cx4ybr8",
+   "origem": "declarado",
+   "receita": 69500
+  },
+  {
+   "comp": "2025-08",
+   "empresaId": "e2",
+   "id": "jyt5clr4ybr8",
+   "origem": "declarado",
+   "receita": 71140
+  },
+  {
+   "comp": "2025-09",
+   "empresaId": "e2",
+   "id": "bramcqf4ybr8",
+   "origem": "declarado",
+   "receita": 67060
+  },
+  {
+   "comp": "2025-10",
+   "empresaId": "e2",
+   "id": "ee07xew4ybr8",
+   "origem": "declarado",
+   "receita": 56790
+  },
+  {
+   "comp": "2025-11",
+   "empresaId": "e2",
+   "id": "6kq71wa4ybr8",
+   "origem": "declarado",
+   "receita": 53730
+  },
+  {
+   "comp": "2025-12",
+   "empresaId": "e2",
+   "id": "ku7cytw4ybr8",
+   "origem": "declarado",
+   "receita": 70150
+  },
+  {
+   "comp": "2026-01",
+   "empresaId": "e2",
+   "id": "0azrew74ybr8",
+   "origem": "declarado",
+   "receita": 57990
+  },
+  {
+   "comp": "2026-02",
+   "empresaId": "e2",
+   "id": "v73xjfl4ybr8",
+   "origem": "declarado",
+   "receita": 58570
+  },
+  {
+   "comp": "2026-03",
+   "empresaId": "e2",
+   "id": "vcq0ab84ybr8",
+   "origem": "declarado",
+   "receita": 64250
+  },
+  {
+   "comp": "2026-04",
+   "empresaId": "e2",
+   "id": "na8n0c74ybr8",
+   "origem": "declarado",
+   "receita": 69960
+  },
+  {
+   "comp": "2026-05",
+   "empresaId": "e2",
+   "id": "hwsfwsy4ybr8",
+   "origem": "declarado",
+   "receita": 70890
+  },
+  {
+   "comp": "2026-06",
+   "empresaId": "e2",
+   "id": "p0mmk364ybr8",
+   "origem": "declarado",
+   "receita": 81550
+  },
+  {
+   "comp": "2026-07",
+   "empresaId": "e2",
+   "id": "pnoautx4ybr8",
+   "origem": "declarado",
+   "receita": 74770
+  },
+  {
+   "comp": "2026-08",
+   "empresaId": "e2",
+   "id": "p7d0ggh4ybr8",
+   "origem": "declarado",
+   "receita": 74230
+  },
+  {
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "id": "tgfftox4ybr8",
+   "origem": "declarado",
+   "receita": 72020
+  },
+  {
+   "comp": "2025-01",
+   "empresaId": "e3",
+   "id": "h6dkpv34ybr8",
+   "origem": "declarado",
+   "receita": 4410
+  },
+  {
+   "comp": "2025-02",
+   "empresaId": "e3",
+   "id": "ade7s1h4ybr8",
+   "origem": "declarado",
+   "receita": 4850
+  },
+  {
+   "comp": "2025-03",
+   "empresaId": "e3",
+   "id": "1rjsjij4ybr8",
+   "origem": "declarado",
+   "receita": 5470
+  },
+  {
+   "comp": "2025-04",
+   "empresaId": "e3",
+   "id": "kaltppv4ybr8",
+   "origem": "declarado",
+   "receita": 5730
+  },
+  {
+   "comp": "2025-05",
+   "empresaId": "e3",
+   "id": "gsyta4x4ybr8",
+   "origem": "declarado",
+   "receita": 5870
+  },
+  {
+   "comp": "2025-06",
+   "empresaId": "e3",
+   "id": "07ksgf84ybr8",
+   "origem": "declarado",
+   "receita": 5680
+  },
+  {
+   "comp": "2025-07",
+   "empresaId": "e3",
+   "id": "eghaewf4ybr8",
+   "origem": "declarado",
+   "receita": 6450
+  },
+  {
+   "comp": "2025-08",
+   "empresaId": "e3",
+   "id": "x1cct244ybr8",
+   "origem": "declarado",
+   "receita": 5210
+  },
+  {
+   "comp": "2025-09",
+   "empresaId": "e3",
+   "id": "bwwtiry4ybr8",
+   "origem": "declarado",
+   "receita": 5250
+  },
+  {
+   "comp": "2025-10",
+   "empresaId": "e3",
+   "id": "k213g7u4ybr8",
+   "origem": "declarado",
+   "receita": 4920
+  },
+  {
+   "comp": "2025-11",
+   "empresaId": "e3",
+   "id": "1nykeqt4ybr8",
+   "origem": "declarado",
+   "receita": 5000
+  },
+  {
+   "comp": "2025-12",
+   "empresaId": "e3",
+   "id": "zey4bqt4ybr8",
+   "origem": "declarado",
+   "receita": 6210
+  },
+  {
+   "comp": "2026-01",
+   "empresaId": "e3",
+   "id": "7n5xyz64ybr8",
+   "origem": "declarado",
+   "receita": 5240
+  },
+  {
+   "comp": "2026-02",
+   "empresaId": "e3",
+   "id": "nvfbxbi4ybr8",
+   "origem": "declarado",
+   "receita": 5120
+  },
+  {
+   "comp": "2026-03",
+   "empresaId": "e3",
+   "id": "mek0ke24ybr8",
+   "origem": "declarado",
+   "receita": 5720
+  },
+  {
+   "comp": "2026-04",
+   "empresaId": "e3",
+   "id": "hw6anzi4ybr8",
+   "origem": "declarado",
+   "receita": 5910
+  },
+  {
+   "comp": "2026-05",
+   "empresaId": "e3",
+   "id": "1s9k4gg4ybr8",
+   "origem": "declarado",
+   "receita": 6260
+  },
+  {
+   "comp": "2026-06",
+   "empresaId": "e3",
+   "id": "jtwtxzs4ybr8",
+   "origem": "declarado",
+   "receita": 6430
+  },
+  {
+   "comp": "2026-07",
+   "empresaId": "e3",
+   "id": "6fg2n9l4ybr8",
+   "origem": "declarado",
+   "receita": 6220
+  },
+  {
+   "comp": "2026-08",
+   "empresaId": "e3",
+   "id": "g8fpni14ybr8",
+   "origem": "declarado",
+   "receita": 6220
+  },
+  {
+   "comp": "2026-09",
+   "empresaId": "e3",
+   "id": "00bi0nk4ybr8",
+   "origem": "declarado",
+   "receita": 5970
+  },
+  {
+   "comp": "2025-06",
+   "empresaId": "e4",
+   "id": "p46wz494ybr8",
+   "origem": "declarado",
+   "receita": 40290
+  },
+  {
+   "comp": "2025-07",
+   "empresaId": "e4",
+   "id": "306xh8z4ybr8",
+   "origem": "declarado",
+   "receita": 45360
+  },
+  {
+   "comp": "2025-08",
+   "empresaId": "e4",
+   "id": "iaqlbra4ybr8",
+   "origem": "declarado",
+   "receita": 39940
+  },
+  {
+   "comp": "2025-09",
+   "empresaId": "e4",
+   "id": "e66tqyl4ybr8",
+   "origem": "declarado",
+   "receita": 40760
+  },
+  {
+   "comp": "2025-10",
+   "empresaId": "e4",
+   "id": "guvc6yj4ybr8",
+   "origem": "declarado",
+   "receita": 36690
+  },
+  {
+   "comp": "2025-11",
+   "empresaId": "e4",
+   "id": "5s9ivdj4ybr8",
+   "origem": "declarado",
+   "receita": 34970
+  },
+  {
+   "comp": "2025-12",
+   "empresaId": "e4",
+   "id": "luzpq154ybr8",
+   "origem": "declarado",
+   "receita": 40410
+  },
+  {
+   "comp": "2026-01",
+   "empresaId": "e4",
+   "id": "c0egmud4ybr8",
+   "origem": "declarado",
+   "receita": 36810
+  },
+  {
+   "comp": "2026-02",
+   "empresaId": "e4",
+   "id": "n9l60d04ybr8",
+   "origem": "declarado",
+   "receita": 40040
+  },
+  {
+   "comp": "2026-03",
+   "empresaId": "e4",
+   "id": "nyyd9xq4ybr8",
+   "origem": "declarado",
+   "receita": 44650
+  },
+  {
+   "comp": "2026-04",
+   "empresaId": "e4",
+   "id": "hzm5bq74ybr8",
+   "origem": "declarado",
+   "receita": 42600
+  },
+  {
+   "comp": "2026-05",
+   "empresaId": "e4",
+   "id": "n96e0ie4ybr8",
+   "origem": "declarado",
+   "receita": 47190
+  },
+  {
+   "comp": "2026-06",
+   "empresaId": "e4",
+   "id": "4ohwozw4ybr8",
+   "origem": "declarado",
+   "receita": 43680
+  },
+  {
+   "comp": "2026-07",
+   "empresaId": "e4",
+   "id": "6b34vdi4ybr8",
+   "origem": "declarado",
+   "receita": 46090
+  },
+  {
+   "comp": "2026-08",
+   "empresaId": "e4",
+   "id": "v77x06p4ybr8",
+   "origem": "declarado",
+   "receita": 42200
+  },
+  {
+   "comp": "2026-09",
+   "empresaId": "e4",
+   "id": "gy3wpxq4ybr8",
+   "origem": "declarado",
+   "receita": 39650
+  }
+ ],
+ "funcionarios": [
+  {
+   "admissao": "2023-02-01",
+   "cargo": "Designer júnior",
+   "cpf": "52998224725",
+   "desligado": false,
+   "docs": [],
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "40xz7p44ybr8",
+   "nome": "Juliana Prado Ribeiro",
+   "salario": 2900
+  },
+  {
+   "admissao": "2024-07-15",
+   "cargo": "Assistente administrativo",
+   "cpf": "11144477735",
+   "desligado": false,
+   "docs": [],
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "ite4c8l4ybr8",
+   "nome": "Rafael Antunes Lima",
+   "salario": 2200
+  },
+  {
+   "admissao": "2020-03-02",
+   "cargo": "Operadora de caixa",
+   "cpf": "39053344705",
+   "desligado": false,
+   "docs": [],
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "wg4ddjg4ybr8",
+   "nome": "Carla Mendes Vieira",
+   "salario": 1850
+  },
+  {
+   "admissao": "2022-09-12",
+   "cargo": "Repositor",
+   "cpf": "86288366757",
+   "desligado": false,
+   "docs": [],
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "6hakh044ybr8",
+   "nome": "Diego Farias Costa",
+   "salario": 1700
+  },
+  {
+   "admissao": "2019-08-01",
+   "cargo": "Gerente de loja",
+   "cpf": "71428793860",
+   "desligado": false,
+   "docs": [],
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "d7o7f504ybr8",
+   "nome": "Patrícia Rocha Nunes",
+   "salario": 3600
+  }
+ ],
+ "folhas": [
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "fuoydpw4ybr9",
+   "tipo": "Folha de pagamento"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "hs6hwic4ybr9",
+   "tipo": "Holerites"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "wka0irk4ybr9",
+   "tipo": "Folha de pagamento"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "ynie33b4ybr9",
+   "tipo": "Holerites"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "8tcw18z4ybr9",
+   "tipo": "Folha de pagamento"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "bdzik104ybr9",
+   "tipo": "Holerites"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "8b2vcow4ybr9",
+   "tipo": "Folha de pagamento"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-07",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "6vk0jhs4ybr9",
+   "tipo": "Holerites"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "iwqm3w84ybr9",
+   "tipo": "Folha de pagamento"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-08",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "67qldrc4ybr9",
+   "tipo": "Holerites"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "21fy0e64ybr9",
+   "tipo": "Folha de pagamento"
+  },
+  {
+   "arquivo": null,
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "exemplo": true,
+   "id": "kxocoxq4ybr9",
+   "tipo": "Holerites"
+  }
+ ],
+ "tomadores": [
+  {
+   "doc": "40128337000101",
+   "email": "",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "gbuomzc4ybr9",
+   "nome": "Construtora Horizonte MS Ltda",
+   "telefone": ""
+  },
+  {
+   "doc": "33441298000150",
+   "email": "",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "z7dg7jf4ybr9",
+   "nome": "Café do Cerrado ME",
+   "telefone": ""
+  },
+  {
+   "doc": "27654110000134",
+   "email": "",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "oozu3gu4ybr9",
+   "nome": "Clínica Vida Plena Ltda",
+   "telefone": ""
+  },
+  {
+   "doc": "52998224725",
+   "email": "",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "29az0ll4ybr9",
+   "nome": "Rafaela Martins",
+   "telefone": ""
+  },
+  {
+   "doc": "18233457000190",
+   "email": "",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "wkbg9pq4ybr9",
+   "nome": "Imobiliária Ipê Ltda",
+   "telefone": ""
+  },
+  {
+   "doc": "11144477735",
+   "email": "",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "gxzg5724ybr9",
+   "nome": "Mariana Silva",
+   "telefone": ""
+  },
+  {
+   "doc": "39053344705",
+   "email": "",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "5fn34ah4ybr9",
+   "nome": "Beatriz Gomes",
+   "telefone": ""
+  },
+  {
+   "doc": "86288366757",
+   "email": "",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "2ytczsx4ybr9",
+   "nome": "Luana Ferreira",
+   "telefone": ""
+  },
+  {
+   "doc": "11222333000181",
+   "email": "",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "og7wd5m4ybr9",
+   "nome": "AgroForte Cooperativa",
+   "telefone": ""
+  },
+  {
+   "doc": "60701190000104",
+   "email": "",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "xdlxoyl4ybr9",
+   "nome": "Logística Centro-Oeste S.A.",
+   "telefone": ""
+  },
+  {
+   "doc": "04252011000110",
+   "email": "",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "k4vwck14ybr9",
+   "nome": "Hospital São Lucas Ltda",
+   "telefone": ""
+  }
+ ],
+ "config": [
+  {
+   "crc": "CRC/MS 016636/O-0",
+   "email": "marcosortiz.cont@gmail.com",
+   "escritorio": "Marcos Alexandre Ortiz · Contabilidade",
+   "exemplo": true,
+   "id": "cfg",
+   "pix": "marcosortiz.cont@gmail.com",
+   "pixCidade": "Campo Grande",
+   "pixNome": "Marcos Alexandre Ortiz",
+   "telefone": "67992814060",
+   "termosVersao": "1.0",
+   "valorRenovacaoCert": 180
+  }
+ ],
+ "despesas": [
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "91vznmq4ybra",
+   "valor": 607
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "5ty4l8g4ybra",
+   "valor": 2298
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-04",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "jxicdrz4ybra",
+   "valor": 6001
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "8hjcbxy4ybra",
+   "valor": 286
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "r7o1p2e4ybra",
+   "valor": 686
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "gqpkwoa4ybra",
+   "valor": 2066
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-05",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "me9ckco4ybra",
+   "valor": 5693
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "7nua6fb4ybra",
+   "valor": 300
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "vlm8cfj4ybra",
+   "valor": 524
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "rmxf4nk4ybra",
+   "valor": 2204
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-06",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "gy3bntk4ybra",
+   "valor": 4867
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "ldgb5ys4ybra",
+   "valor": 294
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "nusersd4ybra",
+   "valor": 597
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "0ij7jf64ybra",
+   "valor": 2230
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-07",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "ac899xq4ybra",
+   "valor": 5893
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "ascfgkq4ybra",
+   "valor": 298
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "2wwgr254ybra",
+   "valor": 641
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "p204v864ybra",
+   "valor": 2229
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-08",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "f9jhfrj4ybra",
+   "valor": 5738
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "0ld3zz94ybra",
+   "valor": 318
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "nf7jay64ybra",
+   "valor": 659
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "y77zkq34ybra",
+   "valor": 2243
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "lu7y03l4ybra",
+   "valor": 5235
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "ryi8rxo4ybra",
+   "valor": 275
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-04",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Atacadão Distribuidora",
+   "id": "dgpp4dn4ybra",
+   "valor": 36541
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-04",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Laticínios Pantanal",
+   "id": "4cxa34j4ybra",
+   "valor": 7683
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Energisa MS",
+   "id": "0clg9ii4ybra",
+   "valor": 1890
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Aluguel do imóvel",
+   "id": "8k8r6yb4ybra",
+   "valor": 4296
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-05",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Atacadão Distribuidora",
+   "id": "0q35kva4ybra",
+   "valor": 36895
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-05",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Laticínios Pantanal",
+   "id": "u6192ox4ybra",
+   "valor": 8917
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Energisa MS",
+   "id": "xd9wl4x4ybra",
+   "valor": 2122
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Aluguel do imóvel",
+   "id": "13wtl4w4ybra",
+   "valor": 4413
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-06",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Atacadão Distribuidora",
+   "id": "faktp8r4ybra",
+   "valor": 42503
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-06",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Laticínios Pantanal",
+   "id": "dkkode84ybra",
+   "valor": 10534
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Energisa MS",
+   "id": "f5k7jk94ybra",
+   "valor": 2317
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Aluguel do imóvel",
+   "id": "8qmd4rq4ybra",
+   "valor": 4770
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-07",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Atacadão Distribuidora",
+   "id": "vseyyvm4ybra",
+   "valor": 44366
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-07",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Laticínios Pantanal",
+   "id": "0p1i6954ybra",
+   "valor": 8288
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Energisa MS",
+   "id": "833r38j4ybra",
+   "valor": 2238
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Aluguel do imóvel",
+   "id": "bhdjbtq4ybra",
+   "valor": 4040
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-08",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Atacadão Distribuidora",
+   "id": "49jnxoc4ybra",
+   "valor": 44199
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-08",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Laticínios Pantanal",
+   "id": "3xebcmg4ybra",
+   "valor": 9152
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Energisa MS",
+   "id": "81gfr5j4ybra",
+   "valor": 2415
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Aluguel do imóvel",
+   "id": "ik74g6x4ybra",
+   "valor": 4027
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Atacadão Distribuidora",
+   "id": "6a79k9w4ybra",
+   "valor": 42780
+  },
+  {
+   "categoria": "CMV",
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Laticínios Pantanal",
+   "id": "s1lqg4g4ybra",
+   "valor": 8103
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Energisa MS",
+   "id": "xe7x4h64ybra",
+   "valor": 2363
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "exemplo": true,
+   "fornecedor": "Aluguel do imóvel",
+   "id": "60gqevt4ybra",
+   "valor": 4378
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "hs01gb24ybra",
+   "valor": 122
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "grsj0b64ybra",
+   "valor": 394
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-04",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "qhk06it4ybra",
+   "valor": 1005
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "8jf4emq4ybra",
+   "valor": 56
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "gjl1m9y4ybra",
+   "valor": 127
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "cdmz7ra4ybra",
+   "valor": 399
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-05",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "wusxw304ybra",
+   "valor": 1188
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "1pywxiu4ybra",
+   "valor": 65
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "fkqqynw4ybra",
+   "valor": 134
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "ue2ms7r4ybra",
+   "valor": 450
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-06",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "f12b26t4ybra",
+   "valor": 1049
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "omrh8al4ybra",
+   "valor": 59
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "c5gjrgb4ybra",
+   "valor": 135
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "92eu2je4ybra",
+   "valor": 403
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-07",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "tsfkrcq4ybra",
+   "valor": 1162
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "yx6xk3p4ybra",
+   "valor": 67
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "xfqfac24ybra",
+   "valor": 113
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "bvnxdpu4ybra",
+   "valor": 469
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-08",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "h1x9c9k4ybra",
+   "valor": 1201
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "93m2rm84ybra",
+   "valor": 68
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "hlkmrk74ybra",
+   "valor": 130
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "kz7cmv94ybra",
+   "valor": 440
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-09",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "2titlg14ybra",
+   "valor": 1057
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e3",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "ax5dmy44ybra",
+   "valor": 57
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "3lh5icg4ybra",
+   "valor": 891
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "vjjq7c14ybra",
+   "valor": 3210
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-04",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "xyz79n74ybra",
+   "valor": 7512
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-04",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "yt1adlu4ybra",
+   "valor": 403
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "tmvan0k4ybra",
+   "valor": 926
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "dkzlmfw4ybra",
+   "valor": 3559
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-05",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "j8e5c464ybra",
+   "valor": 8594
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-05",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "yhwgquk4ybra",
+   "valor": 458
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "km0fluf4ybra",
+   "valor": 895
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "g5reskn4ybra",
+   "valor": 3201
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-06",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "d44p9vt4ybra",
+   "valor": 7603
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-06",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "4rcrvvn4ybra",
+   "valor": 456
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "h0xcxpu4ybra",
+   "valor": 908
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "mfs7bd24ybra",
+   "valor": 3032
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-07",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "zm2xh5l4ybra",
+   "valor": 7984
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-07",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "4c6hl8o4ybra",
+   "valor": 506
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "u2zg9sp4ybra",
+   "valor": 927
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "rvy9pre4ybra",
+   "valor": 3032
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-08",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "tppu6r04ybra",
+   "valor": 8161
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-08",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "tpvtu244ybra",
+   "valor": 457
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Adobe Systems",
+   "id": "9x6zz5e4ybra",
+   "valor": 745
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Aluguel da sala",
+   "id": "ze5xrp34ybra",
+   "valor": 2856
+  },
+  {
+   "categoria": "Custo do serviço",
+   "comp": "2026-09",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Freelancers parceiros",
+   "id": "gsy9flf4ybra",
+   "valor": 6617
+  },
+  {
+   "categoria": "Operacional",
+   "comp": "2026-09",
+   "empresaId": "e4",
+   "exemplo": true,
+   "fornecedor": "Internet e telefonia",
+   "id": "pf7i12p4ybra",
+   "valor": 396
+  }
+ ],
+ "notas": [
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-05",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "34ww60z4ybra",
+   "issRetido": false,
+   "nDPS": 213,
+   "numero": 213,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "33441298000150",
+    "nome": "Café do Cerrado ME"
+   },
+   "tomadorId": "z7dg7jf4ybr9",
+   "valor": 13020
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-11",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "o4yy1yo4ybra",
+   "issRetido": false,
+   "nDPS": 214,
+   "numero": 214,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "52998224725",
+    "nome": "Rafaela Martins"
+   },
+   "tomadorId": "29az0ll4ybr9",
+   "valor": 8370
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-17",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "fmbyji54ybra",
+   "issRetido": false,
+   "nDPS": 215,
+   "numero": 215,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "40128337000101",
+    "nome": "Construtora Horizonte MS Ltda"
+   },
+   "tomadorId": "gbuomzc4ybr9",
+   "valor": 5580
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-23",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "c3t3y524ybra",
+   "issRetido": false,
+   "nDPS": 216,
+   "numero": 216,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "27654110000134",
+    "nome": "Clínica Vida Plena Ltda"
+   },
+   "tomadorId": "oozu3gu4ybr9",
+   "valor": 4030
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-05",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "f884tnz4ybra",
+   "issRetido": false,
+   "nDPS": 217,
+   "numero": 217,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "40128337000101",
+    "nome": "Construtora Horizonte MS Ltda"
+   },
+   "tomadorId": "gbuomzc4ybr9",
+   "valor": 13540
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-11",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "ckgdn654ybra",
+   "issRetido": false,
+   "nDPS": 218,
+   "numero": 218,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "27654110000134",
+    "nome": "Clínica Vida Plena Ltda"
+   },
+   "tomadorId": "oozu3gu4ybr9",
+   "valor": 8700
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-17",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "19cyyat4ybra",
+   "issRetido": false,
+   "nDPS": 219,
+   "numero": 219,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "18233457000190",
+    "nome": "Imobiliária Ipê Ltda"
+   },
+   "tomadorId": "wkbg9pq4ybr9",
+   "valor": 5800
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-23",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "4u6rpf14ybra",
+   "issRetido": false,
+   "nDPS": 220,
+   "numero": 220,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "33441298000150",
+    "nome": "Café do Cerrado ME"
+   },
+   "tomadorId": "z7dg7jf4ybr9",
+   "valor": 4190
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-05",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "ntoyf194ybra",
+   "issRetido": false,
+   "nDPS": 221,
+   "numero": 221,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "18233457000190",
+    "nome": "Imobiliária Ipê Ltda"
+   },
+   "tomadorId": "wkbg9pq4ybr9",
+   "valor": 12030
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-11",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "1et96aw4ybra",
+   "issRetido": false,
+   "nDPS": 222,
+   "numero": 222,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "33441298000150",
+    "nome": "Café do Cerrado ME"
+   },
+   "tomadorId": "z7dg7jf4ybr9",
+   "valor": 7730
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-17",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "n2kwotd4ybra",
+   "issRetido": false,
+   "nDPS": 223,
+   "numero": 223,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "52998224725",
+    "nome": "Rafaela Martins"
+   },
+   "tomadorId": "29az0ll4ybr9",
+   "valor": 5160
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-23",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "9qnmciv4ybra",
+   "issRetido": false,
+   "nDPS": 224,
+   "numero": 224,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "40128337000101",
+    "nome": "Construtora Horizonte MS Ltda"
+   },
+   "tomadorId": "gbuomzc4ybr9",
+   "valor": 3720
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-05",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "hhp6klx4ybra",
+   "issRetido": false,
+   "nDPS": 225,
+   "numero": 225,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "52998224725",
+    "nome": "Rafaela Martins"
+   },
+   "tomadorId": "29az0ll4ybr9",
+   "valor": 13500
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-11",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "wlyez8l4ybra",
+   "issRetido": false,
+   "nDPS": 226,
+   "numero": 226,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "40128337000101",
+    "nome": "Construtora Horizonte MS Ltda"
+   },
+   "tomadorId": "gbuomzc4ybr9",
+   "valor": 8680
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-17",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "kwglazm4ybra",
+   "issRetido": false,
+   "nDPS": 227,
+   "numero": 227,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "27654110000134",
+    "nome": "Clínica Vida Plena Ltda"
+   },
+   "tomadorId": "oozu3gu4ybr9",
+   "valor": 5790
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-23",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "du6aeqp4ybra",
+   "issRetido": false,
+   "nDPS": 228,
+   "numero": 228,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "18233457000190",
+    "nome": "Imobiliária Ipê Ltda"
+   },
+   "tomadorId": "wkbg9pq4ybr9",
+   "valor": 4170
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-05",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "b7vowom4ybra",
+   "issRetido": false,
+   "nDPS": 229,
+   "numero": 229,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "27654110000134",
+    "nome": "Clínica Vida Plena Ltda"
+   },
+   "tomadorId": "oozu3gu4ybr9",
+   "valor": 12420
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-11",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "kg1a8ca4ybra",
+   "issRetido": false,
+   "nDPS": 230,
+   "numero": 230,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "18233457000190",
+    "nome": "Imobiliária Ipê Ltda"
+   },
+   "tomadorId": "wkbg9pq4ybr9",
+   "valor": 7980
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-17",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "t49qwfn4ybra",
+   "issRetido": false,
+   "nDPS": 231,
+   "numero": 231,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "33441298000150",
+    "nome": "Café do Cerrado ME"
+   },
+   "tomadorId": "z7dg7jf4ybr9",
+   "valor": 5320
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-23",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "3en3bn44ybra",
+   "issRetido": false,
+   "nDPS": 232,
+   "numero": 232,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "52998224725",
+    "nome": "Rafaela Martins"
+   },
+   "tomadorId": "29az0ll4ybr9",
+   "valor": 3850
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-05",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "ol7itw54ybra",
+   "issRetido": false,
+   "nDPS": 233,
+   "numero": 233,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "33441298000150",
+    "nome": "Café do Cerrado ME"
+   },
+   "tomadorId": "z7dg7jf4ybr9",
+   "valor": 12790
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-11",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "l3tjvl94ybra",
+   "issRetido": false,
+   "nDPS": 234,
+   "numero": 234,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "52998224725",
+    "nome": "Rafaela Martins"
+   },
+   "tomadorId": "29az0ll4ybr9",
+   "valor": 8220
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-17",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "zebpgx74ybra",
+   "issRetido": false,
+   "nDPS": 235,
+   "numero": 235,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "40128337000101",
+    "nome": "Construtora Horizonte MS Ltda"
+   },
+   "tomadorId": "gbuomzc4ybr9",
+   "valor": 5480
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-23",
+   "descricao": "Criação de identidade visual",
+   "empresaId": "e1",
+   "exemplo": true,
+   "id": "vtdhjec4ybra",
+   "issRetido": false,
+   "nDPS": 236,
+   "numero": 236,
+   "serie": "1",
+   "servicoId": "7g659dg4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "27654110000134",
+    "nome": "Clínica Vida Plena Ltda"
+   },
+   "tomadorId": "oozu3gu4ybr9",
+   "valor": 3960
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-05",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "8qfm8x44ybra",
+   "issRetido": false,
+   "nDPS": 59,
+   "numero": 59,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11144477735",
+    "nome": "Mariana Silva"
+   },
+   "tomadorId": "gxzg5724ybr9",
+   "valor": 2480
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-11",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "kl40d4o4ybra",
+   "issRetido": false,
+   "nDPS": 60,
+   "numero": 60,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "86288366757",
+    "nome": "Luana Ferreira"
+   },
+   "tomadorId": "2ytczsx4ybr9",
+   "valor": 1600
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-17",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "houn2f34ybra",
+   "issRetido": false,
+   "nDPS": 61,
+   "numero": 61,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "39053344705",
+    "nome": "Beatriz Gomes"
+   },
+   "tomadorId": "5fn34ah4ybr9",
+   "valor": 1830
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-05",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "rj16ut74ybra",
+   "issRetido": false,
+   "nDPS": 62,
+   "numero": 62,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "86288366757",
+    "nome": "Luana Ferreira"
+   },
+   "tomadorId": "2ytczsx4ybr9",
+   "valor": 2630
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-11",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "u974zsj4ybra",
+   "issRetido": false,
+   "nDPS": 63,
+   "numero": 63,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "39053344705",
+    "nome": "Beatriz Gomes"
+   },
+   "tomadorId": "5fn34ah4ybr9",
+   "valor": 1690
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-17",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "27ibn3v4ybra",
+   "issRetido": false,
+   "nDPS": 64,
+   "numero": 64,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11144477735",
+    "nome": "Mariana Silva"
+   },
+   "tomadorId": "gxzg5724ybr9",
+   "valor": 1940
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-05",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "l04e3t24ybra",
+   "issRetido": false,
+   "nDPS": 65,
+   "numero": 65,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "39053344705",
+    "nome": "Beatriz Gomes"
+   },
+   "tomadorId": "5fn34ah4ybr9",
+   "valor": 2700
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-11",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "y34feh84ybra",
+   "issRetido": false,
+   "nDPS": 66,
+   "numero": 66,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11144477735",
+    "nome": "Mariana Silva"
+   },
+   "tomadorId": "gxzg5724ybr9",
+   "valor": 1740
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-17",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "qc2jldx4ybra",
+   "issRetido": false,
+   "nDPS": 67,
+   "numero": 67,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "86288366757",
+    "nome": "Luana Ferreira"
+   },
+   "tomadorId": "2ytczsx4ybr9",
+   "valor": 1990
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-05",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "xbui6g74ybra",
+   "issRetido": false,
+   "nDPS": 68,
+   "numero": 68,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11144477735",
+    "nome": "Mariana Silva"
+   },
+   "tomadorId": "gxzg5724ybr9",
+   "valor": 2610
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-11",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "t10ffxf4ybra",
+   "issRetido": false,
+   "nDPS": 69,
+   "numero": 69,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "86288366757",
+    "nome": "Luana Ferreira"
+   },
+   "tomadorId": "2ytczsx4ybr9",
+   "valor": 1680
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-17",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "mpjjbrr4ybra",
+   "issRetido": false,
+   "nDPS": 70,
+   "numero": 70,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "39053344705",
+    "nome": "Beatriz Gomes"
+   },
+   "tomadorId": "5fn34ah4ybr9",
+   "valor": 1930
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-05",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "l1fpynd4ybra",
+   "issRetido": false,
+   "nDPS": 71,
+   "numero": 71,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "86288366757",
+    "nome": "Luana Ferreira"
+   },
+   "tomadorId": "2ytczsx4ybr9",
+   "valor": 2610
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-11",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "369g1pj4ybra",
+   "issRetido": false,
+   "nDPS": 72,
+   "numero": 72,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "39053344705",
+    "nome": "Beatriz Gomes"
+   },
+   "tomadorId": "5fn34ah4ybr9",
+   "valor": 1680
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-17",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "k27c2r14ybra",
+   "issRetido": false,
+   "nDPS": 73,
+   "numero": 73,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11144477735",
+    "nome": "Mariana Silva"
+   },
+   "tomadorId": "gxzg5724ybr9",
+   "valor": 1930
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-05",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "oa82bhl4ybra",
+   "issRetido": false,
+   "nDPS": 74,
+   "numero": 74,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "39053344705",
+    "nome": "Beatriz Gomes"
+   },
+   "tomadorId": "5fn34ah4ybr9",
+   "valor": 2510
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-11",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "22o8dxc4ybra",
+   "issRetido": false,
+   "nDPS": 75,
+   "numero": 75,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11144477735",
+    "nome": "Mariana Silva"
+   },
+   "tomadorId": "gxzg5724ybr9",
+   "valor": 1610
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-17",
+   "descricao": "Serviços de manicure e pedicure",
+   "empresaId": "e3",
+   "exemplo": true,
+   "id": "8h9dj4p4ybra",
+   "issRetido": false,
+   "nDPS": 76,
+   "numero": 76,
+   "serie": "1",
+   "servicoId": "h6b3jt74ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "86288366757",
+    "nome": "Luana Ferreira"
+   },
+   "tomadorId": "2ytczsx4ybr9",
+   "valor": 1850
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-05",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "7qo6qvz4ybra",
+   "issRetido": false,
+   "nDPS": 32,
+   "numero": 32,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11222333000181",
+    "nome": "AgroForte Cooperativa"
+   },
+   "tomadorId": "og7wd5m4ybr9",
+   "valor": 17890
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-11",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "rbjhfdl4ybra",
+   "issRetido": false,
+   "nDPS": 33,
+   "numero": 33,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "04252011000110",
+    "nome": "Hospital São Lucas Ltda"
+   },
+   "tomadorId": "k4vwck14ybr9",
+   "valor": 11500
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-17",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "syuot7j4ybra",
+   "issRetido": false,
+   "nDPS": 34,
+   "numero": 34,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "60701190000104",
+    "nome": "Logística Centro-Oeste S.A."
+   },
+   "tomadorId": "xdlxoyl4ybr9",
+   "valor": 7670
+  },
+  {
+   "chave": "",
+   "comp": "2026-04",
+   "data": "2026-04-23",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "dxg32aw4ybra",
+   "issRetido": false,
+   "nDPS": 35,
+   "numero": 35,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11222333000181",
+    "nome": "AgroForte Cooperativa"
+   },
+   "tomadorId": "og7wd5m4ybr9",
+   "valor": 5540
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-05",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "g52iql64ybra",
+   "issRetido": false,
+   "nDPS": 36,
+   "numero": 36,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "04252011000110",
+    "nome": "Hospital São Lucas Ltda"
+   },
+   "tomadorId": "k4vwck14ybr9",
+   "valor": 19820
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-11",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "9on9oxt4ybra",
+   "issRetido": false,
+   "nDPS": 37,
+   "numero": 37,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "60701190000104",
+    "nome": "Logística Centro-Oeste S.A."
+   },
+   "tomadorId": "xdlxoyl4ybr9",
+   "valor": 12740
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-17",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "eho27884ybra",
+   "issRetido": false,
+   "nDPS": 38,
+   "numero": 38,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11222333000181",
+    "nome": "AgroForte Cooperativa"
+   },
+   "tomadorId": "og7wd5m4ybr9",
+   "valor": 8490
+  },
+  {
+   "chave": "",
+   "comp": "2026-05",
+   "data": "2026-05-23",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "qkk0ckh4ybra",
+   "issRetido": false,
+   "nDPS": 39,
+   "numero": 39,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "04252011000110",
+    "nome": "Hospital São Lucas Ltda"
+   },
+   "tomadorId": "k4vwck14ybr9",
+   "valor": 6140
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-05",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "hlb294p4ybra",
+   "issRetido": false,
+   "nDPS": 40,
+   "numero": 40,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "60701190000104",
+    "nome": "Logística Centro-Oeste S.A."
+   },
+   "tomadorId": "xdlxoyl4ybr9",
+   "valor": 18350
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-11",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "0pc06n44ybra",
+   "issRetido": false,
+   "nDPS": 41,
+   "numero": 41,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11222333000181",
+    "nome": "AgroForte Cooperativa"
+   },
+   "tomadorId": "og7wd5m4ybr9",
+   "valor": 11790
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-17",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "rmsigo54ybra",
+   "issRetido": false,
+   "nDPS": 42,
+   "numero": 42,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "04252011000110",
+    "nome": "Hospital São Lucas Ltda"
+   },
+   "tomadorId": "k4vwck14ybr9",
+   "valor": 7860
+  },
+  {
+   "chave": "",
+   "comp": "2026-06",
+   "data": "2026-06-23",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "eanht1e4ybra",
+   "issRetido": false,
+   "nDPS": 43,
+   "numero": 43,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "60701190000104",
+    "nome": "Logística Centro-Oeste S.A."
+   },
+   "tomadorId": "xdlxoyl4ybr9",
+   "valor": 5680
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-05",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "fbjyf1x4ybra",
+   "issRetido": false,
+   "nDPS": 44,
+   "numero": 44,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11222333000181",
+    "nome": "AgroForte Cooperativa"
+   },
+   "tomadorId": "og7wd5m4ybr9",
+   "valor": 19360
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-11",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "ixmxvpt4ybra",
+   "issRetido": false,
+   "nDPS": 45,
+   "numero": 45,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "04252011000110",
+    "nome": "Hospital São Lucas Ltda"
+   },
+   "tomadorId": "k4vwck14ybr9",
+   "valor": 12440
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-17",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "kv3jstm4ybra",
+   "issRetido": false,
+   "nDPS": 46,
+   "numero": 46,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "60701190000104",
+    "nome": "Logística Centro-Oeste S.A."
+   },
+   "tomadorId": "xdlxoyl4ybr9",
+   "valor": 8300
+  },
+  {
+   "chave": "",
+   "comp": "2026-07",
+   "data": "2026-07-23",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "lh4e7ah4ybra",
+   "issRetido": false,
+   "nDPS": 47,
+   "numero": 47,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11222333000181",
+    "nome": "AgroForte Cooperativa"
+   },
+   "tomadorId": "og7wd5m4ybr9",
+   "valor": 5990
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-05",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "enw6bdh4ybra",
+   "issRetido": false,
+   "nDPS": 48,
+   "numero": 48,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "04252011000110",
+    "nome": "Hospital São Lucas Ltda"
+   },
+   "tomadorId": "k4vwck14ybr9",
+   "valor": 17720
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-11",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "0tkim4o4ybra",
+   "issRetido": false,
+   "nDPS": 49,
+   "numero": 49,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "60701190000104",
+    "nome": "Logística Centro-Oeste S.A."
+   },
+   "tomadorId": "xdlxoyl4ybr9",
+   "valor": 11390
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-17",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "sdz9dun4ybra",
+   "issRetido": false,
+   "nDPS": 50,
+   "numero": 50,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11222333000181",
+    "nome": "AgroForte Cooperativa"
+   },
+   "tomadorId": "og7wd5m4ybr9",
+   "valor": 7600
+  },
+  {
+   "chave": "",
+   "comp": "2026-08",
+   "data": "2026-08-23",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "urmogzp4ybra",
+   "issRetido": false,
+   "nDPS": 51,
+   "numero": 51,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "04252011000110",
+    "nome": "Hospital São Lucas Ltda"
+   },
+   "tomadorId": "k4vwck14ybr9",
+   "valor": 5490
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-05",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "8069v7h4ybra",
+   "issRetido": false,
+   "nDPS": 52,
+   "numero": 52,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "60701190000104",
+    "nome": "Logística Centro-Oeste S.A."
+   },
+   "tomadorId": "xdlxoyl4ybr9",
+   "valor": 16650
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-11",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "aplfyzu4ybra",
+   "issRetido": false,
+   "nDPS": 53,
+   "numero": 53,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "11222333000181",
+    "nome": "AgroForte Cooperativa"
+   },
+   "tomadorId": "og7wd5m4ybr9",
+   "valor": 10710
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-17",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "tav3nih4ybra",
+   "issRetido": false,
+   "nDPS": 54,
+   "numero": 54,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "04252011000110",
+    "nome": "Hospital São Lucas Ltda"
+   },
+   "tomadorId": "k4vwck14ybr9",
+   "valor": 7140
+  },
+  {
+   "chave": "",
+   "comp": "2026-09",
+   "data": "2026-09-23",
+   "descricao": "Consultoria em tecnologia da informação",
+   "empresaId": "e4",
+   "exemplo": true,
+   "id": "wzocr4e4ybra",
+   "issRetido": false,
+   "nDPS": 55,
+   "numero": 55,
+   "serie": "1",
+   "servicoId": "zbow7js4ybr9",
+   "status": "autorizada",
+   "tomador": {
+    "doc": "60701190000104",
+    "nome": "Logística Centro-Oeste S.A."
+   },
+   "tomadorId": "xdlxoyl4ybr9",
+   "valor": 5150
+  }
+ ],
+ "checklist": [
+  {
+   "arquivo": {
+    "id": null,
+    "nome": "ofx_2026-09.ofx",
+    "tamanho": 48213,
+    "tipo": "",
+    "url": null
+   },
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "enviadoEm": "2026-10-30T15:37:13.989Z",
+   "exemplo": true,
+   "id": "cbxq0714ybr9",
+   "itemId": "ofx",
+   "motivo": "",
+   "status": "aprovado"
+  },
+  {
+   "arquivo": {
+    "id": null,
+    "nome": "extpdf_2026-09.pdf",
+    "tamanho": 48213,
+    "tipo": "",
+    "url": null
+   },
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "enviadoEm": "2026-10-30T15:37:13.989Z",
+   "exemplo": true,
+   "id": "evhxnhy4ybr9",
+   "itemId": "extpdf",
+   "motivo": "",
+   "status": "aprovado"
+  },
+  {
+   "arquivo": {
+    "id": null,
+    "nome": "desp_2026-09.pdf",
+    "tamanho": 48213,
+    "tipo": "",
+    "url": null
+   },
+   "comp": "2026-09",
+   "empresaId": "e1",
+   "enviadoEm": "2026-10-30T15:37:13.989Z",
+   "exemplo": true,
+   "id": "j3w9gn94ybr9",
+   "itemId": "desp",
+   "motivo": "",
+   "status": "enviado"
+  },
+  {
+   "arquivo": {
+    "id": null,
+    "nome": "ofx_2026-09.ofx",
+    "tamanho": 48213,
+    "tipo": "",
+    "url": null
+   },
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "enviadoEm": "2026-10-30T15:37:13.989Z",
+   "exemplo": true,
+   "id": "elm4m3b4ybr9",
+   "itemId": "ofx",
+   "motivo": "",
+   "status": "enviado"
+  },
+  {
+   "arquivo": {
+    "id": null,
+    "nome": "nfe_2026-09.xml",
+    "tamanho": 48213,
+    "tipo": "",
+    "url": null
+   },
+   "comp": "2026-09",
+   "empresaId": "e2",
+   "enviadoEm": "2026-10-30T15:37:13.989Z",
+   "exemplo": true,
+   "id": "l9oviwr4ybr9",
+   "itemId": "nfe",
+   "motivo": "O XML enviado é de nota de entrada (compra). Envie apenas as notas de saída emitidas pela empresa.",
+   "status": "recusado"
+  },
+  {
+   "arquivo": {
+    "id": null,
+    "nome": "extpdf_2026-09.pdf",
+    "tamanho": 48213,
+    "tipo": "",
+    "url": null
+   },
+   "comp": "2026-09",
+   "empresaId": "e3",
+   "enviadoEm": "2026-10-30T15:37:13.989Z",
+   "exemplo": true,
+   "id": "d3oy80v4ybr9",
+   "itemId": "extpdf",
+   "motivo": "",
+   "status": "aprovado"
+  },
+  {
+   "arquivo": {
+    "id": null,
+    "nome": "ofx_2026-09.ofx",
+    "tamanho": 48213,
+    "tipo": "",
+    "url": null
+   },
+   "comp": "2026-09",
+   "empresaId": "e4",
+   "enviadoEm": "2026-10-30T15:37:13.989Z",
+   "exemplo": true,
+   "id": "pld5hhm4ybr9",
+   "itemId": "ofx",
+   "motivo": "",
+   "status": "aprovado"
+  },
+  {
+   "arquivo": {
+    "id": null,
+    "nome": "extpdf_2026-09.pdf",
+    "tamanho": 48213,
+    "tipo": "",
+    "url": null
+   },
+   "comp": "2026-09",
+   "empresaId": "e4",
+   "enviadoEm": "2026-10-30T15:37:13.989Z",
+   "exemplo": true,
+   "id": "gbrevbo4ybr9",
+   "itemId": "extpdf",
+   "motivo": "",
+   "status": "aprovado"
+  },
+  {
+   "arquivo": {
+    "id": null,
+    "nome": "desp_2026-09.pdf",
+    "tamanho": 48213,
+    "tipo": "",
+    "url": null
+   },
+   "comp": "2026-09",
+   "empresaId": "e4",
+   "enviadoEm": "2026-10-30T15:37:13.989Z",
+   "exemplo": true,
+   "id": "sfbi8304ybr9",
+   "itemId": "desp",
+   "motivo": "",
+   "status": "aprovado"
+  }
+ ],
+ "tickets": [
+  {
+   "criadoEm": "2026-10-26T15:37:13.991Z",
+   "descricao": "Queremos incluir a sócia Juliana com 10% das quotas.",
+   "empresaId": "e1",
+   "eventos": [
+    {
+     "autor": "Cliente",
+     "em": "2026-10-26T15:37:13.991Z",
+     "texto": "Solicitação aberta."
+    }
+   ],
+   "exemplo": true,
+   "faturado": false,
+   "id": "2ky74ha4ybrb",
+   "prazo": "2026-11-05",
+   "status": "em_andamento",
+   "tipo": "Alteração contratual",
+   "titulo": "Inclusão de novo sócio",
+   "valor": 0
+  },
+  {
+   "criadoEm": "2026-10-27T15:37:13.991Z",
+   "descricao": "Precisamos das certidões negativas para participar de licitação.",
+   "empresaId": "e2",
+   "eventos": [
+    {
+     "autor": "Cliente",
+     "em": "2026-10-27T15:37:13.991Z",
+     "texto": "Solicitação aberta."
+    }
+   ],
+   "exemplo": true,
+   "faturado": false,
+   "id": "3oppota4ybrb",
+   "prazo": "2026-10-30",
+   "status": "aguardando_cliente",
+   "tipo": "Emissão de certidão",
+   "titulo": "CND para licitação municipal",
+   "valor": 0
+  },
+  {
+   "criadoEm": "2026-10-18T15:37:13.991Z",
+   "descricao": "Vou passar do limite este ano?",
+   "empresaId": "e3",
+   "eventos": [
+    {
+     "autor": "Cliente",
+     "em": "2026-10-18T15:37:13.991Z",
+     "texto": "Solicitação aberta."
+    }
+   ],
+   "exemplo": true,
+   "faturado": false,
+   "id": "bh89arv4ybrb",
+   "prazo": "2026-10-23",
+   "status": "aberto",
+   "tipo": "Outros",
+   "titulo": "Dúvida sobre limite do MEI",
+   "valor": 0
+  },
+  {
+   "criadoEm": "2026-10-30T16:08:13.408Z",
+   "descricao": "Solicito a renovação do certificado digital que vence em 24/11/2026.",
+   "empresaId": "e1",
+   "eventos": [
+    {
+     "autor": "Cliente",
+     "em": "2026-10-30T16:08:13.409Z",
+     "texto": "Solicitação aberta."
+    }
+   ],
+   "faturado": false,
+   "id": "z4oi2jy626hs",
+   "prazo": "2026-11-04",
+   "status": "aberto",
+   "tipo": "Renovação de certificado",
+   "titulo": "Renovação do certificado digital A1",
+   "valor": 0
+  }
+ ],
+ "empresas": [
+  {
+   "abertura": "2021-03-10",
+   "acessos": [],
+   "anexo": "III",
+   "atividade": "Design gráfico e de identidade visual",
+   "checklist": [
+    {
+     "formatos": [
+      "ofx"
+     ],
+     "id": "ofx",
+     "nome": "Extrato bancário (OFX)"
+    },
+    {
+     "formatos": [
+      "pdf"
+     ],
+     "id": "extpdf",
+     "nome": "Extrato bancário (PDF)"
+    },
+    {
+     "formatos": [
+      "pdf",
+      "jpg",
+      "png"
+     ],
+     "id": "desp",
+     "nome": "Comprovantes de despesas"
+    },
+    {
+     "formatos": [
+      "xml"
+     ],
+     "id": "nfe",
+     "nome": "Notas fiscais de saída (XML)"
+    }
+   ],
+   "cnae": "7410-2/02",
+   "cnpj": "45321877000112",
+   "criadoEm": "2026-10-30T15:37:13.988Z",
+   "email": "financeiro@studiopantanal.exemplo",
+   "exemplo": true,
+   "fantasia": "Studio Pantanal",
+   "fatorR": true,
+   "ibge": "5002704",
+   "id": "e1",
+   "municipio": "Campo Grande",
+   "operadorId": "op2",
+   "plano": {
+    "adicionalFunc": 45,
+    "funcInclusos": 2,
+    "metodo": "pix",
+    "nome": "Serviços Essencial",
+    "valor": 690
+   },
+   "prolabore": 3500,
+   "razao": "Studio Pantanal Design Ltda",
+   "regime": "SN",
+   "reinf": false,
+   "status": "ativo",
+   "telefone": "67999810001",
+   "uf": "MS"
+  },
+  {
+   "abertura": "2019-08-01",
+   "acessos": [],
+   "anexo": "I",
+   "atividade": "Comércio varejista de mercadorias em geral",
+   "checklist": [
+    {
+     "formatos": [
+      "ofx"
+     ],
+     "id": "ofx",
+     "nome": "Extrato bancário (OFX)"
+    },
+    {
+     "formatos": [
+      "pdf"
+     ],
+     "id": "extpdf",
+     "nome": "Extrato bancário (PDF)"
+    },
+    {
+     "formatos": [
+      "pdf",
+      "jpg",
+      "png"
+     ],
+     "id": "desp",
+     "nome": "Comprovantes de despesas"
+    },
+    {
+     "formatos": [
+      "xml"
+     ],
+     "id": "nfe",
+     "nome": "Notas fiscais de saída (XML)"
+    }
+   ],
+   "cnae": "4712-1/00",
+   "cnpj": "32887654000175",
+   "criadoEm": "2026-10-30T15:37:13.988Z",
+   "email": "contato@bompreco.exemplo",
+   "exemplo": true,
+   "fantasia": "Mercearia Bom Preço",
+   "fatorR": false,
+   "ibge": "5002704",
+   "id": "e2",
+   "municipio": "Campo Grande",
+   "operadorId": "op2",
+   "plano": {
+    "adicionalFunc": 45,
+    "funcInclusos": 3,
+    "metodo": "boleto",
+    "nome": "Comércio Plus",
+    "valor": 890
+   },
+   "prolabore": 2500,
+   "razao": "Mercearia Bom Preço Ltda",
+   "regime": "SN",
+   "reinf": false,
+   "status": "ativo",
+   "telefone": "67999820002",
+   "uf": "MS"
+  },
+  {
+   "abertura": "2023-05-15",
+   "acessos": [],
+   "anexo": null,
+   "atividade": "Manicure, pedicure e design de sobrancelhas",
+   "checklist": [
+    {
+     "formatos": [
+      "pdf"
+     ],
+     "id": "extpdf",
+     "nome": "Extrato bancário (PDF)"
+    }
+   ],
+   "cnae": "9602-5/02",
+   "cnpj": "41234567000100",
+   "criadoEm": "2026-10-30T15:37:13.988Z",
+   "email": "ana.estetica@exemplo.com",
+   "exemplo": true,
+   "fantasia": "Ana Souza Estética",
+   "fatorR": false,
+   "ibge": "5002704",
+   "id": "e3",
+   "meiAtividade": "servicos",
+   "municipio": "Campo Grande",
+   "operadorId": "op4",
+   "plano": {
+    "adicionalFunc": 45,
+    "funcInclusos": 1,
+    "metodo": "cartao",
+    "nome": "MEI Tranquilo",
+    "valor": 99
+   },
+   "prolabore": 0,
+   "razao": "Ana Souza Estética 41234567890",
+   "regime": "MEI",
+   "reinf": false,
+   "status": "ativo",
+   "telefone": "67999830003",
+   "uf": "MS"
+  },
+  {
+   "abertura": "2025-06-02",
+   "acessos": [],
+   "anexo": "V",
+   "atividade": "Consultoria em tecnologia da informação",
+   "checklist": [
+    {
+     "formatos": [
+      "ofx"
+     ],
+     "id": "ofx",
+     "nome": "Extrato bancário (OFX)"
+    },
+    {
+     "formatos": [
+      "pdf"
+     ],
+     "id": "extpdf",
+     "nome": "Extrato bancário (PDF)"
+    },
+    {
+     "formatos": [
+      "pdf",
+      "jpg",
+      "png"
+     ],
+     "id": "desp",
+     "nome": "Comprovantes de despesas"
+    }
+   ],
+   "cnae": "6204-0/00",
+   "cnpj": "29887123000178",
+   "criadoEm": "2026-10-30T15:37:13.988Z",
+   "email": "adm@techsul.exemplo",
+   "exemplo": true,
+   "fantasia": "TechSul",
+   "fatorR": true,
+   "ibge": "5002704",
+   "id": "e4",
+   "municipio": "Campo Grande",
+   "operadorId": null,
+   "plano": {
+    "adicionalFunc": 45,
+    "funcInclusos": 2,
+    "metodo": "pix",
+    "nome": "Serviços Essencial",
+    "valor": 690
+   },
+   "prolabore": 9000,
+   "razao": "TechSul Consultoria em TI Ltda",
+   "regime": "SN",
+   "reinf": false,
+   "status": "ativo",
+   "telefone": "67999840004",
+   "uf": "MS"
+  }
+ ]
+}

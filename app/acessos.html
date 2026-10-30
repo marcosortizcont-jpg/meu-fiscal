@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Acessos e equipe · Meu Fiscal</title>
+<!--MF_CONFIG-->
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--navy:#0F172A;--ink:#0F172A;--muted:#64748B;--line:#E2E8F0;--line-2:#F1F5F9;--bg:#F8FAFC;--surface:#fff;--accent:#059669;--accent-h:#047857;--crit:#DC2626;--warn:#B45309;--info:#2563EB}
+*{box-sizing:border-box;margin:0}
+body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
+header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header a{color:#CBD5E1;text-decoration:none;font-weight:600;font-size:13px}header a:hover{color:#fff}
+.marca{display:flex;align-items:center;gap:10px;font-weight:700}.marca i{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#059669,#0d9488);display:grid;place-items:center;font-style:normal;font-size:12px}
+main{max-width:1080px;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:18px}
+h1{font-size:24px;letter-spacing:-.01em}.sub{color:var(--muted);margin-top:4px;line-height:1.5}
+.topo{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{border:0;background:none;padding:9px 12px;font:inherit;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;cursor:pointer}
+.tabs button[aria-selected=true]{color:var(--ink);border-color:var(--accent)}
+.painel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:18px;box-shadow:0 1px 2px rgba(15,23,42,.04)}
+.btn{display:inline-flex;align-items:center;gap:6px;font:inherit;font-weight:600;font-size:13px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}.btn.pri:hover{background:var(--accent-h)}
+.btn.sm{padding:4px 9px;font-size:12px}.btn.perigo{color:var(--crit)}
+table{width:100%;border-collapse:collapse}th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;padding:10px;border-bottom:1px solid var(--line)}
+td{padding:12px 10px;border-bottom:1px solid var(--line-2);vertical-align:top}td b{font-weight:600}td small{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.pill{display:inline-flex;font-size:12px;font-weight:500;border-radius:99px;padding:2px 10px;background:var(--line-2);color:#334155;white-space:nowrap}
+.pill.ativo{background:#ECFDF5;color:#047857}.pill.convidado{background:#EFF6FF;color:#1D4ED8}.pill.bloqueado{background:#FEF2F2;color:#B91C1C}
+.acoes{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.vazio{padding:28px;text-align:center;color:var(--muted)}
+dialog{border:0;border-radius:14px;padding:0;width:min(560px,calc(100vw - 32px));box-shadow:0 20px 50px rgba(15,23,42,.25)}
+dialog::backdrop{background:rgba(15,23,42,.45)}
+.mh{padding:16px 18px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center}.mh h2{font-size:17px}
+.mb{padding:18px;display:flex;flex-direction:column;gap:14px;max-height:65vh;overflow:auto}.mf{padding:14px 18px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+label.f{display:flex;flex-direction:column;gap:5px;font-weight:600;font-size:13px;color:#334155}
+input[type=text],input[type=email],select{font:inherit;padding:9px 10px;border:1px solid #CBD5E1;border-radius:8px;width:100%}
+.emp-lista{display:flex;flex-direction:column;gap:6px;border:1px solid var(--line);border-radius:8px;padding:8px;max-height:240px;overflow:auto}
+.emp-lista .it{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:4px}
+.emp-lista select{width:auto;padding:4px 6px;font-size:12px}
+.aviso{padding:12px 14px;border-radius:8px;font-size:13px;line-height:1.5;border:1px solid}
+.aviso.ok{background:#ECFDF5;border-color:#A7F3D0;color:#065F46}.aviso.err{background:#FEF2F2;border-color:#FECACA;color:#991B1B}.aviso.info{background:#F8FAFC;border-color:var(--line);color:#334155}
+.copiar{display:flex;gap:6px}.copiar input{font-family:ui-monospace,monospace;font-size:12px}
+@media (max-width:720px){thead{display:none}tr{display:grid;gap:4px;padding:12px 0;border-bottom:1px solid var(--line)}td{border:0;padding:2px 0}.acoes{justify-content:flex-start}}
+</style>
+</head>
+<body>
+<header><span class="marca"><i>MF</i>Meu Fiscal · Painel Contábil</span><a href="/admin/dashboard">← Voltar ao painel</a></header>
+<main>
+  <div class="topo"><div><h1>Acessos e equipe</h1><p class="sub">Libere o Portal do Cliente para os empresários e cadastre os colaboradores do escritório. Cada pessoa recebe um link por e-mail para criar a senha.</p></div><div id="botoes"></div></div>
+  <div class="tabs" role="tablist"><button role="tab" data-aba="clientes" aria-selected="true">Clientes</button><button role="tab" data-aba="equipe" aria-selected="false">Equipe do escritório</button></div>
+  <div id="msg"></div>
+  <section class="painel" id="lista"><div class="vazio">Carregando…</div></section>
+</main>
+<dialog id="dlg"></dialog>
+<script>
+(function(){
+  const $=s=>document.querySelector(s);
+  const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const PAPEL={master:'Master',gestor:'Gestor',analista:'Analista'}, ST={ativo:'Ativo',convidado:'Convite pendente',bloqueado:'Bloqueado'};
+  let D=null, aba='clientes';
+  async function api(m,c,b){const r=await fetch(c,{method:m,credentials:'same-origin',headers:{'X-MF-Site':'painel',...(b?{'Content-Type':'application/json'}:{})},body:b?JSON.stringify(b):undefined});let j={};try{j=await r.json()}catch(e){}if(r.status===401){location.replace('/admin/login');throw new Error('sessão')}if(!r.ok)throw new Error(j.erro||('Erro '+r.status));return j}
+  const nomeEmp=id=>{const e=D.empresas.find(x=>x.id===id);return e?(e.fantasia||e.razao||id):id};
+  const pode=amb=>amb==='equipe'?D.eu.papel==='master':['master','gestor'].includes(D.eu.papel);
+  function msg(t,h){$('#msg').innerHTML=h?`<div class="aviso ${t}">${h}</div>`:''}
+  function linkConvite(r){return r.emailEnviado?'':`<div class="aviso info">O e-mail não foi enviado (serviço de e-mail não configurado). Copie o link e envie por WhatsApp:<div class="copiar" style="margin-top:8px"><input type="text" readonly value="${esc(r.link)}"><button class="btn sm" data-copiar>Copiar</button></div></div>`}
+  async function carregar(){try{D=await api('GET','/api/admin/usuarios');desenhar()}catch(e){if(e.message!=='sessão')$('#lista').innerHTML=`<div class="vazio">${esc(e.message)}</div>`}}
+  function desenhar(){
+    document.querySelectorAll('[data-aba]').forEach(b=>b.setAttribute('aria-selected',b.dataset.aba===aba));
+    $('#botoes').innerHTML=aba==='clientes'?(pode('cliente')?'<button class="btn pri" data-novo="cliente">+ Liberar acesso de cliente</button>':''):(pode('equipe')?'<button class="btn pri" data-novo="equipe">+ Cadastrar colaborador</button>':'');
+    const us=D.usuarios.filter(u=>u.ambiente===(aba==='clientes'?'cliente':'equipe'));
+    if(!us.length){$('#lista').innerHTML=`<div class="vazio">${aba==='clientes'?'Nenhum cliente com acesso ainda. Libere o portal para o primeiro empresário.':'Nenhum colaborador cadastrado.'}</div>`;return}
+    $('#lista').innerHTML=`<table><thead><tr><th>Pessoa</th><th>${aba==='clientes'?'Empresas liberadas':'Nível'}</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead><tbody>${us.map(u=>`<tr>
+      <td><b>${esc(u.nome)}</b><small>${esc(u.email)}</small></td>
+      <td>${aba==='clientes'?(u.empresas.map(e=>`${esc(nomeEmp(e.id))} <small style="display:inline">· ${esc(e.perfil)}</small>`).join('<br>')||'<small>Nenhuma</small>'):esc(PAPEL[u.papel])}</td>
+      <td><span class="pill ${u.status}">${ST[u.status]}</span></td>
+      <td>${u.ultimo_login_em?new Date(u.ultimo_login_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}):'<small>Nunca</small>'}</td>
+      <td><div class="acoes">${pode(u.ambiente)?`${u.ambiente==='cliente'?`<button class="btn sm" data-editar="${u.id}">Empresas</button>`:''}${u.status==='convidado'?`<button class="btn sm" data-reenviar="${u.id}">Reenviar convite</button>`:''}${u.id!==D.eu.id?(u.status==='bloqueado'?`<button class="btn sm" data-status="ativo" data-id="${u.id}">Reativar</button>`:`<button class="btn sm perigo" data-status="bloqueado" data-id="${u.id}">Bloquear</button>`):''}`:''}</div></td></tr>`).join('')}</tbody></table>`;
+  }
+  function seletorEmpresas(sel){
+    return `<div class="emp-lista">${D.empresas.map(e=>{const s=sel.find(x=>x.id===e.id);return `<label class="it"><input type="checkbox" data-emp="${esc(e.id)}" ${s?'checked':''}><span>${esc(e.fantasia||e.razao)}<small style="display:block;color:var(--muted)">${esc(e.cnpj||'')}</small></span><select data-perfil="${esc(e.id)}">${['Sócio','Financeiro','RH'].map(p=>`<option ${s&&s.perfil===p?'selected':''}>${p}</option>`).join('')}</select></label>`}).join('')||'<small>Nenhuma empresa na carteira.</small>'}</div><small style="color:var(--muted)">Sócio vê tudo · Financeiro vê guias, notas e faturas · RH vê pessoal e folha.</small>`;
+  }
+  const lerEmpresas=()=>[...document.querySelectorAll('[data-emp]:checked')].map(c=>({id:c.dataset.emp,perfil:document.querySelector(`[data-perfil="${CSS.escape(c.dataset.emp)}"]`).value}));
+  function abrir(html){const d=$('#dlg');d.innerHTML=html;d.showModal()}
+  document.addEventListener('click',async e=>{
+    const t=e.target.closest('button');if(!t)return;
+    if(t.dataset.aba){aba=t.dataset.aba;msg();desenhar();return}
+    if(t.hasAttribute('data-fechar')){$('#dlg').close();return}
+    if(t.hasAttribute('data-copiar')){const i=t.parentElement.querySelector('input');i.select();try{await navigator.clipboard.writeText(i.value);t.textContent='Copiado'}catch(er){}return}
+    if(t.dataset.novo){const cli=t.dataset.novo==='cliente';abrir(`<form method="dialog" id="f-novo"><div class="mh"><h2>${cli?'Liberar acesso de cliente':'Cadastrar colaborador'}</h2><button type="button" class="btn sm" data-fechar>Fechar</button></div><div class="mb">
+      <label class="f">Nome completo<input type="text" name="nome" required minlength="3"></label><label class="f">E-mail${cli?'':' corporativo'}<input type="email" name="email" required></label>
+      ${cli?`<div class="f" style="display:flex;flex-direction:column;gap:6px"><b style="font-size:13px">Empresas que esta pessoa vai ver</b>${seletorEmpresas([])}</div>`:`<label class="f">Nível de acesso<select name="papel"><option value="analista">Analista · executa as rotinas</option><option value="gestor">Gestor · gerencia o departamento e libera clientes</option><option value="master">Master · tudo, inclusive cadastrar equipe</option></select></label>`}
+      <div id="dlg-msg"></div></div><div class="mf"><button type="button" class="btn" data-fechar>Cancelar</button><button class="btn pri" value="ok" data-enviar="${cli?'cliente':'equipe'}">Enviar convite</button></div></form>`);return}
+    if(t.dataset.enviar){e.preventDefault();const f=$('#f-novo');const corpo={nome:f.nome.value.trim(),email:f.email.value.trim(),ambiente:t.dataset.enviar,papel:f.papel?.value,empresas:t.dataset.enviar==='cliente'?lerEmpresas():undefined};
+      t.disabled=true;try{const r=await api('POST','/api/admin/usuarios',corpo);$('#dlg').close();msg('ok',`Convite criado para <b>${esc(corpo.email)}</b>.${r.emailEnviado?' O e-mail já foi enviado.':''}`+linkConvite(r));await carregar()}catch(er){$('#dlg-msg').innerHTML=`<div class="aviso err">${esc(er.message)}</div>`;t.disabled=false}return}
+    if(t.dataset.editar){const u=D.usuarios.find(x=>x.id===t.dataset.editar);abrir(`<div class="mh"><h2>Empresas de ${esc(u.nome)}</h2><button class="btn sm" data-fechar>Fechar</button></div><div class="mb">${seletorEmpresas(u.empresas)}<div id="dlg-msg"></div></div><div class="mf"><button class="btn" data-fechar>Cancelar</button><button class="btn pri" data-salvar-emp="${u.id}">Salvar</button></div>`);return}
+    if(t.dataset.salvarEmp){t.disabled=true;try{await api('PATCH','/api/admin/usuarios/'+t.dataset.salvarEmp,{empresas:lerEmpresas()});$('#dlg').close();msg('ok','Acesso atualizado. Se a pessoa estiver com o portal aberto, ele recarrega sozinho.');await carregar()}catch(er){$('#dlg-msg').innerHTML=`<div class="aviso err">${esc(er.message)}</div>`;t.disabled=false}return}
+    if(t.dataset.reenviar){t.disabled=true;try{const r=await api('POST',`/api/admin/usuarios/${t.dataset.reenviar}/convite`);msg('ok',`Novo convite gerado. O link anterior deixou de valer.${r.emailEnviado?' O e-mail já foi enviado.':''}`+linkConvite(r))}catch(er){msg('err',esc(er.message))}t.disabled=false;return}
+    if(t.dataset.status){t.disabled=true;try{await api('PATCH','/api/admin/usuarios/'+t.dataset.id,{status:t.dataset.status});msg('ok',t.dataset.status==='bloqueado'?'Acesso bloqueado. As sessões abertas foram encerradas na hora.':'Acesso reativado.');await carregar()}catch(er){msg('err',esc(er.message));t.disabled=false}return}
+  });
+  carregar();
+})();
+</script>
+</body>
+</html>

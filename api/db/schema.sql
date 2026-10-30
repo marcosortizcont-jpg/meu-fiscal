@@ -1,0 +1,125 @@
+-- Meu Fiscal · banco único dos dois sites (PostgreSQL 14+; testado no 16)
+-- Multitenant por escritório: toda linha de negócio carrega escritorio_id e toda consulta da API filtra por ele.
+-- Idempotente: pode rodar de novo a cada deploy.
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TABLE IF NOT EXISTS escritorios (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nome       TEXT NOT NULL,
+  criado_em  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Um e-mail = uma conta na plataforma inteira. É isso que permite recusar, com aviso claro,
+-- um cliente que tenta entrar no Painel (e um colaborador que tenta entrar no Portal).
+CREATE TABLE IF NOT EXISTS usuarios (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id    UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  nome             TEXT NOT NULL,
+  email            TEXT NOT NULL,
+  ambiente         TEXT NOT NULL CHECK (ambiente IN ('cliente','equipe')),
+  papel            TEXT CHECK (papel IN ('master','gestor','analista')),
+  status           TEXT NOT NULL DEFAULT 'convidado' CHECK (status IN ('convidado','ativo','bloqueado')),
+  senha_hash       TEXT,
+  criado_em        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  ultimo_login_em  TIMESTAMPTZ,
+  CONSTRAINT equipe_tem_papel  CHECK (ambiente = 'cliente' OR papel IS NOT NULL),
+  CONSTRAINT cliente_sem_papel CHECK (ambiente = 'equipe'  OR papel IS NULL)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS usuarios_email_unico ON usuarios (lower(email));
+
+-- Quais empresas cada usuário-cliente enxerga e com que perfil (vários CNPJs no mesmo login)
+CREATE TABLE IF NOT EXISTS usuarios_empresas (
+  usuario_id  UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  empresa_id  TEXT NOT NULL,
+  perfil      TEXT NOT NULL DEFAULT 'Sócio' CHECK (perfil IN ('Sócio','Financeiro','RH')),
+  PRIMARY KEY (usuario_id, empresa_id)
+);
+
+CREATE TABLE IF NOT EXISTS sessoes (
+  id           CHAR(64) PRIMARY KEY,                 -- SHA-256 do sid que vai no JWT
+  usuario_id   UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  site         TEXT NOT NULL CHECK (site IN ('cliente','painel')),
+  expira_em    TIMESTAMPTZ NOT NULL,
+  revogada_em  TIMESTAMPTZ,
+  ip           TEXT,
+  user_agent   TEXT,
+  criado_em    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS sessoes_usuario ON sessoes (usuario_id) WHERE revogada_em IS NULL;
+
+-- Convites (primeira senha) e redefinição de senha: só o SHA-256 do token fica salvo
+CREATE TABLE IF NOT EXISTS tokens (
+  hash        CHAR(64) PRIMARY KEY,
+  usuario_id  UUID NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+  tipo        TEXT NOT NULL CHECK (tipo IN ('convite','redefinicao')),
+  expira_em   TIMESTAMPTZ NOT NULL,
+  usado_em    TIMESTAMPTZ,
+  criado_em   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Dados de negócio: um registro por item das coleções do app (empresas, guias, documentos, tickets…).
+-- empresa_id é extraído do próprio registro e é a chave do isolamento entre clientes.
+CREATE TABLE IF NOT EXISTS registros (
+  escritorio_id   UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  colecao         TEXT NOT NULL,
+  id              TEXT NOT NULL,
+  empresa_id      TEXT,
+  dados           JSONB NOT NULL,
+  versao          INTEGER NOT NULL DEFAULT 1,
+  atualizado_em   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  atualizado_por  UUID,
+  PRIMARY KEY (escritorio_id, colecao, id)
+);
+CREATE INDEX IF NOT EXISTS registros_empresa ON registros (escritorio_id, empresa_id, colecao);
+
+CREATE TABLE IF NOT EXISTS arquivos (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id  UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  empresa_id     TEXT,
+  chave          TEXT NOT NULL,
+  tipo           TEXT NOT NULL,
+  tamanho        INTEGER NOT NULL,
+  criado_por     UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+  criado_em      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS acessos_log (
+  id          BIGSERIAL PRIMARY KEY,
+  em          TIMESTAMPTZ NOT NULL DEFAULT now(),
+  acao        TEXT NOT NULL,
+  usuario_id  UUID,
+  email       TEXT,
+  ip          TEXT,
+  detalhe     TEXT
+);
+CREATE INDEX IF NOT EXISTS acessos_log_em ON acessos_log (em DESC);
+
+-- Tempo real: toda gravação em "registros" avisa a API pelo canal "meufiscal".
+-- A API repassa o aviso, por SSE, só para quem pode ver aquele registro.
+CREATE OR REPLACE FUNCTION avisar_registro() RETURNS trigger AS $$
+DECLARE r RECORD;
+BEGIN
+  r := COALESCE(NEW, OLD);
+  PERFORM pg_notify('meufiscal', json_build_object(
+    't', 'registro', 'esc', r.escritorio_id, 'c', r.colecao, 'id', r.id,
+    'emp', r.empresa_id, 'op', lower(TG_OP), 'por', r.atualizado_por)::text);
+  RETURN NULL;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS registros_aviso ON registros;
+CREATE TRIGGER registros_aviso AFTER INSERT OR UPDATE OR DELETE ON registros
+  FOR EACH ROW EXECUTE FUNCTION avisar_registro();
+
+-- Mudança de acesso de um cliente (empresa liberada ou removida): a API reconecta a sessão dele.
+CREATE OR REPLACE FUNCTION avisar_acesso() RETURNS trigger AS $$
+DECLARE r RECORD;
+BEGIN
+  r := COALESCE(NEW, OLD);
+  PERFORM pg_notify('meufiscal', json_build_object('t', 'acesso', 'usuario', r.usuario_id)::text);
+  RETURN NULL;
+END $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS usuarios_empresas_aviso ON usuarios_empresas;
+CREATE TRIGGER usuarios_empresas_aviso AFTER INSERT OR UPDATE OR DELETE ON usuarios_empresas
+  FOR EACH ROW EXECUTE FUNCTION avisar_acesso();

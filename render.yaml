@@ -1,0 +1,47 @@
+# Blueprint do Render (plano gratuito). No Render: New → Blueprint → escolha o repositório.
+services:
+  - type: web
+    name: meufiscal-api
+    runtime: node
+    plan: free
+    rootDir: api
+    buildCommand: echo "sem dependências"
+    startCommand: npm start            # aplica o schema (idempotente) e sobe a API
+    healthCheckPath: /api/saude
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: JWT_SECRET_CLIENTE
+        generateValue: true
+      - key: JWT_SECRET_PAINEL
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_URL_DIRECT
+        sync: false
+      - key: ORIGENS_CLIENTE
+        sync: false
+      - key: ORIGENS_PAINEL
+        sync: false
+      - key: URL_PUBLICA_API
+        sync: false
+      - key: ARQUIVOS_DRIVER
+        value: s3
+      - key: S3_ENDPOINT
+        sync: false
+      - key: S3_REGIAO
+        value: auto
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_ACCESS_KEY_ID
+        sync: false
+      - key: S3_SECRET_ACCESS_KEY
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_REMETENTE
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

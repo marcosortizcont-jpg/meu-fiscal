@@ -1,0 +1,64 @@
+# Gerado por: node sites/build.mjs cliente --configurar
+# (Alternativa à Vercel. No Netlify, aponte o "Base directory" para sites/cliente.)
+
+[build]
+  base = "sites/cliente"
+  command = "node ../build.mjs cliente"
+  publish = "dist"
+
+[[redirects]]
+  from = "/"
+  to = "/dashboard"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/admin"
+  to = "/login"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/admin/*"
+  to = "/login"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/cadastro"
+  to = "/login?primeiro-acesso"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/api/*"
+  to = "https://meufiscal-api.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/login"
+  to = "/login.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/definir-senha"
+  to = "/login.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/dashboard"
+  to = "/app.html"
+  status = 200
+  force = true
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = '''default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com; connect-src 'self' https://meufiscal-api.onrender.com https://*.r2.cloudflarestorage.com; worker-src 'self' blob:; frame-src 'self' blob: https://*.r2.cloudflarestorage.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none''''
+    X-Frame-Options = '''DENY'''
+    X-Content-Type-Options = '''nosniff'''
+    Referrer-Policy = '''strict-origin-when-cross-origin'''
+    Permissions-Policy = '''camera=(), microphone=(), geolocation=(), payment=()'''

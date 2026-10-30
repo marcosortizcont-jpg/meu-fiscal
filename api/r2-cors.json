@@ -1,0 +1,8 @@
+[
+  {
+    "AllowedOrigins": ["https://meufiscal-cliente.vercel.app", "https://meufiscal-painel.vercel.app"],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedHeaders": ["content-type"],
+    "MaxAgeSeconds": 3600
+  }
+]

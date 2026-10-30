@@ -1,0 +1,7 @@
+node_modules/
+sites/*/dist/
+api/.env
+api/arquivos/
+.env.local
+.vercel
+.netlify
