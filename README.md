@@ -14,7 +14,7 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 | Site 2 · Painel Contábil | Vercel (ou Netlify) | `sites/painel` |
 | API única | Render (Web Service free) | `api` |
 | Banco | Neon (PostgreSQL free) | `api/db/schema.sql` |
-| Arquivos (XML, PDFs, comprovantes) | Cloudflare R2 (10 GB free) | — |
+| Arquivos (XML, PDFs, comprovantes) | No próprio banco nesta fase (até 4 MB cada); depois Neon Object Storage ou Cloudflare R2 | — |
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
@@ -53,7 +53,10 @@ Suba esta pasta para um repositório no GitHub (pode ser privado).
 
 Não precisa rodar nada no banco à mão: a API aplica `db/schema.sql` sozinha a cada início, e o schema é idempotente.
 
-### 3. Arquivos · Cloudflare R2
+### 3. Arquivos (opcional nesta fase)
+Na configuração inicial (`ARQUIVOS_DRIVER=banco`), os arquivos ficam no próprio PostgreSQL, com limite de 4 MB cada, e este passo pode ser pulado. Quando o volume crescer, migre para um armazenamento S3: troque para `ARQUIVOS_DRIVER=s3` e preencha as variáveis `S3_*`. Os arquivos antigos continuam abrindo, porque cada arquivo guarda onde foi salvo.
+
+#### Usando Cloudflare R2
 1. No painel da Cloudflare, abra **R2** e crie o bucket `meufiscal-arquivos`. A ativação do R2 pede um cartão, mas não há cobrança dentro da cota gratuita.
 2. Em **R2 → Manage API tokens**, crie um token com permissão *Object Read & Write* só nesse bucket. Anote:
    - Access Key ID → `S3_ACCESS_KEY_ID`

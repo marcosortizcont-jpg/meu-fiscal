@@ -300,18 +300,19 @@ export function registrarRotas(r, { db, hub }) {
     const tamanho = Number(ctx.corpo.tamanho);
     const empresaId = ctx.corpo.empresaId != null ? String(ctx.corpo.empresaId) : null;
     if (!TIPOS_ARQUIVO[tipo]) throw new ErroHttp(415, 'Tipo de arquivo não aceito.');
-    if (!Number.isInteger(tamanho) || tamanho <= 0 || tamanho > CONFIG.arquivos.maxBytes) throw new ErroHttp(413, 'O arquivo precisa ter até 20 MB.');
+    const limite = CONFIG.arquivos.driver === 'banco' ? CONFIG.arquivos.maxBytesBanco : CONFIG.arquivos.maxBytes;
+    if (!Number.isInteger(tamanho) || tamanho <= 0 || tamanho > limite) throw new ErroHttp(413, `O arquivo precisa ter até ${Math.round(limite / 1048576)} MB.`);
     if (u.ambiente === 'cliente' && !u.empresas.some(e => e.id === empresaId)) throw new ErroHttp(403, 'Você não tem acesso a esta empresa.');
     if (limitar(`arq:${u.id}`, 200, 3600).bloqueado) throw new ErroHttp(429, 'Limite de envios por hora atingido.');
     const id = crypto.randomUUID();
     const chave = `${u.escritorio_id}/${empresaId || 'escritorio'}/${id}.${TIPOS_ARQUIVO[tipo]}`;
-    await db.query('INSERT INTO arquivos (id, escritorio_id, empresa_id, chave, tipo, tamanho, criado_por) VALUES ($1,$2,$3,$4,$5,$6,$7)', [id, u.escritorio_id, empresaId, chave, tipo, tamanho, u.id]);
+    await db.query('INSERT INTO arquivos (id, escritorio_id, empresa_id, chave, tipo, tamanho, criado_por, local) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)', [id, u.escritorio_id, empresaId, chave, tipo, tamanho, u.id, CONFIG.arquivos.driver]);
     return { id, url: `/api/arquivos/${id}`, envio: urlEnvio({ id, chave, tipo, tamanho }) };
   });
 
   async function arquivoPermitido(u, id) {
     if (!/^[0-9a-f-]{36}$/.test(id)) throw new ErroHttp(404, 'Arquivo não encontrado.');
-    const [a] = await db.query('SELECT id, empresa_id, chave, tipo, tamanho, criado_por FROM arquivos WHERE id = $1 AND escritorio_id = $2', [id, u.escritorio_id]);
+    const [a] = await db.query('SELECT id, empresa_id, chave, tipo, tamanho, criado_por, local FROM arquivos WHERE id = $1 AND escritorio_id = $2', [id, u.escritorio_id]);
     if (!a) throw new ErroHttp(404, 'Arquivo não encontrado.');
     if (u.ambiente === 'cliente' && !u.empresas.some(e => e.id === a.empresa_id) && a.criado_por !== u.id) {
       // arquivo anexado pelo escritório a um registro desta empresa (ex.: PDF da guia, boleto da fatura)
@@ -323,23 +324,31 @@ export function registrarRotas(r, { db, hub }) {
   }
 
   r.put('/api/arquivos/:id/conteudo', async ctx => {
-    if (CONFIG.arquivos.driver !== 'disco') throw new ErroHttp(404, 'Rota não disponível.');
     const u = await exigir(ctx);
     const a = await arquivoPermitido(u, ctx.params.id);
+    if (!['disco', 'banco'].includes(a.local)) throw new ErroHttp(404, 'Rota não disponível.');
     if (a.criado_por !== u.id) throw new ErroHttp(403, 'Envio não autorizado.');
     const corpo = await lerCorpoBruto(ctx.req, CONFIG.arquivos.maxBytes);
     if (corpo.length !== a.tamanho) throw new ErroHttp(400, 'Tamanho do arquivo não confere.');
-    await gravarDisco(a, corpo);
+    if (a.local === 'banco') await db.query('INSERT INTO arquivos_conteudo (id, conteudo) VALUES ($1, $2) ON CONFLICT (id) DO UPDATE SET conteudo = EXCLUDED.conteudo', [a.id, corpo]);
+    else await gravarDisco(a, corpo);
     return { ok: true };
   }, { corpo: 'bruto' });
 
   r.get('/api/arquivos/:id', async ctx => {
     const u = await exigir(ctx);
     const a = await arquivoPermitido(u, ctx.params.id);
-    if (CONFIG.arquivos.driver === 's3') { ctx.res.writeHead(302, { Location: urlDownload(a) }).end(); return; }
+    // cada arquivo é lido de onde foi guardado: trocar o armazenamento depois não quebra os antigos
+    if (a.local === 's3') { ctx.res.writeHead(302, { Location: urlDownload(a) }).end(); return; }
+    const cab = { 'Content-Type': a.tipo, 'Content-Length': a.tamanho, 'Content-Disposition': 'inline', 'Cache-Control': 'private, max-age=300', 'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" };
+    if (a.local === 'banco') {
+      const [c] = await db.query('SELECT conteudo FROM arquivos_conteudo WHERE id = $1', [a.id]);
+      if (!c) throw new ErroHttp(404, 'Arquivo ainda não enviado.');
+      ctx.res.writeHead(200, cab).end(c.conteudo); return;
+    }
     const caminho = caminhoDisco(a);
     if (!fs.existsSync(caminho)) throw new ErroHttp(404, 'Arquivo ainda não enviado.');
-    ctx.res.writeHead(200, { 'Content-Type': a.tipo, 'Content-Length': a.tamanho, 'Content-Disposition': 'inline', 'Content-Security-Policy': "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; sandbox" });
+    ctx.res.writeHead(200, cab);
     fs.createReadStream(caminho).pipe(ctx.res);
   });
 

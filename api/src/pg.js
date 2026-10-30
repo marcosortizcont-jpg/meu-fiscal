@@ -34,6 +34,7 @@ const DECIMAIS = new Set([700, 701, 1700]);
 function converter(oid, v) {
   if (v === null) return null;
   if (oid === 16) return v === 't';
+  if (oid === 17) return Buffer.from(v.slice(2), 'hex');            // bytea
   if (INTEIROS.has(oid) || DECIMAIS.has(oid)) return Number(v);
   if (oid === 114 || oid === 3802) return JSON.parse(v);
   if (oid === 1184 || oid === 1114) {
@@ -59,6 +60,7 @@ function lerArray(s) {
 function serializar(v) {
   if (v === null || v === undefined) return null;
   if (v instanceof Date) return v.toISOString();
+  if (Buffer.isBuffer(v)) return '\\x' + v.toString('hex');
   if (Array.isArray(v)) return '{' + v.map(x => x === null ? 'NULL' : '"' + String(x).replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"').join(',') + '}';
   if (typeof v === 'object') return JSON.stringify(v);
   if (typeof v === 'boolean') return v ? 't' : 'f';

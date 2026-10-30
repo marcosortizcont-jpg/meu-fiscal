@@ -25,9 +25,11 @@ export const CONFIG = {
   urlApiPublica: (e.URL_PUBLICA_API || '').replace(/\/$/, ''),
   cookieSeguro: e.COOKIE_SEGURO ? e.COOKIE_SEGURO === '1' : PRODUCAO,
   arquivos: {
-    driver: e.ARQUIVOS_DRIVER || (e.S3_BUCKET ? 's3' : 'disco'),
+    // s3: Neon Object Storage, Cloudflare R2 ou outro S3 · banco: dentro do PostgreSQL (fase inicial) · disco: só desenvolvimento
+    driver: e.ARQUIVOS_DRIVER || (e.S3_BUCKET ? 's3' : (PRODUCAO ? 'banco' : 'disco')),
     pasta: e.ARQUIVOS_PASTA || path.resolve(process.cwd(), 'arquivos'),
     maxBytes: 20 * 1024 * 1024,
+    maxBytesBanco: Number(e.ARQUIVOS_MAX_MB_BANCO || 4) * 1024 * 1024,   // o proxy dos sites limita o corpo da requisição
     s3: { endpoint: (e.S3_ENDPOINT || '').replace(/\/$/, ''), regiao: e.S3_REGIAO || 'auto', bucket: e.S3_BUCKET, chave: e.S3_ACCESS_KEY_ID, segredo: e.S3_SECRET_ACCESS_KEY },
   },
   email: { resend: e.RESEND_API_KEY, remetente: e.EMAIL_REMETENTE || 'Meu Fiscal <nao-responda@meufiscal.com.br>' },
@@ -56,8 +58,9 @@ export function validarConfig() {
   if (PRODUCAO) {
     if (!CONFIG.urlApiPublica.startsWith('https://')) erros.push('URL_PUBLICA_API precisa ser https:// em produção.');
     [...CONFIG.origens.cliente, ...CONFIG.origens.painel].forEach(o => { if (!o.startsWith('https://')) erros.push('Origem sem https: ' + o); });
-    if (CONFIG.arquivos.driver === 'disco') erros.push('ARQUIVOS_DRIVER=disco não serve em produção (o disco do plano gratuito é apagado a cada deploy). Configure o S3/R2.');
+    if (CONFIG.arquivos.driver === 'disco') erros.push('ARQUIVOS_DRIVER=disco não serve em produção (o disco do plano gratuito é apagado a cada deploy). Use banco ou s3.');
   }
+  if (!['s3', 'banco', 'disco'].includes(CONFIG.arquivos.driver)) erros.push('ARQUIVOS_DRIVER precisa ser s3, banco ou disco.');
   if (CONFIG.arquivos.driver === 's3') {
     const s = CONFIG.arquivos.s3;
     if (!s.endpoint || !s.bucket || !s.chave || !s.segredo) erros.push('S3_ENDPOINT, S3_BUCKET, S3_ACCESS_KEY_ID e S3_SECRET_ACCESS_KEY são obrigatórios com ARQUIVOS_DRIVER=s3.');

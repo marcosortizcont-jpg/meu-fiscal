@@ -83,6 +83,14 @@ CREATE TABLE IF NOT EXISTS arquivos (
   criado_por     UUID REFERENCES usuarios(id) ON DELETE SET NULL,
   criado_em      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+-- onde cada arquivo está guardado (s3, banco ou disco): permite trocar o armazenamento sem perder os antigos
+ALTER TABLE arquivos ADD COLUMN IF NOT EXISTS local TEXT NOT NULL DEFAULT 's3';
+
+-- Conteúdo dos arquivos quando ARQUIVOS_DRIVER=banco (fase inicial, sem armazenamento externo)
+CREATE TABLE IF NOT EXISTS arquivos_conteudo (
+  id        UUID PRIMARY KEY REFERENCES arquivos(id) ON DELETE CASCADE,
+  conteudo  BYTEA NOT NULL
+);
 
 CREATE TABLE IF NOT EXISTS acessos_log (
   id          BIGSERIAL PRIMARY KEY,

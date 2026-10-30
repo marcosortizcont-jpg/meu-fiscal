@@ -44,7 +44,7 @@ export function urlEnvio(arq) {
       metodo: 'PUT', cabecalhos: { 'Content-Type': arq.tipo },
     };
   }
-  // modo disco: o envio passa pela própria API (mesma origem, via proxy do site)
+  // modos banco e disco: o envio passa pela própria API (mesma origem, via proxy do site)
   return { url: `/api/arquivos/${arq.id}/conteudo`, metodo: 'PUT', cabecalhos: { 'Content-Type': arq.tipo } };
 }
 
