@@ -45,4 +45,4 @@ services:
         value: marcosortiz.cont@gmail.com
       - key: IMPORTAR_DADOS_INICIAIS
         value: "1"
-      # Copiloto de IA gratuito: adicione GEMINI_API_KEY em Environment (chave criada em aistudio.google.com)
+      # Copiloto de IA gratuito: adicione GROQ_API_KEY em Environment (chave criada em console.groq.com, sem cartão)

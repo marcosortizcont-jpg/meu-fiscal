@@ -35,8 +35,15 @@ export const CONFIG = {
   // chave do cofre (certificados e senhas de portais): 32+ caracteres; sem ela os segredos não podem ser lidos
   cofreChave: e.COFRE_CHAVE || (PRODUCAO ? '' : 'chave-de-desenvolvimento-nao-usar-em-producao'),
   email: { resend: e.RESEND_API_KEY, remetente: e.EMAIL_REMETENTE || 'Meu Fiscal <nao-responda@meufiscal.com.br>' },
-  // IA do copiloto: Google Gemini (camada gratuita, chave em aistudio.google.com) ou, se preferir, a API da Anthropic
-  ia: { gemini: e.GEMINI_API_KEY, modeloGemini: e.IA_MODELO_GEMINI || 'gemini-2.5-flash', chave: e.ANTHROPIC_API_KEY, modelo: e.IA_MODELO || 'claude-sonnet-5-5' },
+  // IA do copiloto, na ordem de preferência:
+  //   Groq (gratuita, sem cartão, não treina com os dados: chave em console.groq.com)
+  //   Google Gemini (camada gratuita em aistudio.google.com; o Google pode usar os textos para melhorar produtos)
+  //   Anthropic (paga)
+  ia: {
+    groq: e.GROQ_API_KEY, modeloGroq: e.IA_MODELO_GROQ || 'llama-3.3-70b-versatile', modeloGroqVisao: e.IA_MODELO_GROQ_VISAO || 'meta-llama/llama-4-scout-17b-16e-instruct',
+    gemini: e.GEMINI_API_KEY, modeloGemini: e.IA_MODELO_GEMINI || 'gemini-flash-latest',
+    chave: e.ANTHROPIC_API_KEY, modelo: e.IA_MODELO || 'claude-sonnet-5-5',
+  },
   // WhatsApp por QR code (WhatsApp Web). Desligue com WHATSAPP=0.
   whatsapp: { ativo: e.WHATSAPP !== '0' },
 };

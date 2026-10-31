@@ -1,4 +1,4 @@
-// Serviços externos opcionais: e-mail transacional (Resend) e IA (Google Gemini ou Anthropic). Sem chave, a API continua funcionando.
+// Serviços externos opcionais: e-mail transacional (Resend) e IA (Groq, Google Gemini ou Anthropic). Sem chave, a API continua funcionando.
 import { CONFIG } from './config.js';
 
 export async function enviarEmail({ para, assunto, html, texto }) {
@@ -28,7 +28,7 @@ export function emailLink({ nome, titulo, texto, rotulo, link, rodape }) {
 /* IA: recebe a conversa no formato do app ({role:'user'|'assistant', content}) e devolve o texto.
    A primeira mensagem do usuário traz as regras e os dados da empresa e vira a instrução de sistema. */
 const erroIA = (msg, status, code) => Object.assign(new Error(msg), { status, code });
-export const iaDisponivel = () => !!(CONFIG.ia.gemini || CONFIG.ia.chave);
+export const iaDisponivel = () => !!(CONFIG.ia.groq || CONFIG.ia.gemini || CONFIG.ia.chave);
 
 function prepararTurnos(mensagens) {
   const msgs = (Array.isArray(mensagens) ? mensagens : []).filter(m => m && ['user', 'assistant'].includes(m.role) && typeof m.content === 'string');
@@ -76,6 +76,52 @@ async function perguntarGemini(sistema, turnos, imagens) {
   return texto;
 }
 
+/* Groq: API no formato da OpenAI, camada gratuita sem cartão. Os modelos mudam com frequência,
+   então, se o configurado sair do ar, a API escolhe outro da lista oficial da conta. */
+const GROQ = 'https://api.groq.com/openai/v1';
+let groqModelos = null;   // cache da lista de modelos da conta
+async function groqListar() {
+  if (groqModelos && groqModelos.ate > Date.now()) return groqModelos.ids;
+  try {
+    const r = await fetch(GROQ + '/models', { headers: { Authorization: `Bearer ${CONFIG.ia.groq}` } });
+    const j = await r.json(); const ids = (j.data || []).filter(m => m.active !== false).map(m => m.id);
+    groqModelos = { ids, ate: Date.now() + 6 * 3600 * 1000 }; return ids;
+  } catch { return []; }
+}
+async function groqEscolher(visao) {
+  const ids = await groqListar();
+  const pref = visao ? [CONFIG.ia.modeloGroqVisao, 'meta-llama/llama-4-maverick-17b-128e-instruct'] : [CONFIG.ia.modeloGroq, 'openai/gpt-oss-120b', 'llama-3.1-8b-instant'];
+  const ok = pref.find(m => ids.includes(m));
+  if (ok) return ok;
+  return visao ? ids.find(i => /llama-4|vision|scout|maverick/i.test(i)) : ids.find(i => /llama|gpt-oss|qwen|gemma/i.test(i) && !/guard|whisper|tts|prompt/i.test(i));
+}
+async function perguntarGroq(sistema, turnos, imagens) {
+  const ims = imagensValidas(imagens);
+  const montar = comImagens => [{ role: 'system', content: (REGRA_SISTEMA + '\n\n' + sistema).slice(0, 60000) }, ...turnos.map((t, i) => {
+    const ultimo = i === turnos.length - 1 && t.role === 'user';
+    if (ultimo && comImagens) return { role: 'user', content: [{ type: 'text', text: t.content }, ...ims.map(im => ({ type: 'image_url', image_url: { url: `data:${im.tipo};base64,${im.base64}` } }))] };
+    return { role: t.role, content: ultimo && ims.length && !comImagens ? t.content + '\n\n[O cliente enviou imagem(ns) que não puderam ser analisadas agora; diga que a equipe vai conferir.]' : t.content };
+  })];
+  const chamar = (modelo, comImagens) => fetch(GROQ + '/chat/completions', {
+    method: 'POST', headers: { Authorization: `Bearer ${CONFIG.ia.groq}`, 'content-type': 'application/json' },
+    body: JSON.stringify({ model: modelo, messages: montar(comImagens), temperature: 0.3, max_tokens: 1200 }),
+  }).then(async r => ({ r, j: await r.json().catch(() => ({})) }));
+  const visao = ims.length > 0;
+  let modelo = visao ? CONFIG.ia.modeloGroqVisao : CONFIG.ia.modeloGroq;
+  let { r, j } = await chamar(modelo, visao);
+  const modeloInvalido = () => [400, 404].includes(r.status) && /model|decommission|not found|does not exist|image/i.test(JSON.stringify(j));
+  if (modeloInvalido()) {
+    const outro = await groqEscolher(visao);
+    if (outro && outro !== modelo) ({ r, j } = await chamar(modelo = outro, visao));
+    if (visao && modeloInvalido()) { const texto = await groqEscolher(false); if (texto) ({ r, j } = await chamar(modelo = texto, false)); }
+  }
+  if (r.status === 429) throw erroIA('Muitas perguntas seguidas para a IA gratuita. Tente de novo em um minuto.', 429, 'rate_limited');
+  if (!r.ok) { console.error('[ia:groq]', r.status, modelo, JSON.stringify(j).slice(0, 400)); throw erroIA('A IA não respondeu agora.', 502); }
+  const texto = String(j.choices?.[0]?.message?.content || '').replace(/<think>[\s\S]*?<\/think>/g, '').trim();
+  if (!texto) throw erroIA('A IA não conseguiu formular uma resposta.', 502);
+  return texto;
+}
+
 async function perguntarAnthropic(sistema, turnos, imagens) {
   const ultimo = turnos.at(-1);
   const ims = imagensValidas(imagens);
@@ -94,5 +140,6 @@ async function perguntarAnthropic(sistema, turnos, imagens) {
 export async function perguntarIA({ mensagens, imagens = [] }) {
   if (!iaDisponivel()) throw erroIA('IA não configurada.', 503, 'sampling_disabled');
   const { sistema, turnos } = prepararTurnos(mensagens);
+  if (CONFIG.ia.groq) return perguntarGroq(sistema, turnos, imagens);
   return CONFIG.ia.gemini ? perguntarGemini(sistema, turnos, imagens) : perguntarAnthropic(sistema, turnos, imagens);
 }

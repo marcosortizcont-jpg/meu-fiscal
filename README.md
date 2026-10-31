@@ -55,12 +55,14 @@ Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site
 - **Controle de obrigações** (antiga Apuração e guias): lista única de obrigações e guias com pesquisa, filtros (cliente, imposto, competência, vencimento, situação, responsável, departamento) e **Imprimir / salvar PDF**. A apuração do DAS continua na segunda aba. O antigo menu Obrigações agora se chama **Matriz e catálogo**.
 - **Atendimento único:** conversas do portal e do WhatsApp na mesma caixa, com filtros (aguardando, comigo, copiloto, WhatsApp) e busca. O copiloto responde primeiro e passa para a equipe quando a pergunta exige análise ou quando o cliente pede um atendente.
 
-#### Copiloto com IA gratuita (Google Gemini)
-1. Entre em **aistudio.google.com** com uma conta Google do escritório → **Get API key** → **Create API key**.
-2. No Render: serviço **meufiscal-api** → **Environment** → **Add Environment Variable** → nome `GEMINI_API_KEY`, valor = a chave. Salve (o Render reinicia sozinho).
-3. Não cole a chave em chats nem no GitHub.
+#### Copiloto com IA gratuita (Groq)
+1. Entre em **console.groq.com** e crie a conta (Google ou e-mail). **Não pede cartão de crédito.**
+2. Menu **API Keys** → **Create API Key** → dê um nome (ex.: Meu Fiscal) → copie a chave (começa com `gsk_`).
+3. No Render: serviço **meufiscal-api** → **Environment** → **Add Environment Variable** → nome `GROQ_API_KEY`, valor = a chave → **Save**. Depois, **Manual Deploy → Deploy latest commit**.
+4. Não cole a chave em chats nem no GitHub.
 
-A camada gratuita do Gemini tem limite de pedidos por minuto e por dia e **o Google pode usar o conteúdo para melhorar os produtos dele**. Para dados sensíveis de clientes em produção, considere ativar o faturamento da chave (camada paga), que não usa os dados para treino.
+A camada gratuita da Groq tem limite de pedidos por minuto e por dia (quando estoura, a conversa vai para a equipe) e não usa as conversas para treinar modelos. Fotos são analisadas por um modelo com visão; se ele não estiver disponível, a equipe confere a imagem.
+Alternativa: `GEMINI_API_KEY` (Google AI Studio, gratuito sem ativar faturamento). Se o Google pedir para ativar faturamento ou comprar créditos, não é necessário para a camada gratuita, e prefira a Groq.
 
 #### WhatsApp por QR code
 1. No Render: **Settings → Build Command** = `npm install --omit=dev --no-audit --no-fund` e **Health Check Path** = `/api/vivo`. Depois, **Manual Deploy → Deploy latest commit**.

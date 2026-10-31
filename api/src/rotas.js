@@ -134,7 +134,7 @@ export function registrarRotas(r, { db, hub }) {
       usuario: { id: u.id, nome: u.nome, email: u.email, ambiente: u.ambiente, papel: u.papel, funcao: u.funcao, permissoes: u.perm },
       modulos: u.ambiente === 'equipe' ? MODULOS : undefined, funcoes: u.ambiente === 'equipe' ? Object.keys(FUNCOES) : undefined,
       site: u.site, escritorio: esc, empresas: u.empresas, urls: { cliente: CONFIG.origens.cliente[0], painel: CONFIG.origens.painel[0] },
-      recursos: { ia: !!(CONFIG.ia.gemini || CONFIG.ia.chave), arquivos: CONFIG.arquivos.driver },
+      recursos: { ia: !!(CONFIG.ia.groq || CONFIG.ia.gemini || CONFIG.ia.chave), arquivos: CONFIG.arquivos.driver },
     };
   });
 
