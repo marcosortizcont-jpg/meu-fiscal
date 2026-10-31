@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Meu Fiscal · Contabilidade online para MEI e Simples Nacional</title>
-<meta name="description" content="Contabilidade online com contador responsável ({{crc}}): impostos calculados, guias no portal, emissão de NFS-e, folha e um copiloto de IA 24 horas. Para MEI e empresas do Simples Nacional.">
+<meta name="description" content="Contabilidade online com contador responsável: impostos calculados, guias no portal, emissão de NFS-e, folha e um copiloto de IA 24 horas. Para MEI e empresas do Simples Nacional.">
 <meta name="theme-color" content="#0F172A">
 <link rel="canonical" href="{{SITE_URL}}/">
 <meta property="og:type" content="website">
@@ -164,7 +164,7 @@
         <p class="text-xs font-semibold uppercase tracking-wider text-esmeralda-escuro">Quem cuida da sua empresa</p>
         <div class="mt-4 flex items-center gap-4">
           <span class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-marinho text-lg font-bold text-white">{{INICIAIS}}</span>
-          <div><p class="text-lg font-bold text-marinho">{{contador}}</p><p class="text-sm text-slate-500">Contador · {{crc}}</p></div>
+          <div><p class="text-lg font-bold text-marinho">{{contador}}</p><p class="text-sm text-slate-500">Contador{{CRC_PONTO}}</p></div>
         </div>
         <p class="mt-5 text-sm leading-relaxed text-slate-600">Cada guia, folha e declaração é conferida por um contador registrado no Conselho Regional de Contabilidade. Quando a dúvida é mais complexa, você fala com gente, não com robô.</p>
         <a href="https://wa.me/{{whatsapp}}" target="_blank" rel="noopener" class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-esmeralda-escuro hover:underline">Falar com o contador no WhatsApp →</a>
@@ -355,7 +355,7 @@
       </details>
       <details class="faq group p-5 sm:p-6">
         <summary>O sistema substitui o contador?</summary>
-        <div><p>Não. O Meu Fiscal é a ferramenta que deixa o trabalho mais rápido e transparente, mas toda apuração, folha e declaração é feita e revisada por um contador registrado no CRC ({{crc}}), que é o responsável técnico pela sua empresa. A IA ajuda nas dúvidas do dia a dia e encaminha para o contador tudo que precisa de análise profissional.</p></div>
+        <div><p>Não. O Meu Fiscal é a ferramenta que deixa o trabalho mais rápido e transparente, mas toda apuração, folha e declaração é feita e revisada por um contador registrado no CRC{{CRC_PAREN}}, que é o responsável técnico pela sua empresa. A IA ajuda nas dúvidas do dia a dia e encaminha para o contador tudo que precisa de análise profissional.</p></div>
       </details>
       <details class="faq group p-5 sm:p-6">
         <summary>Atendem empresas de qualquer cidade?</summary>
@@ -404,7 +404,7 @@
   </div>
   <div class="border-t border-white/10">
     <div class="mx-auto max-w-7xl px-4 py-6 text-xs leading-relaxed sm:px-6 lg:px-8">
-      <p>Serviços contábeis prestados por {{escritorio}}, sob responsabilidade técnica de {{contador}}, contador registrado no {{crc}}. "Meu Fiscal" é a plataforma de atendimento do escritório.</p>
+      <p>Serviços contábeis prestados por {{escritorio}}, sob responsabilidade técnica de {{contador}}, contador{{CRC_REG}}. "Meu Fiscal" é a plataforma de atendimento do escritório.</p>
       <p class="mt-2">© {{ANO}} Meu Fiscal. Os valores dos impostos são pagos diretamente aos órgãos públicos e não estão incluídos na mensalidade.</p>
     </div>
   </div>

@@ -45,16 +45,18 @@ export function montarLanding(tpl, c, { siteUrl, painelUrl }) {
     description: 'Contabilidade online para MEI e empresas do Simples Nacional.',
     telephone: c.telefone, email: c.email, areaServed: 'BR',
     address: { '@type': 'PostalAddress', addressLocality: String(c.cidade || '').split('/')[0], addressRegion: String(c.cidade || '').split('/')[1] || undefined, addressCountry: 'BR' },
-    founder: { '@type': 'Person', name: c.contador, jobTitle: 'Contador', identifier: c.crc },
+    founder: { '@type': 'Person', name: c.contador, jobTitle: 'Contador', ...(c.crc ? { identifier: c.crc } : {}) },
     makesOffer: (c.planos || []).map(p => ({ '@type': 'Offer', name: p.nome, price: p.preco, priceCurrency: 'BRL' })),
   };
   const clientes = Number(c.clientesAtivos) > 0
     ? `<li class="flex items-center gap-2"><svg viewBox="0 0 24 24" class="h-5 w-5 text-esmeralda" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 21h18M5 21V8l7-5 7 5v13M9 21v-6h6v6"/></svg>Mais de ${esc(c.clientesAtivos)} empresas atendidas</li>`
-    : `<li class="flex items-center gap-2"><svg viewBox="0 0 24 24" class="h-5 w-5 text-esmeralda" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 7l8 4 8-4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/></svg>Contador responsável ${esc(c.crc)}</li>`;
+    : `<li class="flex items-center gap-2"><svg viewBox="0 0 24 24" class="h-5 w-5 text-esmeralda" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 4 7l8 4 8-4z"/><path d="M4 12l8 4 8-4M4 17l8 4 8-4"/></svg>Contador responsável${c.crc ? ' ' + esc(c.crc) : ' pela sua empresa'}</li>`;
   const vars = {
     ...c, SITE_URL: siteUrl, PAINEL_URL: painelUrl, ANO: new Date().getFullYear(),
     CTA_TOPO: c.aberturaGratis ? 'Abrir empresa grátis' : 'Mudar de contabilidade',
     INICIAIS: iniciais(c.contador),
+    // CRC é opcional: com "crc" vazio no JSON, a página não mostra o registro em lugar nenhum
+    CRC_PONTO: c.crc ? ' · ' + c.crc : '', CRC_PAREN: c.crc ? ' (' + c.crc + ')' : '', CRC_REG: c.crc ? ' registrado no ' + c.crc : '', CRC_VIRG: c.crc ? ', ' + c.crc : '',
   };
   return tpl
     .replace('<!--@JSONLD-->', `<script type="application/ld+json">${JSON.stringify(jsonld).replace(/</g, '\\u003c')}</script>`)
