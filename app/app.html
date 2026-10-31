@@ -319,16 +319,44 @@ td.r,th.r{text-align:right}
   .cols-2-1{grid-template-columns:minmax(0,1fr)}
   .inbox{grid-template-columns:minmax(0,1fr)}
 }
+/* Carteira 360°, catálogo e equipe */
+.grid-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}
+.chips-lista{display:flex;flex-wrap:wrap;gap:6px 10px;margin-top:8px}
+.lista-check{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:6px 14px;max-height:260px;overflow:auto;padding:10px;border:1px solid var(--line);border-radius:8px;margin-top:6px}
+.rep-lista{display:flex;flex-direction:column;gap:8px}
+.linha-rep{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) minmax(0,1.2fr) minmax(0,1.4fr) auto;gap:8px;align-items:center}
+.linha-rep[data-rep=socio]{grid-template-columns:minmax(0,2fr) minmax(0,1.2fr) 110px auto auto}
+.linha-rep input{min-width:0}
+.tabs button:disabled{opacity:.45;cursor:not-allowed}
+.matriz-perm td,.matriz-perm th{white-space:nowrap}
+.page-head .eyebrow{display:block;margin-bottom:2px}
+@media (max-width:820px){
+  .linha-rep,.linha-rep[data-rep=socio]{grid-template-columns:minmax(0,1fr) minmax(0,1fr);padding:10px;border:1px solid var(--line);border-radius:8px}
+  .linha-rep input[name=socio_nome],.linha-rep input[name=ct_nome]{grid-column:1/-1}
+  .tabela-cart thead,.tabela-cofre thead{display:none}
+  .tabela-cart tr,.tabela-cofre tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:6px 12px;padding:12px 0;border-bottom:1px solid var(--line)}
+  .tabela-cart td,.tabela-cofre td{display:block;padding:0;border:0}
+  .tabela-cart td:first-child,.tabela-cart td:last-child,.tabela-cofre td:first-child,.tabela-cofre td:last-child{grid-column:1/-1}
+  .tabela-cart td[data-r]::before,.tabela-cofre td[data-r]::before{content:attr(data-r);display:block;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600}
+  .tabela-cart td.r .actions,.tabela-cofre td.r .actions{justify-content:flex-start!important}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+}
+@media (prefers-reduced-motion:reduce){.side,.menu-fundo{transition:none!important}}
+/* Menu lateral retrátil (celular e tablet em pé) */
+.btn-menu{display:none;align-items:center;justify-content:center;width:40px;height:40px;margin-left:-6px;border:0;border-radius:10px;background:transparent;color:var(--navy);cursor:pointer;flex:none}
+.btn-menu svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}
+.btn-menu:hover{background:var(--surface-2)}
+.menu-fundo{display:none}
+html.sem-rolagem,html.sem-rolagem body{overflow:hidden}
 @media (max-width:820px){
   .app{grid-template-columns:minmax(0,1fr)}
-  .side{position:static;height:auto;padding-block:12px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));gap:10px}
-  .nav{flex-direction:row;overflow-x:auto;gap:4px;padding-bottom:4px}
-  .nav-label{display:none}
-  .nav a{white-space:nowrap;background:rgba(148,163,184,.08)}
-  .nav a[aria-current="page"]::before{left:12px;right:12px;top:auto;bottom:0;width:auto;height:3px;border-radius:3px 3px 0 0}
-  .side-foot{display:none}
+  .btn-menu{display:inline-flex}
+  .side{position:fixed;top:0;bottom:0;left:0;z-index:60;width:80vw;max-width:340px;height:100dvh;overflow-y:auto;overscroll-behavior:contain;transform:translateX(-104%);transition:transform .28s cubic-bezier(.2,.8,.2,1);box-shadow:none;padding-top:max(20px,env(safe-area-inset-top,0px));padding-left:max(16px,env(safe-area-inset-left,0px))}
+  .app.menu-aberto .side{transform:translateX(0);box-shadow:0 20px 60px rgba(2,6,23,.45)}
+  .menu-fundo{display:block;position:fixed;inset:0;z-index:55;background:rgba(15,23,42,.42);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);opacity:0;pointer-events:none;transition:opacity .28s}
+  .app.menu-aberto .menu-fundo{opacity:1;pointer-events:auto}
   .topbar,.content{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
-  .topbar{position:static}
+  .topbar{position:sticky;top:0;z-index:20;gap:8px}
   .comp-block,.dept-head{grid-template-columns:minmax(0,1fr)}
   .dept-head{display:none}
   .comp-block .dept-col::before{content:attr(data-dept);display:block;font-size:.68rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;margin-bottom:4px}
@@ -426,6 +454,7 @@ function anexoEfetivo(e,comp){
 }
 function apurar(e,comp){
   const receita=receitaMes(e.id,comp);
+  if(e.regime!=='MEI'&&e.regime!=='SN') return {receita, valor:null, aliq:null, anexo:null, rbt12:null, foraSimples:true};
   if(e.regime==='MEI') return {receita, valor:DAS_MEI[e.meiAtividade||'servicos'], aliq:null, anexo:null, rbt12:null};
   const rb=rbt12De(e,comp); const anexo=anexoEfetivo(e,comp); const aliq=aliqEfetiva(rb.valor,anexo);
   return {receita, rbt12:rb.valor, proporcional:rb.proporcional, anexo, aliq, faixa:faixaDe(rb.valor,anexo)+1, valor: receita==null?null:r2(receita*aliq)};
@@ -438,7 +467,7 @@ function vencPadrao(tipo,comp){return ajustaVenc(addMes(comp,1)+'-20',VENC_REGRA
 const DEPTO_DA_GUIA={'DAS':'Fiscal','DAS-MEI':'Fiscal','ISS':'Fiscal','Parcelamento':'Fiscal','FGTS':'Pessoal','DCTFWeb':'Pessoal','Outra':'Contábil'};
 
 /* Matriz de obrigações por regime e quadro de pessoal */
-function obrigacoesDevidas(e,comp,funcs){
+function obrigacoesDevidasFixas(e,comp,funcs){
   const temFunc=(funcs||S.funcionarios).some(f=>f.empresaId===e.id&&!f.desligado);
   const m=+comp.slice(5,7), prox=addMes(comp,1); const out=[];
   if(e.regime==='MEI'){
@@ -459,7 +488,7 @@ function obrigacoesDevidas(e,comp,funcs){
 }
 
 /* ===================== Estado e persistência ===================== */
-const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria'];
+const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes'];
 const S={}; COLS.forEach(c=>S[c]=[]);
 const CAP={db:null,user:null,sample:null,assets:null,downloads:null};
 const ME={id:null,nome:'',canEdit:true};
@@ -674,7 +703,7 @@ function motor(eid,publico){
       if(r>lim*1.2)add('crit',e,'Limite',`Faturamento de ${brl(r)} passou 20% do limite do MEI: desenquadramento retroativo a janeiro`,publico==='c'?'c-dash':'a-carteira');
       else if(r>lim)add('crit',e,'Limite',`Faturamento de ${brl(r)} passou o limite do MEI (${brl(lim)})`,publico==='c'?'c-dash':'a-carteira');
       else if(r>lim*0.8)add('warn',e,'Limite',`Faturamento já usa ${pct(r/lim)} do limite anual do MEI`,publico==='c'?'c-dash':'a-carteira');}
-    else{const rb=rbt12De(e,compAtual()).valor;
+    else if(e.regime==='SN'){const rb=rbt12De(e,compAtual()).valor;
       if(rb>LIMITE_SN)add('crit',e,'Limite','Receita dos últimos 12 meses acima de R$ 4,8 milhões: exclusão do Simples',publico==='c'?'c-dash':'a-carteira');
       else if(rb>SUBLIMITE)add('warn',e,'Limite','Receita acima do sublimite de R$ 3,6 milhões: ICMS e ISS fora do DAS',publico==='c'?'c-dash':'a-carteira');}
   });
@@ -863,7 +892,7 @@ const NAV_C=[
   ['c-nfse','Notas de serviço',['Sócio','Financeiro']],['c-envio','Envio mensal',['Sócio','Financeiro']],['c-docs','Documentos da empresa',['Sócio','Financeiro','RH']],
   ['c-dp','Pessoal e folha',['Sócio','RH']],['c-cert','Certificado digital',['Sócio','Financeiro']],['c-fin','Plano e faturas',['Sócio','Financeiro']],
   ['c-ia','Copiloto contábil',['Sócio','Financeiro','RH'],true],['c-dem','Solicitações',['Sócio','Financeiro','RH'],true],['c-priv','Privacidade',['Sócio','Financeiro','RH']]];
-const NAV_A=[['a-home','Central de alertas'],['a-carteira','Carteira de clientes'],['a-obrig','Obrigações'],['a-guias','Apuração e guias'],['a-docs','Documentos'],['a-chat','Atendimento'],['a-fiscal','Monitor fiscal'],['a-cert','Certificados'],['a-hon','Honorários'],['a-dem','Demandas'],['a-equipe','Equipe e auditoria'],['a-config','Configurações']];
+const NAV_A=[['a-home','Central de alertas'],['a-carteira','Carteira de clientes'],['a-obrig','Obrigações'],['a-guias','Apuração e guias'],['a-docs','Documentos'],['a-chat','Atendimento'],['a-fiscal','Monitor fiscal'],['a-cert','Certificados'],['a-hon','Honorários'],['a-dem','Demandas'],['a-equipe','Equipe e permissões'],['a-config','Configurações']];
 function empresasVisiveis(){
   if(ME.canEdit) return S.empresas.filter(e=>e.status!=='inativo');
   return S.empresas.filter(e=>e.status!=='inativo'&&(e.acessos||[]).some(a=>a.uid===ME.id));
@@ -881,7 +910,7 @@ function lerHash(){
     if(h.startsWith('a-')&&!ME.canEdit){UI.modo='cliente';UI.view='c-dash'}else{UI.modo=h.startsWith('a-')?'painel':'cliente';UI.view=h}
   }
 }
-window.addEventListener('hashchange',()=>{lerHash();render();window.scrollTo(0,0)});
+window.addEventListener('hashchange',()=>{UI.menu=false;document.documentElement.classList.remove('sem-rolagem');lerHash();render();window.scrollTo(0,0)});
 
 /* ===================== Render ===================== */
 let pendRender=false, rTimer=null;
@@ -900,11 +929,13 @@ function renderInterno(){
   const vis=empresasVisiveis();
   if(!vis.find(e=>e.id===UI.empresaId)) UI.empresaId=vis[0]?.id||null;
   if(UI.modo==='cliente'&&!podeVer(UI.view)){UI.view=NAV_C.find(n=>n[2].includes(perfilAtual()))[0]}
-  const html=`<div class="app">${sidebar()}<div class="main">${topbar()}<main class="content" id="main">${conteudo()}</main></div></div>`;
+  const html=`<div class="app ${UI.menu?'menu-aberto':''}"><div class="menu-fundo" data-act="menu-fechar"></div>${sidebar()}<div class="main">${topbar()}<main class="content" id="main">${conteudo()}</main></div></div>`;
   const vivos=[...document.querySelectorAll('[data-live][id]')].map(el=>({id:el.id,v:el.value,f:document.activeElement===el,s:el.selectionStart}));
-  const formAdm=document.querySelector('form[data-form="admissao"]');
+  // formulários em edição sobrevivem às atualizações em tempo real (mesmo formulário, mesmo registro)
+  const chaveF=f=>f.dataset.form+'|'+(f.dataset.id||'')+'|'+(f.dataset.emp||'');
+  const emEdicao=new Map([...document.querySelectorAll('form[data-form="admissao"], form[data-preservar]')].map(f=>[chaveF(f),f]));
   const sy=window.scrollY; root.innerHTML=html; window.scrollTo(0,sy);
-  if(formAdm){const nf=document.querySelector('form[data-form="admissao"]');if(nf)nf.replaceWith(formAdm)}
+  if(emEdicao.size)document.querySelectorAll('form[data-form="admissao"], form[data-preservar]').forEach(nf=>{const v=emEdicao.get(chaveF(nf));if(v)nf.replaceWith(v)});
   vivos.forEach(x=>{const el=document.getElementById(x.id);if(!el||el.disabled)return;if(x.v&&!el.value)el.value=x.v;if(x.f){el.focus();try{el.setSelectionRange(x.s,x.s)}catch(e){}}});
   pos();
 }
@@ -935,9 +966,9 @@ function sidebar(){
 function topbar(){
   const vis=empresasVisiveis(); const e=empAtual();
   const sel=vis.length?`<select id="emp-sel" data-change="emp-sel" aria-label="Empresa">${vis.map(x=>`<option value="${x.id}" ${x.id===UI.empresaId?'selected':''}>${esc(x.fantasia||x.razao)} · ${fmtCNPJ(x.cnpj)}</option>`).join('')}</select>`:'';
-  if(UI.modo==='painel') return `<div class="topbar"><div class="grow"><span class="eyebrow">Painel contábil</span></div><span class="small muted">${esc(ME.nome||'')}</span></div>`;
-  return `<div class="topbar"><div class="company-pick grow"><span class="eyebrow">Empresa</span>${sel}</div>
-    ${e?`<span>${pill(e.regime==='MEI'?'MEI':'Simples Nacional','acc')}</span>`:''}
+  if(UI.modo==='painel') return `<div class="topbar">${botaoMenu()}<div class="grow"><span class="eyebrow">Painel contábil</span></div><span class="small muted">${esc(ME.nome||'')}</span></div>`;
+  return `<div class="topbar">${botaoMenu()}<div class="company-pick grow"><span class="eyebrow">Empresa</span>${sel}</div>
+    ${e?`<span>${pill(nomeRegime(e),'acc')}</span>`:''}
     ${ME.canEdit?`<label class="small muted" style="display:flex;gap:6px;align-items:center">Perfil<select data-change="perfil" style="width:auto">${['Sócio','Financeiro','RH'].map(p=>`<option ${p===UI.perfil?'selected':''}>${p}</option>`).join('')}</select></label>`:`<span class="tag">${esc(perfilAtual())}</span>`}
   </div>`;
 }
@@ -1025,6 +1056,7 @@ function vDash(e){
   ${lim.html}`;
 }
 function resumoLimite(e){
+  if(e.regime!=='MEI'&&e.regime!=='SN') return '';
   const ca=compAtual(), ano=ca.slice(0,4);
   if(e.regime==='MEI'){
     const lim=limiteMEIAno(e,ano), r=receitaAno(e.id,ano);
@@ -1489,7 +1521,7 @@ function contextoIA(e){
   const itens=e.checklist||[]; const env=S.checklist.filter(x=>x.empresaId===e.id&&x.comp===ant);
   const pend=itens.filter(it=>{const x=env.find(z=>z.itemId===it.id);return !x||x.status==='recusado'}).map(i=>i.nome);
   const c=certDe(e.id);
-  return {hoje:hoje(),empresa:{nome:e.fantasia||e.razao,regime:e.regime==='MEI'?'MEI':'Simples Nacional',anexo_atual:e.regime==='SN'?anexoEfetivo(e,ca):null,fator_r:!!e.fatorR,atividade:e.atividade,cnae:e.cnae,municipio:e.municipio+'/'+e.uf,mei_atividade:e.regime==='MEI'?DAS_MEI_NOME[e.meiAtividade]:null,funcionarios_ativos:S.funcionarios.filter(f=>f.empresaId===e.id&&!f.desligado).length},
+  return {hoje:hoje(),empresa:{nome:e.fantasia||e.razao,regime:nomeRegime(e),anexo_atual:e.regime==='SN'?anexoEfetivo(e,ca):null,fator_r:!!e.fatorR,atividade:e.atividade,cnae:e.cnae,municipio:e.municipio+'/'+e.uf,mei_atividade:e.regime==='MEI'?DAS_MEI_NOME[e.meiAtividade]:null,funcionarios_ativos:S.funcionarios.filter(f=>f.empresaId===e.id&&!f.desligado).length},
     faturamento:{ano_corrente:receitaAno(e.id,ano),limite_mei_ano:e.regime==='MEI'?limiteMEIAno(e,ano):null,rbt12:e.regime==='SN'?r2(rbt12De(e,ca).valor):null,aliquota_efetiva_mes_atual:e.regime==='SN'?r2(ap.aliq*100)+'%':null,faturamento_mes_anterior:receitaMes(e.id,ant),das_estimado_mes_anterior:apA.valor},
     guias, documentos_pendentes_mes_anterior:pend, certificado_validade:c?c.validade:null, mensalidade_em_atraso:empresaBloqueada(e)};
 }
@@ -1613,7 +1645,7 @@ function aHome(){
 }
 
 /* ===================== Painel: Carteira ===================== */
-function aCarteira(){
+function aCarteiraAntiga(){
   const es=S.empresas.slice().sort((a,b)=>(a.fantasia||a.razao).localeCompare(b.fantasia||b.razao));
   const carga={}; S.operadores.forEach(o=>carga[o.id]=es.filter(e=>e.operadorId===o.id).length);
   return `${head('Carteira de clientes','Cadastro, regime tributário, plano e responsável de cada empresa.',`<button class="btn" data-act="distribuir">Distribuir clientes sem responsável</button><button class="btn primary" data-act="nova-empresa">Nova empresa</button>`)}
@@ -1664,7 +1696,7 @@ function modalAcessos(e){
 }
 
 /* ===================== Painel: Obrigações ===================== */
-function aObrig(){
+function aObrigMatriz(){
   const comp=compDe('obrig');
   const es=S.empresas.filter(e=>e.status!=='inativo');
   const obs=S.obrigacoes.filter(o=>o.comp===comp);
@@ -1680,7 +1712,7 @@ function travasFechamento(e,comp){
   if(!S.obrigacoes.some(o=>o.empresaId===e.id&&o.comp===comp)) T.push('Obrigações da competência não geradas');
   const gTipo=e.regime==='MEI'?'DAS-MEI':'DAS';
   const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo===gTipo);
-  if(!g) T.push(`${gTipo}: guia não apurada`); else if(g.status==='rascunho') T.push(`${gTipo}: guia não liberada ao cliente`);
+  if(e.regime==='MEI'||e.regime==='SN'){ if(!g) T.push(`${gTipo}: guia não apurada`); else if(g.status==='rascunho') T.push(`${gTipo}: guia não liberada ao cliente`); }
   return T;
 }
 
@@ -1696,7 +1728,7 @@ function aGuias(){
     const st=g?statusGuia(g):null; const fech=S.fechamentos.some(f=>f.empresaId===e.id&&f.comp===comp);
     return `<tr><td><b>${esc(e.fantasia||e.razao)}</b><div class="sub num" style="font-weight:400">${fmtCNPJ(e.cnpj)}</div></td>
     <td class="r"><input type="number" step="0.01" min="0" value="${ap.receita??''}" data-change="receita" data-id="${e.id}" data-comp="${comp}" style="width:108px;text-align:right" class="mono" ${fech?'disabled':''} aria-label="Receita">${nfse&&Math.abs(nfse-(ap.receita||0))>0.009?`<div><button class="btn ghost sm" data-act="usar-nfse" data-id="${e.id}" data-v="${nfse}">Usar NFS-e: ${brl(nfse)}</button></div>`:''}</td>
-    <td class="r num small">${ap.rbt12!=null?brl(ap.rbt12)+(ap.proporcional?'*':''):'—'}</td><td class="small">${e.regime==='MEI'?'MEI · valor fixo':ap.anexo+' · '+ap.faixa+'ª'}</td><td class="r num">${ap.aliq!=null?pct(ap.aliq):'—'}</td>
+    <td class="r num small">${ap.rbt12!=null?brl(ap.rbt12)+(ap.proporcional?'*':''):'—'}</td><td class="small">${e.regime==='MEI'?'MEI · valor fixo':ap.foraSimples?nomeRegime(e):ap.anexo+' · '+ap.faixa+'ª'}</td><td class="r num">${ap.aliq!=null?pct(ap.aliq):'—'}</td>
     <td class="r num" style="font-weight:600;color:var(--navy)">${ap.valor!=null?brl(ap.valor):'—'}</td><td>${g?pill(st.t,st.c)+(g.arquivo?' <span class="small muted">PDF ok</span>':''):'<span class="small muted">Não apurada</span>'}</td>
     <td><div class="actions" style="flex-wrap:nowrap">${!fech?`<button class="btn sm" data-act="apurar" data-id="${e.id}" ${ap.valor==null?'disabled title="Informe a receita"':''}>${g?'Recalcular':'Apurar'}</button>`:''}${g?`<label class="btn sm">PDF<input type="file" hidden accept=".pdf" data-up="guia-pdf" data-id="${g.id}"></label>${g.status==='rascunho'?`<button class="btn sm primary" data-act="liberar" data-id="${g.id}">Liberar</button>`:''}`:''}</div></td></tr>`}).join('')}</tbody></table></div>
   <p class="small muted">* RBT12 proporcionalizada (empresa com menos de 12 meses de atividade). Para o lote, nomeie os PDFs com o CNPJ (só números) e o tipo, por exemplo: <span class="mono">45321877000190_DAS_${comp}.pdf</span>.</p></div>
@@ -1781,7 +1813,7 @@ function aDem(){
 }
 
 /* ===================== Painel: Equipe e auditoria ===================== */
-function aEquipe(){
+function aEquipeAntiga(){
   const f=UI.tab.audArea||''; const L=S.auditoria.filter(a=>!f||a.area===f);
   const areas=[...new Set(S.auditoria.map(a=>a.area))];
   return `${head('Equipe e auditoria','Operadores, departamentos e registro de todas as ações feitas na plataforma.',`<button class="btn" data-act="exportar-aud">Exportar auditoria (CSV)</button><button class="btn primary" data-act="novo-op">Novo operador</button>`)}
@@ -2189,6 +2221,439 @@ async function iniciar(){
   });
   setTimeout(()=>{if(!primeiro)liberar()},6000);
 }
+/* ==== MÓDULOS v2 (início) · equipe e permissões, carteira 360°, motor de obrigações, menu lateral ==== */
+IC.menu='<path d="M4 7h16M4 12h16M4 17h16"/>';
+IC.back='<path d="M15 18l-6-6 6-6"/>';
+IC.plus='<path d="M12 5v14M5 12h14"/>';
+IC.lock='<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>';
+function botaoMenu(){return `<button class="btn-menu" data-act="menu" aria-label="Abrir menu" aria-expanded="${!!UI.menu}">${svg('menu')}</button>`}
+ACT['menu']=()=>{UI.menu=!UI.menu;const a=document.querySelector('.app');if(a)a.classList.toggle('menu-aberto',UI.menu);document.documentElement.classList.toggle('sem-rolagem',UI.menu);const b=document.querySelector('.btn-menu');if(b)b.setAttribute('aria-expanded',UI.menu)};
+ACT['menu-fechar']=()=>{if(UI.menu)ACT['menu']()};
+document.addEventListener('keydown',ev=>{if(ev.key==='Escape'&&UI.menu)ACT['menu']()});
+document.addEventListener('click',ev=>{const a=ev.target.closest('.nav a, .mode-switch button');if(!a)return;if(a.matches('.nav a'))UI.cart=null;if(UI.menu){UI.menu=false;document.documentElement.classList.remove('sem-rolagem')}},true);
+
+/* ---------- permissões da equipe ---------- */
+const MOD_DA_VIEW={'a-carteira':'carteira','a-obrig':'obrig','a-guias':'guias','a-docs':'docs','a-chat':'chat','a-fiscal':'fiscal','a-cert':'cert','a-hon':'hon','a-dem':'dem','a-equipe':'equipe','a-config':'config'};
+const NIVEL_NOME={nenhum:'Sem acesso',ver:'Consultar',editar:'Editar'};
+function podeMod(m,n){if(!ME.perm)return true;const p=ME.perm[m]||'nenhum';return n==='editar'?p==='editar':p!=='nenhum'}
+const ehMaster=()=>!ME.perm||ME.papel==='master';
+function aplicarPermissoes(){for(let i=NAV_A.length-1;i>=0;i--){const m=MOD_DA_VIEW[NAV_A[i][0]];if(m&&!podeMod(m,'ver'))NAV_A.splice(i,1)}}
+const soConsulta=m=>podeMod(m,'editar')?'':`<div class="banner info"><span class="small">${svg('lock')} Seu acesso a esta área é só de consulta. Para alterar, peça ao administrador master.</span></div>`;
+
+/* ---------- dados vindos da API (cache por tela) ---------- */
+const APIC={};
+function apiDado(chave,caminho){
+  if(MODO!=='api')return {indisponivel:true};
+  const c=APIC[chave];
+  if(!c){APIC[chave]={carregando:true};MF.api('GET',caminho).then(d=>{APIC[chave]={dados:d};agendarRender()}).catch(e=>{APIC[chave]={erro:e.message};agendarRender()});return APIC[chave]}
+  return c;
+}
+const invalidar=pref=>{Object.keys(APIC).forEach(k=>{if(k===pref||k.startsWith(pref+':'))delete APIC[k]});agendarRender()};
+const carregandoBox=t=>`<p class="small muted">${esc(t||'Carregando…')}</p>`;
+const soNoServidor=`<div class="banner info"><span class="small">Este recurso funciona na versão publicada do Meu Fiscal (Portal e Painel com servidor), onde senhas e certificados ficam guardados com criptografia.</span></div>`;
+function gerarSenha8(){const a='ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';const r=crypto.getRandomValues(new Uint32Array(8));let s='';for(const x of r)s+=a[x%a.length];return /\d/.test(s)&&/[A-Za-z]/.test(s)?s:gerarSenha8()}
+ACT['gerar-senha']=el=>{const i=document.getElementById(el.dataset.alvo);if(i){i.value=gerarSenha8();i.type='text';i.dispatchEvent(new Event('input',{bubbles:true}))}};
+const campoSenha8=(id,nome,rot,obrig)=>`<label class="f"><span>${rot}</span><span style="display:flex;gap:6px"><input type="text" id="${id}" name="${nome}" maxlength="8" pattern="[A-Za-z0-9]{8}" ${obrig?'required':''} autocomplete="new-password" class="mono" placeholder="8 letras ou números"><button type="button" class="btn sm" data-act="gerar-senha" data-alvo="${id}">Gerar</button></span></label>`;
+const SENHA8=/^[A-Za-z0-9]{8}$/;
+
+/* ---------- motor de obrigações ---------- */
+const RECORRENCIAS={mensal:'Mensal',trimestral:'Trimestral',anual:'Anual',eventual:'Eventual'};
+const CONDICOES={'':'Sempre que estiver no pacote','com_folha':'Só com funcionários ou pró-labore','com_funcionarios':'Só com funcionários registrados','reinf':'Só se obrigada à EFD-Reinf'};
+const MESES_N=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const BASES={MEI:'MEI',SN:'Simples Nacional',LP:'Lucro Presumido',LR:'Lucro Real'};
+function ultimoDiaMes(a,m){return new Date(Date.UTC(a,m,0)).getUTCDate()}
+function nEsimoUtil(a,m,n){let c=0;for(let d=1;d<=ultimoDiaMes(a,m);d++){const iso=`${a}-${pad(m)}-${pad(d)}`;if(ehUtil(iso)&&++c===n)return iso}return ultimoUtil(a,m)}
+function ultimoUtil(a,m){let d=ultimoDiaMes(a,m),iso;do{iso=`${a}-${pad(m)}-${pad(d)}`;d--}while(!ehUtil(iso)&&d>0);return iso}
+function vencimentoDe(o,comp){
+  const v=o.venc||{tipo:'dia',dia:20,ajuste:'prorroga',mesesApos:1};let a,m;
+  if(o.recorrencia==='anual'){a=+comp.slice(0,4)+1;m=Number(v.mes||3)}else{const c=addMes(comp,Number(v.mesesApos??1));a=+c.slice(0,4);m=+c.slice(5,7)}
+  if(v.tipo==='ultimo_util')return ultimoUtil(a,m);
+  if(v.tipo==='dia_util')return nEsimoUtil(a,m,Number(v.dia||1));
+  return ajustaVenc(`${a}-${pad(m)}-${pad(Math.min(Number(v.dia||20),ultimoDiaMes(a,m)))}`,v.ajuste||'prorroga');
+}
+function textoVenc(o){
+  const v=o.venc||{};const quando=o.recorrencia==='anual'?`de ${MESES_N[(Number(v.mes||3))-1]} do ano seguinte`:({0:'do mês da competência',1:'do mês seguinte',2:'do 2º mês seguinte'}[Number(v.mesesApos??1)]||'');
+  if(v.tipo==='ultimo_util')return 'Último dia útil '+quando;
+  if(v.tipo==='dia_util')return `${v.dia}º dia útil ${quando}`;
+  return `Dia ${v.dia} ${quando}${v.ajuste==='antecipa'?' (antecipa)':' (prorroga)'}`;
+}
+function devidaNaComp(o,comp){if(o.ativo===false)return false;const m=+comp.slice(5,7);return o.recorrencia==='mensal'||(o.recorrencia==='trimestral'&&m%3===0)||(o.recorrencia==='anual'&&m===12)}
+function condicaoOk(o,e,funcs){const temFunc=(funcs||S.funcionarios).some(f=>f.empresaId===e.id&&!f.desligado);if(o.condicao==='com_funcionarios')return temFunc;if(o.condicao==='com_folha')return temFunc||Number(e.prolabore)>0;if(o.condicao==='reinf')return !!e.reinf;return true}
+function regimeDe(e){
+  if(!e)return null;
+  if(e.regimeId){const r=S.regimes.find(x=>x.id===e.regimeId);if(r)return r}
+  const cod=e.regime==='MEI'?'MEI':(e.regime==='LP'||e.regime==='LR')?e.regime:'SN-'+(e.anexo||'III');
+  return S.regimes.find(r=>r.codigo===cod)||null;
+}
+function nomeRegime(e){const r=regimeDe(e);if(r)return r.nome;return e.regime==='MEI'?'MEI':BASES[e.regime]||'Simples Nacional'}
+function pacoteDaEmpresa(e){
+  const r=regimeDe(e);const doRegime=new Set(r?r.obrigacoes||[]:[]);const extras=new Set(e.obrigExtras||[]);const rem=new Set(e.obrigRemovidas||[]);
+  const ids=new Set([...doRegime,...extras]);rem.forEach(id=>ids.delete(id));
+  return {regime:r,itens:[...ids].map(id=>S.catalogo.find(c=>c.id===id)).filter(Boolean).map(o=>({o,origem:doRegime.has(o.id)?'regime':'avulsa'})),removidas:[...rem].map(id=>S.catalogo.find(c=>c.id===id)).filter(Boolean)};
+}
+function obrigacoesDevidas(e,comp,funcs){
+  if(!S.catalogo||!S.catalogo.length)return obrigacoesDevidasFixas(e,comp,funcs);
+  return pacoteDaEmpresa(e).itens.map(x=>x.o).filter(o=>devidaNaComp(o,comp)&&condicaoOk(o,e,funcs)).map(o=>({tipo:o.nome,prazo:vencimentoDe(o,comp),depto:o.depto,catId:o.id}));
+}
+function respDe(e,depto){const r=e.responsaveis||{};return r[depto]||r['Legalização']||e.operadorId||null}
+function gerarObrigacoes(empresas,comp){let n=0;empresas.forEach(e=>obrigacoesDevidas(e,comp).forEach(o=>{if(!S.obrigacoes.some(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo===o.tipo)){S.obrigacoes.push({id:uid(),empresaId:e.id,comp,...o,status:'pendente',responsavel:respDe(e,o.depto)});n++}}));return n}
+ACT['gerar-obrig']=()=>{const comp=compDe('obrig');let n=0;mut('obrigacoes',()=>{n=gerarObrigacoes(S.empresas.filter(e=>e.status!=='inativo'),comp)},['Obrigações','Gerou matriz de '+fmtComp(comp),'']);toast(n?n+' obrigação(ões) gerada(s).':'A matriz já estava completa.')};
+
+function catalogoPadrao(){
+  const c=(id,nome,depto,recorrencia,venc,condicao='',obs='')=>({id,nome,depto,recorrencia,venc,condicao,obs,ativo:true,criadoEm:agora()});
+  return [
+    c('das-mei','DAS-MEI','Fiscal','mensal',{tipo:'dia',dia:20,ajuste:'prorroga',mesesApos:1}),
+    c('dasn-simei','DASN-SIMEI','Fiscal','anual',{tipo:'dia',dia:31,mes:5,ajuste:'prorroga'}),
+    c('pgdas','PGDAS-D','Fiscal','mensal',{tipo:'dia',dia:20,ajuste:'prorroga',mesesApos:1}),
+    c('defis','DEFIS','Fiscal','anual',{tipo:'dia',dia:31,mes:3,ajuste:'prorroga'}),
+    c('contabilidade','Contabilidade','Contábil','mensal',{tipo:'dia',dia:15,ajuste:'prorroga',mesesApos:2}),
+    c('esocial','eSocial','Pessoal','mensal',{tipo:'dia',dia:15,ajuste:'antecipa',mesesApos:1},'com_folha'),
+    c('dctfweb','DCTFWeb','Pessoal','mensal',{tipo:'dia',dia:20,ajuste:'antecipa',mesesApos:1},'com_folha'),
+    c('fgts','FGTS Digital','Pessoal','mensal',{tipo:'dia',dia:20,ajuste:'antecipa',mesesApos:1},'com_funcionarios'),
+    c('reinf','EFD-Reinf','Fiscal','mensal',{tipo:'dia',dia:15,ajuste:'antecipa',mesesApos:1},'reinf'),
+    c('pis-cofins','PIS/COFINS','Fiscal','mensal',{tipo:'dia',dia:25,ajuste:'antecipa',mesesApos:1}),
+    c('efd-contribuicoes','EFD-Contribuições','Fiscal','mensal',{tipo:'dia_util',dia:10,mesesApos:2}),
+    c('efd-icms-ipi','EFD ICMS/IPI','Fiscal','mensal',{tipo:'dia',dia:20,ajuste:'antecipa',mesesApos:1},'','O prazo varia por estado: confira o da SEFAZ.'),
+    c('irpj-csll','IRPJ e CSLL (trimestral)','Fiscal','trimestral',{tipo:'ultimo_util',mesesApos:1}),
+    c('ecd','ECD','Contábil','anual',{tipo:'ultimo_util',mes:6}),
+    c('ecf','ECF','Contábil','anual',{tipo:'ultimo_util',mes:7}),
+    c('honorarios','Honorários','Financeiro','mensal',{tipo:'dia',dia:10,ajuste:'prorroga',mesesApos:1},'','Cobrança da mensalidade do escritório.'),
+  ];
+}
+function regimesPadrao(){
+  const folha=['esocial','dctfweb','fgts'];const sn=['pgdas','defis','contabilidade',...folha,'reinf'];const lucro=['contabilidade',...folha,'reinf','pis-cofins','efd-contribuicoes','efd-icms-ipi','irpj-csll','ecd','ecf'];
+  const r=(codigo,nome,base,anexo,obrigacoes)=>({id:'reg-'+codigo.toLowerCase(),codigo,nome,base,anexo,obrigacoes});
+  return [r('MEI','MEI','MEI',null,['das-mei','dasn-simei',...folha]),
+    ...['I','II','III','IV','V'].map(a=>r('SN-'+a,'Simples Nacional · Anexo '+a,'SN',a,sn)),
+    r('LP','Lucro Presumido','LP',null,lucro),r('LR','Lucro Real','LR',null,lucro)];
+}
+ACT['catalogo-padrao']=()=>confirmar('Criar catálogo e regimes padrão','Serão criados 16 tipos de obrigação (MEI, Simples, Lucro Presumido e Real, folha e Reinf) e 8 regimes já com o pacote de cada um. As empresas passam a usar o regime correspondente ao cadastro. Depois você pode ajustar prazos e pacotes.','Criar',()=>{
+  mut(['catalogo','regimes'],()=>{const c=catalogoPadrao(),r=regimesPadrao();c.forEach(x=>{if(!S.catalogo.some(y=>y.id===x.id))S.catalogo.push(x)});r.forEach(x=>{if(!S.regimes.some(y=>y.id===x.id))S.regimes.push(x)})},['Obrigações','Criou catálogo e regimes padrão','']);toast('Catálogo e regimes criados.')});
+
+/* ---------- Obrigações: matriz, catálogo e regimes ---------- */
+function aObrig(){
+  const t=UI.tab.obrig||'matriz';
+  const abas=`<div class="tabs" role="tablist">${[['matriz','Matriz do mês'],['catalogo',`Catálogo de obrigações (${S.catalogo.length})`],['regimes',`Regimes tributários (${S.regimes.length})`]].map(([k,r])=>`<button role="tab" aria-selected="${t===k}" data-act="tab" data-k="obrig" data-v="${k}">${r}</button>`).join('')}</div>`;
+  if(t==='matriz'){const h=aObrigMatriz();return h.replace('\n  <div class="panel">',soConsulta('obrig')+abas+'\n  <div class="panel">')}
+  const ed=podeMod('obrig','editar');
+  if(t==='catalogo'){
+    return `${head('Obrigações e fechamento','Catálogo do escritório: cada obrigação com recorrência, regra de vencimento e condição. O pacote de cada empresa vem do regime tributário.',ed?`<button class="btn primary" data-act="obrigacao-form">${svg('plus')}Nova obrigação</button>`:'')}${soConsulta('obrig')}${abas}
+    <div class="panel">${S.catalogo.length?`<div class="table-wrap"><table><thead><tr><th>Obrigação</th><th>Depto</th><th>Recorrência</th><th>Vencimento</th><th>Condição</th><th class="r">Empresas</th><th></th></tr></thead><tbody>${S.catalogo.slice().sort((a,b)=>a.depto.localeCompare(b.depto)||a.nome.localeCompare(b.nome)).map(o=>{const n=S.empresas.filter(e=>e.status!=='inativo'&&pacoteDaEmpresa(e).itens.some(x=>x.o.id===o.id)).length;return `<tr><td><b>${esc(o.nome)}</b>${o.ativo===false?' '+pill('Inativa',''):''}${o.obs?`<div class="sub">${esc(o.obs)}</div>`:''}</td><td>${esc(o.depto)}</td><td>${RECORRENCIAS[o.recorrencia]||'—'}</td><td class="small">${textoVenc(o)}</td><td class="small">${o.condicao?esc(CONDICOES[o.condicao]):'—'}</td><td class="r num">${n}</td><td class="r">${ed?`<button class="btn sm" data-act="obrigacao-form" data-id="${o.id}">Editar</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`
+      :vazio('Nenhuma obrigação cadastrada. Comece pelo catálogo padrão: ele já traz os prazos do MEI, Simples Nacional, Lucro Presumido e Real.',ed?`<button class="btn primary" data-act="catalogo-padrao">Criar catálogo e regimes padrão</button>`:'')}</div>`;
+  }
+  return `${head('Obrigações e fechamento','Regimes tributários: o pacote de obrigações de cada regime é vinculado automaticamente às empresas que o usam.',ed?`<button class="btn primary" data-act="regime-form">${svg('plus')}Novo regime</button>`:'')}${soConsulta('obrig')}${abas}
+  ${S.regimes.length?`<div class="grid-cards">${S.regimes.map(r=>{const es=S.empresas.filter(e=>regimeDe(e)?.id===r.id);return `<div class="panel"><div class="panel-head"><h2>${esc(r.nome)}</h2>${ed?`<button class="btn sm" data-act="regime-form" data-id="${r.id}">Editar</button>`:''}</div><div class="small muted">${es.length} empresa${es.length!==1?'s':''} · ${(r.obrigacoes||[]).length} obrigação(ões) no pacote</div><div class="chips-lista">${(r.obrigacoes||[]).map(id=>S.catalogo.find(c=>c.id===id)).filter(Boolean).map(o=>`<span class="tag">${esc(o.nome)}</span>`).join('')||'<span class="small muted">Pacote vazio</span>'}</div></div>`}).join('')}</div>`
+    :`<div class="panel">${vazio('Nenhum regime cadastrado.',ed?`<button class="btn primary" data-act="catalogo-padrao">Criar catálogo e regimes padrão</button>`:'')}</div>`}`;
+}
+ACT['obrigacao-form']=el=>{
+  const o=el.dataset.id?S.catalogo.find(x=>x.id===el.dataset.id):{recorrencia:'mensal',depto:'Fiscal',venc:{tipo:'dia',dia:20,ajuste:'prorroga',mesesApos:1},ativo:true,condicao:''};
+  const v=o.venc||{};const sel=(n,ops,val)=>`<select name="${n}">${Object.entries(ops).map(([k,r])=>`<option value="${k}" ${String(val)===String(k)?'selected':''}>${esc(r)}</option>`).join('')}</select>`;
+  openModal(`${mHead(o.id?'Editar obrigação':'Nova obrigação')}<form data-form="obrigacao" data-id="${o.id||''}"><div class="modal-body"><div class="grid-f">
+  <label class="f full"><span>Nome da obrigação *</span><input type="text" name="nome" required maxlength="80" value="${esc(o.nome||'')}" placeholder="Ex.: DCTFWeb"></label>
+  <label class="f"><span>Departamento</span>${sel('depto',Object.fromEntries(DEPTOS_TICKET.map(d=>[d,d])),o.depto)}</label>
+  <label class="f"><span>Recorrência</span>${sel('recorrencia',RECORRENCIAS,o.recorrencia)}</label>
+  <label class="f"><span>Regra de vencimento</span>${sel('vtipo',{dia:'Dia fixo do mês',dia_util:'N-ésimo dia útil',ultimo_util:'Último dia útil'},v.tipo||'dia')}</label>
+  <label class="f"><span>Dia (ou nº do dia útil)</span><input type="number" name="vdia" min="1" max="31" value="${v.dia||20}"></label>
+  <label class="f"><span>Mês do vencimento (mensal e trimestral)</span>${sel('vmeses',{0:'No mês da competência',1:'No mês seguinte',2:'No 2º mês seguinte'},v.mesesApos??1)}</label>
+  <label class="f"><span>Mês do vencimento (anual, ano seguinte)</span>${sel('vmes',Object.fromEntries(MESES_N.map((m,i)=>[i+1,m])),v.mes||3)}</label>
+  <label class="f"><span>Se cair em fim de semana</span>${sel('vajuste',{prorroga:'Prorroga para o dia útil seguinte',antecipa:'Antecipa para o dia útil anterior'},v.ajuste||'prorroga')}</label>
+  <label class="f"><span>Condição</span>${sel('condicao',CONDICOES,o.condicao||'')}</label>
+  <label class="f full"><span>Observação</span><input type="text" name="obs" maxlength="200" value="${esc(o.obs||'')}"></label>
+  <label class="chk full"><input type="checkbox" name="ativo" ${o.ativo!==false?'checked':''}> Ativa (aparece na matriz e nos pacotes)</label>
+  </div>
+  <div class="form-sec"><h3>Alocação em lote</h3><p class="sub">Vincule agora, sem precisar abrir empresa por empresa.</p>
+   <div class="f"><span class="small" style="font-weight:600;color:var(--muted)">Incluir no pacote dos regimes</span><div class="chips-lista">${S.regimes.map(r=>`<label class="chk"><input type="checkbox" name="lote_regime" value="${r.id}" ${(r.obrigacoes||[]).includes(o.id)?'checked':''}> ${esc(r.nome)}</label>`).join('')||'<span class="small muted">Nenhum regime cadastrado.</span>'}</div></div>
+   <div class="f"><span class="small" style="font-weight:600;color:var(--muted)">Vincular também a empresas específicas (avulsa)</span><div class="lista-check">${S.empresas.filter(e=>e.status!=='inativo').map(e=>`<label class="chk"><input type="checkbox" name="lote_empresa" value="${e.id}" ${(e.obrigExtras||[]).includes(o.id)?'checked':''}> ${esc(e.fantasia||e.razao)} <span class="small muted">· ${esc(nomeRegime(e))}</span></label>`).join('')}</div></div>
+  </div></div><div class="modal-foot">${o.id?`<button type="button" class="btn danger" data-act="obrigacao-excluir" data-id="${o.id}">Excluir</button>`:''}<span class="grow"></span><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar obrigação</button></div></form>`,true);
+};
+FORM['obrigacao']=(fd,form)=>{
+  const id=form.dataset.id||('obr-'+uid());const nome=String(fd.get('nome')||'').trim();if(!nome){toast('Informe o nome.',true);return}
+  if(S.catalogo.some(c=>c.nome.toLowerCase()===nome.toLowerCase()&&c.id!==id)){toast('Já existe uma obrigação com este nome.',true);return}
+  const dados={id,nome,depto:fd.get('depto'),recorrencia:fd.get('recorrencia'),venc:{tipo:fd.get('vtipo'),dia:Number(fd.get('vdia')||20),mesesApos:Number(fd.get('vmeses')),mes:Number(fd.get('vmes')),ajuste:fd.get('vajuste')},condicao:fd.get('condicao')||'',obs:String(fd.get('obs')||'').trim(),ativo:!!fd.get('ativo')};
+  const regs=new Set(fd.getAll('lote_regime')),emps=new Set(fd.getAll('lote_empresa'));
+  closeModal();
+  mut(['catalogo','regimes','empresas'],()=>{
+    const prev=S.catalogo.find(c=>c.id===id);if(prev)Object.assign(prev,dados);else S.catalogo.push({...dados,criadoEm:agora()});
+    S.regimes.forEach(r=>{const tem=(r.obrigacoes||[]).includes(id);if(regs.has(r.id)&&!tem)r.obrigacoes=[...(r.obrigacoes||[]),id];if(!regs.has(r.id)&&tem)r.obrigacoes=r.obrigacoes.filter(x=>x!==id)});
+    S.empresas.forEach(e=>{const tem=(e.obrigExtras||[]).includes(id);if(emps.has(e.id)){if(!tem)e.obrigExtras=[...(e.obrigExtras||[]),id];if((e.obrigRemovidas||[]).includes(id))e.obrigRemovidas=e.obrigRemovidas.filter(x=>x!==id)}else if(tem)e.obrigExtras=e.obrigExtras.filter(x=>x!==id)});
+  },['Obrigações',(S.catalogo.some(c=>c.id===id)?'Salvou':'Cadastrou')+' obrigação '+nome,'']);
+  const n=S.empresas.filter(e=>e.status!=='inativo'&&pacoteDaEmpresa(e).itens.some(x=>x.o.id===id)).length;toast(`${nome}: vinculada a ${n} empresa${n!==1?'s':''}.`);
+};
+ACT['obrigacao-excluir']=el=>{const o=S.catalogo.find(x=>x.id===el.dataset.id);confirmar('Excluir obrigação',`"${esc(o.nome)}" sai do catálogo, dos pacotes dos regimes e das empresas. As obrigações já geradas nos meses anteriores continuam no histórico.`,'Excluir',()=>{mut(['catalogo','regimes','empresas'],()=>{S.catalogo=S.catalogo.filter(c=>c.id!==o.id);S.regimes.forEach(r=>{if((r.obrigacoes||[]).includes(o.id))r.obrigacoes=r.obrigacoes.filter(x=>x!==o.id)});S.empresas.forEach(e=>{if((e.obrigExtras||[]).includes(o.id))e.obrigExtras=e.obrigExtras.filter(x=>x!==o.id);if((e.obrigRemovidas||[]).includes(o.id))e.obrigRemovidas=e.obrigRemovidas.filter(x=>x!==o.id)})},['Obrigações','Excluiu obrigação '+o.nome,''])},true)};
+ACT['regime-form']=el=>{
+  const r=el.dataset.id?S.regimes.find(x=>x.id===el.dataset.id):{base:'SN',anexo:'III',obrigacoes:[]};
+  openModal(`${mHead(r.id?'Editar regime':'Novo regime tributário')}<form data-form="regime" data-id="${r.id||''}"><div class="modal-body"><div class="grid-f">
+  <label class="f full"><span>Nome *</span><input type="text" name="nome" required maxlength="60" value="${esc(r.nome||'')}" placeholder="Ex.: Simples Nacional · Anexo III"></label>
+  <label class="f"><span>Enquadramento</span><select name="base">${Object.entries(BASES).map(([k,v])=>`<option value="${k}" ${r.base===k?'selected':''}>${v}</option>`).join('')}</select></label>
+  <label class="f"><span>Anexo (Simples)</span><select name="anexo"><option value="">—</option>${['I','II','III','IV','V'].map(a=>`<option ${r.anexo===a?'selected':''}>${a}</option>`).join('')}</select></label>
+  </div><div class="form-sec"><h3>Pacote de obrigações</h3><p class="sub">Toda empresa deste regime recebe estas obrigações automaticamente. Itens com condição (ex.: só com funcionários) entram apenas quando a condição se aplica.</p>
+  <div class="lista-check">${S.catalogo.map(o=>`<label class="chk"><input type="checkbox" name="obr" value="${o.id}" ${(r.obrigacoes||[]).includes(o.id)?'checked':''}> ${esc(o.nome)} <span class="small muted">· ${esc(o.depto)} · ${RECORRENCIAS[o.recorrencia]}${o.condicao?' · '+esc(CONDICOES[o.condicao]):''}</span></label>`).join('')||'<span class="small muted">Cadastre obrigações no catálogo primeiro.</span>'}</div></div></div>
+  <div class="modal-foot">${r.id?`<button type="button" class="btn danger" data-act="regime-excluir" data-id="${r.id}">Excluir</button>`:''}<span class="grow"></span><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar regime</button></div></form>`,true);
+};
+FORM['regime']=(fd,form)=>{const id=form.dataset.id||('reg-'+uid());const base=fd.get('base');const dados={id,nome:String(fd.get('nome')).trim(),base,anexo:base==='SN'?(fd.get('anexo')||'III'):null,obrigacoes:fd.getAll('obr')};
+  const prev=S.regimes.find(r=>r.id===id);if(!prev)dados.codigo=(base==='SN'?'SN-'+dados.anexo:base)+'-'+id.slice(-4);
+  closeModal();mut('regimes',()=>{if(prev)Object.assign(prev,dados);else S.regimes.push(dados)},['Obrigações','Salvou regime '+dados.nome,'']);
+  const n=S.empresas.filter(e=>regimeDe(e)?.id===id).length;toast(`Regime salvo. ${n} empresa${n!==1?'s':''} usa${n!==1?'m':''} este pacote.`)};
+ACT['regime-excluir']=el=>{const r=S.regimes.find(x=>x.id===el.dataset.id);const n=S.empresas.filter(e=>e.regimeId===r.id).length;if(n){toast(`${n} empresa(s) usam este regime. Troque o regime delas antes de excluir.`,true);return}
+  confirmar('Excluir regime',`Excluir "${esc(r.nome)}"?`,'Excluir',()=>mut('regimes',()=>{S.regimes=S.regimes.filter(x=>x.id!==r.id)},['Obrigações','Excluiu regime '+r.nome,'']),true)};
+
+/* ---------- Carteira de clientes: lista e visão 360° ---------- */
+function nomeEquipe(id){if(!id)return '';const l=APIC.equipe?.dados?.equipe||[];return (l.find(x=>x.id===id)||S.operadores.find(x=>x.id===id)||{}).nome||''}
+function listaEquipe(){if(MODO==='api'){const d=apiDado('equipe','/api/equipe');return d.dados?d.dados.equipe:null}return S.operadores.map(o=>({id:o.id,nome:o.nome,funcao:o.depto}))}
+function aCarteira(){
+  if(UI.cart)return detalheEmpresa();
+  listaEquipe();
+  const es=S.empresas.slice().sort((a,b)=>(a.fantasia||a.razao).localeCompare(b.fantasia||b.razao));
+  const ed=podeMod('carteira','editar');
+  return `${head('Carteira de clientes','Toque no nome da empresa para abrir o cadastro completo: dados, acesso ao portal, certificado, senhas dos portais, responsáveis e obrigações.',ed?`<button class="btn primary" data-act="cart-abrir" data-id="">${svg('plus')}Nova empresa</button>`:'')}${soConsulta('carteira')}
+  <div class="panel"><div class="table-wrap"><table class="tabela-cart"><thead><tr><th>Empresa</th><th>CNPJ</th><th>Regime</th><th>Responsável fiscal</th><th>Situação</th><th></th></tr></thead><tbody>${es.map(e=>{const c=motor(e.id,'a').filter(a=>a.nivel==='crit').length;return `<tr><td><button class="nome-link" data-act="cart-abrir" data-id="${e.id}">${esc(e.fantasia||e.razao)}</button><div class="small muted">${esc(e.razao)}</div></td><td class="mono small" data-r="CNPJ">${fmtCNPJ(e.cnpj)}</td><td class="small" data-r="Regime">${esc(nomeRegime(e))}</td><td class="small" data-r="Responsável">${esc(nomeEquipe(respDe(e,'Fiscal')))||'<span class="muted">—</span>'}</td><td>${e.status==='inativo'?pill('Inativa',''):empresaBloqueada(e)?pill('Bloqueio parcial','crit'):c?pill(c+' crítico'+(c>1?'s':''),'crit'):pill('Em dia','ok')}</td><td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-act="cart-abrir" data-id="${e.id}">Abrir</button><button class="btn sm" data-act="ver-cliente" data-id="${e.id}">Ver portal</button></div></td></tr>`}).join('')||'<tr><td colspan="6" class="muted">Nenhuma empresa cadastrada.</td></tr>'}</tbody></table></div></div>`;
+}
+ACT['cart-abrir']=el=>{UI.cart={id:el.dataset.id||null,aba:'dados'};render();window.scrollTo(0,0)};
+ACT['cart-voltar']=()=>{UI.cart=null;render();window.scrollTo(0,0)};
+ACT['nova-empresa']=el=>{UI.view='a-carteira';UI.modo='painel';UI.cart={id:el.dataset.id||null,aba:'dados'};if(location.hash!=='#a-carteira')location.hash='a-carteira';else render()};
+const ABAS_EMP=[['dados','Dados gerais e acesso'],['cert','Certificado digital'],['cofre','Cofre de senhas'],['resp','Responsáveis'],['obrig','Obrigações vinculadas']];
+function detalheEmpresa(){
+  const e=UI.cart.id?emp(UI.cart.id):null;if(UI.cart.id&&!e){UI.cart=null;return aCarteira()}
+  const aba=e?UI.cart.aba:'dados';
+  const abas=`<div class="tabs" role="tablist">${ABAS_EMP.map(([k,r])=>`<button role="tab" aria-selected="${aba===k}" ${!e&&k!=='dados'?'disabled':''} data-act="cart-aba" data-v="${k}">${r}</button>`).join('')}</div>`;
+  const corpo={dados:abaDados,cert:abaCert,cofre:abaCofre,resp:abaResp,obrig:abaObrig}[aba](e);
+  return `<button class="btn-voltar" data-act="cart-voltar">${svg('back')}Carteira de clientes</button>
+  <div class="page-head"><div><span class="eyebrow">${e?'Cadastro da empresa':'Nova empresa'}</span><h1>${e?esc(e.fantasia||e.razao):'Nova empresa'}</h1>${e?`<p>${esc(e.razao)} · ${fmtCNPJ(e.cnpj)} · ${esc(nomeRegime(e))}</p>`:'<p>Preencha os dados. Ao salvar, as obrigações do regime escolhido são vinculadas automaticamente.</p>'}</div>${e?`<div class="actions"><button class="btn" data-act="ver-cliente" data-id="${e.id}">Ver como o cliente</button></div>`:''}</div>${soConsulta('carteira')}${abas}${corpo}`;
+}
+ACT['cart-aba']=el=>{UI.cart.aba=el.dataset.v;render()};
+
+function abaDados(e){
+  const x=e||{regime:'SN',anexo:'III',plano:{nome:'',valor:0,funcInclusos:1,adicionalFunc:45,metodo:'pix'},checklist:[{id:'ofx',nome:'Extrato bancário (OFX)',formatos:['ofx']},{id:'desp',nome:'Comprovantes de despesas',formatos:['pdf','jpg','png']}],uf:'MS',municipio:'Campo Grande',ibge:'5002704',socios:[],contatos:[]};
+  const end=x.endereco||{};const c=(n,r,v,extra,cls)=>`<label class="f ${cls||''}"><span>${r}</span><input name="${n}" value="${esc(v??'')}" ${extra||''}></label>`;
+  const reg=regimeDe(x);
+  const socio=(s,i)=>`<div class="linha-rep" data-rep="socio"><input name="socio_nome" placeholder="Nome do sócio" value="${esc(s.nome||'')}"><input name="socio_cpf" placeholder="CPF" inputmode="numeric" class="mono" value="${esc(s.cpf?fmtCPF(s.cpf):'')}"><input name="socio_part" type="number" min="0" max="100" step="0.01" placeholder="% capital" value="${s.participacao??''}"><label class="chk"><input type="checkbox" name="socio_adm" value="${i}" ${s.administrador?'checked':''}> Administrador</label><button type="button" class="btn sm ghost" data-act="rep-remover" aria-label="Remover">Remover</button></div>`;
+  const contato=c2=>`<div class="linha-rep" data-rep="contato"><input name="ct_nome" placeholder="Nome" value="${esc(c2.nome||'')}"><input name="ct_cargo" placeholder="Cargo ou função" value="${esc(c2.cargo||'')}"><input name="ct_tel" type="tel" placeholder="Telefone / WhatsApp" value="${esc(c2.telefone?fmtFone(c2.telefone):'')}"><input name="ct_email" type="email" placeholder="E-mail" value="${esc(c2.email||'')}"><button type="button" class="btn sm ghost" data-act="rep-remover" aria-label="Remover">Remover</button></div>`;
+  const ed=podeMod('carteira','editar');
+  return `<form class="panel" data-form="empresa360" data-preservar="1" data-id="${e?e.id:''}" novalidate>
+  <div class="form-sec"><h3>Identificação</h3><div class="grid-f">
+   ${c('razao','Razão social *',x.razao,'required','full')}${c('fantasia','Nome fantasia',x.fantasia)}${c('cnpj','CNPJ *',x.cnpj?fmtCNPJ(x.cnpj):'','required inputmode="numeric" class="mono"')}
+   ${c('ie','Inscrição estadual',x.ie,'placeholder="Isento, se não houver"')}${c('im','Inscrição municipal',x.im)}${c('abertura','Início das atividades *',x.abertura,'type="date" required')}
+   ${c('cnae','CNAE principal',x.cnae)}${c('atividade','Atividade principal',x.atividade,'','full')}
+  </div></div>
+  <div class="form-sec"><h3>Regime tributário</h3><div class="grid-f">
+   ${S.regimes.length?`<label class="f full"><span>Regime (define o pacote de obrigações) *</span><select name="regimeId" required>${S.regimes.map(r=>`<option value="${r.id}" ${reg&&reg.id===r.id?'selected':''}>${esc(r.nome)}</option>`).join('')}</select></label>`
+    :`<label class="f"><span>Regime</span><select name="regime"><option value="SN" ${x.regime==='SN'?'selected':''}>Simples Nacional</option><option value="MEI" ${x.regime==='MEI'?'selected':''}>MEI</option></select></label><label class="f"><span>Anexo do Simples</span><select name="anexo">${Object.keys(ANEXOS).map(a=>`<option value="${a}" ${x.anexo===a?'selected':''}>${ANEXO_NOME[a]}</option>`).join('')}</select></label><p class="small muted full">Para usar regimes com pacote automático de obrigações, crie o catálogo em Obrigações › Catálogo.</p>`}
+   <label class="f"><span>Atividade do MEI</span><select name="meiAtividade">${Object.entries(DAS_MEI_NOME).map(([k,v])=>`<option value="${k}" ${x.meiAtividade===k?'selected':''}>${v}</option>`).join('')}</select></label>
+   ${c('prolabore','Pró-labore mensal (R$)',x.prolabore||0,'type="number" step="0.01" min="0"')}
+   <label class="chk"><input type="checkbox" name="fatorR" ${x.fatorR?'checked':''}> Atividade sujeita ao Fator R (Anexo III ou V)</label>
+   <label class="chk"><input type="checkbox" name="reinf" ${x.reinf?'checked':''}> Obrigada à EFD-Reinf</label>
+  </div></div>
+  <div class="form-sec"><h3>Endereço</h3><div class="grid-f">
+   ${c('cep','CEP',end.cep,'inputmode="numeric"')}${c('logradouro','Logradouro',end.logradouro,'','full')}${c('numero','Número',end.numero)}${c('complemento','Complemento',end.complemento)}${c('bairro','Bairro',end.bairro)}
+   ${c('municipio','Município',x.municipio)}${c('uf','UF',x.uf,'maxlength="2"')}${c('ibge','Código IBGE do município',x.ibge,'maxlength="7" inputmode="numeric"')}
+  </div></div>
+  <div class="form-sec"><h3>Contato principal</h3><div class="grid-f">${c('telefone','Telefone (WhatsApp)',x.telefone?fmtFone(x.telefone):'','type="tel"')}${c('email','E-mail',x.email,'type="email"')}</div></div>
+  <div class="form-sec"><div class="panel-head"><h3>Sócios</h3>${ed?`<button type="button" class="btn sm" data-act="rep-add" data-v="socio">${svg('plus')}Adicionar sócio</button>`:''}</div><div class="rep-lista" id="rep-socio">${(x.socios||[]).map(socio).join('')}</div><template id="tpl-socio">${socio({},'__i__')}</template></div>
+  <div class="form-sec"><div class="panel-head"><h3>Outros contatos</h3>${ed?`<button type="button" class="btn sm" data-act="rep-add" data-v="contato">${svg('plus')}Adicionar contato</button>`:''}</div><div class="rep-lista" id="rep-contato">${(x.contatos||[]).map(contato).join('')}</div><template id="tpl-contato">${contato({})}</template></div>
+  <div class="form-sec"><h3>Plano contábil</h3><div class="grid-f">${c('pNome','Nome do plano',x.plano?.nome)}${c('pValor','Mensalidade (R$)',x.plano?.valor||0,'type="number" step="0.01" min="0"')}${c('pInc','Funcionários inclusos',x.plano?.funcInclusos||0,'type="number" min="0"')}${c('pAdd','Adicional por funcionário (R$)',x.plano?.adicionalFunc||0,'type="number" step="0.01" min="0"')}
+   <label class="f"><span>Situação</span><select name="status"><option value="ativo" ${x.status!=='inativo'?'selected':''}>Ativa</option><option value="inativo" ${x.status==='inativo'?'selected':''}>Inativa</option></select></label></div></div>
+  <div class="form-sec"><h3>Documentos mensais exigidos</h3><p class="sub">Um por linha: Nome do documento | extensões. Ex.: Extrato bancário (OFX) | ofx</p><textarea name="checklist" style="min-height:96px" class="mono">${esc((x.checklist||[]).map(k=>k.nome+' | '+k.formatos.join(',')).join('\n'))}</textarea></div>
+  ${ed?`<div class="form-acoes"><button type="button" class="btn" data-act="cart-voltar">Cancelar</button><button class="btn primary">${e?'Salvar alterações':'Cadastrar empresa'}</button></div>`:''}
+  </form>${e?secaoAcesso(e):''}`;
+}
+ACT['rep-add']=el=>{const t=document.getElementById('tpl-'+el.dataset.v),l=document.getElementById('rep-'+el.dataset.v);if(!t||!l)return;const i=l.children.length;l.insertAdjacentHTML('beforeend',t.innerHTML.replace(/__i__/g,i+'_'+Date.now()));l.lastElementChild.querySelector('input')?.focus()};
+ACT['rep-remover']=el=>el.closest('.linha-rep')?.remove();
+FORM['empresa360']=async(fd,form)=>{
+  const id=form.dataset.id;const g=k=>String(fd.get(k)??'').trim();const cnpj=soDig(g('cnpj'));
+  if(!g('razao')){toast('Informe a razão social.',true);return}
+  if(!cnpjValido(cnpj)){toast('CNPJ inválido. Confira os dígitos.',true);return}
+  if(S.empresas.some(e=>e.cnpj===cnpj&&e.id!==id)){toast('Já existe uma empresa com este CNPJ.',true);return}
+  if(!g('abertura')){toast('Informe o início das atividades.',true);return}
+  const prev=id?emp(id):null;
+  const ck=g('checklist').split('\n').map(l=>l.trim()).filter(Boolean).map((l,i)=>{const [n,f]=l.split('|');const old=(prev?.checklist||[]).find(o=>o.nome===n.trim());return {id:old?old.id:'ck'+i+'_'+uid().slice(0,5),nome:n.trim(),formatos:(f||'pdf').split(',').map(x=>x.trim().toLowerCase().replace('.','')).filter(Boolean)}});
+  const admIdx=new Set(fd.getAll('socio_adm'));const sn=fd.getAll('socio_nome'),scpf=fd.getAll('socio_cpf'),sp=fd.getAll('socio_part');
+  const linhasS=[...form.querySelectorAll('[data-rep=socio]')];
+  const socios=sn.map((n,i)=>({nome:n.trim(),cpf:soDig(scpf[i]),participacao:sp[i]===''?null:Number(sp[i]),administrador:!!linhasS[i]?.querySelector('[name=socio_adm]')?.checked})).filter(s=>s.nome);
+  for(const s of socios){if(s.cpf&&!cpfValido(s.cpf)){toast('CPF inválido do sócio '+s.nome+'.',true);return}}
+  const cn=fd.getAll('ct_nome'),cc=fd.getAll('ct_cargo'),ct=fd.getAll('ct_tel'),ce=fd.getAll('ct_email');
+  const contatos=cn.map((n,i)=>({nome:n.trim(),cargo:cc[i].trim(),telefone:soDig(ct[i]),email:ce[i].trim()})).filter(x=>x.nome||x.telefone||x.email);
+  const dados={razao:g('razao'),fantasia:g('fantasia'),cnpj,ie:g('ie'),im:g('im'),abertura:g('abertura'),cnae:g('cnae'),atividade:g('atividade'),meiAtividade:g('meiAtividade'),prolabore:Number(g('prolabore')||0),fatorR:!!fd.get('fatorR'),reinf:!!fd.get('reinf'),
+    endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},municipio:g('municipio'),uf:g('uf').toUpperCase(),ibge:soDig(g('ibge')),telefone:soDig(g('telefone')),email:g('email'),socios,contatos,status:g('status')||'ativo',
+    plano:{...(prev?.plano||{metodo:'pix'}),nome:g('pNome'),valor:Number(g('pValor')||0),funcInclusos:Number(g('pInc')||0),adicionalFunc:Number(g('pAdd')||0)},checklist:ck};
+  if(fd.has('regimeId')){const r=S.regimes.find(x=>x.id===fd.get('regimeId'));dados.regimeId=r.id;dados.regime=r.base;if(r.base==='SN')dados.anexo=r.anexo||prev?.anexo||'III'}
+  else{dados.regime=g('regime')||'SN';dados.anexo=g('anexo')||'III'}
+  if(dados.regime!=='SN')dados.fatorR=false;
+  let nova=null,n=0;const comp=compDe('obrig');
+  mut(['empresas','obrigacoes'],()=>{
+    if(prev)Object.assign(prev,dados);else{nova={id:uid(),...dados,acessos:[],obrigExtras:[],obrigRemovidas:[],responsaveis:{},criadoEm:agora()};S.empresas.push(nova);n=gerarObrigacoes([nova],comp)}
+  },['Carteira',prev?'Editou empresa':'Cadastrou empresa',dados.razao]);
+  if(nova){UI.cart={id:nova.id,aba:'dados'};toast(`Empresa cadastrada. ${(pacoteDaEmpresa(nova).itens.length)} obrigação(ões) vinculada(s) pelo regime${n?` e ${n} gerada(s) para ${fmtComp(comp)}`:''}.`);render();window.scrollTo(0,0)}
+  else toast('Cadastro salvo.');
+};
+
+/* acesso do cliente ao portal (dentro da aba Dados) */
+function secaoAcesso(e){
+  if(MODO!=='api')return `<div class="panel"><h2>Acesso ao Portal do Cliente</h2>${soNoServidor}</div>`;
+  const d=apiDado('usuarios','/api/admin/usuarios');
+  if(d.carregando)return `<div class="panel"><h2>Acesso ao Portal do Cliente</h2>${carregandoBox()}</div>`;
+  if(d.erro)return `<div class="panel"><h2>Acesso ao Portal do Cliente</h2><p class="small muted">${esc(d.erro)}</p></div>`;
+  const pode=d.dados.eu.podeClientes;
+  const us=d.dados.usuarios.filter(u=>u.ambiente==='cliente'&&u.empresas.some(x=>x.id===e.id));
+  const ST={ativo:['Ativo','ok'],convidado:['Convite pendente','info'],bloqueado:['Bloqueado','crit']};
+  return `<div class="panel"><div class="panel-head"><div><h2>Acesso ao Portal do Cliente</h2><p class="sub">Quem entra em ${esc(MF.urlCliente||'Portal do Cliente')} e vê esta empresa. Login é o e-mail; a senha tem exatamente 8 letras ou números.</p></div></div>
+   ${us.length?`<div class="table-wrap"><table><thead><tr><th>Pessoa</th><th>Perfil</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead><tbody>${us.map(u=>{const p=u.empresas.find(x=>x.id===e.id).perfil;const [st,cl]=ST[u.status]||['—',''];return `<tr><td><b>${esc(u.nome)}</b><div class="sub">${esc(u.email)}</div></td><td>${esc(p)}</td><td>${pill(st,cl)}</td><td class="small">${u.ultimo_login_em?fmtDH(u.ultimo_login_em):'Nunca'}</td><td class="r">${pode?`<div class="actions" style="justify-content:flex-end"><button class="btn sm" data-act="usuario-senha" data-id="${u.id}" data-nome="${esc(u.nome)}">Definir senha</button>${u.status==='convidado'?`<button class="btn sm" data-act="usuario-convite" data-id="${u.id}">Novo link</button>`:''}${u.status==='bloqueado'?`<button class="btn sm" data-act="usuario-status" data-id="${u.id}" data-v="ativo">Reativar</button>`:`<button class="btn sm danger" data-act="usuario-status" data-id="${u.id}" data-v="bloqueado">Bloquear</button>`}<button class="btn sm ghost" data-act="acesso-remover" data-id="${u.id}" data-emp="${e.id}">Tirar desta empresa</button></div>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted">Nenhuma pessoa com acesso a esta empresa ainda.</p>'}
+   ${pode?`<form class="form-sec" data-form="cliente-acesso" data-preservar="1" data-emp="${e.id}"><h3>Criar acesso</h3><div class="grid-f">
+     <label class="f"><span>Nome completo *</span><input name="nome" required minlength="3" value="${esc((e.socios||[]).find(s=>s.administrador)?.nome||'')}"></label>
+     <label class="f"><span>E-mail (login) *</span><input name="email" type="email" required value="${esc(us.length?'':e.email||'')}"></label>
+     <label class="f"><span>Perfil</span><select name="perfil"><option>Sócio</option><option>Financeiro</option><option>RH</option></select></label>
+     ${campoSenha8('senha-ini','senha','Senha inicial (deixe vazio para mandar convite)',false)}
+   </div><div class="actions" style="margin-top:10px"><button class="btn primary">Criar acesso</button></div><div id="acesso-msg"></div></form>`:''}
+  </div>`;
+}
+FORM['cliente-acesso']=async(fd,form)=>{
+  const e=emp(form.dataset.emp);const email=String(fd.get('email')||'').trim().toLowerCase();const senha=String(fd.get('senha')||'').trim();const perfil=fd.get('perfil');
+  if(senha&&!SENHA8.test(senha)){toast('A senha inicial precisa ter exatamente 8 letras ou números.',true);return}
+  const lista=APIC.usuarios?.dados?.usuarios||[];const existe=lista.find(u=>u.email.toLowerCase()===email);
+  try{
+    if(existe){
+      if(existe.ambiente!=='cliente'){toast('Este e-mail é de uma conta da equipe.',true);return}
+      await MF.api('PATCH','/api/admin/usuarios/'+existe.id,{empresas:[...existe.empresas.filter(x=>x.id!==e.id),{id:e.id,perfil}]});
+      if(senha)await MF.api('PUT','/api/admin/usuarios/'+existe.id+'/senha',{senha});
+      invalidar('usuarios');toast('Empresa liberada para '+existe.nome+(senha?' com a nova senha.':'. Ele usa a senha que já tem.'));return;
+    }
+    const r=await MF.api('POST','/api/admin/usuarios',{nome:fd.get('nome'),email,ambiente:'cliente',empresas:[{id:e.id,perfil}],senha:senha||undefined});
+    invalidar('usuarios');
+    const portal=(MF.urlCliente||'')+'/login';
+    const texto=senha?`Olá! Seu acesso ao Portal do Cliente do Meu Fiscal está pronto.\nEndereço: ${r.endereco||portal}\nLogin: ${email}\nSenha: ${senha}\nNo primeiro acesso, aceite os termos de uso.`:`Olá! Crie a sua senha do Portal do Cliente do Meu Fiscal por este link (vale 72 horas): ${r.link}`;
+    openModal(`${mHead('Acesso criado')}<div class="modal-body"><p>${senha?'A conta já está ativa.':'Convite criado.'} ${r.emailEnviado?'O e-mail foi enviado.':'Envie os dados ao cliente pelo WhatsApp:'}</p><textarea id="dl-text" class="mono" style="min-height:130px" readonly>${esc(texto)}</textarea></div><div class="modal-foot">${e.telefone?`<a class="btn" href="${waLink(e.telefone,texto)}" target="_blank" rel="noopener">Abrir WhatsApp</a>`:''}<button class="btn" data-act="copy-dl">Copiar</button><button class="btn primary" data-act="close-modal">Concluir</button></div>`);
+  }catch(er){toast(er.message,true)}
+};
+ACT['usuario-senha']=el=>openModal(`${mHead('Definir senha')}<form data-form="usuario-senha" data-id="${el.dataset.id}"><div class="modal-body"><p class="small">Nova senha de <b>${esc(el.dataset.nome)}</b>. As sessões abertas dessa pessoa serão encerradas e links de convite pendentes deixam de valer.</p><div class="grid-f">${campoSenha8('nova-senha','senha','Nova senha *',true)}</div></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar senha</button></div></form>`);
+FORM['usuario-senha']=async(fd,form)=>{const senha=String(fd.get('senha')||'');if(!SENHA8.test(senha)){toast('A senha precisa ter exatamente 8 letras ou números.',true);return}
+  try{await MF.api('PUT','/api/admin/usuarios/'+form.dataset.id+'/senha',{senha});closeModal();invalidar('usuarios');invalidar('equipe-admin');openModal(`${mHead('Senha definida')}<div class="modal-body"><p>Senha salva. Repasse à pessoa por um canal seguro:</p><input id="dl-text" class="mono" readonly value="${esc(senha)}" style="font-size:1.1rem"></div><div class="modal-foot"><button class="btn" data-act="copy-dl">Copiar</button><button class="btn primary" data-act="close-modal">Concluir</button></div>`)}catch(er){toast(er.message,true)}};
+ACT['usuario-convite']=async el=>{try{const r=await MF.api('POST',`/api/admin/usuarios/${el.dataset.id}/convite`,{});openModal(`${mHead('Novo link de convite')}<div class="modal-body"><p>${r.emailEnviado?'Enviado por e-mail. ':''}O link anterior deixou de valer. Vale por 72 horas:</p><textarea id="dl-text" class="mono" readonly>${esc(r.link)}</textarea></div><div class="modal-foot"><button class="btn" data-act="copy-dl">Copiar</button><button class="btn primary" data-act="close-modal">Concluir</button></div>`)}catch(er){toast(er.message,true)}};
+ACT['usuario-status']=el=>{const bloq=el.dataset.v==='bloqueado';const vai=async()=>{try{await MF.api('PATCH','/api/admin/usuarios/'+el.dataset.id,{status:el.dataset.v});invalidar('usuarios');invalidar('equipe-admin');invalidar('equipe');toast(bloq?'Acesso bloqueado. As sessões abertas foram encerradas.':'Acesso reativado.')}catch(er){toast(er.message,true)}};bloq?confirmar('Bloquear acesso','A pessoa é desconectada na hora e não consegue mais entrar até ser reativada.','Bloquear',vai,true):vai()};
+ACT['acesso-remover']=el=>{const u=(APIC.usuarios?.dados?.usuarios||[]).find(x=>x.id===el.dataset.id);if(!u)return;confirmar('Tirar acesso a esta empresa',`${esc(u.nome)} deixa de ver esta empresa no portal${u.empresas.length===1?' (e fica sem nenhuma empresa)':''}.`,'Tirar acesso',async()=>{try{await MF.api('PATCH','/api/admin/usuarios/'+u.id,{empresas:u.empresas.filter(x=>x.id!==el.dataset.emp)});invalidar('usuarios');toast('Acesso removido.')}catch(er){toast(er.message,true)}},true)};
+
+/* certificado digital */
+function abaCert(e){
+  const local=certDe(e.id);const n=local?diasAte(local.validade):null;
+  const regua=`<p class="small muted">Alertas automáticos: o painel avisa na Central de alertas e em Certificados aos 30, 15 e 7 dias do vencimento, e o cliente vê o aviso no portal.</p>`;
+  const resumo=local?`<div class="kpis"><div class="kpi"><span class="eyebrow">Validade</span><b>${fmtData(local.validade)}</b><small>${n<0?'Vencido':n+' dias restantes'}</small></div><div class="kpi"><span class="eyebrow">Situação</span><b>${n<0?pill('Vencido','crit'):n<=7?pill('Vence em '+n+' dias','crit'):n<=30?pill('Vence em '+n+' dias','warn'):pill('Válido','ok')}</b><small>${esc(local.emissor||'')}</small></div><div class="kpi"><span class="eyebrow">Titular</span><b style="font-size:1rem">${esc(local.titular||'—')}</b><small>${local.cnpjCert?fmtCNPJ(local.cnpjCert):''}</small></div></div>`:'';
+  if(MODO!=='api')return `<div class="panel"><h2>Certificado digital A1</h2>${resumo||'<p class="small muted">Nenhum certificado registrado.</p>'}${regua}${soNoServidor}</div>`;
+  if(!podeMod('cert','ver'))return `<div class="panel">${vazio('Seu acesso não inclui certificados digitais.')}</div>`;
+  const d=apiDado('cert:'+e.id,'/api/certificados/'+e.id);const c=d.dados?.certificado;const ed=podeMod('cert','editar');
+  return `<div class="panel"><div class="panel-head"><h2>Certificado digital A1</h2>${c&&ed?`<div class="actions"><button class="btn sm" data-act="cert-senha" data-id="${e.id}">${svg('eye')}Ver senha</button><a class="btn sm" href="/api/certificados/${encodeURIComponent(e.id)}/arquivo">${svg('download')}Baixar .pfx</a><button class="btn sm danger" data-act="cert-remover" data-id="${e.id}">Remover</button></div>`:''}</div>
+  ${resumo}${d.carregando?carregandoBox():c?`<p class="small muted">Arquivo <b>${esc(c.nome_arquivo||'')}</b> guardado com criptografia${c.enviado_por?` · enviado por ${esc(c.enviado_por)}`:''} em ${fmtDH(c.enviado_em)}.</p>`:'<p class="small muted">Nenhum certificado guardado no cofre do escritório.</p>'}${regua}</div>
+  ${ed?`<form class="panel" data-form="cert-upload" data-preservar="1" data-id="${e.id}"><h2>${c?'Substituir certificado':'Enviar certificado'}</h2><p class="sub">O arquivo e a senha são guardados cifrados (AES-256). O sistema confere a senha, lê a validade e o CNPJ do próprio certificado.</p><div class="grid-f">
+   <label class="f"><span>Arquivo .pfx ou .p12 *</span><input type="file" name="pfx" accept=".pfx,.p12" required></label>
+   <label class="f"><span>Senha do certificado *</span><input type="password" name="senha" required autocomplete="off"></label>
+  </div><div class="actions" style="margin-top:10px"><button class="btn primary">${svg('lock')}Validar e guardar</button></div></form>`:''}`;
+}
+FORM['cert-upload']=async(fd,form,ignorar)=>{
+  const f=fd.get('pfx');const senha=String(fd.get('senha')||'');if(!f||!f.size){toast('Escolha o arquivo .pfx.',true);return}
+  if(!/\.(pfx|p12)$/i.test(f.name)){toast('Envie um arquivo .pfx ou .p12.',true);return}if(f.size>100*1024){toast('Arquivo grande demais para um certificado A1.',true);return}
+  const b64=await new Promise(ok=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.readAsDataURL(f)});
+  try{const r=await MF.api('POST','/api/certificados/'+form.dataset.id,{arquivo:b64,nome:f.name,senha,ignorarCnpj:!!ignorar});
+    form.reset();invalidar('cert:'+form.dataset.id);toast('Certificado guardado. Válido até '+fmtData(r.certificado.valido_ate)+'.')}
+  catch(er){if(er.status===409&&!ignorar){confirmar('CNPJ diferente',esc(er.message)+' Guardar mesmo assim?','Guardar mesmo assim',()=>FORM['cert-upload'](fd,form,true))}else toast(er.message,true)}
+};
+ACT['cert-senha']=async el=>{try{const r=await MF.api('POST',`/api/certificados/${encodeURIComponent(el.dataset.id)}/senha`,{});openModal(`${mHead('Senha do certificado')}<div class="modal-body"><p class="small muted">Esta consulta ficou registrada na auditoria.</p><input id="dl-text" class="mono" readonly value="${esc(r.senha)}"></div><div class="modal-foot"><button class="btn" data-act="copy-dl">Copiar</button><button class="btn primary" data-act="close-modal">Fechar</button></div>`)}catch(er){toast(er.message,true)}};
+ACT['cert-remover']=el=>confirmar('Remover certificado','O arquivo e a senha serão apagados do cofre. O registro de validade continua para o histórico de alertas.','Remover',async()=>{try{await MF.api('DELETE','/api/certificados/'+encodeURIComponent(el.dataset.id));invalidar('cert:'+el.dataset.id);toast('Certificado removido.')}catch(er){toast(er.message,true)}},true);
+
+/* cofre de senhas */
+const PORTAIS=['Prefeitura · NFS-e','SEFAZ Estadual','e-CAC (Receita Federal)','FGTS Digital','eSocial / gov.br','Junta Comercial','Simples Nacional / SIMEI','Previdência / INSS','Outro'];
+const REVELADAS={};
+function abaCofre(e){
+  if(MODO!=='api')return `<div class="panel"><h2>Cofre de senhas e portais</h2>${soNoServidor}</div>`;
+  if(!podeMod('cofre','ver'))return `<div class="panel">${vazio('Seu acesso não inclui o cofre de senhas.')}</div>`;
+  const d=apiDado('cofre:'+e.id,'/api/cofre/'+e.id);if(d.carregando)return `<div class="panel">${carregandoBox()}</div>`;if(d.erro)return `<div class="panel"><p class="small muted">${esc(d.erro)}</p></div>`;
+  const {itens,podeEditar}=d.dados;
+  return `<div class="panel"><div class="panel-head"><div><h2>Cofre de senhas e portais</h2><p class="sub">Senhas guardadas com criptografia. Toda vez que alguém revela uma senha, fica registrado quem viu e quando.</p></div>${podeEditar?`<button class="btn primary" data-act="cofre-form" data-emp="${e.id}">${svg('plus')}Adicionar portal</button>`:''}</div>
+  ${itens.length?`<div class="table-wrap"><table class="tabela-cofre"><thead><tr><th>Portal</th><th>Login</th><th>Senha</th><th>Atualizado</th><th></th></tr></thead><tbody>${itens.map(i=>`<tr><td><b>${esc(i.portal)}</b>${i.url?`<div class="sub"><a href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">${esc(i.url.replace(/^https?:\/\//,'').slice(0,40))}</a></div>`:''}${i.observacao?`<div class="sub">${esc(i.observacao)}</div>`:''}</td><td data-r="Login">${i.login?`<span class="mono small">${esc(i.login)}</span> <button class="btn sm ghost" data-act="copiar" data-t="${esc(i.login)}">Copiar</button>`:'—'}</td>
+   <td data-r="Senha">${i.tem_senha?(REVELADAS[i.id]?`<span class="mono">${esc(REVELADAS[i.id])}</span> <button class="btn sm ghost" data-act="copiar" data-t="${esc(REVELADAS[i.id])}">Copiar</button>`:`<span class="mono muted">••••••••</span> <button class="btn sm" data-act="cofre-revelar" data-emp="${e.id}" data-id="${i.id}">${svg('eye')}Revelar</button>`):'<span class="muted small">Sem senha</span>'}</td>
+   <td class="small" data-r="Atualizado">${fmtDH(i.atualizado_em)}${i.atualizado_por?`<div class="muted">${esc(i.atualizado_por)}</div>`:''}</td><td class="r">${podeEditar?`<div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-act="cofre-form" data-emp="${e.id}" data-id="${i.id}">Editar</button><button class="btn sm danger" data-act="cofre-excluir" data-emp="${e.id}" data-id="${i.id}">Excluir</button></div>`:''}</td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhuma senha guardada para esta empresa.')}</div>`;
+}
+ACT['cofre-revelar']=async el=>{try{const r=await MF.api('POST',`/api/cofre/${encodeURIComponent(el.dataset.emp)}/${el.dataset.id}/revelar`,{});REVELADAS[el.dataset.id]=r.senha;render();setTimeout(()=>{delete REVELADAS[el.dataset.id];agendarRender()},30000)}catch(er){toast(er.message,true)}};
+ACT['cofre-form']=el=>{const i=el.dataset.id?(APIC['cofre:'+el.dataset.emp]?.dados?.itens||[]).find(x=>x.id===el.dataset.id):{};const preset=PORTAIS.includes(i.portal)?i.portal:(i.portal?'Outro':PORTAIS[0]);
+  openModal(`${mHead(i.id?'Editar portal':'Adicionar portal')}<form data-form="cofre-item" data-emp="${el.dataset.emp}" data-id="${i.id||''}"><div class="modal-body"><div class="grid-f">
+  <label class="f"><span>Portal</span><select name="preset">${PORTAIS.map(p=>`<option ${p===preset?'selected':''}>${p}</option>`).join('')}</select></label>
+  <label class="f"><span>Nome (se escolher "Outro")</span><input name="outro" maxlength="80" value="${esc(preset==='Outro'?i.portal||'':'')}"></label>
+  <label class="f full"><span>Endereço do portal</span><input name="url" type="url" placeholder="https://" value="${esc(i.url||'')}"></label>
+  <label class="f"><span>Login / usuário / CPF / CNPJ</span><input name="login" autocomplete="off" value="${esc(i.login||'')}"></label>
+  <label class="f"><span>Senha${i.id?' (vazio mantém a atual)':''}</span><input name="senha" type="password" autocomplete="new-password"></label>
+  <label class="f full"><span>Observação</span><input name="observacao" maxlength="300" value="${esc(i.observacao||'')}" placeholder="Ex.: código de acesso, perguntas de segurança, quem renova"></label>
+  </div></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">${svg('lock')}Guardar</button></div></form>`)};
+FORM['cofre-item']=async(fd,form)=>{const portal=fd.get('preset')==='Outro'?String(fd.get('outro')||'').trim():fd.get('preset');if(!portal){toast('Informe o nome do portal.',true);return}
+  try{await MF.api('POST','/api/cofre/'+encodeURIComponent(form.dataset.emp),{id:form.dataset.id||undefined,portal,url:String(fd.get('url')||'').trim(),login:fd.get('login'),senha:fd.get('senha')||undefined,observacao:fd.get('observacao')});closeModal();invalidar('cofre:'+form.dataset.emp);toast('Guardado no cofre.')}catch(er){toast(er.message,true)}};
+ACT['cofre-excluir']=el=>confirmar('Excluir do cofre','O login e a senha deste portal serão apagados.','Excluir',async()=>{try{await MF.api('DELETE',`/api/cofre/${encodeURIComponent(el.dataset.emp)}/${el.dataset.id}`);invalidar('cofre:'+el.dataset.emp);toast('Excluído.')}catch(er){toast(er.message,true)}},true);
+
+/* responsáveis por setor */
+const SETORES=[['Fiscal','Responsável fiscal'],['Pessoal','Responsável pessoal / folha'],['Contábil','Responsável contábil'],['Legalização','Responsável legalização / geral']];
+function abaResp(e){
+  const lista=listaEquipe();if(!lista)return `<div class="panel">${carregandoBox()}</div>`;
+  const r=e.responsaveis||{};const ed=podeMod('carteira','editar');
+  return `<form class="panel" data-form="responsaveis" data-preservar="1" data-id="${e.id}"><h2>Atendentes responsáveis</h2><p class="sub">Quem cuida desta empresa em cada departamento. As obrigações geradas já saem atribuídas ao responsável do departamento.</p>
+  <div class="grid-f">${SETORES.map(([k,rot])=>`<label class="f"><span>${rot}</span><select name="${k}" ${ed?'':'disabled'}><option value="">Sem responsável</option>${lista.map(p=>`<option value="${p.id}" ${r[k]===p.id?'selected':''}>${esc(p.nome)}${p.funcao?' · '+esc(p.funcao):''}</option>`).join('')}</select></label>`).join('')}</div>
+  ${ed?`<div class="actions" style="margin-top:12px"><button class="btn primary">Salvar responsáveis</button></div>`:''}</form>
+  <div class="panel"><h2>Carteira de cada responsável</h2><div class="list">${lista.map(p=>{const n=S.empresas.filter(x=>x.status!=='inativo'&&Object.values(x.responsaveis||{}).includes(p.id)).length;return `<div class="row"><div class="grow"><b>${esc(p.nome)}</b> <span class="small muted">${esc(p.funcao||'')}</span></div><span class="num small">${n} empresa${n!==1?'s':''}</span></div>`}).join('')}</div></div>`;
+}
+FORM['responsaveis']=(fd,form)=>{const e=emp(form.dataset.id);const r={};SETORES.forEach(([k])=>{const v=fd.get(k);if(v)r[k]=v});
+  mut(['empresas','obrigacoes'],()=>{e.responsaveis=r;S.obrigacoes.filter(o=>o.empresaId===e.id&&o.status!=='entregue').forEach(o=>{const n=respDe(e,o.depto);if(n)o.responsavel=n})},['Carteira','Definiu responsáveis',e.razao]);toast('Responsáveis salvos.')};
+
+/* obrigações vinculadas */
+function abaObrig(e){
+  if(!S.catalogo.length)return `<div class="panel">${vazio('O catálogo de obrigações ainda não foi criado. Ele define o pacote automático de cada regime.',podeMod('obrig','editar')?`<button class="btn primary" data-act="catalogo-padrao">Criar catálogo e regimes padrão</button>`:'')}</div>`;
+  const p=pacoteDaEmpresa(e);const comp=compDe('obrig');const ed=podeMod('obrig','editar');
+  const fora=S.catalogo.filter(o=>o.ativo!==false&&!p.itens.some(x=>x.o.id===o.id));
+  return `<div class="panel"><div class="panel-head"><div><h2>Obrigações vinculadas</h2><p class="sub">Regime: <b>${esc(p.regime?p.regime.nome:'sem regime definido')}</b>. O pacote do regime entra automaticamente; aqui você inclui avulsas ou tira itens só desta empresa.</p></div>${ed?`<button class="btn" data-act="obrig-gerar-emp" data-id="${e.id}">Gerar ${fmtComp(comp)} desta empresa</button>`:''}</div>
+  ${p.itens.length?`<div class="table-wrap"><table><thead><tr><th>Obrigação</th><th>Origem</th><th>Vencimento</th><th>Próximo prazo (${fmtComp(comp)})</th><th></th></tr></thead><tbody>${p.itens.sort((a,b)=>a.o.nome.localeCompare(b.o.nome)).map(({o,origem})=>{const devida=devidaNaComp(o,comp)&&condicaoOk(o,e);return `<tr><td><b>${esc(o.nome)}</b><div class="sub">${esc(o.depto)} · ${RECORRENCIAS[o.recorrencia]}${o.condicao?' · '+esc(CONDICOES[o.condicao]):''}</div></td><td>${origem==='regime'?pill('Pacote do regime',''):pill('Avulsa','info')}</td><td class="small">${textoVenc(o)}</td><td class="num small">${devida?fmtData(vencimentoDe(o,comp)):'<span class="muted">Não se aplica neste mês</span>'}</td><td class="r">${ed?`<button class="btn sm ghost" data-act="obrig-tirar" data-id="${e.id}" data-o="${o.id}" data-origem="${origem}">Tirar</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted">Nenhuma obrigação vinculada.</p>'}
+  ${ed&&fora.length?`<form class="form-sec" data-form="obrig-avulsa" data-preservar="1" data-id="${e.id}"><h3>Adicionar obrigação avulsa</h3><div class="grid-f"><label class="f full"><span>Obrigação do catálogo</span><select name="o">${fora.map(o=>`<option value="${o.id}">${esc(o.nome)} · ${esc(o.depto)}</option>`).join('')}</select></label></div><div class="actions" style="margin-top:10px"><button class="btn">${svg('plus')}Adicionar</button></div></form>`:''}
+  ${p.removidas.length?`<div class="form-sec"><h3>Retiradas do pacote do regime</h3><div class="list">${p.removidas.map(o=>`<div class="row"><div class="grow">${esc(o.nome)}</div>${ed?`<button class="btn sm" data-act="obrig-restaurar" data-id="${e.id}" data-o="${o.id}">Devolver ao pacote</button>`:''}</div>`).join('')}</div></div>`:''}</div>`;
+}
+ACT['obrig-tirar']=el=>{const e=emp(el.dataset.id);const id=el.dataset.o;mut('empresas',()=>{if(el.dataset.origem==='regime')e.obrigRemovidas=[...new Set([...(e.obrigRemovidas||[]),id])];else e.obrigExtras=(e.obrigExtras||[]).filter(x=>x!==id)},['Obrigações','Tirou obrigação da empresa',e.razao]);toast('Obrigação retirada desta empresa. As já geradas continuam no histórico.')};
+ACT['obrig-restaurar']=el=>{const e=emp(el.dataset.id);mut('empresas',()=>{e.obrigRemovidas=(e.obrigRemovidas||[]).filter(x=>x!==el.dataset.o)},['Obrigações','Devolveu obrigação ao pacote',e.razao])};
+FORM['obrig-avulsa']=(fd,form)=>{const e=emp(form.dataset.id);const id=fd.get('o');mut('empresas',()=>{if((e.obrigRemovidas||[]).includes(id))e.obrigRemovidas=e.obrigRemovidas.filter(x=>x!==id);else e.obrigExtras=[...new Set([...(e.obrigExtras||[]),id])]},['Obrigações','Incluiu obrigação avulsa',e.razao]);toast('Obrigação incluída.')};
+ACT['obrig-gerar-emp']=el=>{const e=emp(el.dataset.id);const comp=compDe('obrig');let n=0;mut('obrigacoes',()=>{n=gerarObrigacoes([e],comp)},['Obrigações','Gerou obrigações de '+fmtComp(comp),e.razao]);toast(n?n+' obrigação(ões) gerada(s) para '+fmtComp(comp)+'.':'As obrigações de '+fmtComp(comp)+' já estavam geradas.')};
+
+/* ---------- Equipe e permissões ---------- */
+function aEquipe(){
+  if(MODO!=='api')return aEquipeAntiga();
+  const t=UI.tab.equipe||'equipe';
+  const abas=`<div class="tabs" role="tablist">${[['equipe','Equipe'],['aud','Auditoria de ações'],['seg','Acessos e segredos']].map(([k,r])=>`<button role="tab" aria-selected="${t===k}" data-act="tab" data-k="equipe" data-v="${k}">${r}</button>`).join('')}</div>`;
+  const cab=head('Equipe e permissões','Colaboradores do escritório, função de cada um e o que cada pessoa pode ver ou editar.',ehMaster()&&t==='equipe'?`<button class="btn primary" data-act="colab-form">${svg('plus')}Novo colaborador</button>`:'');
+  if(t==='aud'){const h=aEquipeAntiga();const i=h.indexOf('<div class="panel"><div class="panel-head"><h2>Registro de auditoria');return cab+abas+(i>=0?h.slice(i):'')}
+  if(t==='seg'){const d=apiDado('acessos-log','/api/admin/acessos-log');return cab+abas+`<div class="panel"><div class="panel-head"><h2>Logins, senhas e cofre</h2><button class="btn sm" data-act="recarregar-log">Atualizar</button></div>${d.carregando?carregandoBox():d.erro?`<p class="small muted">${esc(d.erro)}</p>`:`<div class="table-wrap"><table><thead><tr><th>Quando</th><th>Quem</th><th>Evento</th><th>Detalhe</th></tr></thead><tbody>${d.dados.registros.map(l=>`<tr><td class="num small">${fmtDH(l.em)}</td><td class="small">${esc(l.nome||l.email||'—')}</td><td class="small">${esc(EVENTOS[l.acao]||l.acao)}</td><td class="small muted">${esc(l.detalhe||'')}</td></tr>`).join('')||'<tr><td colspan="4" class="muted">Nada registrado.</td></tr>'}</tbody></table></div>`}</div>`}
+  const d=apiDado('equipe-admin','/api/admin/usuarios');
+  if(d.carregando)return cab+abas+`<div class="panel">${carregandoBox()}</div>`;if(d.erro)return cab+abas+`<div class="panel"><p class="small muted">${esc(d.erro)}</p></div>`;
+  const eq=d.dados.usuarios.filter(u=>u.ambiente==='equipe');const ST={ativo:['Ativo','ok'],convidado:['Convite pendente','info'],bloqueado:['Desativado','crit']};
+  return cab+abas+`<div class="panel"><div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>Função</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead><tbody>${eq.map(u=>{const [st,cl]=ST[u.status]||['—',''];const ajust=Object.keys(u.permissoes||{}).length;return `<tr><td><b>${esc(u.nome)}</b>${u.id===ME.id?' <span class="tag">você</span>':''}<div class="sub">${esc(u.email)}</div></td><td>${esc(u.funcao||(u.papel==='master'?'Master':'—'))}${ajust?`<div class="sub">${ajust} permissão(ões) ajustada(s)</div>`:''}</td><td>${pill(st,cl)}</td><td class="small">${u.ultimo_login_em?fmtDH(u.ultimo_login_em):'Nunca'}</td>
+   <td class="r">${ehMaster()?`<div class="actions" style="justify-content:flex-end"><button class="btn sm" data-act="colab-form" data-id="${u.id}">Editar</button><button class="btn sm" data-act="usuario-senha" data-id="${u.id}" data-nome="${esc(u.nome)}">Definir senha</button>${u.status==='convidado'?`<button class="btn sm" data-act="usuario-convite" data-id="${u.id}">Novo link</button>`:''}${u.id!==ME.id?(u.status==='bloqueado'?`<button class="btn sm" data-act="usuario-status" data-id="${u.id}" data-v="ativo">Reativar</button>`:`<button class="btn sm danger" data-act="usuario-status" data-id="${u.id}" data-v="bloqueado">Desativar</button>`):''}</div>`:''}</td></tr>`}).join('')}</tbody></table></div></div>
+  <div class="panel"><h2>O que cada função pode fazer por padrão</h2><p class="sub">O master pode ajustar módulo a módulo para cada pessoa em "Editar".</p><div class="table-wrap"><table class="matriz-perm"><thead><tr><th>Módulo</th>${Object.keys(d.dados.funcoes).map(f=>`<th>${esc(f)}</th>`).join('')}</tr></thead><tbody>${d.dados.modulos.map(([m,r])=>`<tr><td>${esc(r)}</td>${Object.values(d.dados.funcoes).map(p=>`<td>${nivelPill(p[m])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
+}
+const EVENTOS={entrar_painel:'Entrou no painel',entrar_cliente:'Entrou no portal',entrar_falha_painel:'Senha errada no painel',entrar_falha_cliente:'Senha errada no portal',cliente_tentou_painel:'Cliente tentou entrar no painel',cofre_senha_revelada:'Revelou senha do cofre',cofre_salvo:'Salvou senha no cofre',cofre_removido:'Excluiu senha do cofre',certificado_a1_salvo:'Guardou certificado A1',certificado_senha_revelada:'Revelou senha do certificado',certificado_baixado:'Baixou certificado A1',certificado_removido:'Removeu certificado A1',senha_definida_pelo_escritorio:'Senha definida pelo master',usuario_alterado:'Alterou usuário',usuario_convidado:'Convidou usuário',usuario_criado_com_senha:'Criou usuário com senha',convite_aceito_painel:'Aceitou convite (painel)',convite_aceito_cliente:'Aceitou convite (portal)',senha_redefinida_painel:'Redefiniu senha (painel)',senha_redefinida_cliente:'Redefiniu senha (portal)'};
+ACT['recarregar-log']=()=>{invalidar('acessos-log');render()};
+const nivelPill=n=>n==='editar'?pill('Editar','ok'):n==='ver'?pill('Consultar','info'):pill('Sem acesso','');
+ACT['colab-form']=el=>{
+  const d=APIC['equipe-admin']?.dados;if(!d)return;const u=el.dataset.id?d.usuarios.find(x=>x.id===el.dataset.id):null;const func=u?.funcao||(u?.papel==='master'?'Master':'Analista Fiscal');const aj=u?.permissoes||{};
+  openModal(`${mHead(u?'Editar colaborador':'Novo colaborador')}<form data-form="colaborador" data-id="${u?.id||''}"><div class="modal-body"><div class="grid-f">
+   <label class="f"><span>Nome completo *</span><input name="nome" required minlength="3" value="${esc(u?.nome||'')}"></label>
+   <label class="f"><span>E-mail corporativo (login) *</span><input name="email" type="email" required value="${esc(u?.email||'')}" ${u?'disabled':''}></label>
+   <label class="f"><span>Função</span><select name="funcao" data-change="funcao-perm">${Object.keys(d.funcoes).map(f=>`<option ${f===func?'selected':''}>${esc(f)}</option>`).join('')}</select></label>
+   ${u?'':campoSenha8('senha-colab','senha','Senha inicial (vazio = convite por link)',false)}
+  </div><div class="form-sec"><h3>Permissões por módulo</h3><p class="sub">"Padrão" segue a função escolhida. Ajuste só o que for diferente para esta pessoa.</p>
+  <div class="table-wrap"><table class="matriz-perm"><thead><tr><th>Módulo</th><th>Padrão da função</th><th>Para esta pessoa</th></tr></thead><tbody>${d.modulos.map(([m,r])=>`<tr><td>${esc(r)}</td><td data-padrao="${m}">${nivelPill(d.funcoes[func][m])}</td><td><select name="perm_${m}" style="width:auto"><option value="">Padrão</option>${['nenhum','ver','editar'].map(n=>`<option value="${n}" ${aj[m]===n?'selected':''}>${NIVEL_NOME[n]}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">${u?'Salvar':'Cadastrar colaborador'}</button></div></form>`,true);
+};
+document.addEventListener('change',ev=>{if(ev.target.dataset.change!=='funcao-perm')return;const d=APIC['equipe-admin']?.dados;if(!d)return;const f=d.funcoes[ev.target.value];document.querySelectorAll('[data-padrao]').forEach(td=>{td.innerHTML=nivelPill(f[td.dataset.padrao])})});
+FORM['colaborador']=async(fd,form)=>{
+  const d=APIC['equipe-admin'].dados;const permissoes={};d.modulos.forEach(([m])=>{const v=fd.get('perm_'+m);if(v)permissoes[m]=v});
+  const senha=String(fd.get('senha')||'').trim();if(senha&&!SENHA8.test(senha)){toast('A senha inicial precisa ter exatamente 8 letras ou números.',true);return}
+  try{
+    if(form.dataset.id){await MF.api('PATCH','/api/admin/usuarios/'+form.dataset.id,{nome:fd.get('nome'),funcao:fd.get('funcao'),permissoes});closeModal();invalidar('equipe-admin');invalidar('equipe');toast('Colaborador atualizado. As novas permissões valem em até 10 segundos.');return}
+    const r=await MF.api('POST','/api/admin/usuarios',{nome:fd.get('nome'),email:fd.get('email'),ambiente:'equipe',funcao:fd.get('funcao'),permissoes,senha:senha||undefined});
+    closeModal();invalidar('equipe-admin');invalidar('equipe');
+    const texto=senha?`Seu acesso ao Painel Contábil do Meu Fiscal está pronto.\nEndereço: ${r.endereco}\nLogin: ${fd.get('email')}\nSenha: ${senha}`:`Crie a sua senha do Painel Contábil do Meu Fiscal por este link (vale 72 horas): ${r.link}`;
+    openModal(`${mHead('Colaborador cadastrado')}<div class="modal-body"><p>${r.emailEnviado?'O convite foi enviado por e-mail. ':''}Repasse os dados de acesso:</p><textarea id="dl-text" class="mono" readonly style="min-height:110px">${esc(texto)}</textarea></div><div class="modal-foot"><button class="btn" data-act="copy-dl">Copiar</button><button class="btn primary" data-act="close-modal">Concluir</button></div>`);
+  }catch(er){toast(er.message,true)}
+};
+/* ==== MÓDULOS v2 (fim) ==== */
+
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();
 </script>

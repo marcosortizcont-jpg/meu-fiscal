@@ -32,6 +32,8 @@ export const CONFIG = {
     maxBytesBanco: Number(e.ARQUIVOS_MAX_MB_BANCO || 4) * 1024 * 1024,   // o proxy dos sites limita o corpo da requisição
     s3: { endpoint: (e.S3_ENDPOINT || '').replace(/\/$/, ''), regiao: e.S3_REGIAO || 'auto', bucket: e.S3_BUCKET, chave: e.S3_ACCESS_KEY_ID, segredo: e.S3_SECRET_ACCESS_KEY },
   },
+  // chave do cofre (certificados e senhas de portais): 32+ caracteres; sem ela os segredos não podem ser lidos
+  cofreChave: e.COFRE_CHAVE || (PRODUCAO ? '' : 'chave-de-desenvolvimento-nao-usar-em-producao'),
   email: { resend: e.RESEND_API_KEY, remetente: e.EMAIL_REMETENTE || 'Meu Fiscal <nao-responda@meufiscal.com.br>' },
   ia: { chave: e.ANTHROPIC_API_KEY, modelo: e.IA_MODELO || 'claude-sonnet-5-5' },
 };
@@ -58,6 +60,7 @@ export function validarConfig() {
   if (PRODUCAO) {
     if (!CONFIG.urlApiPublica.startsWith('https://')) erros.push('URL_PUBLICA_API precisa ser https:// em produção.');
     [...CONFIG.origens.cliente, ...CONFIG.origens.painel].forEach(o => { if (!o.startsWith('https://')) erros.push('Origem sem https: ' + o); });
+    if (!CONFIG.cofreChave || CONFIG.cofreChave.length < 32) { console.warn('[aviso] COFRE_CHAVE ausente ou curta: certificados e cofre de senhas ficam indisponíveis até ela ser definida.'); CONFIG.cofreChave = ''; }
     if (CONFIG.arquivos.driver === 'disco') erros.push('ARQUIVOS_DRIVER=disco não serve em produção (o disco do plano gratuito é apagado a cada deploy). Use banco ou s3.');
   }
   if (!['s3', 'banco', 'disco'].includes(CONFIG.arquivos.driver)) erros.push('ARQUIVOS_DRIVER precisa ser s3, banco ou disco.');

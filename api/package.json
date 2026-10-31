@@ -7,7 +7,7 @@
     "node": ">=20"
   },
   "scripts": {
-    "start": "node scripts/aplicar-schema.mjs && node scripts/inicializar.mjs && node src/servidor.js",
+    "start": "node scripts/aplicar-schema.mjs && node scripts/inicializar.mjs && node --openssl-legacy-provider src/servidor.js",
     "dev": "node --watch src/servidor.js",
     "db:schema": "node scripts/aplicar-schema.mjs",
     "criar-master": "node scripts/criar-master.mjs",

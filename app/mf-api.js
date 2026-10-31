@@ -179,8 +179,8 @@
   M.rodape = function () {
     const txt = M.estado === 'online' ? 'Tempo real · conectado' : M.estado === 'reconectando' ? 'Reconectando…' : 'Conectando…';
     return `<span class="conn ${M.estado === 'online' ? 'ok' : ''}" id="mf-selo"><i></i>${txt}</span>
-      <span>${esc(ME.nome)}${M.site === 'painel' && M.eu?.usuario?.papel ? ' · ' + esc({ master: 'Master', gestor: 'Gestor', analista: 'Analista' }[M.eu.usuario.papel]) : ''}</span>
-      <span style="display:flex;gap:10px;flex-wrap:wrap">${M.site === 'painel' ? '<a href="/admin/cadastro" style="color:inherit">Acessos e equipe</a>' : ''}<a href="#" data-act="mf-sair" style="color:inherit">Sair</a></span>`;
+      <span>${esc(ME.nome)}${M.site === 'painel' && (ME.funcao || ME.papel) ? ' · ' + esc(ME.funcao || ({ master: 'Master' }[ME.papel] || 'Equipe')) : ''}</span>
+      <span style="display:flex;gap:10px;flex-wrap:wrap">${M.site === 'painel' && typeof podeMod === 'function' && podeMod('equipe', 'ver') ? '<a href="#a-equipe" style="color:inherit">Equipe e permissões</a>' : ''}<a href="#" data-act="mf-sair" style="color:inherit">Sair</a></span>`;
   };
   function selo() {
     const el = document.getElementById('mf-selo'); if (!el) return;
@@ -200,6 +200,9 @@
     }
     M.eu = eu;
     ME.id = eu.usuario.id; ME.nome = eu.usuario.nome; ME.canEdit = M.site === 'painel';
+    ME.papel = eu.usuario.papel; ME.funcao = eu.usuario.funcao; ME.perm = eu.usuario.permissoes || null;
+    M.urlCliente = eu.urls?.cliente || ''; M.urlPainel = eu.urls?.painel || '';
+    if (M.site === 'painel' && typeof aplicarPermissoes === 'function') aplicarPermissoes();
     Object.assign(CAP, { db: null, sample: eu.recursos.ia ? sample : null, assets, downloads, user: M.site === 'painel' ? usuarios : null });
     try { await carregarTudo(); }
     catch (e) { if (e.code !== 'sessao') telaCarregando('Falha ao carregar os dados: ' + e.message, true); return; }

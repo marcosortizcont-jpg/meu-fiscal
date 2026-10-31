@@ -27,6 +27,10 @@ CREATE TABLE IF NOT EXISTS usuarios (
   CONSTRAINT cliente_sem_papel CHECK (ambiente = 'equipe'  OR papel IS NULL)
 );
 CREATE UNIQUE INDEX IF NOT EXISTS usuarios_email_unico ON usuarios (lower(email));
+-- Função na equipe (Master, Analista Fiscal, Analista de DP, Analista Contábil, Legalização) e ajustes de permissão por módulo
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS funcao TEXT;
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permissoes JSONB NOT NULL DEFAULT '{}';
+UPDATE usuarios SET funcao = 'Master' WHERE papel = 'master' AND funcao IS NULL;
 
 -- Quais empresas cada usuário-cliente enxerga e com que perfil (vários CNPJs no mesmo login)
 CREATE TABLE IF NOT EXISTS usuarios_empresas (
@@ -91,6 +95,38 @@ CREATE TABLE IF NOT EXISTS arquivos_conteudo (
   id        UUID PRIMARY KEY REFERENCES arquivos(id) ON DELETE CASCADE,
   conteudo  BYTEA NOT NULL
 );
+
+-- Certificado A1 de cada empresa: arquivo e senha cifrados com COFRE_CHAVE (AES-256-GCM)
+CREATE TABLE IF NOT EXISTS certificados_a1 (
+  escritorio_id  UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  empresa_id     TEXT NOT NULL,
+  pfx_cifrado    BYTEA NOT NULL,
+  senha_cifrada  BYTEA NOT NULL,
+  nome_arquivo   TEXT,
+  titular        TEXT,
+  cnpj           TEXT,
+  emissor        TEXT,
+  valido_de      DATE,
+  valido_ate     DATE NOT NULL,
+  enviado_por    UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+  enviado_em     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (escritorio_id, empresa_id)
+);
+
+-- Cofre de senhas dos portais do cliente (Prefeitura/NFS-e, SEFAZ, e-CAC, FGTS Digital, Junta, SIMEI…)
+CREATE TABLE IF NOT EXISTS cofre_senhas (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id   UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  empresa_id      TEXT NOT NULL,
+  portal          TEXT NOT NULL,
+  url             TEXT,
+  login           TEXT,
+  senha_cifrada   BYTEA,
+  observacao      TEXT,
+  atualizado_por  UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+  atualizado_em   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS cofre_empresa ON cofre_senhas (escritorio_id, empresa_id);
 
 CREATE TABLE IF NOT EXISTS acessos_log (
   id          BIGSERIAL PRIMARY KEY,

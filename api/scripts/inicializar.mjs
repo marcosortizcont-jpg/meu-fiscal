@@ -21,7 +21,7 @@ try {
   if (usuarios === 0 && EMAIL_RE.test(email)) {
     if (!esc) [esc] = await db.query('INSERT INTO escritorios (nome) VALUES ($1) RETURNING id', [e.ESCRITORIO_NOME || 'Meu escritório']);
     const nome = String(e.MASTER_NOME || email.split('@')[0]).trim();
-    const [u] = await db.query(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, status) VALUES ($1,$2,$3,'equipe','master','convidado') RETURNING id`, [esc.id, nome, email]);
+    const [u] = await db.query(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, funcao, status) VALUES ($1,$2,$3,'equipe','master','Master','convidado') RETURNING id`, [esc.id, nome, email]);
     const token = aleatorio(32);
     await db.query(`INSERT INTO tokens (hash, usuario_id, tipo, expira_em) VALUES ($1,$2,'convite', now() + interval '72 hours')`, [sha256(token), u.id]);
     console.log('\n================ PRIMEIRO ACESSO ================');

@@ -19,6 +19,8 @@ services:
         generateValue: true
       - key: JWT_SECRET_PAINEL
         generateValue: true
+      - key: COFRE_CHAVE               # chave do cofre (certificados e senhas). NUNCA troque depois de usar: os segredos ficariam ilegíveis.
+        generateValue: true
       - key: DATABASE_URL              # Neon, com Connection pooling ligado (tem "-pooler")
         sync: false
       - key: DATABASE_URL_DIRECT       # Neon, com Connection pooling desligado

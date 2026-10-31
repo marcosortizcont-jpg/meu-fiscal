@@ -8,6 +8,8 @@ import { assinarJwt, verificarJwt, hashSenha, conferirSenha, sha256, aleatorio, 
 import { COLECOES, empresaDe, filtroLeitura, podeLer, visivelAoCliente, prepararLeitura, conferirEscrita, carimbar } from './regras.js';
 import { urlEnvio, urlDownload, caminhoDisco, gravarDisco } from './arquivos.js';
 import { enviarEmail, emailLink, perguntarIA } from './externos.js';
+import { MODULOS, FUNCOES, permissoesEfetivas, pode, limparPermissoes } from './permissoes.js';
+import { registrarGestao } from './gestao.js';
 
 const AUD = site => `meufiscal:${site}`;
 export const ROTA_SENHA = { cliente: '/definir-senha', painel: '/admin/definir-senha' };
@@ -30,13 +32,14 @@ export function registrarRotas(r, { db, hub }) {
   async function usuarioDaSessao(site, sid) {
     const chave = sha256(sid);
     const c = cache.get(chave); if (c && c.ate > Date.now()) return c.u;
-    const [u] = await db.query(`SELECT u.id, u.escritorio_id, u.nome, u.email, u.ambiente, u.papel, s.id AS sessao_id
+    const [u] = await db.query(`SELECT u.id, u.escritorio_id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, s.id AS sessao_id
       FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
       WHERE s.id = $1 AND s.site = $2 AND s.revogada_em IS NULL AND s.expira_em > now() AND u.status = 'ativo' AND u.ambiente = $3`,
       [chave, site, AMBIENTE_DO_SITE[site]]);
     if (!u) return null;
     u.site = site;
     u.empresas = u.ambiente === 'cliente' ? await carregarEmpresas(u.id) : [];
+    u.perm = permissoesEfetivas(u);
     cache.set(chave, { u, ate: Date.now() + 10000 });
     return u;
   }
@@ -124,8 +127,9 @@ export function registrarRotas(r, { db, hub }) {
     const u = await exigir(ctx);
     const [esc] = await db.query('SELECT id, nome FROM escritorios WHERE id = $1', [u.escritorio_id]);
     return {
-      usuario: { id: u.id, nome: u.nome, email: u.email, ambiente: u.ambiente, papel: u.papel },
-      site: u.site, escritorio: esc, empresas: u.empresas,
+      usuario: { id: u.id, nome: u.nome, email: u.email, ambiente: u.ambiente, papel: u.papel, funcao: u.funcao, permissoes: u.perm },
+      modulos: u.ambiente === 'equipe' ? MODULOS : undefined, funcoes: u.ambiente === 'equipe' ? Object.keys(FUNCOES) : undefined,
+      site: u.site, escritorio: esc, empresas: u.empresas, urls: { cliente: CONFIG.origens.cliente[0], painel: CONFIG.origens.painel[0] },
       recursos: { ia: !!CONFIG.ia.chave, arquivos: CONFIG.arquivos.driver },
     };
   });
@@ -361,14 +365,27 @@ export function registrarRotas(r, { db, hub }) {
   }, { limite: 12 * 1024 * 1024 });
 
   /* ================= gestão de acessos (painel) ================= */
+  const podeCliente = u => u.papel === 'master' || pode(u, 'carteira', 'editar');
+  const limparCacheDe = id => { for (const [k, v] of cache) if (v.u.id === id) cache.delete(k); };
+
+  // lista curta da equipe para escolher responsáveis (qualquer pessoa da equipe)
+  r.get('/api/equipe', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' });
+    const l = await db.query(`SELECT id, nome, funcao, papel, status FROM usuarios WHERE escritorio_id = $1 AND ambiente = 'equipe' AND status <> 'bloqueado' ORDER BY nome`, [u.escritorio_id]);
+    return { equipe: l.map(x => ({ id: x.id, nome: x.nome, funcao: x.funcao || (x.papel === 'master' ? 'Master' : ''), status: x.status })) };
+  });
+
   r.get('/api/admin/usuarios', async ctx => {
     const u = await exigir(ctx, { site: 'painel' });
-    const usuarios = await db.query(`SELECT u.id, u.nome, u.email, u.ambiente, u.papel, u.status, u.ultimo_login_em,
+    const verEquipe = u.papel === 'master' || pode(u, 'equipe', 'ver');
+    if (!verEquipe && !pode(u, 'carteira', 'ver')) throw new ErroHttp(403, 'Sem acesso.');
+    const usuarios = await db.query(`SELECT u.id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, u.status, u.ultimo_login_em,
         COALESCE((SELECT json_agg(json_build_object('id', ue.empresa_id, 'perfil', ue.perfil)) FROM usuarios_empresas ue WHERE ue.usuario_id = u.id), '[]'::json) AS empresas
-      FROM usuarios u WHERE u.escritorio_id = $1 ORDER BY u.ambiente DESC, u.nome`, [u.escritorio_id]);
+      FROM usuarios u WHERE u.escritorio_id = $1 ${verEquipe ? '' : "AND u.ambiente = 'cliente'"} ORDER BY u.ambiente DESC, u.nome`, [u.escritorio_id]);
+    usuarios.forEach(x => { if (x.ambiente === 'equipe') x.efetivas = permissoesEfetivas(x); });
     const empresas = await db.query(`SELECT id, dados->>'razao' AS razao, dados->>'fantasia' AS fantasia, dados->>'cnpj' AS cnpj FROM registros
       WHERE escritorio_id = $1 AND colecao = 'empresas' ORDER BY dados->>'razao'`, [u.escritorio_id]);
-    return { eu: { id: u.id, papel: u.papel }, usuarios, empresas };
+    return { eu: { id: u.id, papel: u.papel, podeEquipe: u.papel === 'master', podeClientes: podeCliente(u) }, usuarios, empresas, modulos: MODULOS, funcoes: FUNCOES };
   });
 
   async function enviarConvite(q, usuario, site, criadoPor) {
@@ -387,61 +404,106 @@ export function registrarRotas(r, { db, hub }) {
     if (!Array.isArray(lista)) return [];
     return lista.filter(e => e && e.id).map(e => ({ id: String(e.id), perfil: ['Sócio', 'Financeiro', 'RH'].includes(e.perfil) ? e.perfil : 'Sócio' }));
   }
+  const funcaoValida = f => Object.keys(FUNCOES).includes(f) ? f : null;
 
+  // Cria colaborador (só master) ou acesso de cliente (master ou quem edita a carteira).
+  // Com "senha" (8 letras ou números) a conta já nasce ativa; sem senha, sai um convite por e-mail/link.
   r.post('/api/admin/usuarios', async ctx => {
     const u = await exigir(ctx, { site: 'painel' });
     const c = ctx.corpo;
     const ambiente = c.ambiente === 'equipe' ? 'equipe' : 'cliente';
     if (ambiente === 'equipe' && u.papel !== 'master') throw new ErroHttp(403, 'Só o administrador master cadastra colaboradores.');
-    if (ambiente === 'cliente' && !['master', 'gestor'].includes(u.papel)) throw new ErroHttp(403, 'Só master e gestores liberam acesso de clientes.');
+    if (ambiente === 'cliente' && !podeCliente(u)) throw new ErroHttp(403, 'Seu acesso não permite liberar o portal para clientes.');
     const nome = String(c.nome || '').trim(), email = String(c.email || '').trim().toLowerCase();
+    const senha = c.senha ? String(c.senha) : '';
     if (nome.length < 3) throw new ErroHttp(400, 'Informe o nome completo.');
     if (!EMAIL_RE.test(email)) throw new ErroHttp(400, 'E-mail inválido.');
-    const papel = ambiente === 'equipe' ? (['master', 'gestor', 'analista'].includes(c.papel) ? c.papel : 'analista') : null;
+    if (senha && !SENHA_RE.test(senha)) throw new ErroHttp(400, 'A senha inicial precisa ter exatamente 8 letras ou números.');
+    const funcao = ambiente === 'equipe' ? (funcaoValida(c.funcao) || 'Analista Fiscal') : null;
+    const papel = ambiente === 'equipe' ? (funcao === 'Master' ? 'master' : 'analista') : null;
+    const permissoes = ambiente === 'equipe' ? limparPermissoes(c.permissoes) : {};
     const empresas = ambiente === 'cliente' ? validarEmpresas(c.empresas) : [];
     if (ambiente === 'cliente' && !empresas.length) throw new ErroHttp(400, 'Escolha ao menos uma empresa.');
+    const hash = senha ? await hashSenha(senha) : null;
     const resultado = await db.tx(async q => {
       const [existe] = await q('SELECT id, ambiente FROM usuarios WHERE lower(email) = $1', [email]);
-      if (existe) throw new ErroHttp(409, existe.ambiente === ambiente ? 'Este e-mail já tem acesso. Use "Editar" para liberar mais empresas.' : 'Este e-mail já é usado por uma conta do outro ambiente.');
-      const [novo] = await q(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, status) VALUES ($1,$2,$3,$4,$5,'convidado') RETURNING id, nome, email`, [u.escritorio_id, nome, email, ambiente, papel]);
+      if (existe) throw new ErroHttp(409, existe.ambiente === ambiente ? 'Este e-mail já tem acesso. Use "Editar" para mudar empresas ou permissões.' : 'Este e-mail já é usado por uma conta do outro ambiente.');
+      const [novo] = await q(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, funcao, permissoes, status, senha_hash) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9) RETURNING id, nome, email`,
+        [u.escritorio_id, nome, email, ambiente, papel, funcao, JSON.stringify(permissoes), senha ? 'ativo' : 'convidado', hash]);
       for (const e of empresas) await q('INSERT INTO usuarios_empresas (usuario_id, empresa_id, perfil) VALUES ($1,$2,$3)', [novo.id, e.id, e.perfil]);
+      if (senha) return { usuario: novo, ativo: true, endereco: CONFIG.origens[ambiente === 'equipe' ? 'painel' : 'cliente'][0] + (ambiente === 'equipe' ? '/admin/login' : '/login') };
       return { usuario: novo, ...(await enviarConvite(q, novo, ambiente === 'equipe' ? 'painel' : 'cliente', u.nome)) };
     });
-    await log('usuario_convidado', { usuarioId: resultado.usuario.id, email, ip: ctx.ip, detalhe: `por ${u.email}` });
+    await log(senha ? 'usuario_criado_com_senha' : 'usuario_convidado', { usuarioId: resultado.usuario.id, email, ip: ctx.ip, detalhe: `por ${u.email}` });
     return resultado;
   });
 
-  r.patch('/api/admin/usuarios/:id', async ctx => {
-    const u = await exigir(ctx, { site: 'painel' });
-    const [alvo] = await db.query('SELECT id, ambiente, papel FROM usuarios WHERE id = $1 AND escritorio_id = $2', [ctx.params.id, u.escritorio_id]);
+  async function alvoGerenciavel(u, id) {
+    const [alvo] = await db.query('SELECT id, nome, email, ambiente, papel, status FROM usuarios WHERE id = $1 AND escritorio_id = $2', [id, u.escritorio_id]);
     if (!alvo) throw new ErroHttp(404, 'Usuário não encontrado.');
     if (alvo.ambiente === 'equipe' && u.papel !== 'master') throw new ErroHttp(403, 'Só o administrador master altera a equipe.');
-    if (alvo.ambiente === 'cliente' && !['master', 'gestor'].includes(u.papel)) throw new ErroHttp(403, 'Sem permissão.');
-    if (alvo.id === u.id && ctx.corpo.status === 'bloqueado') throw new ErroHttp(400, 'Você não pode bloquear a própria conta.');
+    if (alvo.ambiente === 'cliente' && !podeCliente(u)) throw new ErroHttp(403, 'Sem permissão para alterar acessos de clientes.');
+    return alvo;
+  }
+
+  r.patch('/api/admin/usuarios/:id', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' });
+    const alvo = await alvoGerenciavel(u, ctx.params.id);
+    const c = ctx.corpo;
+    if (alvo.id === u.id && (c.status === 'bloqueado' || (c.funcao && c.funcao !== 'Master'))) throw new ErroHttp(400, 'Você não pode bloquear nem rebaixar a própria conta.');
+    if (alvo.ambiente === 'equipe' && alvo.papel === 'master' && (c.status === 'bloqueado' || (c.funcao && c.funcao !== 'Master'))) {
+      const [{ n }] = await db.query(`SELECT count(*)::int AS n FROM usuarios WHERE escritorio_id = $1 AND papel = 'master' AND status = 'ativo' AND id <> $2`, [u.escritorio_id, alvo.id]);
+      if (n === 0) throw new ErroHttp(400, 'O escritório precisa de pelo menos um master ativo.');
+    }
     await db.tx(async q => {
-      if (['ativo', 'bloqueado'].includes(ctx.corpo.status)) {
-        await q(`UPDATE usuarios SET status = $1 WHERE id = $2 AND (status <> 'convidado' OR $1 = 'bloqueado')`, [ctx.corpo.status, alvo.id]);
-        if (ctx.corpo.status === 'bloqueado') await q('UPDATE sessoes SET revogada_em = now() WHERE usuario_id = $1 AND revogada_em IS NULL', [alvo.id]);
+      if (typeof c.nome === 'string' && c.nome.trim().length >= 3) await q('UPDATE usuarios SET nome = $1 WHERE id = $2', [c.nome.trim(), alvo.id]);
+      if (['ativo', 'bloqueado'].includes(c.status)) {
+        await q(`UPDATE usuarios SET status = $1 WHERE id = $2 AND (status <> 'convidado' OR $1 = 'bloqueado')`, [c.status, alvo.id]);
+        if (c.status === 'bloqueado') await q('UPDATE sessoes SET revogada_em = now() WHERE usuario_id = $1 AND revogada_em IS NULL', [alvo.id]);
       }
-      if (alvo.ambiente === 'equipe' && ['master', 'gestor', 'analista'].includes(ctx.corpo.papel) && alvo.id !== u.id) await q('UPDATE usuarios SET papel = $1 WHERE id = $2', [ctx.corpo.papel, alvo.id]);
-      if (alvo.ambiente === 'cliente' && Array.isArray(ctx.corpo.empresas)) {
+      if (alvo.ambiente === 'equipe') {
+        const f = funcaoValida(c.funcao);
+        if (f) await q('UPDATE usuarios SET funcao = $1, papel = $2 WHERE id = $3', [f, f === 'Master' ? 'master' : 'analista', alvo.id]);
+        if (c.permissoes) await q('UPDATE usuarios SET permissoes = $1::jsonb WHERE id = $2', [JSON.stringify(limparPermissoes(c.permissoes)), alvo.id]);
+      }
+      if (alvo.ambiente === 'cliente' && Array.isArray(c.empresas)) {
         await q('DELETE FROM usuarios_empresas WHERE usuario_id = $1', [alvo.id]);
-        for (const e of validarEmpresas(ctx.corpo.empresas)) await q('INSERT INTO usuarios_empresas (usuario_id, empresa_id, perfil) VALUES ($1,$2,$3)', [alvo.id, e.id, e.perfil]);
+        for (const e of validarEmpresas(c.empresas)) await q('INSERT INTO usuarios_empresas (usuario_id, empresa_id, perfil) VALUES ($1,$2,$3)', [alvo.id, e.id, e.perfil]);
       }
     });
-    for (const [k, v] of cache) if (v.u.id === alvo.id) cache.delete(k);
-    if (ctx.corpo.status === 'bloqueado') hub.encerrarUsuario(alvo.id);
-    await log('usuario_alterado', { usuarioId: alvo.id, ip: ctx.ip, detalhe: `por ${u.email}: ${JSON.stringify(ctx.corpo).slice(0, 300)}` });
+    limparCacheDe(alvo.id);
+    if (c.status === 'bloqueado') hub.encerrarUsuario(alvo.id);
+    await log('usuario_alterado', { usuarioId: alvo.id, ip: ctx.ip, detalhe: `por ${u.email}: ${JSON.stringify(c).slice(0, 300)}` });
     return { ok: true };
   });
 
+  // O master (ou quem edita a carteira, para clientes) define a senha diretamente.
+  // A conta fica ativa, convites pendentes deixam de valer e as sessões abertas são encerradas.
+  r.put('/api/admin/usuarios/:id/senha', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' });
+    const alvo = await alvoGerenciavel(u, ctx.params.id);
+    const senha = String(ctx.corpo.senha || '');
+    if (!SENHA_RE.test(senha)) throw new ErroHttp(400, 'A senha precisa ter exatamente 8 letras ou números.');
+    const hash = await hashSenha(senha);
+    await db.tx(async q => {
+      await q(`UPDATE usuarios SET senha_hash = $1, status = CASE WHEN status = 'bloqueado' THEN status ELSE 'ativo' END WHERE id = $2`, [hash, alvo.id]);
+      await q('UPDATE tokens SET usado_em = now() WHERE usuario_id = $1 AND usado_em IS NULL', [alvo.id]);
+      if (alvo.id !== u.id) await q('UPDATE sessoes SET revogada_em = now() WHERE usuario_id = $1 AND revogada_em IS NULL', [alvo.id]);
+    });
+    limparCacheDe(alvo.id);
+    if (alvo.id !== u.id) hub.encerrarUsuario(alvo.id);
+    await log('senha_definida_pelo_escritorio', { usuarioId: alvo.id, ip: ctx.ip, detalhe: `por ${u.email}` });
+    return { ok: true, status: alvo.status === 'bloqueado' ? 'bloqueado' : 'ativo' };
+  });
+
   r.post('/api/admin/usuarios/:id/convite', async ctx => {
-    const u = await exigir(ctx, { site: 'painel', papeis: ['master', 'gestor'] });
-    const [alvo] = await db.query(`SELECT id, nome, email, ambiente FROM usuarios WHERE id = $1 AND escritorio_id = $2 AND status = 'convidado'`, [ctx.params.id, u.escritorio_id]);
-    if (!alvo) throw new ErroHttp(404, 'Convite não encontrado (a conta já pode estar ativa).');
-    if (alvo.ambiente === 'equipe' && u.papel !== 'master') throw new ErroHttp(403, 'Só o administrador master reenvia convites da equipe.');
+    const u = await exigir(ctx, { site: 'painel' });
+    const alvo = await alvoGerenciavel(u, ctx.params.id);
+    if (alvo.status !== 'convidado') throw new ErroHttp(404, 'Convite não encontrado (a conta já está ativa).');
     return db.tx(q => enviarConvite(q, alvo, alvo.ambiente === 'equipe' ? 'painel' : 'cliente', u.nome));
   });
+
+  registrarGestao(r, { db, exigir, log, pode });
 
   return { carregarEmpresas };
 }

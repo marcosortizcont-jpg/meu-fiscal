@@ -6,14 +6,13 @@
 
 export const COLECOES = ['config', 'operadores', 'empresas', 'faturamento', 'despesas', 'guias', 'documentos', 'checklist', 'obrigacoes',
   'fechamentos', 'funcionarios', 'folhas', 'admissoes', 'notas', 'tomadores', 'servicos', 'certificados', 'tickets', 'conversas', 'cnds',
-  'ecac', 'faturas', 'consentimentos', 'auditoria'];
+  'ecac', 'faturas', 'consentimentos', 'auditoria', 'catalogo', 'regimes'];
+import { MODULO_DA_COLECAO, SEMPRE_LEGIVEIS, pode } from './permissoes.js';
 
 // Coleções que existem para o escritório inteiro (sem empresa)
-const GLOBAIS = new Set(['config', 'operadores', 'auditoria']);
+const GLOBAIS = new Set(['config', 'operadores', 'auditoria', 'catalogo', 'regimes']);
 // O cliente nunca recebe estas coleções
-const OCULTAS_CLIENTE = new Set(['operadores', 'auditoria']);
-// Só master/gestor alteram a configuração do escritório e a lista de operadores
-const SO_GESTAO = new Set(['config', 'operadores']);
+const OCULTAS_CLIENTE = new Set(['operadores', 'auditoria', 'catalogo', 'regimes']);
 
 /*
  * Permissões do cliente por coleção.
@@ -45,8 +44,12 @@ export const empresaDe = (colecao, dados) => colecao === 'empresas' ? String(dad
 
 /* ---------- leitura ---------- */
 // Monta o WHERE de leitura. Retorna [sql, params] a partir do índice inicial informado.
+// Equipe: coleções dos módulos marcados como "nenhum" para a pessoa não são enviadas
+export function ocultasEquipe(u) {
+  return Object.keys(MODULO_DA_COLECAO).filter(c => !SEMPRE_LEGIVEIS.has(c) && !pode(u, MODULO_DA_COLECAO[c], 'ver'));
+}
 export function filtroLeitura(u, i = 2) {
-  if (u.ambiente === 'equipe') return ['', []];
+  if (u.ambiente === 'equipe') { const o = ocultasEquipe(u); return o.length ? [` AND colecao <> ALL($${i}::text[])`, [o]] : ['', []]; }
   return [` AND colecao <> ALL($${i}::text[]) AND (empresa_id = ANY($${i + 1}::text[]) OR colecao = 'config'`
     + ` OR (colecao = 'consentimentos' AND dados->>'uid' = $${i + 2}))`
     + ` AND NOT (colecao = 'guias' AND dados->>'status' = 'rascunho')`, [[...OCULTAS_CLIENTE], u.empresas.map(e => e.id), u.id]];
@@ -54,7 +57,7 @@ export function filtroLeitura(u, i = 2) {
 // Registro que existe mas ainda não foi liberado ao cliente (ex.: guia em rascunho)
 export function visivelAoCliente(colecao, dados) { return !(colecao === 'guias' && dados && dados.status === 'rascunho'); }
 export function podeLer(u, colecao, empresaId) {
-  if (u.ambiente === 'equipe') return true;
+  if (u.ambiente === 'equipe') return SEMPRE_LEGIVEIS.has(colecao) || !MODULO_DA_COLECAO[colecao] || pode(u, MODULO_DA_COLECAO[colecao], 'ver');
   if (OCULTAS_CLIENTE.has(colecao)) return false;
   if (colecao === 'config') return true;
   return empresaId != null && u.empresas.some(e => e.id === empresaId);
@@ -93,7 +96,9 @@ export function conferirEscrita(u, op, atual) {
   if (c === 'auditoria' && (op.op === 'apagar' || atual)) throw new Error('O histórico de auditoria não pode ser alterado.');
 
   if (u.ambiente === 'equipe') {
-    if (SO_GESTAO.has(c) && !['master', 'gestor'].includes(u.papel)) throw new Error('Só administradores e gestores alteram esta área.');
+    if (c === 'auditoria') return;
+    const m = MODULO_DA_COLECAO[c];
+    if (m && !pode(u, m, 'editar')) throw new Error('Seu acesso a esta área é só de consulta. Peça ao administrador master para liberar a edição.');
     return;
   }
 
