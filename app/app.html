@@ -891,7 +891,7 @@ const NAV_C=[
   ['c-dash','Visão geral',['Sócio','Financeiro']],['c-bi','Gestão do negócio',['Sócio','Financeiro'],true],['c-guias','Guias e impostos',['Sócio','Financeiro','RH']],
   ['c-nfse','Notas de serviço',['Sócio','Financeiro']],['c-envio','Envio mensal',['Sócio','Financeiro']],['c-docs','Documentos da empresa',['Sócio','Financeiro','RH']],
   ['c-dp','Pessoal e folha',['Sócio','RH']],['c-cert','Certificado digital',['Sócio','Financeiro']],['c-fin','Plano e faturas',['Sócio','Financeiro']],
-  ['c-ia','Copiloto contábil',['Sócio','Financeiro','RH'],true],['c-dem','Solicitações',['Sócio','Financeiro','RH'],true],['c-priv','Privacidade',['Sócio','Financeiro','RH']]];
+  ['c-ia','Atendimento',['Sócio','Financeiro','RH'],true],['c-dem','Solicitações',['Sócio','Financeiro','RH'],true],['c-priv','Privacidade',['Sócio','Financeiro','RH']]];
 const NAV_A=[['a-home','Central de alertas'],['a-carteira','Carteira de clientes'],['a-obrig','Obrigações'],['a-guias','Apuração e guias'],['a-docs','Documentos'],['a-chat','Atendimento'],['a-fiscal','Monitor fiscal'],['a-cert','Certificados'],['a-hon','Honorários'],['a-dem','Demandas'],['a-equipe','Equipe e permissões'],['a-config','Configurações']];
 function empresasVisiveis(){
   if(ME.canEdit) return S.empresas.filter(e=>e.status!=='inativo');
@@ -1507,8 +1507,8 @@ function vIA(e){
   const c=conversaAtiva(e.id,false);
   const status=!c||c.status==='ia'?pill('Copiloto respondendo','acc'):c.status==='humano'?pill('Atendente: '+(opNome(c.atendenteId)),'ok'):pill('Aguardando a equipe','warn');
   const sug=['Quanto vou pagar de DAS este mês?','Estou perto do limite do meu regime?','Me envie a guia em aberto','Como emito uma nota para pessoa física?','Quais documentos faltam enviar?','Confira este boleto ou nota que vou anexar'];
-  return `${head('Copiloto contábil','Tira dúvidas sobre Simples Nacional, MEI, notas e prazos com base nos dados da sua empresa. Envie fotos, PDFs ou documentos para a IA analisar. Quando a resposta exigir análise humana, a conversa passa para a equipe.',status)}
-  ${!CAP.sample?`<div class="banner info"><span class="small">O copiloto de IA não está disponível neste acesso. Suas mensagens vão direto para a equipe do escritório.</span></div>`:''}
+  return `${head('Atendimento','Tire dúvidas com o copiloto de IA, que conhece os dados da sua empresa, ou fale com a equipe do escritório. Envie fotos, PDFs ou documentos. Quando a resposta exigir análise humana, um atendente assume a conversa.',status)}
+  ${!CAP.sample?`<div class="banner info"><span class="small">No momento suas mensagens vão direto para a equipe do escritório, que responde por aqui.</span></div>`:''}
   <div class="chat"><div class="msgs" id="msgs">${c&&c.mensagens.length?bolhas(c,'cliente'):`<div class="msg sys">Faça uma pergunta ou escolha uma sugestão abaixo.</div>`}${UI.iaDraft!=null?`<div class="msg them"><span class="who">Copiloto IA</span><span id="ia-draft">${esc(UI.iaDraft||'Pensando…')}</span></div>`:''}</div>
   <div>${UI.iaAnexos.length?`<div class="chips-anexo">${UI.iaAnexos.map((f,i)=>`<span class="chip-anexo">${svg('clip')}<span title="${esc(f.name)}">${esc(f.name)}</span><button type="button" data-act="ia-rm-anexo" data-i="${i}" aria-label="Remover ${esc(f.name)}">×</button></span>`).join('')}</div>`:''}
   <form class="composer" data-form="msg-ia"><label class="btn attach" title="Anexar foto, PDF ou documento" aria-label="Anexar arquivo">${svg('clip')}<input type="file" hidden multiple accept="image/jpeg,image/png,image/webp,.pdf,.txt,.csv,.xml,.ofx,.docx" data-up="ia-anexo" ${UI.iaDraft!=null?'disabled':''}></label><textarea id="ia-input" data-live="1" placeholder="${UI.iaAnexos.length?'O que você quer saber sobre o arquivo?':'Escreva sua dúvida ou anexe uma foto, PDF ou documento'}" maxlength="2000" ${UI.iaDraft!=null?'disabled':''}></textarea>${UI.iaDraft!=null?'<button type="button" class="btn" data-act="ia-stop">Parar</button>':'<button class="btn primary">Enviar</button>'}</form></div></div>
@@ -3061,8 +3061,23 @@ const PEDE_HUMANO=/\b(atendente|humano|falar com (o |a |um |uma )?(contador|cont
 const regrasIABase=regrasIA;
 regrasIA=function(e){return regrasIABase(e).replace('- A última linha da resposta','- Se o cliente pedir para falar com uma pessoa, um atendente ou o contador, diga que vai chamar a equipe e use CONFIANCA: baixa.\n- A última linha da resposta')};
 const perguntarIABase=perguntarIA;
+// a conversa do portal é separada da do WhatsApp da mesma empresa
+conversaAtiva=function(eid,criar){
+  let c=S.conversas.find(x=>x.empresaId===eid&&x.status!=='encerrada'&&x.canal!=='whatsapp');
+  if(!c&&criar){c={id:uid(),empresaId:eid,canal:'portal',status:'ia',atendenteId:null,criadoEm:agora(),mensagens:[]};S.conversas.push(c)}
+  return c;
+};
+const SEM_IA_TXT=['Mensagem encaminhada para a equipe do escritório.','O uso do copiloto não foi autorizado neste navegador. Sua mensagem foi para a equipe.','O copiloto não está disponível para esta conta. Sua mensagem foi para a equipe.'];
+function retomarCopiloto(e){
+  // a conversa foi para a fila só porque a IA estava indisponível e ninguém da equipe respondeu ainda: o copiloto volta a atender
+  const c=e&&conversaAtiva(e.id,false);if(!c||!CAP.sample||c.status!=='aguardando_humano')return;
+  const i=c.mensagens.map(m=>m.de==='sistema'&&SEM_IA_TXT.includes(m.texto)).lastIndexOf(true);if(i<0)return;
+  if(c.mensagens.slice(i).some(m=>m.de==='humano'||m.de==='ia'))return;
+  if(c.mensagens.slice(i+1).some(m=>m.de==='sistema'))return;
+  c.status='ia';
+}
 perguntarIA=async function(texto){
-  const e=empAtual();
+  const e=empAtual();retomarCopiloto(e);
   if(e&&texto&&PEDE_HUMANO.test(texto)&&!UI.iaAnexos.length&&UI.iaDraft==null){
     mut('conversas',()=>{const c=conversaAtiva(e.id,true);c.mensagens.push({de:'cliente',texto,em:agora(),uid:ME.id});if(c.status==='ia'){c.status='aguardando_humano';c.mensagens.push({de:'sistema',texto:'Pronto! Chamamos a equipe do escritório. Um atendente vai continuar esta conversa por aqui.',em:agora()})}},['Atendimento','Cliente pediu atendente',e.razao]);
     return;
