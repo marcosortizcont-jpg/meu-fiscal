@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Termos de uso e privacidade · Meu Fiscal</title>
+<meta name="theme-color" content="#0F172A">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/landing.css">
+</head>
+<body class="bg-claro font-sans text-slate-700 antialiased">
+<header class="border-b border-slate-200 bg-white">
+  <div class="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:px-6">
+    <a href="/" class="flex items-center gap-2.5"><span class="grid h-8 w-8 place-items-center rounded-lg bg-esmeralda text-white"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="m9.5 14.5 2 2 4-4.5"/></svg></span><span class="font-extrabold text-marinho">Meu Fiscal</span></a>
+    <a href="/" class="text-sm font-semibold text-esmeralda-escuro">← Voltar ao site</a>
+  </div>
+</header>
+<main class="legal mx-auto max-w-3xl px-4 py-12 sm:px-6">
+  <p class="text-sm text-slate-500">Última atualização: {{DATA}}</p>
+
+  <section id="termos">
+    <h1 class="mt-2 text-3xl font-extrabold tracking-tight text-marinho">Termos de uso</h1>
+    <p>Estes termos regem o uso da plataforma Meu Fiscal, por meio da qual {{escritorio}} ("escritório") presta serviços contábeis aos seus clientes. O responsável técnico é {{contador}}, {{crc}}.</p>
+    <h2>1. O serviço</h2>
+    <p>A plataforma é o canal de atendimento do escritório: envio e guarda de documentos, publicação de guias e relatórios, emissão de notas fiscais, comunicação com a equipe e um assistente de inteligência artificial. Os serviços contábeis em si (escopo, valores e prazos) são definidos no contrato de prestação de serviços assinado entre o cliente e o escritório, que prevalece sobre estes termos.</p>
+    <h2>2. Responsabilidades do cliente</h2>
+    <ul><li>Enviar documentos e informações completos e no prazo informado no portal.</li><li>Manter sua senha em sigilo e avisar o escritório se suspeitar de uso indevido.</li><li>Pagar os tributos nas datas de vencimento. Os valores de impostos são pagos diretamente aos órgãos públicos.</li></ul>
+    <h2>3. Assistente de IA</h2>
+    <p>As respostas do assistente servem como orientação geral e podem conter imprecisões. Decisões que envolvam valores, prazos legais ou mudanças na empresa devem ser confirmadas com o contador responsável.</p>
+    <h2>4. Disponibilidade</h2>
+    <p>Trabalhamos para manter a plataforma disponível, mas podem ocorrer interrupções para manutenção ou por falhas de terceiros. Guias e documentos também podem ser solicitados diretamente à equipe.</p>
+    <h2>5. Encerramento</h2>
+    <p>Ao fim do contrato, o acesso é encerrado e os documentos são entregues ao cliente ou ao novo contador, conforme as normas do Conselho Federal de Contabilidade.</p>
+    <h2>6. Contato e foro</h2>
+    <p>Dúvidas: {{email}} ou WhatsApp {{telefone}}. Fica eleito o foro da comarca de {{cidade}}.</p>
+  </section>
+
+  <section id="privacidade" class="mt-16 border-t border-slate-200 pt-6">
+    <h1 class="mt-6 text-3xl font-extrabold tracking-tight text-marinho">Política de privacidade</h1>
+    <p>Esta política explica como tratamos dados pessoais, em conformidade com a Lei Geral de Proteção de Dados (Lei 13.709/2018). O controlador é {{escritorio}}.</p>
+    <h2>Quais dados coletamos</h2>
+    <ul><li><b>Formulário do site:</b> nome, WhatsApp, e-mail, cidade e a mensagem que você escrever.</li><li><b>Clientes:</b> dados cadastrais da empresa e dos sócios, documentos fiscais e contábeis, dados de funcionários necessários à folha, certificado digital e acessos a portais públicos quando autorizados.</li><li><b>Uso da plataforma:</b> registros de acesso (data, hora e IP), exigidos pelo Marco Civil da Internet.</li></ul>
+    <h2>Para que usamos</h2>
+    <ul><li>Responder ao seu contato e apresentar uma proposta (base legal: procedimentos preliminares a contrato).</li><li>Prestar os serviços contábeis contratados e cumprir obrigações legais e fiscais.</li><li>Garantir a segurança da conta e prevenir fraudes (legítimo interesse).</li></ul>
+    <h2>Com quem compartilhamos</h2>
+    <p>Com órgãos públicos quando a lei exige (Receita Federal, prefeituras, eSocial, entre outros) e com fornecedores de tecnologia que hospedam a plataforma, sob obrigação de sigilo. Não vendemos dados.</p>
+    <h2>Segurança e retenção</h2>
+    <p>O acesso é individual e protegido por senha. Certificados digitais e senhas de portais ficam armazenados com criptografia. Documentos contábeis são guardados pelos prazos exigidos em lei; dados de contatos que não viraram clientes são apagados quando deixam de ser necessários.</p>
+    <h2>Seus direitos</h2>
+    <p>Você pode pedir acesso, correção, portabilidade ou exclusão dos seus dados, e saber com quem foram compartilhados, pelo e-mail {{email}}.</p>
+  </section>
+</main>
+<footer class="border-t border-slate-200 py-8 text-center text-xs text-slate-500">{{escritorio}} · {{crc}} · {{cidade}}</footer>
+<script>if(location.pathname.indexOf('privacidade')>-1)document.getElementById('privacidade').scrollIntoView();</script>
+</body>
+</html>

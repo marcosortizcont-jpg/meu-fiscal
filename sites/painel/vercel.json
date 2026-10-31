@@ -79,7 +79,16 @@
       ]
     },
     {
-      "source": "/(app|login|acessos).html",
+      "source": "/(app|login|acessos|index|legal).html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/",
       "headers": [
         {
           "key": "Cache-Control",

@@ -6,13 +6,13 @@
 
 export const COLECOES = ['config', 'operadores', 'empresas', 'faturamento', 'despesas', 'guias', 'documentos', 'checklist', 'obrigacoes',
   'fechamentos', 'funcionarios', 'folhas', 'admissoes', 'notas', 'tomadores', 'servicos', 'certificados', 'tickets', 'conversas', 'cnds',
-  'ecac', 'faturas', 'consentimentos', 'auditoria', 'catalogo', 'regimes'];
+  'ecac', 'faturas', 'consentimentos', 'auditoria', 'catalogo', 'regimes', 'leads'];
 import { MODULO_DA_COLECAO, SEMPRE_LEGIVEIS, pode } from './permissoes.js';
 
 // Coleções que existem para o escritório inteiro (sem empresa)
-const GLOBAIS = new Set(['config', 'operadores', 'auditoria', 'catalogo', 'regimes']);
+const GLOBAIS = new Set(['config', 'operadores', 'auditoria', 'catalogo', 'regimes', 'leads']);
 // O cliente nunca recebe estas coleções
-const OCULTAS_CLIENTE = new Set(['operadores', 'auditoria', 'catalogo', 'regimes']);
+const OCULTAS_CLIENTE = new Set(['operadores', 'auditoria', 'catalogo', 'regimes', 'leads']);
 
 /*
  * Permissões do cliente por coleção.

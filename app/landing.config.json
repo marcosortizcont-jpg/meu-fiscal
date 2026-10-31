@@ -1,0 +1,97 @@
+{
+  "_leia": "Edite aqui os textos que mudam com frequência. Depois de salvar no GitHub, a Vercel publica sozinha.",
+  "escritorio": "Marcos Alexandre Ortiz · Contabilidade",
+  "contador": "Marcos Alexandre Ortiz",
+  "crc": "CRC/MS 016636/O-0",
+  "cidade": "Campo Grande/MS",
+  "whatsapp": "5567992814060",
+  "telefone": "(67) 99281-4060",
+  "email": "marcosortiz.cont@gmail.com",
+  "instagram": "marcosortiz.cont",
+  "clientesAtivos": null,
+  "_clientesAtivos": "Quando quiser mostrar, troque null pelo número real de empresas atendidas (ex.: 120).",
+  "aberturaGratis": false,
+  "_aberturaGratis": "Mude para true somente se a abertura de empresa for realmente sem custo de honorário. Aí o botão do topo vira \"Abrir empresa grátis\".",
+  "metricas": [
+    {
+      "valor": "24h",
+      "titulo": "Copiloto de IA",
+      "texto": "Tire dúvidas a qualquer hora, inclusive mandando foto da nota ou do boleto."
+    },
+    {
+      "valor": "1 lugar",
+      "titulo": "Tudo no portal",
+      "texto": "Guias, notas, folha e documentos organizados por mês, sem caçar e-mail."
+    },
+    {
+      "valor": "0",
+      "titulo": "Papel e deslocamento",
+      "texto": "Do envio de documentos ao pagamento da guia, tudo é feito online."
+    },
+    {
+      "valor": "CRC",
+      "titulo": "Contador responsável",
+      "texto": "Toda apuração passa por um profissional registrado no Conselho."
+    }
+  ],
+  "_metricas": "Quando tiver números medidos (economia média, satisfação, tempo de entrega das guias), troque estes cartões pelos números reais.",
+  "planos": [
+    {
+      "id": "mei",
+      "nome": "MEI",
+      "subtitulo": "Para o microempreendedor individual",
+      "preco": 99,
+      "destaque": false,
+      "itens": [
+        "DAS-MEI do mês calculado e liberado no portal",
+        "Declaração anual (DASN-SIMEI)",
+        "Emissão de notas fiscais de serviço",
+        "Alerta de limite de faturamento do MEI",
+        "Copiloto de IA 24 horas",
+        "1 funcionário incluso (R$ 45 por adicional)"
+      ]
+    },
+    {
+      "id": "servicos",
+      "nome": "Simples Nacional · Serviços",
+      "subtitulo": "Prestadores de serviço, Anexos III, IV e V",
+      "preco": 690,
+      "destaque": true,
+      "selo": "Mais escolhido",
+      "itens": [
+        "Apuração do Simples (PGDAS-D) e guia DAS",
+        "Acompanhamento do Fator R",
+        "Contabilidade mensal, balanço e DEFIS",
+        "Pró-labore, folha, eSocial e FGTS Digital",
+        "2 funcionários inclusos (R$ 45 por adicional)",
+        "B.I. de faturamento e alíquota efetiva",
+        "Copiloto de IA 24 horas e atendimento humano"
+      ]
+    },
+    {
+      "id": "comercio",
+      "nome": "Simples Nacional · Comércio",
+      "subtitulo": "Comércio e indústria, Anexos I e II",
+      "preco": 890,
+      "destaque": false,
+      "itens": [
+        "Apuração do Simples (PGDAS-D) e guia DAS",
+        "Conferência das notas de saída (XML)",
+        "Contabilidade mensal, balanço e DEFIS",
+        "Pró-labore, folha, eSocial e FGTS Digital",
+        "3 funcionários inclusos (R$ 45 por adicional)",
+        "B.I. de faturamento e alíquota efetiva",
+        "Copiloto de IA 24 horas e atendimento humano"
+      ]
+    }
+  ],
+  "depoimentos": [],
+  "_depoimentos_exemplo": [
+    {
+      "texto": "Escreva aqui o depoimento real, com autorização do cliente.",
+      "nome": "Nome do cliente",
+      "empresa": "Nome da empresa",
+      "regime": "MEI"
+    }
+  ]
+}

@@ -1,0 +1,457 @@
+<!doctype html>
+<html lang="pt-BR" class="scroll-smooth">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Meu Fiscal · Contabilidade online para MEI e Simples Nacional</title>
+<meta name="description" content="Contabilidade online com contador responsável ({{crc}}): impostos calculados, guias no portal, emissão de NFS-e, folha e um copiloto de IA 24 horas. Para MEI e empresas do Simples Nacional.">
+<meta name="theme-color" content="#0F172A">
+<link rel="canonical" href="{{SITE_URL}}/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:title" content="Meu Fiscal · Sua contabilidade sem burocracia">
+<meta property="og:description" content="Impostos calculados, guias no portal, NFS-e e IA 24h, com um contador de verdade cuidando da sua empresa.">
+<meta property="og:url" content="{{SITE_URL}}/">
+<meta property="og:image" content="{{SITE_URL}}/og.svg">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/landing.css">
+<!--@JSONLD-->
+</head>
+<body class="bg-claro font-sans text-slate-700 antialiased">
+<a href="#conteudo" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2">Pular para o conteúdo</a>
+
+<!-- A. NAVBAR -->
+<header id="topo" class="fixed inset-x-0 top-0 z-50 border-b border-transparent bg-claro/80 backdrop-blur-md transition-colors">
+  <nav class="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-[72px] lg:px-8" aria-label="Principal">
+    <a href="/" class="flex shrink-0 items-center gap-2.5" aria-label="Meu Fiscal, página inicial">
+      <span class="grid h-9 w-9 place-items-center rounded-xl bg-esmeralda text-white shadow-sm shadow-esmeralda/30">
+        <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="m9.5 14.5 2 2 4-4.5"/></svg>
+      </span>
+      <span class="text-lg font-extrabold tracking-tight text-marinho">Meu Fiscal</span>
+    </a>
+    <ul class="hidden items-center gap-1 lg:flex">
+      <li><a href="#como-funciona" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-marinho">Como funciona</a></li>
+      <li><a href="#vantagens" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-marinho">Vantagens</a></li>
+      <li><a href="#planos" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-marinho">Planos</a></li>
+      <li><a href="#para-quem" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-marinho">Para quem é</a></li>
+      <li><a href="#faq" class="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 hover:bg-white hover:text-marinho">FAQ</a></li>
+    </ul>
+    <div class="flex items-center gap-2">
+      <a href="/login" class="hidden rounded-lg px-3 py-2 text-sm font-semibold text-marinho hover:bg-white sm:inline-flex">Entrar</a>
+      <a href="#comecar" data-objetivo="migrar" class="hidden items-center rounded-xl bg-esmeralda px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-esmeralda/30 transition hover:bg-esmeralda-escuro sm:inline-flex">{{CTA_TOPO}}</a>
+      <button id="btn-menu" type="button" class="grid h-10 w-10 place-items-center rounded-lg text-marinho hover:bg-white lg:hidden" aria-controls="menu-movel" aria-expanded="false" aria-label="Abrir menu">
+        <svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+      </button>
+    </div>
+  </nav>
+  <div id="menu-movel" class="hidden border-t border-slate-200 bg-white px-4 pb-5 pt-2 shadow-lg lg:hidden">
+    <ul class="grid gap-1 py-2 text-base font-medium text-marinho">
+      <li><a href="#como-funciona" class="block rounded-lg px-3 py-3 hover:bg-claro">Como funciona</a></li>
+      <li><a href="#vantagens" class="block rounded-lg px-3 py-3 hover:bg-claro">Vantagens</a></li>
+      <li><a href="#planos" class="block rounded-lg px-3 py-3 hover:bg-claro">Planos</a></li>
+      <li><a href="#para-quem" class="block rounded-lg px-3 py-3 hover:bg-claro">Para quem é</a></li>
+      <li><a href="#faq" class="block rounded-lg px-3 py-3 hover:bg-claro">FAQ</a></li>
+    </ul>
+    <div class="grid grid-cols-2 gap-2">
+      <a href="/login" class="rounded-xl border border-slate-300 px-4 py-3 text-center text-sm font-semibold text-marinho">Entrar</a>
+      <a href="#comecar" data-objetivo="migrar" class="rounded-xl bg-esmeralda px-4 py-3 text-center text-sm font-semibold text-white">{{CTA_TOPO}}</a>
+    </div>
+  </div>
+</header>
+
+<main id="conteudo">
+
+<!-- B. HERO -->
+<section class="relative overflow-hidden pt-28 lg:pt-36">
+  <div class="pointer-events-none absolute inset-0 -z-10" aria-hidden="true">
+    <div class="absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full bg-esmeralda/10 blur-3xl"></div>
+    <div class="absolute -left-40 top-60 h-[420px] w-[420px] rounded-full bg-sky-200/30 blur-3xl"></div>
+    <div class="absolute inset-0 bg-grade [mask-image:linear-gradient(to_bottom,black,transparent_75%)]"></div>
+  </div>
+  <div class="mx-auto grid max-w-7xl items-center gap-14 px-4 pb-20 sm:px-6 lg:grid-cols-[1.02fr_1fr] lg:gap-10 lg:px-8 lg:pb-28">
+    <div>
+      <p class="inline-flex items-center gap-2 rounded-full border border-esmeralda/20 bg-white px-3 py-1 text-xs font-semibold text-esmeralda-escuro shadow-sm">
+        <span class="h-1.5 w-1.5 rounded-full bg-esmeralda"></span> Contabilidade online para MEI e Simples Nacional
+      </p>
+      <h1 class="mt-5 text-[2.35rem] font-extrabold leading-[1.08] tracking-tight text-marinho sm:text-5xl lg:text-[3.6rem]">
+        A contabilidade que cuida de tudo para o seu negócio <span class="text-esmeralda">crescer</span>.
+      </h1>
+      <p class="mt-5 max-w-xl text-lg leading-relaxed text-slate-600">
+        Sem papelada e sem correr atrás de contador. Você emite suas notas, recebe os impostos já calculados no portal e tira dúvidas com uma IA contábil 24 horas, com um contador registrado no CRC revisando tudo. Por uma fração do custo de um escritório tradicional.
+      </p>
+      <div class="mt-8 flex flex-col gap-3 sm:flex-row">
+        <a href="#comecar" data-objetivo="migrar" class="inline-flex items-center justify-center gap-2 rounded-xl bg-esmeralda px-6 py-4 text-base font-semibold text-white shadow-lg shadow-esmeralda/25 transition hover:-translate-y-0.5 hover:bg-esmeralda-escuro">
+          Quero migrar ou abrir minha empresa
+          <svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </a>
+        <a href="#planos" class="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-6 py-4 text-base font-semibold text-marinho transition hover:border-marinho">Ver planos e preços</a>
+      </div>
+      <ul class="mt-8 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-600">
+        <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" class="h-5 w-5 text-esmeralda" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3 5 6v5c0 4.5 3 8.3 7 10 4-1.7 7-5.5 7-10V6z"/><path d="m9 12 2 2 4-4"/></svg>Dados protegidos e criptografados</li>
+        <li class="flex items-center gap-2"><svg viewBox="0 0 24 24" class="h-5 w-5 text-esmeralda" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18.5 14.8c1.6.8 2.7 2.6 3 5.2"/></svg>Atendimento humano de especialistas</li>
+        <!--@CLIENTES_BADGE-->
+      </ul>
+    </div>
+
+    <!-- mockup: notebook + celular com o portal do cliente -->
+    <div class="relative mx-auto w-full max-w-[600px] lg:mr-0" aria-hidden="true">
+      <div class="rounded-[18px] border border-slate-800 bg-marinho p-2.5 shadow-2xl shadow-marinho/30">
+        <div class="overflow-hidden rounded-lg bg-white">
+          <div class="flex items-center gap-1.5 border-b border-slate-100 bg-slate-50 px-3 py-2">
+            <span class="h-2 w-2 rounded-full bg-red-300"></span><span class="h-2 w-2 rounded-full bg-amber-300"></span><span class="h-2 w-2 rounded-full bg-emerald-300"></span>
+            <span class="ml-3 flex-1 rounded bg-white px-2 py-0.5 text-[9px] text-slate-400">portal · meu fiscal</span>
+          </div>
+          <div class="grid grid-cols-[92px_1fr] sm:grid-cols-[120px_1fr]">
+            <div class="space-y-1 bg-marinho p-2.5 text-[9px] text-slate-400 sm:text-[10px]">
+              <div class="mb-3 flex items-center gap-1.5 font-bold text-white"><span class="h-3.5 w-3.5 rounded bg-esmeralda"></span>Meu Fiscal</div>
+              <div class="rounded bg-white/10 px-2 py-1 text-white">Visão geral</div>
+              <div class="px-2 py-1">Guias</div><div class="px-2 py-1">Notas fiscais</div><div class="px-2 py-1">Funcionários</div><div class="px-2 py-1">Documentos</div><div class="px-2 py-1">Copiloto IA</div>
+            </div>
+            <div class="space-y-2.5 p-3">
+              <div class="flex items-center justify-between"><div><div class="text-[8px] text-slate-400">Olá, Ana</div><div class="text-[11px] font-bold text-marinho">Estúdio Aurora Ltda</div></div><span class="rounded-full bg-emerald-50 px-2 py-0.5 text-[8px] font-semibold text-esmeralda-escuro">Tudo em dia</span></div>
+              <div class="grid grid-cols-3 gap-2">
+                <div class="rounded-md border border-slate-100 p-2"><div class="text-[7px] text-slate-400">Faturamento do mês</div><div class="text-[11px] font-bold text-marinho">R$ 38.420</div><div class="text-[7px] text-esmeralda">+12% vs anterior</div></div>
+                <div class="rounded-md border border-slate-100 p-2"><div class="text-[7px] text-slate-400">Alíquota efetiva</div><div class="text-[11px] font-bold text-marinho">6,42%</div><div class="text-[7px] text-slate-400">Anexo III · Fator R</div></div>
+                <div class="rounded-md border border-slate-100 p-2"><div class="text-[7px] text-slate-400">Notas emitidas</div><div class="text-[11px] font-bold text-marinho">27</div><div class="text-[7px] text-slate-400">neste mês</div></div>
+              </div>
+              <div class="rounded-md border border-slate-100 p-2">
+                <div class="mb-1.5 text-[8px] font-semibold text-marinho">Faturamento · últimos 6 meses</div>
+                <div class="flex h-16 items-end gap-1.5">
+                  <span class="flex-1 rounded-t bg-slate-200" style="height:45%"></span><span class="flex-1 rounded-t bg-slate-200" style="height:58%"></span><span class="flex-1 rounded-t bg-slate-200" style="height:52%"></span><span class="flex-1 rounded-t bg-slate-200" style="height:70%"></span><span class="flex-1 rounded-t bg-slate-200" style="height:76%"></span><span class="flex-1 rounded-t bg-esmeralda" style="height:92%"></span>
+                </div>
+              </div>
+              <div class="flex items-center justify-between rounded-md bg-claro p-2"><div><div class="text-[8px] font-semibold text-marinho">DAS · competência 09/2026</div><div class="text-[7px] text-slate-400">Vence em 20/10 · calculado pelo seu contador</div></div><span class="rounded bg-esmeralda px-2 py-1 text-[8px] font-semibold text-white">Baixar guia</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mx-auto h-3 w-[108%] -translate-x-[3.7%] rounded-b-2xl bg-gradient-to-b from-slate-300 to-slate-400"></div>
+      <!-- celular -->
+      <div class="absolute -bottom-10 -left-2 w-[150px] rounded-[26px] border-[5px] border-marinho bg-marinho shadow-2xl shadow-marinho/40 sm:-left-8 sm:w-[178px]">
+        <div class="overflow-hidden rounded-[20px] bg-white">
+          <div class="mx-auto mt-1.5 h-1.5 w-12 rounded-full bg-slate-200"></div>
+          <div class="space-y-2 p-2.5">
+            <div class="text-[9px] font-bold text-marinho">Copiloto IA</div>
+            <div class="ml-auto w-[85%] rounded-xl rounded-br-sm bg-esmeralda p-2 text-[8px] leading-snug text-white">Posso contratar meu primeiro funcionário este mês?</div>
+            <div class="w-[92%] rounded-xl rounded-bl-sm bg-slate-100 p-2 text-[8px] leading-snug text-slate-700">Pode sim! Envie os documentos pela tela de Admissão e seu contador registra no eSocial. O custo estimado fica em…</div>
+            <div class="flex items-center gap-1.5 rounded-lg border border-slate-200 p-1.5"><span class="h-4 w-4 rounded bg-slate-100"></span><span class="text-[7px] text-slate-400">Foto da nota enviada</span></div>
+            <div class="rounded-lg border border-slate-200 px-2 py-1.5 text-[7px] text-slate-400">Pergunte qualquer coisa…</div>
+          </div>
+        </div>
+      </div>
+      <div class="absolute -right-2 top-10 hidden rounded-xl border border-slate-100 bg-white p-3 shadow-xl sm:block">
+        <div class="flex items-center gap-2"><span class="grid h-8 w-8 place-items-center rounded-lg bg-emerald-50 text-esmeralda"><svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7"/></svg></span><div><div class="text-[11px] font-bold text-marinho">NFS-e emitida</div><div class="text-[10px] text-slate-400">em poucos segundos</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- C. AUTORIDADE E PROVA SOCIAL -->
+<section id="vantagens" class="scroll-mt-20 bg-marinho py-20 text-white lg:py-24">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="max-w-2xl">
+      <p class="text-sm font-semibold uppercase tracking-wider text-emerald-400">Por que o Meu Fiscal</p>
+      <h2 class="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Tecnologia para o dia a dia, contador de verdade para as decisões.</h2>
+    </div>
+    <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <!--@METRICAS-->
+    </div>
+    <div class="mt-6 grid gap-4 lg:grid-cols-[1fr_1.35fr]">
+      <div class="rounded-2xl bg-white p-6 text-slate-700 sm:p-8">
+        <p class="text-xs font-semibold uppercase tracking-wider text-esmeralda-escuro">Quem cuida da sua empresa</p>
+        <div class="mt-4 flex items-center gap-4">
+          <span class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl bg-marinho text-lg font-bold text-white">{{INICIAIS}}</span>
+          <div><p class="text-lg font-bold text-marinho">{{contador}}</p><p class="text-sm text-slate-500">Contador · {{crc}}</p></div>
+        </div>
+        <p class="mt-5 text-sm leading-relaxed text-slate-600">Cada guia, folha e declaração é conferida por um contador registrado no Conselho Regional de Contabilidade. Quando a dúvida é mais complexa, você fala com gente, não com robô.</p>
+        <a href="https://wa.me/{{whatsapp}}" target="_blank" rel="noopener" class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-esmeralda-escuro hover:underline">Falar com o contador no WhatsApp →</a>
+      </div>
+      <div class="rounded-2xl border border-white/10 bg-white/5 p-6 sm:p-8">
+        <p class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Comparando com o escritório tradicional</p>
+        <div class="mt-5 overflow-hidden rounded-xl border border-white/10 text-sm">
+          <div class="grid grid-cols-[1.3fr_1fr_1fr] bg-white/5 px-4 py-3 text-xs font-semibold text-slate-300"><span></span><span>Tradicional</span><span class="text-emerald-400">Meu Fiscal</span></div>
+          <div class="grid grid-cols-[1.3fr_1fr_1fr] border-t border-white/10 px-4 py-3"><span class="text-slate-300">Guias de impostos</span><span class="text-slate-400">Por e-mail ou WhatsApp</span><span>No portal, por mês</span></div>
+          <div class="grid grid-cols-[1.3fr_1fr_1fr] border-t border-white/10 px-4 py-3"><span class="text-slate-300">Dúvidas</span><span class="text-slate-400">Horário comercial</span><span>IA 24h + contador</span></div>
+          <div class="grid grid-cols-[1.3fr_1fr_1fr] border-t border-white/10 px-4 py-3"><span class="text-slate-300">Notas fiscais</span><span class="text-slate-400">Você se vira na prefeitura</span><span>Emissor no portal</span></div>
+          <div class="grid grid-cols-[1.3fr_1fr_1fr] border-t border-white/10 px-4 py-3"><span class="text-slate-300">Quanto vou pagar de imposto</span><span class="text-slate-400">Descobre no vencimento</span><span>B.I. com alíquota projetada</span></div>
+        </div>
+      </div>
+    </div>
+    <!--@DEPOIMENTOS-->
+  </div>
+</section>
+
+<!-- D. COMO FUNCIONA -->
+<section id="como-funciona" class="scroll-mt-20 py-20 lg:py-28">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="text-sm font-semibold uppercase tracking-wider text-esmeralda-escuro">Como funciona</p>
+      <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-marinho sm:text-4xl">Três passos e sua contabilidade está resolvida</h2>
+      <p class="mt-4 text-slate-600">Abrindo do zero ou saindo de outro escritório, o caminho é o mesmo e a gente conduz cada etapa.</p>
+    </div>
+    <ol class="relative mt-14 grid gap-6 lg:grid-cols-3">
+      <li class="relative rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+        <span class="text-5xl font-extrabold text-slate-100">01</span>
+        <span class="absolute right-7 top-7 grid h-12 w-12 place-items-center rounded-xl bg-emerald-50 text-esmeralda"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>
+        <h3 class="mt-2 text-lg font-bold text-marinho">Cadastre-se e escolha o plano</h3>
+        <p class="mt-2 text-sm leading-relaxed text-slate-600">Conte em poucos minutos o que sua empresa faz. A gente indica o plano certo e, se você já tem contador, cuida da transferência com ele.</p>
+      </li>
+      <li class="relative rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+        <span class="text-5xl font-extrabold text-slate-100">02</span>
+        <span class="absolute right-7 top-7 grid h-12 w-12 place-items-center rounded-xl bg-emerald-50 text-esmeralda"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg></span>
+        <h3 class="mt-2 text-lg font-bold text-marinho">Envie documentos com o checklist</h3>
+        <p class="mt-2 text-sm leading-relaxed text-slate-600">Todo mês o portal mostra exatamente o que falta: extratos, notas, recibos. Mande pelo celular, até por foto, e acompanhe o que já foi recebido.</p>
+      </li>
+      <li class="relative rounded-2xl border border-slate-200 bg-white p-7 shadow-sm">
+        <span class="text-5xl font-extrabold text-slate-100">03</span>
+        <span class="absolute right-7 top-7 grid h-12 w-12 place-items-center rounded-xl bg-emerald-50 text-esmeralda"><svg viewBox="0 0 24 24" class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span>
+        <h3 class="mt-2 text-lg font-bold text-marinho">Guias, B.I. e suporte na palma da mão</h3>
+        <p class="mt-2 text-sm leading-relaxed text-slate-600">As guias chegam calculadas e organizadas por competência. Você acompanha faturamento, alíquota e limites, e tira dúvidas com a IA a qualquer hora.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<!-- E. RECURSOS -->
+<section id="recursos" class="scroll-mt-20 border-y border-slate-200 bg-white py-20 lg:py-28">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-16">
+      <div class="lg:sticky lg:top-28 lg:self-start">
+        <p class="text-sm font-semibold uppercase tracking-wider text-esmeralda-escuro">O que você recebe</p>
+        <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-marinho sm:text-4xl">Um portal que trabalha pela sua empresa</h2>
+        <p class="mt-4 text-slate-600">Tudo o que você precisa para cumprir as obrigações e entender os números, em um só lugar, no computador ou no celular.</p>
+        <a href="#planos" class="mt-6 inline-flex items-center gap-2 font-semibold text-esmeralda-escuro hover:underline">Ver o que cada plano inclui →</a>
+      </div>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <article class="rounded-2xl border border-slate-200 p-6 transition hover:border-esmeralda/40 hover:shadow-md">
+          <span class="grid h-11 w-11 place-items-center rounded-xl bg-marinho text-white"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h4"/></svg></span>
+          <h3 class="mt-4 font-bold text-marinho">Emissor de NFS-e integrado</h3>
+          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">Emita notas de serviço com tomadores e serviços salvos. Tudo fica registrado no faturamento do mês automaticamente.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-200 p-6 transition hover:border-esmeralda/40 hover:shadow-md">
+          <span class="grid h-11 w-11 place-items-center rounded-xl bg-marinho text-white"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg></span>
+          <h3 class="mt-4 font-bold text-marinho">B.I. e alíquota efetiva</h3>
+          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">Veja faturamento, receita dos últimos 12 meses, limite do regime e a projeção da alíquota do Simples antes de a guia chegar.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-200 p-6 transition hover:border-esmeralda/40 hover:shadow-md">
+          <span class="grid h-11 w-11 place-items-center rounded-xl bg-esmeralda text-white"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v3M5.6 5.6l2.1 2.1M3 12h3M18.4 5.6l-2.1 2.1M21 12h-3"/><rect x="7" y="10" width="10" height="10" rx="3"/><path d="M10 15h.01M14 15h.01"/></svg></span>
+          <h3 class="mt-4 font-bold text-marinho">Copiloto de IA contábil</h3>
+          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">Pergunte em português simples, mande foto de nota, boleto ou PDF. A IA conhece os dados da sua empresa e chama o contador quando precisa.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-200 p-6 transition hover:border-esmeralda/40 hover:shadow-md">
+          <span class="grid h-11 w-11 place-items-center rounded-xl bg-marinho text-white"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.8-3.5 3.4-5.5 6.5-5.5s5.7 2 6.5 5.5M17 11v6M14 14h6"/></svg></span>
+          <h3 class="mt-4 font-bold text-marinho">Funcionários e folha</h3>
+          <p class="mt-1.5 text-sm leading-relaxed text-slate-600">Admissão pelo portal, folha, pró-labore, eSocial e FGTS Digital. Holerites e guias disponíveis para baixar todo mês.</p>
+        </article>
+        <article class="rounded-2xl border border-slate-200 p-6 transition hover:border-esmeralda/40 hover:shadow-md sm:col-span-2">
+          <div class="flex flex-col gap-4 sm:flex-row sm:items-center">
+            <span class="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-marinho text-white"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4M8 14h3M8 17h6"/></svg></span>
+            <div>
+              <h3 class="font-bold text-marinho">Central de guias por competência</h3>
+              <p class="mt-1.5 text-sm leading-relaxed text-slate-600">DAS, INSS, FGTS, ISS e demais guias organizadas mês a mês, com vencimento, status de pagamento e lembrete antes de vencer. Nada se perde no e-mail.</p>
+            </div>
+          </div>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PARA QUEM É -->
+<section id="para-quem" class="scroll-mt-20 py-20 lg:py-28">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="text-sm font-semibold uppercase tracking-wider text-esmeralda-escuro">Para quem é</p>
+      <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-marinho sm:text-4xl">Feito para quem quer crescer sem burocracia</h2>
+    </div>
+    <div class="mt-12 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div class="rounded-2xl border border-slate-200 bg-white p-6"><p class="text-xs font-semibold text-esmeralda-escuro">MEI</p><h3 class="mt-1 font-bold text-marinho">Microempreendedor</h3><p class="mt-2 text-sm text-slate-600">DAS e declaração anual em dia, com alerta antes de estourar o limite do MEI.</p></div>
+      <div class="rounded-2xl border border-slate-200 bg-white p-6"><p class="text-xs font-semibold text-esmeralda-escuro">Serviços</p><h3 class="mt-1 font-bold text-marinho">Profissionais e agências</h3><p class="mt-2 text-sm text-slate-600">Consultorias, TI, marketing, saúde e estética, com Fator R acompanhado mês a mês.</p></div>
+      <div class="rounded-2xl border border-slate-200 bg-white p-6"><p class="text-xs font-semibold text-esmeralda-escuro">Comércio</p><h3 class="mt-1 font-bold text-marinho">Lojas e e-commerce</h3><p class="mt-2 text-sm text-slate-600">Conferência das notas de saída e apuração do Simples com o anexo correto.</p></div>
+      <div class="rounded-2xl border border-slate-200 bg-white p-6"><p class="text-xs font-semibold text-esmeralda-escuro">Transição</p><h3 class="mt-1 font-bold text-marinho">Quem vai sair do MEI</h3><p class="mt-2 text-sm text-slate-600">Desenquadramento e migração para ME no Simples, sem multa e sem susto.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- F. PLANOS -->
+<section id="planos" class="scroll-mt-20 bg-white py-20 lg:py-28">
+  <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-2xl text-center">
+      <p class="text-sm font-semibold uppercase tracking-wider text-esmeralda-escuro">Planos e preços</p>
+      <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-marinho sm:text-4xl">Preço justo e transparente, sem surpresa no fim do mês</h2>
+      <p class="mt-4 text-slate-600">Mensalidade fixa conforme o porte da empresa. Funcionários adicionais têm valor por pessoa.</p>
+    </div>
+    <div class="mt-14 grid items-stretch gap-6 lg:grid-cols-3">
+      <!--@PLANOS-->
+    </div>
+    <p class="mt-8 text-center text-sm text-slate-500">Empresa no Lucro Presumido, com muitos funcionários ou alguma particularidade? <a href="#comecar" data-objetivo="outro" class="font-semibold text-esmeralda-escuro hover:underline">Peça uma proposta sob medida.</a></p>
+  </div>
+</section>
+
+<!-- CONTATO / COMEÇAR -->
+<section id="comecar" class="scroll-mt-20 bg-marinho py-20 lg:py-28">
+  <div class="mx-auto grid max-w-7xl gap-12 px-4 sm:px-6 lg:grid-cols-2 lg:px-8">
+    <div class="text-white">
+      <p class="text-sm font-semibold uppercase tracking-wider text-emerald-400">Vamos começar</p>
+      <h2 class="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Conte sobre sua empresa. Um especialista chama você no WhatsApp.</h2>
+      <p class="mt-4 text-slate-300">Sem compromisso. Você recebe a indicação do plano, o que precisa para a troca de contador ou para a abertura, e tira suas dúvidas direto com o especialista.</p>
+      <ul class="mt-8 space-y-4 text-sm text-slate-200">
+        <li class="flex gap-3"><span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-esmeralda/20 text-emerald-400">✓</span>Na troca de contabilidade, nós pedimos os documentos ao escritório anterior.</li>
+        <li class="flex gap-3"><span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-esmeralda/20 text-emerald-400">✓</span>Na abertura, cuidamos do CNPJ, inscrições e enquadramento no regime certo.</li>
+        <li class="flex gap-3"><span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-esmeralda/20 text-emerald-400">✓</span>Seu acesso ao portal é liberado assim que a empresa entra na carteira.</li>
+      </ul>
+      <a href="https://wa.me/{{whatsapp}}?text=Ol%C3%A1!%20Vim%20pelo%20site%20do%20Meu%20Fiscal." target="_blank" rel="noopener" class="mt-8 inline-flex items-center gap-2 rounded-xl border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">Prefiro chamar no WhatsApp · {{telefone}}</a>
+    </div>
+    <form id="form-contato" class="rounded-2xl bg-white p-6 shadow-2xl sm:p-8" novalidate>
+      <fieldset class="grid gap-2" aria-label="O que você precisa">
+        <legend class="mb-2 text-sm font-semibold text-marinho">O que você precisa?</legend>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <label class="opcao"><input type="radio" name="objetivo" value="migrar" class="peer sr-only" checked><span>Trocar de contador</span></label>
+          <label class="opcao"><input type="radio" name="objetivo" value="abrir" class="peer sr-only"><span>Abrir empresa</span></label>
+          <label class="opcao"><input type="radio" name="objetivo" value="mei" class="peer sr-only"><span>Sou MEI</span></label>
+          <label class="opcao"><input type="radio" name="objetivo" value="outro" class="peer sr-only"><span>Outro</span></label>
+        </div>
+      </fieldset>
+      <div class="mt-5 grid gap-4 sm:grid-cols-2">
+        <label class="campo sm:col-span-2"><span>Seu nome</span><input name="nome" required autocomplete="name" maxlength="120"></label>
+        <label class="campo"><span>WhatsApp com DDD</span><input name="whatsapp" required inputmode="tel" autocomplete="tel" placeholder="(67) 99999-9999" maxlength="16"></label>
+        <label class="campo"><span>E-mail <em class="font-normal not-italic text-slate-400">(opcional)</em></span><input name="email" type="email" autocomplete="email" maxlength="160"></label>
+        <label class="campo"><span>Plano de interesse</span><select name="plano"><option value="">Ainda não sei</option><!--@PLANOS_OPCOES--></select></label>
+        <label class="campo"><span>Cidade</span><input name="cidade" autocomplete="address-level2" maxlength="80"></label>
+        <label class="campo sm:col-span-2"><span>Conte um pouco <em class="font-normal not-italic text-slate-400">(opcional)</em></span><textarea name="mensagem" rows="3" maxlength="1000" placeholder="Ex.: tenho uma agência com 2 funcionários e quero sair do meu contador atual."></textarea></label>
+        <label class="hidden" aria-hidden="true">Não preencha<input name="site_empresa" tabindex="-1" autocomplete="off"></label>
+      </div>
+      <p id="contato-erro" class="mt-4 hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert"></p>
+      <button type="submit" class="mt-5 w-full rounded-xl bg-esmeralda px-6 py-4 text-base font-semibold text-white shadow-lg shadow-esmeralda/25 transition hover:bg-esmeralda-escuro disabled:opacity-60">Quero falar com um especialista</button>
+      <p class="mt-3 text-center text-xs text-slate-400">Usamos seus dados só para responder este contato. Veja a <a href="/privacidade" class="underline">política de privacidade</a>.</p>
+      <div id="contato-ok" class="hidden text-center" role="status">
+        <span class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-esmeralda"><svg viewBox="0 0 24 24" class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg></span>
+        <h3 class="mt-4 text-xl font-bold text-marinho">Recebemos seu contato!</h3>
+        <p class="mt-2 text-sm text-slate-600">Um especialista vai chamar você no WhatsApp informado. Se preferir adiantar, fale agora:</p>
+        <a id="contato-wa" href="https://wa.me/{{whatsapp}}" target="_blank" rel="noopener" class="mt-5 inline-flex rounded-xl bg-esmeralda px-6 py-3 font-semibold text-white">Abrir conversa no WhatsApp</a>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- G. FAQ -->
+<section id="faq" class="scroll-mt-20 py-20 lg:py-28">
+  <div class="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+    <div class="text-center">
+      <p class="text-sm font-semibold uppercase tracking-wider text-esmeralda-escuro">Perguntas frequentes</p>
+      <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-marinho sm:text-4xl">Ficou alguma dúvida?</h2>
+    </div>
+    <div class="mt-10 divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white">
+      <details class="faq group p-5 sm:p-6" open>
+        <summary>É difícil mudar de contabilidade?</summary>
+        <div><p>Não. Você só precisa nos autorizar. A gente entra em contato com o seu contador atual, solicita os livros, as declarações entregues, a folha e os acessos necessários, confere se há pendências e assume a partir da próxima competência. Você não precisa ter conversas difíceis nem juntar papelada: o portal mostra cada etapa da transição.</p></div>
+      </details>
+      <details class="faq group p-5 sm:p-6">
+        <summary>Como funcionam os pagamentos dos impostos?</summary>
+        <div><p>Todo mês o seu contador apura os impostos e publica as guias (DAS, INSS, FGTS, ISS e outras) no portal, organizadas por competência e com a data de vencimento. Você recebe um aviso, baixa o boleto ou copia o código e paga no banco de sua preferência. O valor do imposto é pago diretamente ao governo, nunca passa pelo escritório. Depois é só marcar como paga ou enviar o comprovante.</p></div>
+      </details>
+      <details class="faq group p-5 sm:p-6">
+        <summary>O sistema substitui o contador?</summary>
+        <div><p>Não. O Meu Fiscal é a ferramenta que deixa o trabalho mais rápido e transparente, mas toda apuração, folha e declaração é feita e revisada por um contador registrado no CRC ({{crc}}), que é o responsável técnico pela sua empresa. A IA ajuda nas dúvidas do dia a dia e encaminha para o contador tudo que precisa de análise profissional.</p></div>
+      </details>
+      <details class="faq group p-5 sm:p-6">
+        <summary>Atendem empresas de qualquer cidade?</summary>
+        <div><p>Sim. Como todo o atendimento é online, atendemos empresas de todo o Brasil. Para emissão de NFS-e, verificamos se a prefeitura da sua cidade já está no padrão nacional ou se usa sistema próprio.</p></div>
+      </details>
+      <details class="faq group p-5 sm:p-6">
+        <summary>Tem fidelidade ou multa para cancelar?</summary>
+        <div><p>As condições ficam no contrato de prestação de serviços, que você recebe antes de contratar. Ao sair, entregamos todos os documentos e fazemos a transferência para o novo contador como manda o Código de Ética da profissão.</p></div>
+      </details>
+      <details class="faq group p-5 sm:p-6">
+        <summary>Meus dados ficam seguros?</summary>
+        <div><p>Sim. O acesso é individual, com senha, e as informações sensíveis, como certificado digital e senhas de portais, ficam guardadas com criptografia. Seguimos a Lei Geral de Proteção de Dados (LGPD) e você pode pedir seus dados a qualquer momento.</p></div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="px-4 pb-20 sm:px-6 lg:px-8">
+  <div class="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 rounded-3xl bg-esmeralda px-6 py-10 text-white sm:px-10 lg:flex-row lg:items-center lg:py-12">
+    <div><h2 class="text-2xl font-extrabold tracking-tight sm:text-3xl">Pronto para ter uma contabilidade que trabalha por você?</h2><p class="mt-2 text-emerald-50">Fale com um especialista hoje e veja o plano ideal para sua empresa.</p></div>
+    <a href="#comecar" data-objetivo="migrar" class="shrink-0 rounded-xl bg-white px-6 py-4 font-semibold text-esmeralda-escuro shadow-lg transition hover:-translate-y-0.5">Quero migrar ou abrir minha empresa</a>
+  </div>
+</section>
+</main>
+
+<!-- H. RODAPÉ -->
+<footer class="bg-marinho text-slate-400">
+  <div class="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
+    <div>
+      <a href="/" class="flex items-center gap-2.5"><span class="grid h-9 w-9 place-items-center rounded-xl bg-esmeralda text-white"><svg viewBox="0 0 24 24" class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="m9.5 14.5 2 2 4-4.5"/></svg></span><span class="text-lg font-extrabold text-white">Meu Fiscal</span></a>
+      <p class="mt-4 max-w-xs text-sm leading-relaxed">Contabilidade online para MEI e empresas do Simples Nacional, com tecnologia e contador responsável.</p>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-white">Navegação</p>
+      <ul class="mt-4 space-y-2.5 text-sm"><li><a href="#como-funciona" class="hover:text-white">Como funciona</a></li><li><a href="#planos" class="hover:text-white">Planos e preços</a></li><li><a href="#para-quem" class="hover:text-white">Para quem é</a></li><li><a href="#faq" class="hover:text-white">Perguntas frequentes</a></li></ul>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-white">Acesso rápido</p>
+      <ul class="mt-4 space-y-2.5 text-sm"><li><a href="/login" class="hover:text-white">Portal do cliente</a></li><li><a href="{{PAINEL_URL}}/admin/login" class="hover:text-white">Área da equipe</a></li><li><a href="/termos" class="hover:text-white">Termos de uso</a></li><li><a href="/privacidade" class="hover:text-white">Política de privacidade</a></li></ul>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-white">Contato</p>
+      <ul class="mt-4 space-y-2.5 text-sm"><li><a href="https://wa.me/{{whatsapp}}" target="_blank" rel="noopener" class="hover:text-white">WhatsApp {{telefone}}</a></li><li><a href="mailto:{{email}}" class="break-all hover:text-white">{{email}}</a></li><li>{{cidade}}</li></ul>
+    </div>
+  </div>
+  <div class="border-t border-white/10">
+    <div class="mx-auto max-w-7xl px-4 py-6 text-xs leading-relaxed sm:px-6 lg:px-8">
+      <p>Serviços contábeis prestados por {{escritorio}}, sob responsabilidade técnica de {{contador}}, contador registrado no {{crc}}. "Meu Fiscal" é a plataforma de atendimento do escritório.</p>
+      <p class="mt-2">© {{ANO}} Meu Fiscal. Os valores dos impostos são pagos diretamente aos órgãos públicos e não estão incluídos na mensalidade.</p>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  var topo=document.getElementById('topo'),btn=document.getElementById('btn-menu'),menu=document.getElementById('menu-movel');
+  function rolou(){topo.classList.toggle('border-slate-200',scrollY>8);topo.classList.toggle('bg-white/90',scrollY>8)}
+  addEventListener('scroll',rolou,{passive:true});rolou();
+  function fechar(){menu.classList.add('hidden');btn.setAttribute('aria-expanded','false')}
+  btn.addEventListener('click',function(){var a=menu.classList.toggle('hidden');btn.setAttribute('aria-expanded',String(!a))});
+  menu.addEventListener('click',function(e){if(e.target.closest('a'))fechar()});
+
+  var f=document.getElementById('form-contato');
+  // botões "Contratar" e CTAs pré-selecionam o plano e o objetivo
+  document.addEventListener('click',function(e){
+    var a=e.target.closest('a[href="#comecar"]');if(!a)return;
+    if(a.dataset.plano){f.plano.value=a.dataset.plano;if(a.dataset.plano==='mei')marcar('mei')}
+    if(a.dataset.objetivo)marcar(a.dataset.objetivo);
+    setTimeout(function(){f.nome.focus({preventScroll:true})},450);
+  });
+  function marcar(v){var r=f.querySelector('input[name=objetivo][value="'+v+'"]');if(r)r.checked=true}
+  f.whatsapp.addEventListener('input',function(){var d=this.value.replace(/\D/g,'').slice(0,11),s=d;
+    if(d.length>2)s='('+d.slice(0,2)+') '+d.slice(2);if(d.length>7)s='('+d.slice(0,2)+') '+d.slice(2,d.length===11?7:6)+'-'+d.slice(d.length===11?7:6);this.value=s});
+  var erro=document.getElementById('contato-erro');
+  f.addEventListener('submit',function(e){
+    e.preventDefault();erro.classList.add('hidden');
+    var d={};new FormData(f).forEach(function(v,k){d[k]=String(v).trim()});
+    if(d.nome.length<3)return falha('Informe seu nome.',f.nome);
+    if(d.whatsapp.replace(/\D/g,'').length<10)return falha('Informe seu WhatsApp com DDD.',f.whatsapp);
+    if(d.email&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email))return falha('Confira o e-mail.',f.email);
+    var q=new URLSearchParams(location.search);['utm_source','utm_medium','utm_campaign'].forEach(function(k){if(q.get(k))d[k]=q.get(k)});
+    if(d.plano)d.plano=f.plano.options[f.plano.selectedIndex].text.split(' · R$')[0];
+    var b=f.querySelector('button[type=submit]');b.disabled=true;b.textContent='Enviando…';
+    var objetivo=f.querySelector('input[name=objetivo]:checked').parentNode.textContent.trim();
+    var texto='Olá! Sou '+d.nome+' e vim pelo site. Preciso de: '+objetivo+(d.plano?' (plano '+d.plano+')':'')+'.'+(d.mensagem?' '+d.mensagem:'');
+    document.getElementById('contato-wa').href='https://wa.me/{{whatsapp}}?text='+encodeURIComponent(texto);
+    fetch('/api/publico/contato',{method:'POST',headers:{'Content-Type':'application/json','X-MF-Site':'cliente'},body:JSON.stringify(d)})
+      .then(function(r){return r.json().catch(function(){return{}}).then(function(j){if(!r.ok)throw new Error(j.erro||'');return j})})
+      .then(function(){Array.prototype.forEach.call(f.children,function(c){if(c.id!=='contato-ok')c.classList.add('hidden')});document.getElementById('contato-ok').classList.remove('hidden')})
+      .catch(function(err){b.disabled=false;b.textContent='Quero falar com um especialista';
+        erro.innerHTML='';erro.appendChild(document.createTextNode((err.message||'Não conseguimos enviar agora.')+' '));
+        var w=document.createElement('a');w.href=document.getElementById('contato-wa').href;w.target='_blank';w.rel='noopener';w.className='font-semibold underline';w.textContent='Enviar pelo WhatsApp';erro.appendChild(w);erro.classList.remove('hidden')});
+  });
+  function falha(m,el){erro.textContent=m;erro.classList.remove('hidden');el.focus()}
+})();
+</script>
+</body>
+</html>

@@ -29,7 +29,7 @@ export const FUNCAO_PADRAO = 'Analista Fiscal';
 
 // Coleção do app → módulo que a governa (para leitura e gravação da equipe)
 export const MODULO_DA_COLECAO = {
-  empresas: 'carteira',
+  empresas: 'carteira', leads: 'carteira',
   catalogo: 'obrig', regimes: 'obrig', obrigacoes: 'obrig', fechamentos: 'obrig',
   guias: 'guias', faturamento: 'guias', despesas: 'guias', notas: 'guias', tomadores: 'guias', servicos: 'guias',
   documentos: 'docs', checklist: 'docs',

@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { montarLanding } from './landing.mjs';
 
 const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(AQUI, '../app');
@@ -20,7 +21,7 @@ for (const arq of ['.env.production', '.env.local']) {
   const p = path.join(DIR, arq); if (!fs.existsSync(p)) continue;
   for (const l of fs.readFileSync(p, 'utf8').split(/\r?\n/)) { const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/); if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, ''); }
 }
-for (const k of ['API_URL', 'ARQUIVOS_HOST']) if (process.env[k]) env[k] = process.env[k];
+for (const k of ['API_URL', 'ARQUIVOS_HOST', 'SITE_URL', 'PAINEL_URL']) if (process.env[k]) env[k] = process.env[k];
 const API = String(env.API_URL || '').replace(/\/$/, '');
 const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(API);
 if (!/^https:\/\/[^/]+$/.test(API) && !LOCAL) { console.error(`API_URL inválida em sites/${site}/.env.production: "${API}". Ex.: API_URL=https://meufiscal-api.onrender.com`); process.exit(1); }
@@ -47,11 +48,12 @@ const SEGURANCA = [
   ...(site === 'painel' ? [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] : []),
 ];
 const ROTAS = site === 'cliente' ? {
+  // "/" é a página comercial (index.html); o portal fica em /dashboard
   redirects: [
-    ['/', '/dashboard'], ['/admin', '/login'], ['/admin/:caminho*', '/login'],     // o portal não tem área administrativa
-    ['/cadastro', '/login?primeiro-acesso'],
+    ['/admin', '/login'], ['/admin/:caminho*', '/login'],     // o portal não tem área administrativa (a equipe usa o site do painel)
+    ['/cadastro', '/#comecar'], ['/primeiro-acesso', '/login?primeiro-acesso'],
   ],
-  paginas: [['/login', '/login.html'], ['/definir-senha', '/login.html'], ['/dashboard', '/app.html']],
+  paginas: [['/login', '/login.html'], ['/definir-senha', '/login.html'], ['/dashboard', '/app.html'], ['/termos', '/legal.html'], ['/privacidade', '/legal.html']],
 } : {
   redirects: [['/', '/admin/dashboard'], ['/admin', '/admin/dashboard'], ['/login', '/admin/login'], ['/dashboard', '/admin/dashboard']],
   paginas: [['/admin/login', '/login.html'], ['/admin/definir-senha', '/login.html'], ['/admin/dashboard', '/app.html'], ['/admin/cadastro', '/acessos.html']],
@@ -72,7 +74,8 @@ function vercelJson() {
     ],
     headers: [
       { source: '/(.*)', headers: SEGURANCA },
-      { source: '/(app|login|acessos).html', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
+      { source: '/(app|login|acessos|index|legal).html', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
+      { source: '/', headers: [{ key: 'Cache-Control', value: 'no-cache' }] },
     ],
   };
 }
@@ -127,5 +130,17 @@ for (const p of ['login.html', ...(site === 'painel' ? ['acessos.html'] : [])])
   fs.writeFileSync(path.join(DIST, p), fs.readFileSync(path.join(APP, p), 'utf8').replace('<!--MF_CONFIG-->', cfg));
 fs.copyFileSync(path.join(APP, 'mf-api.js'), path.join(DIST, 'mf-api.js'));
 fs.writeFileSync(path.join(DIST, 'favicon.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#059669"/><text x="32" y="41" font-family="Arial,sans-serif" font-size="26" font-weight="700" text-anchor="middle" fill="#fff">MF</text></svg>`);
-fs.writeFileSync(path.join(DIST, 'robots.txt'), site === 'painel' ? 'User-agent: *\nDisallow: /\n' : 'User-agent: *\nDisallow: /dashboard\nDisallow: /api/\n');
+if (site === 'cliente') {
+  // página comercial em "/" + termos/privacidade, montadas a partir de app/landing.config.json
+  const SITE_URL = String(env.SITE_URL || 'https://meufiscal-cliente.vercel.app').replace(/\/$/, '');
+  const PAINEL_URL = String(env.PAINEL_URL || 'https://meufiscal-painel.vercel.app').replace(/\/$/, '');
+  const lc = JSON.parse(fs.readFileSync(path.join(APP, 'landing.config.json'), 'utf8'));
+  fs.writeFileSync(path.join(DIST, 'index.html'), montarLanding(fs.readFileSync(path.join(APP, 'landing.html'), 'utf8'), lc, { siteUrl: SITE_URL, painelUrl: PAINEL_URL }));
+  const data = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  fs.writeFileSync(path.join(DIST, 'legal.html'), montarLanding(fs.readFileSync(path.join(APP, 'legal.html'), 'utf8'), { ...lc, DATA: data }, { siteUrl: SITE_URL, painelUrl: PAINEL_URL }));
+  fs.copyFileSync(path.join(APP, 'landing.css'), path.join(DIST, 'landing.css'));
+  fs.writeFileSync(path.join(DIST, 'og.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#0F172A"/><rect x="80" y="80" width="96" height="96" rx="22" fill="#059669"/><text x="80" y="330" font-family="Arial,sans-serif" font-size="78" font-weight="700" fill="#fff">Meu Fiscal</text><text x="80" y="420" font-family="Arial,sans-serif" font-size="40" fill="#94A3B8">Contabilidade online para MEI e Simples Nacional</text><text x="80" y="520" font-family="Arial,sans-serif" font-size="32" fill="#34D399">Impostos calculados · NFS-e · IA 24h · Contador responsável</text></svg>`);
+  fs.writeFileSync(path.join(DIST, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${SITE_URL}/</loc></url><url><loc>${SITE_URL}/termos</loc></url><url><loc>${SITE_URL}/privacidade</loc></url></urlset>\n`);
+}
+fs.writeFileSync(path.join(DIST, 'robots.txt'), site === 'painel' ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nDisallow: /dashboard\nDisallow: /login\nDisallow: /api/\nSitemap: ${String(env.SITE_URL || 'https://meufiscal-cliente.vercel.app').replace(/\/$/, '')}/sitemap.xml\n`);
 console.log(`Site "${site}" gerado em sites/${site}/dist (API: ${API})`);

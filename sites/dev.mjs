@@ -12,7 +12,7 @@ const DIR = path.join(AQUI, site), DIST = path.join(DIR, 'dist');
 const cfg = JSON.parse(fs.readFileSync(path.join(DIR, 'vercel.json'), 'utf8'));
 const API = (process.env.API_URL || 'http://localhost:8080').replace(/\/$/, '');
 const API_PROD = new URL(cfg.rewrites.find(r => /^https?:/.test(r.destination)).destination.replace(':caminho*', '')).origin;
-const TIPOS = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.txt': 'text/plain; charset=utf-8', '.json': 'application/json' };
+const TIPOS = { '.css': 'text/css; charset=utf-8', '.xml': 'application/xml', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.txt': 'text/plain; charset=utf-8', '.json': 'application/json' };
 
 function casar(padrao, caminho) {
   if (padrao.includes(':caminho*')) { const base = padrao.replace('/:caminho*', ''); return caminho === base || caminho.startsWith(base + '/') ? caminho.slice(base.length + 1) : null; }
@@ -34,7 +34,7 @@ http.createServer((req, res) => {
     }
     return servir(r.destination, res);
   }
-  servir(u.pathname, res);
+  servir(u.pathname === '/' ? '/index.html' : u.pathname, res);
 }).listen(Number(porta), () => console.log(`site ${site} em http://localhost:${porta} (API ${API})`));
 
 function servir(caminho, res) {

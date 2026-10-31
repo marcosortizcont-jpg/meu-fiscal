@@ -141,14 +141,25 @@ O build tem uma trava: se o proxy do `vercel.json` apontar para uma API diferent
 - No Render, aponte `api.seuescritorio.com.br`.
 - Depois atualize `ORIGENS_*` e `URL_PUBLICA_API` no Render, `API_URL` nos dois `.env.production`, rode `--configurar` de novo e atualize o CORS do R2.
 
+## Página comercial (o que fica em `/` no site do cliente)
+
+- **Preços, planos, números e depoimentos**: edite `app/landing.config.json` no GitHub (lápis ✏️ → *Commit changes*). A Vercel publica sozinha em ~1 minuto.
+- **Depoimentos** só aparecem quando a lista `depoimentos` tiver itens. Use apenas depoimentos reais, com autorização do cliente.
+- **Botão do topo**: mostra "Mudar de contabilidade". Se a abertura de empresa for sem custo de honorário, troque `aberturaGratis` para `true` e ele vira "Abrir empresa grátis".
+- **Quem preenche o formulário** vira um *interessado* no Painel → Carteira de clientes (e um alerta na Central de alertas), em tempo real. Dali você chama no WhatsApp e, com um clique em *Cadastrar empresa*, o cadastro já abre com e-mail e telefone preenchidos.
+- Textos de termos e privacidade: `app/legal.html` (revise com seu advogado).
+- Se mudar classes de layout em `app/landing.html`, recompile o CSS com o Tailwind CLI: `tailwindcss -c sites/landing/tailwind.config.js -i sites/landing/landing.src.css -o app/landing.css --minify`. Só editar o JSON não exige isso.
+
 ## Rotas publicadas
 
 | Site 1 · Portal do Cliente | | Site 2 · Painel Contábil | |
 |---|---|---|---|
+| `/` | **página comercial** (planos, FAQ, formulário) | | |
+| `/termos`, `/privacidade` | textos legais | | |
 | `/login` | entrar | `/admin/login` | entrar (e-mail corporativo) |
 | `/definir-senha?token=` | convite / nova senha | `/admin/definir-senha?token=` | convite / nova senha |
 | `/dashboard` | portal | `/admin/dashboard` | painel operacional |
-| `/cadastro` | → orientação de primeiro acesso | `/admin/cadastro` | Acessos e equipe |
+| `/cadastro` | → formulário da página comercial · `/primeiro-acesso` → orientação de primeiro acesso | `/admin/cadastro` | Acessos e equipe |
 | `/admin/*` | → `/login` (bloqueado) | `/`, `/login`, `/dashboard` | → rotas `/admin/…` |
 
 ## Testar no seu computador

@@ -7,12 +7,6 @@
   publish = "dist"
 
 [[redirects]]
-  from = "/"
-  to = "/dashboard"
-  status = 302
-  force = true
-
-[[redirects]]
   from = "/admin"
   to = "/login"
   status = 302
@@ -26,6 +20,12 @@
 
 [[redirects]]
   from = "/cadastro"
+  to = "/#comecar"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/primeiro-acesso"
   to = "/login?primeiro-acesso"
   status = 302
   force = true
@@ -51,6 +51,18 @@
 [[redirects]]
   from = "/dashboard"
   to = "/app.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/termos"
+  to = "/legal.html"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/privacidade"
+  to = "/legal.html"
   status = 200
   force = true
 

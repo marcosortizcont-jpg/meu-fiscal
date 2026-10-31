@@ -3,6 +3,8 @@
 import { ErroHttp } from './http.js';
 import { cifrar, decifrar, lerCertificadoA1 } from './cofre.js';
 import { CONFIG } from './config.js';
+import crypto from 'node:crypto';
+import { limitar } from './seguranca.js';
 
 export function registrarGestao(r, { db, exigir, log, pode }) {
   const semChave = () => { if (!CONFIG.cofreChave) throw new ErroHttp(503, 'Cofre indisponível: falta a variável COFRE_CHAVE no servidor.'); };
@@ -116,6 +118,32 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
     await log('cofre_senha_revelada', { usuarioId: u.id, ip: ctx.ip, detalhe: `${c.portal} · empresa ${ctx.params.empresaId}` });
     return { senha: decifrar(c.senha_cifrada) };
   });
+
+  /* ---------------- contato pela página comercial (público) ---------------- */
+  // Quem preenche o formulário do site vira um "interessado" no Painel (Carteira de clientes), em tempo real.
+  const OBJETIVOS = { abrir: 'Abrir empresa', migrar: 'Trocar de contabilidade', mei: 'Sou MEI', outro: 'Outro assunto' };
+  r.post('/api/publico/contato', async ctx => {
+    const c = ctx.corpo || {};
+    if (c.site_empresa) return { ok: true };                              // armadilha para robôs: campo invisível
+    if (limitar(`contato-ip:${ctx.ip}`, 5, 3600).bloqueado || limitar('contato-total', 300, 86400).bloqueado)
+      throw new ErroHttp(429, 'Recebemos muitos contatos agora. Tente de novo mais tarde ou chame no WhatsApp.');
+    const nome = String(c.nome || '').trim().slice(0, 120);
+    const whatsapp = String(c.whatsapp || '').replace(/\D/g, '').slice(0, 13);
+    const email = String(c.email || '').trim().toLowerCase().slice(0, 160);
+    if (nome.length < 3) throw new ErroHttp(400, 'Informe seu nome.');
+    if (whatsapp.length < 10) throw new ErroHttp(400, 'Informe um WhatsApp com DDD.');
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ErroHttp(400, 'E-mail inválido.');
+    const [esc] = await db.query('SELECT id FROM escritorios ORDER BY criado_em LIMIT 1');
+    if (!esc) throw new ErroHttp(503, 'Escritório ainda não configurado.');
+    const id = 'lead-' + crypto.randomUUID();
+    const utm = {}; for (const k of ['utm_source', 'utm_medium', 'utm_campaign']) if (c[k]) utm[k] = String(c[k]).slice(0, 80);
+    const dados = { id, nome, whatsapp, email, objetivo: OBJETIVOS[c.objetivo] ? c.objetivo : 'outro', objetivoNome: OBJETIVOS[c.objetivo] || OBJETIVOS.outro,
+      plano: String(c.plano || '').slice(0, 60), cidade: String(c.cidade || '').trim().slice(0, 80), mensagem: String(c.mensagem || '').trim().slice(0, 1000),
+      status: 'novo', origem: 'site', utm, criadoEm: new Date().toISOString() };
+    await db.query(`INSERT INTO registros (escritorio_id, colecao, id, empresa_id, dados) VALUES ($1,'leads',$2,NULL,$3::jsonb)`, [esc.id, id, JSON.stringify(dados)]);
+    await log('contato_site', { ip: ctx.ip, email: email || null, detalhe: `${nome} · ${dados.objetivoNome}` });
+    return { ok: true };
+  }, { limite: 16 * 1024 });
 
   /* ---------------- auditoria de acessos sensíveis (master) ---------------- */
   r.get('/api/admin/acessos-log', async ctx => {

@@ -6,11 +6,6 @@
   "outputDirectory": "dist",
   "redirects": [
     {
-      "source": "/",
-      "destination": "/dashboard",
-      "permanent": false
-    },
-    {
       "source": "/admin",
       "destination": "/login",
       "permanent": false
@@ -22,6 +17,11 @@
     },
     {
       "source": "/cadastro",
+      "destination": "/#comecar",
+      "permanent": false
+    },
+    {
+      "source": "/primeiro-acesso",
       "destination": "/login?primeiro-acesso",
       "permanent": false
     }
@@ -42,6 +42,14 @@
     {
       "source": "/dashboard",
       "destination": "/app.html"
+    },
+    {
+      "source": "/termos",
+      "destination": "/legal.html"
+    },
+    {
+      "source": "/privacidade",
+      "destination": "/legal.html"
     }
   ],
   "headers": [
@@ -71,7 +79,16 @@
       ]
     },
     {
-      "source": "/(app|login|acessos).html",
+      "source": "/(app|login|acessos|index|legal).html",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
+    },
+    {
+      "source": "/",
       "headers": [
         {
           "key": "Cache-Control",

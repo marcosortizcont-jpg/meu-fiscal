@@ -488,7 +488,7 @@ function obrigacoesDevidasFixas(e,comp,funcs){
 }
 
 /* ===================== Estado e persistência ===================== */
-const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes'];
+const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads'];
 const S={}; COLS.forEach(c=>S[c]=[]);
 const CAP={db:null,user:null,sample:null,assets:null,downloads:null};
 const ME={id:null,nome:'',canEdit:true};
@@ -989,7 +989,7 @@ function conteudo(){
 function head(titulo,sub,acoes){return `<div class="page-head"><div><h1>${titulo}</h1>${sub?`<p>${sub}</p>`:''}</div>${acoes?`<div class="actions">${acoes}</div>`:''}</div>`}
 function listaAlertas(A,max){
   if(!A.length) return `<p class="muted small">Nenhuma pendência. Tudo em dia.</p>`;
-  return `<div class="alerts">${A.slice(0,max||50).map(a=>`<div class="alert ${a.nivel}"><span class="sev"></span><div><p>${esc(a.texto)}</p><small>${esc(a.area)}${UI.modo==='painel'?' · '+esc(a.empresa):''}</small></div><a class="btn sm" href="#${a.view}" data-act="${UI.modo==='painel'?'goemp':''}" data-id="${a.empresaId}">Resolver</a></div>`).join('')}</div>`;
+  return `<div class="alerts">${A.slice(0,max||50).map(a=>`<div class="alert ${a.nivel}"><span class="sev"></span><div><p>${esc(a.texto)}</p><small>${esc(a.area)}${UI.modo==='painel'?' · '+esc(a.empresa):''}</small></div><a class="btn sm" href="#${a.view}" data-act="${UI.modo==='painel'?'goemp':''}" data-id="${a.empresaId||''}">Resolver</a></div>`).join('')}</div>`;
 }
 
 /* ===================== Consentimento LGPD ===================== */
@@ -2405,7 +2405,7 @@ function aCarteira(){
   listaEquipe();
   const es=S.empresas.slice().sort((a,b)=>(a.fantasia||a.razao).localeCompare(b.fantasia||b.razao));
   const ed=podeMod('carteira','editar');
-  return `${head('Carteira de clientes','Toque no nome da empresa para abrir o cadastro completo: dados, acesso ao portal, certificado, senhas dos portais, responsáveis e obrigações.',ed?`<button class="btn primary" data-act="cart-abrir" data-id="">${svg('plus')}Nova empresa</button>`:'')}${soConsulta('carteira')}
+  return `${head('Carteira de clientes','Toque no nome da empresa para abrir o cadastro completo: dados, acesso ao portal, certificado, senhas dos portais, responsáveis e obrigações.',ed?`<button class="btn primary" data-act="cart-abrir" data-id="">${svg('plus')}Nova empresa</button>`:'')}${soConsulta('carteira')}${painelLeads()}
   <div class="panel"><div class="table-wrap"><table class="tabela-cart"><thead><tr><th>Empresa</th><th>CNPJ</th><th>Regime</th><th>Responsável fiscal</th><th>Situação</th><th></th></tr></thead><tbody>${es.map(e=>{const c=motor(e.id,'a').filter(a=>a.nivel==='crit').length;return `<tr><td><button class="nome-link" data-act="cart-abrir" data-id="${e.id}">${esc(e.fantasia||e.razao)}</button><div class="small muted">${esc(e.razao)}</div></td><td class="mono small" data-r="CNPJ">${fmtCNPJ(e.cnpj)}</td><td class="small" data-r="Regime">${esc(nomeRegime(e))}</td><td class="small" data-r="Responsável">${esc(nomeEquipe(respDe(e,'Fiscal')))||'<span class="muted">—</span>'}</td><td>${e.status==='inativo'?pill('Inativa',''):empresaBloqueada(e)?pill('Bloqueio parcial','crit'):c?pill(c+' crítico'+(c>1?'s':''),'crit'):pill('Em dia','ok')}</td><td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-act="cart-abrir" data-id="${e.id}">Abrir</button><button class="btn sm" data-act="ver-cliente" data-id="${e.id}">Ver portal</button></div></td></tr>`}).join('')||'<tr><td colspan="6" class="muted">Nenhuma empresa cadastrada.</td></tr>'}</tbody></table></div></div>`;
 }
 ACT['cart-abrir']=el=>{UI.cart={id:el.dataset.id||null,aba:'dados'};render();window.scrollTo(0,0)};
@@ -2652,6 +2652,25 @@ FORM['colaborador']=async(fd,form)=>{
     openModal(`${mHead('Colaborador cadastrado')}<div class="modal-body"><p>${r.emailEnviado?'O convite foi enviado por e-mail. ':''}Repasse os dados de acesso:</p><textarea id="dl-text" class="mono" readonly style="min-height:110px">${esc(texto)}</textarea></div><div class="modal-foot"><button class="btn" data-act="copy-dl">Copiar</button><button class="btn primary" data-act="close-modal">Concluir</button></div>`);
   }catch(er){toast(er.message,true)}
 };
+/* ---------- interessados que chegam pela página comercial ---------- */
+const ST_LEAD={novo:['Novo','warn'],contato:['Em contato','info'],convertido:['Virou cliente','ok'],descartado:['Descartado','']};
+const motorBase=motor;
+motor=function(eid,publico){const A=motorBase(eid,publico);if(!eid&&publico==='a'&&podeMod('carteira','ver')){const n=S.leads.filter(l=>l.status==='novo');n.forEach(l=>A.unshift({nivel:'warn',empresaId:null,empresa:l.nome,area:'Novo interessado',texto:`${l.nome} quer: ${l.objetivoNome||'falar com o escritório'}${l.plano?' · plano '+l.plano:''}`,view:'a-carteira'}))}return A};
+function painelLeads(){
+  const abertos=S.leads.filter(l=>l.status==='novo'||l.status==='contato').sort((a,b)=>b.criadoEm.localeCompare(a.criadoEm));
+  if(!abertos.length&&!UI.verLeads)return S.leads.length?`<p class="small muted"><button class="link" data-act="leads-todos">Ver os ${S.leads.length} interessados anteriores</button></p>`:'';
+  const lista=UI.verLeads?S.leads.slice().sort((a,b)=>b.criadoEm.localeCompare(a.criadoEm)):abertos;const ed=podeMod('carteira','editar');
+  return `<div class="panel"><div class="panel-head"><div><h2>Interessados pela página do escritório</h2><p class="sub">Quem preencheu o formulário do site. Chame no WhatsApp e, quando fechar, cadastre a empresa.</p></div><button class="btn sm ghost" data-act="leads-todos">${UI.verLeads?'Só os em aberto':'Ver todos'}</button></div>
+  <div class="table-wrap"><table class="tabela-cart"><thead><tr><th>Pessoa</th><th>Quer</th><th>Recebido</th><th>Situação</th><th></th></tr></thead><tbody>${lista.map(l=>{const [st,cl]=ST_LEAD[l.status]||['—',''];const msg=`Olá, ${l.nome.split(' ')[0]}! Aqui é do escritório ${cfg().escritorio||''}. Recebemos seu contato pelo site sobre "${l.objetivoNome||''}". Podemos conversar?`;return `<tr><td><b>${esc(l.nome)}</b><div class="sub">${fmtFone(String(l.whatsapp||"").replace(/^55/,""))}${l.email?' · '+esc(l.email):''}${l.cidade?' · '+esc(l.cidade):''}</div>${l.mensagem?`<div class="sub">“${esc(l.mensagem.slice(0,140))}”</div>`:''}</td><td data-r="Quer">${esc(l.objetivoNome||'')}${l.plano?`<div class="sub">Plano: ${esc(l.plano)}</div>`:''}</td><td class="small" data-r="Recebido">${fmtDH(l.criadoEm)}</td><td>${pill(st,cl)}</td>
+   <td class="r"><div class="actions" style="justify-content:flex-end"><a class="btn sm primary" href="${waLink(l.whatsapp.replace(/^55/,''),msg)}" target="_blank" rel="noopener" data-act="lead-wa" data-id="${l.id}">WhatsApp</a>${ed?`${l.status!=='convertido'?`<button class="btn sm" data-act="lead-converter" data-id="${l.id}">Cadastrar empresa</button>`:''}${l.status==='novo'||l.status==='contato'?`<button class="btn sm ghost" data-act="lead-status" data-id="${l.id}" data-v="descartado">Descartar</button>`:''}`:''}</div></td></tr>`}).join('')||'<tr><td colspan="5" class="muted">Nenhum interessado.</td></tr>'}</tbody></table></div></div>`;
+}
+ACT['leads-todos']=()=>{UI.verLeads=!UI.verLeads;render()};
+ACT['lead-wa']=el=>{const l=S.leads.find(x=>x.id===el.dataset.id);if(l&&l.status==='novo'&&podeMod('carteira','editar'))setTimeout(()=>mut('leads',()=>{l.status='contato';l.contatoEm=agora()},['Carteira','Chamou interessado no WhatsApp',l.nome]),300)};
+ACT['lead-status']=el=>{const l=S.leads.find(x=>x.id===el.dataset.id);mut('leads',()=>{l.status=el.dataset.v},['Carteira','Interessado: '+ST_LEAD[el.dataset.v][0],l.nome])};
+ACT['lead-converter']=el=>{const l=S.leads.find(x=>x.id===el.dataset.id);UI.leadConvertendo=l.id;UI.cart={id:null,aba:'dados'};render();window.scrollTo(0,0);
+  setTimeout(()=>{const f=document.querySelector('form[data-form=empresa360]');if(!f)return;if(f.email&&!f.email.value)f.email.value=l.email||'';if(f.telefone&&!f.telefone.value)f.telefone.value=fmtFone(l.whatsapp.replace(/^55/,''));toast('Cadastre a empresa de '+l.nome+'. Ao salvar, o interessado é marcado como cliente.')},60)};
+const formEmpresaBase=FORM['empresa360'];
+FORM['empresa360']=async(fd,form)=>{const antes=S.empresas.length;await formEmpresaBase(fd,form);if(UI.leadConvertendo&&S.empresas.length>antes){const l=S.leads.find(x=>x.id===UI.leadConvertendo);UI.leadConvertendo=null;if(l)mut('leads',()=>{l.status='convertido';l.empresaId=S.empresas[S.empresas.length-1].id;l.convertidoEm=agora()},['Carteira','Interessado virou cliente',l.nome])}};
 /* ==== MÓDULOS v2 (fim) ==== */
 
 lerHash();
