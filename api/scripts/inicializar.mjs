@@ -29,6 +29,21 @@ try {
     console.log('Abra este link para criar a sua senha (vale 72 h, uso único):');
     console.log(`${CONFIG.origens.painel[0]}/admin/definir-senha?token=${token}`);
     console.log('==================================================\n');
+  } else if (usuarios > 0) {
+    // Master ainda sem senha: a cada início sai um link novo no log (o anterior deixa de valer)
+    const [m] = await db.query(`SELECT id, nome, email FROM usuarios WHERE ambiente = 'equipe' AND papel = 'master' AND status = 'convidado' ORDER BY criado_em LIMIT 1`);
+    if (m) {
+      const token = aleatorio(32);
+      await db.tx(async q => {
+        await q(`UPDATE tokens SET usado_em = now() WHERE usuario_id = $1 AND tipo = 'convite' AND usado_em IS NULL`, [m.id]);
+        await q(`INSERT INTO tokens (hash, usuario_id, tipo, expira_em) VALUES ($1,$2,'convite', now() + interval '72 hours')`, [sha256(token), m.id]);
+      });
+      console.log('\n================ PRIMEIRO ACESSO ================');
+      console.log(`Master ainda sem senha: ${m.nome} <${m.email}>`);
+      console.log('Abra este link para criar a sua senha (vale 72 h, uso único):');
+      console.log(`${CONFIG.origens.painel[0]}/admin/definir-senha?token=${token}`);
+      console.log('==================================================\n');
+    }
   } else if (usuarios === 0) {
     console.log('[inicializar] Nenhum usuário ainda. Defina MASTER_EMAIL, MASTER_NOME e ESCRITORIO_NOME no Render para criar o primeiro acesso.');
   }
