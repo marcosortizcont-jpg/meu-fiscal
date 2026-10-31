@@ -13,7 +13,7 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
     if (!e) throw new ErroHttp(404, 'Empresa não encontrada.');
     return e.dados;
   }
-  const exigirModulo = (u, m, nivel) => { if (!pode(u, m, nivel)) throw new ErroHttp(403, nivel === 'editar' ? 'Seu acesso a esta área é só de consulta.' : 'Seu acesso não inclui esta área.'); };
+  const exigirModulo = (u, m, nivel) => { if (!pode(u, m, nivel)) throw new ErroHttp(403, nivel === 'excluir' ? 'Seu acesso não permite excluir nesta área.' : nivel === 'editar' ? 'Seu acesso a esta área é só de consulta.' : 'Seu acesso não inclui esta área.'); };
 
   /* ---------------- certificado A1 ---------------- */
   r.get('/api/certificados/:empresaId', async ctx => {
@@ -72,7 +72,7 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
     ctx.res.end(pfx);
   });
   r.delete('/api/certificados/:empresaId', async ctx => {
-    const u = await exigir(ctx, { site: 'painel' }); exigirModulo(u, 'cert', 'editar');
+    const u = await exigir(ctx, { site: 'painel' }); exigirModulo(u, 'cert', 'excluir');
     await db.query('DELETE FROM certificados_a1 WHERE escritorio_id = $1 AND empresa_id = $2', [u.escritorio_id, ctx.params.empresaId]);
     await log('certificado_removido', { usuarioId: u.id, ip: ctx.ip, detalhe: 'empresa ' + ctx.params.empresaId });
     return { ok: true };
@@ -106,7 +106,7 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
     return { ok: true, id };
   });
   r.delete('/api/cofre/:empresaId/:id', async ctx => {
-    const u = await exigir(ctx, { site: 'painel' }); exigirModulo(u, 'cofre', 'editar');
+    const u = await exigir(ctx, { site: 'painel' }); exigirModulo(u, 'cofre', 'excluir');
     await db.query('DELETE FROM cofre_senhas WHERE id = $1 AND escritorio_id = $2 AND empresa_id = $3', [ctx.params.id, u.escritorio_id, ctx.params.empresaId]);
     await log('cofre_removido', { usuarioId: u.id, ip: ctx.ip, detalhe: `item ${ctx.params.id}` });
     return { ok: true };

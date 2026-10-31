@@ -156,7 +156,7 @@
       return { text: r.texto };
     } catch (e) {
       if (e.name === 'AbortError') throw Object.assign(e, { code: 'aborted' });
-      throw Object.assign(e, { code: e.status === 503 ? 'sampling_disabled' : (e.code || 'erro') });
+      throw Object.assign(e, { code: e.status === 503 ? 'sampling_disabled' : e.status === 429 ? 'rate_limited' : e.status === 422 ? 'refused' : (e.code || 'erro') });
     }
   }
   sample.limits = async () => ({ images: { maxCount: 5 } });

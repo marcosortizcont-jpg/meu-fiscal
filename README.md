@@ -46,6 +46,29 @@ Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site
   - O botão **Criar catálogo e regimes padrão** traz 16 obrigações e 8 regimes (MEI, Simples Anexos I a V, Lucro Presumido e Real). Confira os prazos estaduais, como o da EFD ICMS/IPI.
 - **Celular:** o menu vira uma gaveta lateral (80% da tela), aberta pelo botão ☰, com fundo desfocado. Ela fecha ao tocar fora, ao escolher um item ou com Esc.
 
+### Novidades: atendimento, permissões e controle de obrigações
+
+- **Permissões por função:** em Equipe e permissões › Permissões por função, o master marca para cada tipo de acesso o que a pessoa pode **visualizar**, **editar** e **excluir** em cada módulo. Excluir exige o nível "excluir" também na API.
+- **Excluir cliente:** só o master, na Carteira (lista ou cadastro), sempre digitando a própria senha. Apaga cadastro, guias, notas, documentos, arquivos, conversas, certificado, cofre e os acessos de cliente que só serviam àquela empresa. Fica registrado em Acessos e segredos.
+- **Carteira:** pesquisa e filtros por regime, responsável, **grupo de empresas** (campo novo no cadastro) e situação.
+- **Documentos e Certificado digital** saíram do menu e ficam no cadastro de cada cliente, com botão **Ativar/Desativar**. Desativado, o cliente não vê o recurso no portal e os alertas somem.
+- **Controle de obrigações** (antiga Apuração e guias): lista única de obrigações e guias com pesquisa, filtros (cliente, imposto, competência, vencimento, situação, responsável, departamento) e **Imprimir / salvar PDF**. A apuração do DAS continua na segunda aba. O antigo menu Obrigações agora se chama **Matriz e catálogo**.
+- **Atendimento único:** conversas do portal e do WhatsApp na mesma caixa, com filtros (aguardando, comigo, copiloto, WhatsApp) e busca. O copiloto responde primeiro e passa para a equipe quando a pergunta exige análise ou quando o cliente pede um atendente.
+
+#### Copiloto com IA gratuita (Google Gemini)
+1. Entre em **aistudio.google.com** com uma conta Google do escritório → **Get API key** → **Create API key**.
+2. No Render: serviço **meufiscal-api** → **Environment** → **Add Environment Variable** → nome `GEMINI_API_KEY`, valor = a chave. Salve (o Render reinicia sozinho).
+3. Não cole a chave em chats nem no GitHub.
+
+A camada gratuita do Gemini tem limite de pedidos por minuto e por dia e **o Google pode usar o conteúdo para melhorar os produtos dele**. Para dados sensíveis de clientes em produção, considere ativar o faturamento da chave (camada paga), que não usa os dados para treino.
+
+#### WhatsApp por QR code
+1. No Render: **Settings → Build Command** = `npm install --omit=dev --no-audit --no-fund` e **Health Check Path** = `/api/vivo`. Depois, **Manual Deploy → Deploy latest commit**.
+2. No Painel: **Atendimento → Conectar WhatsApp** e leia o QR code no celular do escritório (WhatsApp › Dispositivos conectados › Conectar dispositivo).
+3. A sessão fica guardada no banco: deploys e reinícios reconectam sozinhos. Desconectar pelo celular encerra a sessão.
+
+É uma conexão do tipo WhatsApp Web (biblioteca Baileys), **não oficial**: use um número do escritório, não faça envios em massa e saiba que o WhatsApp pode bloquear números que violam os termos dele. Com o WhatsApp conectado, a API chama a si mesma a cada 10 minutos para o Render gratuito não dormir (consome as 750 horas mensais do plano, suficientes para 1 serviço ligado o mês todo). Contatos são identificados pelo telefone da empresa ou dos contatos do cadastro; números desconhecidos podem ser vinculados a uma empresa ou registrados como interessados.
+
 > **Chave do cofre (`COFRE_CHAVE`).** O Render gera a chave sozinho. Ela cifra os certificados e as senhas dos portais e **nunca pode ser trocada nem perdida**: sem ela, esses segredos ficam ilegíveis. Guarde uma cópia em local seguro: no Render, abra **Environment → COFRE_CHAVE → Reveal**.
 
 ## Sincronização em tempo real

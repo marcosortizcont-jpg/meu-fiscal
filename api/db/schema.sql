@@ -167,3 +167,15 @@ END $$ LANGUAGE plpgsql;
 DROP TRIGGER IF EXISTS usuarios_empresas_aviso ON usuarios_empresas;
 CREATE TRIGGER usuarios_empresas_aviso AFTER INSERT OR UPDATE OR DELETE ON usuarios_empresas
   FOR EACH ROW EXECUTE FUNCTION avisar_acesso();
+
+-- Permissões padrão de cada função, ajustáveis pelo master (sobrepõem as do código)
+ALTER TABLE escritorios ADD COLUMN IF NOT EXISTS funcoes JSONB;
+
+-- Sessão do WhatsApp conectado por QR code (chaves de criptografia do aparelho vinculado)
+CREATE TABLE IF NOT EXISTS whatsapp_auth (
+  escritorio_id  UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  chave          TEXT NOT NULL,
+  valor          TEXT NOT NULL,
+  atualizado_em  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (escritorio_id, chave)
+);

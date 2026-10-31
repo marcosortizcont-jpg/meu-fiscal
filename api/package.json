@@ -2,9 +2,12 @@
   "name": "meu-fiscal-api",
   "private": true,
   "type": "module",
-  "description": "API única do Meu Fiscal: atende o Portal do Cliente e o Painel Contábil. Sem dependências externas.",
+  "description": "API única do Meu Fiscal: atende o Portal do Cliente e o Painel Contábil. Única dependência (opcional): Baileys, para o WhatsApp por QR code.",
   "engines": {
     "node": ">=20"
+  },
+  "optionalDependencies": {
+    "baileys": "7.0.0-rc14"
   },
   "scripts": {
     "start": "node scripts/aplicar-schema.mjs && node scripts/inicializar.mjs && node --openssl-legacy-provider src/servidor.js",

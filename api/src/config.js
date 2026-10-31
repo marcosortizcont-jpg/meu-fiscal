@@ -35,7 +35,10 @@ export const CONFIG = {
   // chave do cofre (certificados e senhas de portais): 32+ caracteres; sem ela os segredos não podem ser lidos
   cofreChave: e.COFRE_CHAVE || (PRODUCAO ? '' : 'chave-de-desenvolvimento-nao-usar-em-producao'),
   email: { resend: e.RESEND_API_KEY, remetente: e.EMAIL_REMETENTE || 'Meu Fiscal <nao-responda@meufiscal.com.br>' },
-  ia: { chave: e.ANTHROPIC_API_KEY, modelo: e.IA_MODELO || 'claude-sonnet-5-5' },
+  // IA do copiloto: Google Gemini (camada gratuita, chave em aistudio.google.com) ou, se preferir, a API da Anthropic
+  ia: { gemini: e.GEMINI_API_KEY, modeloGemini: e.IA_MODELO_GEMINI || 'gemini-2.5-flash', chave: e.ANTHROPIC_API_KEY, modelo: e.IA_MODELO || 'claude-sonnet-5-5' },
+  // WhatsApp por QR code (WhatsApp Web). Desligue com WHATSAPP=0.
+  whatsapp: { ativo: e.WHATSAPP !== '0' },
 };
 
 export const SITES = ['cliente', 'painel'];

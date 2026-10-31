@@ -7,9 +7,9 @@ services:
     plan: free
     region: ohio                       # mesma região do banco no Neon (us-east-2)
     rootDir: api
-    buildCommand: echo "sem dependências"
+    buildCommand: npm install --omit=dev --no-audit --no-fund   # instala só o módulo do WhatsApp (opcional)
     startCommand: npm start            # aplica o schema (idempotente) e sobe a API
-    healthCheckPath: /api/saude
+    healthCheckPath: /api/vivo        # não consulta o banco (economiza as horas gratuitas do Neon)
     envVars:
       - key: NODE_ENV
         value: production
@@ -45,3 +45,4 @@ services:
         value: marcosortiz.cont@gmail.com
       - key: IMPORTAR_DADOS_INICIAIS
         value: "1"
+      # Copiloto de IA gratuito: adicione GEMINI_API_KEY em Environment (chave criada em aistudio.google.com)

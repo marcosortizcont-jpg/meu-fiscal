@@ -98,6 +98,7 @@ export function conferirEscrita(u, op, atual) {
   if (u.ambiente === 'equipe') {
     if (c === 'auditoria') return;
     const m = MODULO_DA_COLECAO[c];
+    if (m && op.op === 'apagar' && !pode(u, m, 'excluir')) throw new Error('Seu acesso não permite excluir registros desta área. Peça ao administrador master.');
     if (m && !pode(u, m, 'editar')) throw new Error('Seu acesso a esta área é só de consulta. Peça ao administrador master para liberar a edição.');
     return;
   }

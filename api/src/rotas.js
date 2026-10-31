@@ -8,8 +8,9 @@ import { assinarJwt, verificarJwt, hashSenha, conferirSenha, sha256, aleatorio, 
 import { COLECOES, empresaDe, filtroLeitura, podeLer, visivelAoCliente, prepararLeitura, conferirEscrita, carimbar } from './regras.js';
 import { urlEnvio, urlDownload, caminhoDisco, gravarDisco } from './arquivos.js';
 import { enviarEmail, emailLink, perguntarIA } from './externos.js';
-import { MODULOS, FUNCOES, permissoesEfetivas, pode, limparPermissoes } from './permissoes.js';
+import { MODULOS, FUNCOES, NIVEIS, permissoesEfetivas, funcoesDoEscritorio, pode, limparPermissoes } from './permissoes.js';
 import { registrarGestao } from './gestao.js';
+import { registrarWhatsApp } from './whatsapp.js';
 
 const AUD = site => `meufiscal:${site}`;
 export const ROTA_SENHA = { cliente: '/definir-senha', painel: '/admin/definir-senha' };
@@ -32,8 +33,8 @@ export function registrarRotas(r, { db, hub }) {
   async function usuarioDaSessao(site, sid) {
     const chave = sha256(sid);
     const c = cache.get(chave); if (c && c.ate > Date.now()) return c.u;
-    const [u] = await db.query(`SELECT u.id, u.escritorio_id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, s.id AS sessao_id
-      FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id
+    const [u] = await db.query(`SELECT u.id, u.escritorio_id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, s.id AS sessao_id, e.funcoes AS funcoes_escritorio
+      FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id JOIN escritorios e ON e.id = u.escritorio_id
       WHERE s.id = $1 AND s.site = $2 AND s.revogada_em IS NULL AND s.expira_em > now() AND u.status = 'ativo' AND u.ambiente = $3`,
       [chave, site, AMBIENTE_DO_SITE[site]]);
     if (!u) return null;
@@ -78,6 +79,9 @@ export function registrarRotas(r, { db, hub }) {
   }
 
   /* ================= autenticação ================= */
+  // sinal de vida sem tocar no banco (mantém o servidor acordado sem gastar o banco gratuito)
+  r.get('/api/vivo', async () => ({ ok: true, em: new Date().toISOString() }));
+
   r.get('/api/saude', async () => {
     const [x] = await db.query('SELECT 1 AS ok');
     return { ok: x.ok === 1, tempoReal: hub.total(), em: new Date().toISOString() };
@@ -130,7 +134,7 @@ export function registrarRotas(r, { db, hub }) {
       usuario: { id: u.id, nome: u.nome, email: u.email, ambiente: u.ambiente, papel: u.papel, funcao: u.funcao, permissoes: u.perm },
       modulos: u.ambiente === 'equipe' ? MODULOS : undefined, funcoes: u.ambiente === 'equipe' ? Object.keys(FUNCOES) : undefined,
       site: u.site, escritorio: esc, empresas: u.empresas, urls: { cliente: CONFIG.origens.cliente[0], painel: CONFIG.origens.painel[0] },
-      recursos: { ia: !!CONFIG.ia.chave, arquivos: CONFIG.arquivos.driver },
+      recursos: { ia: !!(CONFIG.ia.gemini || CONFIG.ia.chave), arquivos: CONFIG.arquivos.driver },
     };
   });
 
@@ -253,6 +257,13 @@ export function registrarRotas(r, { db, hub }) {
           if (Number(op.dados.renovacao.valor) !== esperado || Number(op.dados.valor) !== esperado) throw new ErroHttp(403, 'Valor da renovação não confere com o do escritório.');
         }
 
+        if (op.op === 'salvar' && op.c === 'conversas' && atual && Array.isArray(atual.dados?.mensagens) && Array.isArray(op.dados.mensagens)) {
+          const chave = m => `${m.em}|${m.de}|${String(m.texto || '').slice(0, 60)}`;
+          const vistas = new Set(op.dados.mensagens.map(chave));
+          const faltam = atual.dados.mensagens.filter(m => !vistas.has(chave(m)));
+          if (faltam.length) op.dados.mensagens = [...op.dados.mensagens, ...faltam].sort((a, b) => String(a.em).localeCompare(String(b.em))).slice(-200);
+          for (const k of ['canal', 'waJid', 'waFone']) if (atual.dados[k] !== undefined) op.dados[k] = atual.dados[k];
+        }
         if (op.op === 'apagar') {
           const res = await q('DELETE FROM registros WHERE escritorio_id = $1 AND colecao = $2 AND id = $3', [u.escritorio_id, op.c, op.id]);
           aplicadas += res.count;
@@ -360,9 +371,53 @@ export function registrarRotas(r, { db, hub }) {
   r.post('/api/ia', async ctx => {
     const u = await exigir(ctx);
     if (limitar(`ia:${u.id}`, 40, 3600).bloqueado) throw new ErroHttp(429, 'Limite de perguntas por hora atingido.');
+    if (limitar(`ia-dia:${u.id}`, 200, 86400).bloqueado) throw new ErroHttp(429, 'Limite diário de perguntas ao copiloto atingido.');
     try { return { texto: await perguntarIA({ mensagens: ctx.corpo.mensagens, imagens: ctx.corpo.imagens || [] }) }; }
-    catch (e) { throw new ErroHttp(e.status || 502, e.message); }
+    catch (e) { throw new ErroHttp(e.status || 502, e.message, e.code ? { codigo: e.code } : undefined); }
   }, { limite: 12 * 1024 * 1024 });
+
+  /* ================= permissões padrão de cada função (master) ================= */
+  r.put('/api/admin/funcoes', async ctx => {
+    const u = await exigir(ctx, { site: 'painel', papeis: ['master'] });
+    const entrada = ctx.corpo.funcoes || {};
+    const limpo = {};
+    for (const nome of Object.keys(FUNCOES)) if (nome !== 'Master' && entrada[nome]) limpo[nome] = limparPermissoes(entrada[nome]);
+    await db.query('UPDATE escritorios SET funcoes = $2::jsonb WHERE id = $1', [u.escritorio_id, JSON.stringify(limpo)]);
+    cache.clear();
+    await log('funcoes_alteradas', { usuarioId: u.id, ip: ctx.ip, detalhe: Object.keys(limpo).join(', ') });
+    return { ok: true, funcoes: funcoesDoEscritorio(limpo) };
+  });
+
+  /* ================= excluir empresa da carteira (master, com senha) ================= */
+  r.post('/api/admin/empresas/:id/excluir', async ctx => {
+    const u = await exigir(ctx, { site: 'painel', papeis: ['master'] });
+    if (limitar(`excluir-emp:${u.id}`, 5, 900).bloqueado) throw new ErroHttp(429, 'Muitas tentativas. Aguarde alguns minutos.');
+    const [eu] = await db.query('SELECT senha_hash FROM usuarios WHERE id = $1', [u.id]);
+    if (!await conferirSenha(String(ctx.corpo.senha || ''), eu?.senha_hash)) {
+      await log('excluir_empresa_senha_errada', { usuarioId: u.id, ip: ctx.ip, detalhe: ctx.params.id });
+      throw new ErroHttp(403, 'Senha incorreta. Nada foi excluído.');
+    }
+    const id = String(ctx.params.id);
+    const [emp] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas' AND id = $2`, [u.escritorio_id, id]);
+    if (!emp) throw new ErroHttp(404, 'Empresa não encontrada.');
+    const nome = emp.dados.razao || emp.dados.fantasia || id;
+    const resumo = await db.tx(async q => {
+      const vinculados = (await q('SELECT usuario_id FROM usuarios_empresas WHERE empresa_id = $1', [id])).map(x => x.usuario_id);
+      const regs = await q('DELETE FROM registros WHERE escritorio_id = $1 AND empresa_id = $2', [u.escritorio_id, id]);
+      const arqs = await q('SELECT id FROM arquivos WHERE escritorio_id = $1 AND empresa_id = $2', [u.escritorio_id, id]);
+      if (arqs.length) await q('DELETE FROM arquivos_conteudo WHERE id = ANY($1::uuid[])', [arqs.map(a => a.id)]);
+      await q('DELETE FROM arquivos WHERE escritorio_id = $1 AND empresa_id = $2', [u.escritorio_id, id]);
+      await q('DELETE FROM certificados_a1 WHERE escritorio_id = $1 AND empresa_id = $2', [u.escritorio_id, id]);
+      await q('DELETE FROM cofre_senhas WHERE escritorio_id = $1 AND empresa_id = $2', [u.escritorio_id, id]);
+      await q('DELETE FROM usuarios_empresas WHERE empresa_id = $1', [id]);
+      // acessos de clientes que ficaram sem nenhuma empresa são removidos
+      const orfaos = vinculados.length ? await q(`DELETE FROM usuarios WHERE id = ANY($1::uuid[]) AND ambiente = 'cliente' AND escritorio_id = $2
+        AND NOT EXISTS (SELECT 1 FROM usuarios_empresas ue WHERE ue.usuario_id = usuarios.id) RETURNING id`, [vinculados, u.escritorio_id]) : [];
+      return { registros: regs.count, arquivos: arqs.length, acessos: orfaos.length };
+    });
+    await log('empresa_excluida', { usuarioId: u.id, ip: ctx.ip, detalhe: `${nome} (${emp.dados.cnpj || id}) · ${resumo.registros} registros, ${resumo.arquivos} arquivos, ${resumo.acessos} acessos` });
+    return { ok: true, ...resumo };
+  });
 
   /* ================= gestão de acessos (painel) ================= */
   const podeCliente = u => u.papel === 'master' || pode(u, 'carteira', 'editar');
@@ -382,10 +437,12 @@ export function registrarRotas(r, { db, hub }) {
     const usuarios = await db.query(`SELECT u.id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, u.status, u.ultimo_login_em,
         COALESCE((SELECT json_agg(json_build_object('id', ue.empresa_id, 'perfil', ue.perfil)) FROM usuarios_empresas ue WHERE ue.usuario_id = u.id), '[]'::json) AS empresas
       FROM usuarios u WHERE u.escritorio_id = $1 ${verEquipe ? '' : "AND u.ambiente = 'cliente'"} ORDER BY u.ambiente DESC, u.nome`, [u.escritorio_id]);
-    usuarios.forEach(x => { if (x.ambiente === 'equipe') x.efetivas = permissoesEfetivas(x); });
+    const [escr] = await db.query('SELECT funcoes FROM escritorios WHERE id = $1', [u.escritorio_id]);
+    const funcoesEsc = funcoesDoEscritorio(escr?.funcoes);
+    usuarios.forEach(x => { if (x.ambiente === 'equipe') x.efetivas = permissoesEfetivas(x, funcoesEsc); });
     const empresas = await db.query(`SELECT id, dados->>'razao' AS razao, dados->>'fantasia' AS fantasia, dados->>'cnpj' AS cnpj FROM registros
       WHERE escritorio_id = $1 AND colecao = 'empresas' ORDER BY dados->>'razao'`, [u.escritorio_id]);
-    return { eu: { id: u.id, papel: u.papel, podeEquipe: u.papel === 'master', podeClientes: podeCliente(u) }, usuarios, empresas, modulos: MODULOS, funcoes: FUNCOES };
+    return { eu: { id: u.id, papel: u.papel, podeEquipe: u.papel === 'master', podeClientes: podeCliente(u) }, usuarios, empresas, modulos: MODULOS, funcoes: funcoesEsc, funcoesCodigo: FUNCOES, niveis: NIVEIS };
   });
 
   async function enviarConvite(q, usuario, site, criadoPor) {
@@ -504,6 +561,7 @@ export function registrarRotas(r, { db, hub }) {
   });
 
   registrarGestao(r, { db, exigir, log, pode });
+  registrarWhatsApp(r, { db, exigir, log, pode });
 
   return { carregarEmpresas };
 }
