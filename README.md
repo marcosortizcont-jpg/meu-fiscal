@@ -31,6 +31,23 @@ Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site
 6. **CORS estrito.** A API responde `Access-Control-Allow-Origin` só para os domínios de `ORIGENS_CLIENTE` e `ORIGENS_PAINEL` (nunca `*`). Toda escrita exige o cabeçalho `X-MF-Site` e uma origem conhecida, o que bloqueia CSRF. O portal não consegue falar com a API "como painel": a origem é conferida contra o site.
 7. **Cabeçalhos de segurança** em cada site: CSP, `X-Frame-Options: DENY`, `nosniff` e `Referrer-Policy`. O painel também leva `noindex`.
 
+## Módulos do Painel Contábil
+
+- **Equipe e permissões** (só o master altera): funções Master, Analista Fiscal, Analista de DP, Analista Contábil e Legalização. Cada função tem um padrão por módulo (sem acesso, consultar, editar), que o master ajusta pessoa a pessoa. O master também cria contas já com senha, redefine senhas e desativa colaboradores; as sessões abertas dessa pessoa caem na hora. A API confere as permissões em cada leitura e gravação (`api/src/permissoes.js`).
+- **Carteira 360°** (toque no nome da empresa), em cinco abas:
+  - **Dados gerais e acesso:** cadastro completo (inscrições estadual e municipal, endereço, sócios e contatos) e criação do acesso do cliente ao portal, com senha inicial de 8 caracteres ou convite por link.
+  - **Certificado digital:** o .pfx e a senha ficam cifrados. A API confere a senha, lê titular, CNPJ e validade do próprio certificado e alimenta os alertas de 30, 15 e 7 dias.
+  - **Cofre de senhas:** portais como Prefeitura/NFS-e, SEFAZ, e-CAC, FGTS Digital, Junta Comercial e SIMEI. Toda senha revelada fica registrada com o nome de quem viu.
+  - **Responsáveis:** quem cuida da empresa no Fiscal, no Pessoal, no Contábil e na Legalização. As obrigações geradas já saem atribuídas a essas pessoas.
+  - **Obrigações vinculadas:** o pacote que vem do regime, mais as obrigações avulsas e as retiradas só daquela empresa.
+- **Motor de obrigações** (Obrigações › Catálogo e Regimes):
+  - Cada obrigação tem recorrência (mensal, trimestral, anual ou eventual), regra de vencimento (dia fixo, n-ésimo dia útil ou último dia útil, com antecipação ou prorrogação), condição (por exemplo, só com funcionários) e alocação em lote para regimes ou empresas.
+  - Ao cadastrar uma empresa, o regime escolhido vincula o pacote inteiro e gera as obrigações do mês.
+  - O botão **Criar catálogo e regimes padrão** traz 16 obrigações e 8 regimes (MEI, Simples Anexos I a V, Lucro Presumido e Real). Confira os prazos estaduais, como o da EFD ICMS/IPI.
+- **Celular:** o menu vira uma gaveta lateral (80% da tela), aberta pelo botão ☰, com fundo desfocado. Ela fecha ao tocar fora, ao escolher um item ou com Esc.
+
+> **Chave do cofre (`COFRE_CHAVE`).** O Render gera a chave sozinho. Ela cifra os certificados e as senhas dos portais e **nunca pode ser trocada nem perdida**: sem ela, esses segredos ficam ilegíveis. Guarde uma cópia em local seguro: no Render, abra **Environment → COFRE_CHAVE → Reveal**.
+
 ## Sincronização em tempo real
 
 1. O cliente envia um documento ou abre uma solicitação no Site 1. A API grava na tabela `registros`.
