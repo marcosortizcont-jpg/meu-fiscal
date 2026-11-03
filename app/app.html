@@ -4009,7 +4009,7 @@ ACT['gravar']=async el=>{
   const fmt=formatoAudio();const rec=new MediaRecorder(stream,fmt.m?{mimeType:fmt.m}:undefined);const partes=[];
   UI.gravando={rec,alvo:el.dataset.alvo,id:el.dataset.id||'',inicio:Date.now()};
   rec.ondataavailable=e=>{if(e.data&&e.data.size)partes.push(e.data)};
-  rec.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const g=UI.gravando;UI.gravando=null;clearInterval(UI.gravTimer);render();
+  rec.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const g=UI.gravando;UI.gravando=null;clearInterval(UI.gravTimer);render();if(g.cancelado){toast('Áudio descartado.');return}
     const seg=(Date.now()-g.inicio)/1000;if(seg<1){toast('Áudio muito curto.',true);return}
     const tipo=(rec.mimeType||fmt.m||'audio/webm').split(';')[0];const ext=tipo==='audio/ogg'?'ogg':tipo==='audio/mp4'?'m4a':'webm';
     const file=new File([new Blob(partes,{type:tipo})],`audio-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.${ext}`,{type:tipo});
@@ -4018,7 +4018,7 @@ ACT['gravar']=async el=>{
   rec.start();render();
   UI.gravTimer=setInterval(()=>{const b=document.querySelector('[data-act=gravar].gravando span');if(b&&UI.gravando){const s=Math.floor((Date.now()-UI.gravando.inicio)/1000);b.textContent=Math.floor(s/60)+':'+pad(s%60)}},500);
 };
-const botoesComposer=(alvo,id)=>`<button type="button" class="btn ico" data-act="emoji" data-alvo="${alvo==='ia'?'ia-input':'hum-input'}" title="Emojis" aria-label="Inserir emoji">${svg('smile')}</button><button type="button" class="btn ico ${UI.gravando&&UI.gravando.alvo===alvo?'gravando':''}" data-act="gravar" data-alvo="${alvo}" data-id="${id||''}" title="${UI.gravando?'Parar e enviar':'Gravar áudio'}" aria-label="Gravar áudio">${svg('mic')}${UI.gravando&&UI.gravando.alvo===alvo?'<span>0:00</span>':''}</button>`;
+const botoesComposer=(alvo,id)=>{const g=UI.gravando&&UI.gravando.alvo===alvo;return `<button type="button" class="btn ico" data-act="emoji" data-alvo="${alvo==='ia'?'ia-input':'hum-input'}" title="Emojis" aria-label="Inserir emoji">${svg('smile')}</button>${g?`<button type="button" class="btn ico" data-act="gravar-cancelar" title="Cancelar o áudio" aria-label="Cancelar o áudio">✕</button>`:''}<button type="button" class="btn ico ${g?'gravando':''}" data-act="gravar" data-alvo="${alvo}" data-id="${id||''}" title="${g?'Parar e enviar':'Gravar áudio'}" aria-label="${g?'Parar e enviar o áudio':'Gravar áudio'}">${svg('mic')}${g?'<span>0:00</span> Enviar':''}</button>`};
 
 /* ---------- portal: Atendimento com o Théo ---------- */
 const vIAV3=vIA;
@@ -4094,7 +4094,7 @@ function resumoConv(c){
   return {c,e:emp(c.empresaId),ini,fim,humanos,soIA,n:ms.filter(m=>m.de!=='sistema').length,comps:new Set(ms.map(m=>String(m.em||'').slice(0,7)).filter(Boolean))};
 }
 function historicoAtend(){
-  const f=UI.fat;const q=(f.q||'').toLowerCase().trim();
+  const f=UI.fat;const fr=UI.fatRasc||(UI.fatRasc={...UI.fat});const q=(f.q||'').toLowerCase().trim();
   const todos=S.conversas.map(resumoConv).sort((a,b)=>String(b.fim).localeCompare(String(a.fim)));
   const L=todos.filter(r=>{
     if(f.empresa&&(f.empresa==='__sem'?!!r.c.empresaId:r.c.empresaId!==f.empresa))return false;
@@ -4107,23 +4107,25 @@ function historicoAtend(){
     return true});
   const atendentes=[...new Set(todos.flatMap(r=>r.humanos))].sort();
   const enc=L.filter(r=>r.c.status==='encerrada').length,ia=L.filter(r=>r.soIA).length,wa=L.filter(r=>r.c.canal==='whatsapp').length;
-  const sel=(k,rot,ops)=>`<label class="f"><span>${rot}</span><select data-fat="${k}"><option value="">Todos</option>${ops.map(([v,r])=>`<option value="${esc(v)}" ${f[k]===v?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`;
+  const sel=(k,rot,ops)=>`<label class="f"><span>${rot}</span><select data-fat="${k}"><option value="">Todos</option>${ops.map(([v,r])=>`<option value="${esc(v)}" ${fr[k]===v?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`;
   const ST={ia:['Com o Théo','acc'],aguardando_humano:['Aguardando','warn'],humano:['Em atendimento','ok'],encerrada:['Encerrada','']};
   return `<div class="panel nao-imprimir"><div class="barra-filtros">
-   <label class="f busca"><span>Pesquisar</span><input type="search" id="busca-fat" data-live="1" value="${esc(f.q)}" placeholder="Cliente, telefone ou palavra dita na conversa"></label>
+   <label class="f busca"><span>Pesquisar</span><input type="search" id="busca-fat" data-live="1" value="${esc(fr.q)}" placeholder="Cliente, telefone ou palavra dita na conversa"></label>
    ${sel('empresa','Cliente',[...S.empresas.slice().sort((a,b)=>(a.fantasia||a.razao).localeCompare(b.fantasia||b.razao)).map(e=>[e.id,e.fantasia||e.razao]),['__sem','Contato não identificado']])}
    ${sel('canal','Canal',[['portal','Portal do cliente'],['whatsapp','WhatsApp']])}
    ${sel('atend','Atendente',atendentes.map(a=>[a,a]))}
    ${sel('sit','Situação',[['aberta','Em aberto'],['encerrada','Encerrada'],['humano','Teve atendente']])}
-   <label class="f"><span>De</span><input type="date" data-fat="de" value="${esc(f.de)}"></label><label class="f"><span>Até</span><input type="date" data-fat="ate" value="${esc(f.ate)}"></label>
-   <label class="f"><span>Competência</span><input type="month" data-fat="comp" value="${esc(f.comp)}"></label>
-  </div><div class="filtro-resumo"><span class="small muted">${L.length} atendimento(s) · ${enc} encerrado(s) · ${ia} resolvido(s) só pelo Théo · ${wa} pelo WhatsApp</span><div class="actions"><button class="btn sm ghost" data-act="fat-limpar">Limpar filtros</button><button class="btn sm" data-act="fat-csv">${svg('download')}Exportar</button><button class="btn sm" data-act="ctrl-imprimir">Imprimir / PDF</button></div></div></div>
+   <label class="f"><span>De</span><input type="date" data-fat="de" value="${esc(fr.de)}"></label><label class="f"><span>Até</span><input type="date" data-fat="ate" value="${esc(fr.ate)}"></label>
+   <label class="f"><span>Competência</span><input type="month" data-fat="comp" value="${esc(fr.comp)}"></label>
+  </div><div class="filtro-resumo"><div class="actions"><button class="btn primary" data-act="fat-pesquisar">${svg('search')}Pesquisar</button></div><span class="small muted">${L.length} atendimento(s) · ${enc} encerrado(s) · ${ia} resolvido(s) só pelo Théo · ${wa} pelo WhatsApp</span><div class="actions"><button class="btn sm ghost" data-act="fat-limpar">Limpar filtros</button><button class="btn sm" data-act="fat-csv">${svg('download')}Exportar</button><button class="btn sm" data-act="ctrl-imprimir">Imprimir / PDF</button></div></div></div>
   <div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Canal</th><th>Início</th><th>Última mensagem</th><th>Atendido por</th><th class="r">Mensagens</th><th>Situação</th><th class="nao-imprimir"></th></tr></thead><tbody>${L.slice(0,500).map(r=>`<tr><td><b>${esc(r.e?(r.e.fantasia||r.e.razao):(r.c.contatoNome||'Contato não identificado'))}</b>${r.c.waFone?`<div class="sub">+${esc(r.c.waFone)}</div>`:''}</td><td>${canalTag(r.c)}</td><td class="num small">${r.ini?fmtDH(r.ini):'—'}</td><td class="num small">${r.fim?fmtDH(r.fim):'—'}</td><td class="small">${r.humanos.length?esc(r.humanos.join(', ')):IA_NOME}</td><td class="r num">${r.n}</td><td>${pill(...(ST[r.c.status]||[r.c.status,'']))}</td>
     <td class="r nao-imprimir"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-act="fat-ver" data-id="${r.c.id}">Ver conversa</button>${r.c.status==='encerrada'&&podeMod('chat','editar')?`<button class="btn sm ghost" data-act="fat-reabrir" data-id="${r.c.id}">Reabrir</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhum atendimento com esses filtros.')}</div>`;
 }
-document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.fat){UI.fat[el.dataset.fat]=el.value;render()}});
-Object.assign(buscaVivas,{'busca-fat':v=>{UI.fat.q=v}});
-ACT['fat-limpar']=()=>{UI.fat={empresa:'',canal:'',atend:'',sit:'',de:'',ate:'',comp:'',q:''};render()};
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.fat){(UI.fatRasc=UI.fatRasc||{...UI.fat})[el.dataset.fat]=el.value}});
+document.addEventListener('input',ev=>{if(ev.target.id==='busca-fat')(UI.fatRasc=UI.fatRasc||{...UI.fat}).q=ev.target.value},true);
+document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&(ev.target.id==='busca-fat'||(ev.target.dataset&&ev.target.dataset.fat))){ev.preventDefault();ev.target.dispatchEvent(new Event('change',{bubbles:true}));ACT['fat-pesquisar']()}});
+ACT['fat-pesquisar']=()=>{UI.fat={...(UI.fatRasc||UI.fat)};render()};
+ACT['fat-limpar']=()=>{UI.fat={empresa:'',canal:'',atend:'',sit:'',de:'',ate:'',comp:'',q:''};UI.fatRasc=null;render()};
 ACT['fat-ver']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.id);if(!c)return;const r=resumoConv(c);
   openModal(`${mHead((r.e?(r.e.fantasia||r.e.razao):(c.contatoNome||'Contato'))+' · '+(c.canal==='whatsapp'?'WhatsApp':'Portal'))}<div class="modal-body"><p class="small muted">${r.ini?fmtDH(r.ini):''} a ${r.fim?fmtDH(r.fim):''} · atendido por ${esc(r.humanos.join(', ')||IA_NOME)}</p><div class="chat"><div class="msgs" style="max-height:60vh">${bolhas(c,'painel')}</div></div></div><div class="modal-foot">${c.status!=='encerrada'?`<button class="btn" data-act="fat-abrir" data-id="${c.id}">Abrir na caixa de entrada</button>`:''}<button class="btn primary" data-act="close-modal">Fechar</button></div>`,true)};
 ACT['fat-abrir']=el=>{closeModal();UI.tab.atend='caixa';UI.convSel=el.dataset.id;UI.convFiltro='todas';render()};
@@ -4134,6 +4136,83 @@ ACT['fat-csv']=()=>{const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const f=
   const L=S.conversas.map(resumoConv).sort((a,b)=>String(b.fim).localeCompare(String(a.fim)));
   baixar('atendimentos-'+hoje()+'.csv','\ufeff'+['Cliente;Canal;Telefone;Início;Última mensagem;Atendido por;Mensagens;Situação'].concat(L.map(r=>[r.e?(r.e.razao):(r.c.contatoNome||''),r.c.canal==='whatsapp'?'WhatsApp':'Portal',r.c.waFone||'',r.ini?fmtDH(r.ini):'',r.fim?fmtDH(r.fim):'',r.humanos.join(', ')||IA_NOME,r.n,r.c.status].map(c).join(';'))).join('\r\n'),'text/csv')};
 /* ==== MÓDULOS v7 (fim) ==== */
+/* ==== MÓDULOS v8: responder mensagem (citação), apagar para todos e cancelar áudio ==== */
+(function(){const st=document.createElement('style');st.textContent=`
+.msg{position:relative}
+.msg .acoes-msg{display:flex;gap:10px;margin-top:4px;font-size:11px;opacity:0;transition:opacity .15s}
+.msg:hover .acoes-msg,.msg:focus-within .acoes-msg{opacity:1}
+@media (hover:none){.msg .acoes-msg{opacity:.75}}
+.msg .acoes-msg button{border:0;background:transparent;padding:0;cursor:pointer;color:inherit;font:inherit;text-decoration:underline;opacity:.85}
+.msg .citacao{display:block;border-left:3px solid var(--accent);background:rgb(0 0 0 / .06);border-radius:6px;padding:4px 8px;margin:2px 0 6px;font-size:12px;cursor:pointer;text-align:left;width:100%;color:inherit;font-family:inherit}
+.msg.me .citacao{background:rgb(255 255 255 / .18);border-left-color:#fff}
+.msg .citacao b{display:block;font-size:11px}
+.msg .apagada{font-style:italic;opacity:.8}
+.msg.destaque{outline:3px solid color-mix(in srgb,var(--accent) 45%,transparent);outline-offset:2px}
+.resp-prev{display:flex;gap:10px;align-items:center;justify-content:space-between;border-left:3px solid var(--accent);background:var(--surface-2);padding:6px 10px;margin:0 10px;border-radius:6px;font-size:13px}
+.resp-prev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.resp-prev button{border:0;background:transparent;cursor:pointer;font-size:16px;color:var(--muted)}
+`;document.head.appendChild(st)})();
+const APAGAR_MIN=60;
+ACT['gravar-cancelar']=()=>{if(!UI.gravando)return;UI.gravando.cancelado=true;UI.gravando.rec.stop()};
+
+/* ---------- bolhas com citação, responder e apagar ---------- */
+const trechoMsg=m=>{const t=String(m.texto||'').replace(/\s*CONFIAN[CÇ]A:.*$/i,'').trim();if(t&&!/^🎤 Mensagem de voz$/.test(t))return t.slice(0,140);const a=(m.arquivos||[])[0];return a?(ehAudio(a)?'🎤 Áudio':/image\//.test(a.tipo||'')||/\.(png|jpe?g|webp|gif)$/i.test(a.nome||'')?'📷 Foto':'📎 '+(a.nome||'Arquivo')):t||'Mensagem'};
+function podeApagar(m,lado){
+  if(m.apagada||m.de==='sistema'||m.de==='ia'||!m.uid||m.uid!==ME.id)return false;
+  if(lado==='cliente'?m.de!=='cliente':m.de!=='humano')return false;
+  return Date.now()-new Date(m.em).getTime()<=APAGAR_MIN*60000;
+}
+const bolhasV7=bolhas;
+bolhas=function(c,lado){
+  if(!c)return '';
+  const pedacos=(c.mensagens||[]).map((m,i)=>{
+    const um=bolhasV7({...c,mensagens:[m]},lado);
+    if(m.de==='sistema')return um;
+    let h=um;
+    if(m.apagada)h=h.replace(/(<span class="who">[\s\S]*?<\/span>)[\s\S]*<\/div>$/,`$1<span class="apagada">🚫 ${m.uid===ME.id?'Você apagou esta mensagem':'Esta mensagem foi apagada'}</span></div>`);
+    if(m.resposta&&!m.apagada){const r=m.resposta;h=h.replace(/(<span class="who">[\s\S]*?<\/span>)/,`$1<button type="button" class="citacao" data-act="ir-msg" data-em="${esc(r.em)}"><b>${esc(r.nome||'')}</b>${esc(r.texto||'')}</button>`)}
+    const acoes=m.apagada?'':`<div class="acoes-msg"><button type="button" data-act="responder-msg" data-c="${esc(c.id)}" data-i="${i}">↩ Responder</button>${podeApagar(m,lado)?`<button type="button" data-act="apagar-msg" data-c="${esc(c.id)}" data-i="${i}">Apagar para todos</button>`:''}</div>`;
+    return h.replace(/<div class="msg /,`<div data-em="${esc(m.em)}" class="msg `).replace(/<\/div>$/,acoes+'</div>');
+  });
+  return pedacos.join('');
+};
+ACT['ir-msg']=el=>{const alvo=[...document.querySelectorAll('#msgs .msg[data-em]')].find(x=>x.dataset.em===el.dataset.em);if(alvo){alvo.scrollIntoView({block:'center',behavior:'smooth'});alvo.classList.add('destaque');setTimeout(()=>alvo.classList.remove('destaque'),1500)}};
+ACT['responder-msg']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.c);const m=c&&c.mensagens[Number(el.dataset.i)];if(!m)return;
+  UI.resposta={convId:c.id,q:{em:m.em,de:m.de,nome:nomeQuemEnviou(m,c),texto:trechoMsg(m)}};render();
+  const t=$('#ia-input')||$('#hum-input');if(t&&!t.disabled)t.focus()};
+ACT['resposta-cancelar']=()=>{UI.resposta=null;render()};
+ACT['apagar-msg']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.c);const m=c&&c.mensagens[Number(el.dataset.i)];if(!m)return;
+  confirmar('Apagar para todos','A mensagem some da conversa para você e para '+(UI.modo==='painel'?'o cliente':'o escritório')+(c.canal==='whatsapp'?' (também no WhatsApp dele)':'')+'. Fica o aviso "Esta mensagem foi apagada".','Apagar para todos',async()=>{
+    if(!podeApagar(m,UI.modo==='painel'?'painel':'cliente')){toast('Só dá para apagar mensagens suas enviadas na última hora.',true);return}
+    if(c.canal==='whatsapp'){try{await MF.api('POST','/api/whatsapp/apagar',{conversaId:c.id,em:m.em});toast('Mensagem apagada.')}catch(er){toast(er.message,true)}return}
+    mut('conversas',()=>{Object.assign(m,{apagada:true,apagadaEm:agora(),texto:''});delete m.arquivos;delete m.resposta},['Atendimento','Apagou mensagem para todos',emp(c.empresaId)?.razao]);
+  })};
+// prévia "Respondendo a…" acima da caixa de texto
+const barraResposta=convId=>{const r=UI.resposta;if(!r||r.convId!==convId)return '';return `<div class="resp-prev"><span>↩ Respondendo a <b>${esc(r.q.nome)}</b>: ${esc(r.q.texto)}</span><button type="button" data-act="resposta-cancelar" aria-label="Cancelar resposta">×</button></div>`};
+const vIAV7=vIA;vIA=function(e){const h=vIAV7(e);const c=conversaAtiva(e.id,false);if(!c)return h;return h.replace('<form class="composer" data-form="msg-ia">',barraResposta(c.id)+'<form class="composer" data-form="msg-ia">')};
+const aChatV7=aChat;aChat=function(){const h=aChatV7();const m=h.match(/<form class="composer" data-form="msg-humano" data-id="([^"]+)">/);return m?h.replace(m[0],barraResposta(m[1])+m[0]):h};
+// a próxima mensagem enviada leva a citação
+const mutV6b=mut;
+mut=function(cols,fn,log){
+  const rp=UI.respostaPendente;
+  if(rp&&[].concat(cols).includes('conversas')){const fn0=fn;fn=()=>{const r=fn0();const c=S.conversas.find(x=>x.id===rp.convId)||(empAtual()&&conversaAtiva(empAtual().id,false));
+    const m=c&&[...c.mensagens].reverse().find(x=>x.uid===ME.id&&x.de!=='sistema'&&!x.resposta&&Date.now()-new Date(x.em).getTime()<15000);
+    if(m){m.resposta=rp.q;UI.respostaPendente=null}return r}}
+  return mutV6b(cols,fn,log);
+};
+const formMsgIA=FORM['msg-ia'];FORM['msg-ia']=(fd,form)=>{if(UI.resposta){UI.respostaPendente=UI.resposta;UI.resposta=null}return formMsgIA(fd,form)};
+const formMsgHum=FORM['msg-humano'];
+FORM['msg-humano']=async(fd,form)=>{
+  const c=S.conversas.find(x=>x.id===form.dataset.id);const r=UI.resposta&&UI.resposta.convId===form.dataset.id?UI.resposta:null;
+  if(c&&c.canal==='whatsapp'&&r){const inp=$('#hum-input');const t=(inp?.value||'').trim();if(!t)return;inp.value='';UI.resposta=null;
+    try{await MF.api('POST','/api/whatsapp/enviar',{conversaId:c.id,texto:t,resposta:r.q})}catch(er){inp.value=t;UI.resposta=r;toast(er.message,true)}render();return}
+  if(r){UI.respostaPendente=r;UI.resposta=null}
+  const out=await formMsgHum(fd,form);render();return out;
+};
+// áudio e arquivos também podem responder
+const enviarArqV7=enviarArquivosHumano;
+enviarArquivosHumano=async function(convId,files){if(UI.resposta&&UI.resposta.convId===convId){UI.respostaPendente=UI.resposta;UI.resposta=null}return enviarArqV7(convId,files)};
+/* ==== MÓDULOS v8 (fim) ==== */
 
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();

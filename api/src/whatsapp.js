@@ -191,6 +191,13 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     const texto = msg.conversation || msg.extendedTextMessage?.text || msg.imageMessage?.caption || msg.videoMessage?.caption || msg.documentMessage?.caption || '';
     const midia = msg.imageMessage ? ['imagem', msg.imageMessage] : msg.documentMessage ? ['documento', msg.documentMessage] : msg.audioMessage ? ['áudio', msg.audioMessage]
       : msg.videoMessage ? ['vídeo', msg.videoMessage] : msg.stickerMessage ? ['figurinha', null] : msg.contactMessage ? ['contato', null] : msg.locationMessage ? ['localização', null] : null;
+    // o contato apagou a mensagem para todos no WhatsApp
+    if (msg.protocolMessage && (msg.protocolMessage.type === 0 || msg.protocolMessage.type === 'REVOKE') && msg.protocolMessage.key?.id) {
+      const esc0 = await escritorio(); const c0 = esc0 && await conversaAberta(esc0, jid);
+      const m0 = c0 && c0.mensagens.find(x => x.waId === msg.protocolMessage.key.id);
+      if (m0 && !m0.apagada) { Object.assign(m0, { apagada: true, apagadaEm: new Date().toISOString(), texto: '' }); delete m0.arquivos; await salvarConversa(esc0, c0); }
+      return;
+    }
     if (!texto && !midia) return;   // confirmações, reações e afins
     const esc = await escritorio(); if (!esc) return;
     const agora = new Date(ts || Date.now()).toISOString();
@@ -253,9 +260,9 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
       empresa: { nome: d.fantasia || d.razao, regime: d.regimeNome || ({ MEI: 'MEI', SN: 'Simples Nacional', LP: 'Lucro Presumido', LR: 'Lucro Real' }[d.regime] || d.regime || ''), municipio: d.municipio },
       guias_em_aberto: guias.map(g => ({ tipo: g.dados.tipo, competencia: g.dados.comp, valor: g.dados.valor, vencimento: g.dados.venc })) };
   }
-  async function enviarTexto(jid, texto) {
+  async function enviarTexto(jid, texto, quoted) {
     if (!W.sock || W.status !== 'conectado') throw new ErroHttp(503, 'O WhatsApp do escritório está desconectado. Conecte pelo QR code em Atendimento.');
-    const r = await W.sock.sendMessage(jid, { text: texto });
+    const r = await W.sock.sendMessage(jid, { text: texto }, quoted ? { quoted } : undefined);
     if (r?.key?.id) { enviadas.set(r.key.id, r.message); if (enviadas.size > 500) enviadas.delete(enviadas.keys().next().value); }
     return r;
   }
@@ -334,7 +341,12 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
     const [l] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND id = $2`, [esc, String(ctx.corpo.conversaId || '')]);
     if (!l || l.dados.canal !== 'whatsapp') throw new ErroHttp(404, 'Conversa do WhatsApp não encontrada.');
     const c = l.dados;
-    if (texto) await enviarTexto(c.waJid, texto);
+    // resposta a uma mensagem (citação, como no WhatsApp)
+    const resp = ctx.corpo.resposta && typeof ctx.corpo.resposta === 'object' ? ctx.corpo.resposta : null;
+    const orig = resp ? c.mensagens.find(m => m.em === resp.em && m.de === resp.de) : null;
+    const quoted = orig && orig.waId ? { key: { remoteJid: c.waJid, id: orig.waId, fromMe: orig.de !== 'cliente' }, message: { conversation: String(orig.texto || '') } } : undefined;
+    const waIds = [];
+    if (texto) { const rt = await enviarTexto(c.waJid, texto, quoted); if (rt?.key?.id) waIds.push(rt.key.id); }
     for (const a of anexos) {
       const [arq] = await db.query('SELECT id, chave, tipo, tamanho, local FROM arquivos WHERE id = $1 AND escritorio_id = $2', [a.id, esc]);
       if (!arq) continue;
@@ -342,13 +354,29 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
       const tipo = arq.tipo; const nome = String(a.nome || 'arquivo').slice(0, 120);
       const msg = /^image\//.test(tipo) && !/gif/.test(tipo) ? { image: buf } : /^audio\/(ogg|mp4|mpeg|aac)/.test(tipo) ? { audio: buf, mimetype: tipo === 'audio/ogg' ? 'audio/ogg; codecs=opus' : tipo, ptt: tipo === 'audio/ogg' }
         : /^video\//.test(tipo) ? { video: buf } : { document: buf, mimetype: tipo, fileName: nome };
-      const r = await W.sock.sendMessage(c.waJid, msg);
-      if (r?.key?.id) enviadas.set(r.key.id, r.message);
+      const r = await W.sock.sendMessage(c.waJid, msg, !texto && quoted ? { quoted } : undefined);
+      if (r?.key?.id) { enviadas.set(r.key.id, r.message); waIds.push(r.key.id); }
     }
     if (c.status !== 'humano') { c.status = 'humano'; c.atendenteUid = u.id; c.mensagens.push({ de: 'sistema', texto: `${u.nome} assumiu a conversa.`, em: new Date().toISOString() }); }
-    c.mensagens.push({ de: 'humano', texto, em: new Date().toISOString(), uid: u.id, nome: u.nome, canal: 'whatsapp', ...(anexos.length ? { arquivos: anexos.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, tamanho: a.tamanho, url: `/api/arquivos/${a.id}` })) } : {}) });
+    c.mensagens.push({ de: 'humano', texto, em: new Date().toISOString(), uid: u.id, nome: u.nome, canal: 'whatsapp', waIds, ...(resp ? { resposta: { em: String(resp.em || ''), de: String(resp.de || ''), nome: String(resp.nome || '').slice(0, 40), texto: String(resp.texto || '').slice(0, 140) } } : {}), ...(anexos.length ? { arquivos: anexos.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, tamanho: a.tamanho, url: `/api/arquivos/${a.id}` })) } : {}) });
     c.naoLidas = 0;
     await salvarConversa(esc, c);
+    return { ok: true };
+  });
+  // apagar para todos: só a própria mensagem e só se for recente (até 60 minutos)
+  r.post('/api/whatsapp/apagar', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' });
+    if (!pode(u, 'chat', 'editar')) throw new ErroHttp(403, 'Seu acesso ao Atendimento é só de consulta.');
+    const [l] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND id = $2`, [u.escritorio_id, String(ctx.corpo.conversaId || '')]);
+    if (!l) throw new ErroHttp(404, 'Conversa não encontrada.');
+    const c = l.dados; const m = c.mensagens.find(x => x.em === ctx.corpo.em && x.uid === u.id && x.de === 'humano');
+    if (!m) throw new ErroHttp(404, 'Mensagem não encontrada ou não foi enviada por você.');
+    if (Date.now() - new Date(m.em).getTime() > 60 * 60 * 1000) throw new ErroHttp(400, 'Só dá para apagar para todos mensagens enviadas na última hora.');
+    if (c.canal === 'whatsapp' && W.sock && W.status === 'conectado') {
+      for (const id of m.waIds || []) { try { await W.sock.sendMessage(c.waJid, { delete: { remoteJid: c.waJid, fromMe: true, id } }); } catch (e) { console.error('[whatsapp] apagar', e.message); } }
+    }
+    Object.assign(m, { apagada: true, apagadaEm: new Date().toISOString(), texto: '' }); delete m.arquivos; delete m.resposta;
+    await salvarConversa(u.escritorio_id, c);
     return { ok: true };
   });
   const envios = new Map();

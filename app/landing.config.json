@@ -38,51 +38,113 @@
   "_metricas": "Quando tiver números medidos (economia média, satisfação, tempo de entrega das guias), troque estes cartões pelos números reais.",
   "planos": [
     {
-      "id": "mei",
-      "nome": "MEI",
-      "subtitulo": "Para o microempreendedor individual",
-      "preco": 99,
+      "id": "basic",
+      "grupo": "servicos",
+      "nome": "Basic",
+      "subtitulo": "Perfeito para quem precisa de suporte, autonomia e agilidade no dia a dia.",
+      "preco": 259,
       "destaque": false,
       "itens": [
-        "DAS-MEI do mês calculado e liberado no portal",
-        "Declaração anual (DASN-SIMEI)",
-        "Emissão de notas fiscais de serviço",
-        "Alerta de limite de faturamento do MEI",
-        "Copiloto de IA 24 horas",
-        "1 funcionário incluso (R$ 45 por adicional)"
-      ]
+        {
+          "t": "Abertura de CNPJ",
+          "tag": "Grátis"
+        },
+        "Contabilidade completa",
+        {
+          "t": "Certificado digital A1",
+          "tag": "Grátis"
+        },
+        "Atendimento por WhatsApp, telefone, e-mail e chat",
+        "Painel contábil completo para a sua empresa"
+      ],
+      "adicional": {
+        "nome": "Endereço comercial para abrir seu CNPJ",
+        "preco": 70
+      }
     },
     {
-      "id": "servicos",
-      "nome": "Simples Nacional · Serviços",
-      "subtitulo": "Prestadores de serviço, Anexos III, IV e V",
-      "preco": 690,
+      "id": "unique",
+      "grupo": "servicos",
+      "nome": "Unique",
+      "subtitulo": "Tenha um gerente de conta dedicado para sua empresa.",
+      "preco": 450,
       "destaque": true,
-      "selo": "Mais escolhido",
+      "selo": "Especialista dedicado",
+      "titulo": "Tudo do Basic, mais:",
       "itens": [
-        "Apuração do Simples (PGDAS-D) e guia DAS",
-        "Acompanhamento do Fator R",
-        "Contabilidade mensal, balanço e DEFIS",
-        "Pró-labore, folha, eSocial e FGTS Digital",
-        "2 funcionários inclusos (R$ 45 por adicional)",
-        "B.I. de faturamento e alíquota efetiva",
-        "Copiloto de IA 24 horas e atendimento humano"
+        "Gerente de conta dedicado para cuidar de tudo da sua empresa",
+        "Horário estendido: atendimento das 8h às 21h com o gerente de conta",
+        "Gestão da folha de sócios e funcionários no Painel de RH: até 5 pessoas",
+        "Importação de notas fiscais de qualquer município"
+      ],
+      "adicional": {
+        "nome": "Endereço comercial para abrir seu CNPJ",
+        "preco": 60
+      }
+    },
+    {
+      "id": "unique-plus",
+      "grupo": "servicos",
+      "nome": "Unique Plus",
+      "subtitulo": "Para quem tem uma operação maior e mais demandas financeiras.",
+      "preco": 700,
+      "destaque": false,
+      "titulo": "Tudo do Unique, mais:",
+      "itens": [
+        "Agendamento de contas ou emissão de notas fiscais: até 100 operações por mês",
+        "Importação de até 800 notas fiscais",
+        "Importação de extrato bancário: até 3 contas"
+      ],
+      "adicional": {
+        "nome": "Endereço comercial para abrir seu CNPJ",
+        "preco": 60
+      }
+    },
+    {
+      "id": "basic-comercio",
+      "grupo": "comercio",
+      "nome": "Basic Comércio",
+      "subtitulo": "Ideal para quem quer manter tudo em dia sem complicação.",
+      "preco": 359,
+      "destaque": false,
+      "itens": [
+        "Contabilidade completa",
+        {
+          "t": "Certificado digital A1",
+          "tag": "Grátis"
+        },
+        "Painel contábil completo para a sua empresa",
+        "Atendimento por WhatsApp, telefone, e-mail e chat",
+        "Gestão da folha de sócios e funcionários no Painel de RH: até 3 pessoas"
       ]
     },
     {
-      "id": "comercio",
-      "nome": "Simples Nacional · Comércio",
-      "subtitulo": "Comércio e indústria, Anexos I e II",
-      "preco": 890,
-      "destaque": false,
+      "id": "unique-comercio",
+      "grupo": "comercio",
+      "nome": "Unique Comércio",
+      "subtitulo": "Tenha um gerente de conta dedicado para sua empresa.",
+      "preco": 550,
+      "destaque": true,
+      "selo": "Especialista dedicado",
+      "titulo": "Tudo do Basic, mais:",
       "itens": [
-        "Apuração do Simples (PGDAS-D) e guia DAS",
-        "Conferência das notas de saída (XML)",
-        "Contabilidade mensal, balanço e DEFIS",
-        "Pró-labore, folha, eSocial e FGTS Digital",
-        "3 funcionários inclusos (R$ 45 por adicional)",
-        "B.I. de faturamento e alíquota efetiva",
-        "Copiloto de IA 24 horas e atendimento humano"
+        "Gerente de conta dedicado para cuidar de tudo da sua empresa",
+        "Gestão da folha de sócios e funcionários no Painel de RH: até 5 pessoas",
+        "Importação de notas fiscais de qualquer município",
+        "Declaração de Imposto de Renda Pessoa Física"
+      ]
+    },
+    {
+      "id": "unique-plus-comercio",
+      "grupo": "comercio",
+      "nome": "Unique Plus Comércio",
+      "subtitulo": "Para quem tem uma operação maior e mais demandas financeiras.",
+      "preco": 900,
+      "destaque": false,
+      "titulo": "Tudo do Unique, mais:",
+      "itens": [
+        "Agendamento de contas ou emissão de notas fiscais: até 100 operações por mês",
+        "Importação de extrato bancário: até 3 contas"
       ]
     }
   ],
@@ -94,5 +156,16 @@
       "empresa": "Nome da empresa",
       "regime": "MEI"
     }
-  ]
+  ],
+  "gruposPlanos": [
+    {
+      "id": "servicos",
+      "nome": "Prestação de serviços"
+    },
+    {
+      "id": "comercio",
+      "nome": "Comércio"
+    }
+  ],
+  "_planos": "Cada plano: grupo (servicos ou comercio), nome, subtitulo, preco, destaque (true no plano em evidência), selo, titulo (ex.: 'Tudo do Basic, mais:'), itens (texto ou {t, tag}) e adicional opcional {nome, preco}."
 }

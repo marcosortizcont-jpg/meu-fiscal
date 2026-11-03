@@ -282,11 +282,9 @@
     <div class="mx-auto max-w-2xl text-center">
       <p class="text-sm font-semibold uppercase tracking-wider text-esmeralda-escuro">Planos e preços</p>
       <h2 class="mt-3 text-3xl font-extrabold tracking-tight text-marinho sm:text-4xl">Preço justo e transparente, sem surpresa no fim do mês</h2>
-      <p class="mt-4 text-slate-600">Mensalidade fixa conforme o porte da empresa. Funcionários adicionais têm valor por pessoa.</p>
+      <p class="mt-4 text-slate-600">Mensalidade fixa. Escolha o tipo da sua empresa e o nível de atendimento que você precisa.</p>
     </div>
-    <div class="mt-14 grid items-stretch gap-6 lg:grid-cols-3">
-      <!--@PLANOS-->
-    </div>
+    <!--@PLANOS-->
     <p class="mt-8 text-center text-sm text-slate-500">Empresa no Lucro Presumido, com muitos funcionários ou alguma particularidade? <a href="#comecar" data-objetivo="outro" class="font-semibold text-esmeralda-escuro hover:underline">Peça uma proposta sob medida.</a></p>
   </div>
 </section>
@@ -419,11 +417,14 @@
   btn.addEventListener('click',function(){var a=menu.classList.toggle('hidden');btn.setAttribute('aria-expanded',String(!a))});
   menu.addEventListener('click',function(e){if(e.target.closest('a'))fechar()});
 
+  document.addEventListener('click',function(e){var b=e.target.closest('[data-grupo-plano]');if(!b)return;var g=b.getAttribute('data-grupo-plano');
+    document.querySelectorAll('[data-grupo-plano]').forEach(function(x){x.setAttribute('aria-selected',String(x===b))});
+    document.querySelectorAll('[data-planos-de]').forEach(function(x){x.classList.toggle('hidden',x.getAttribute('data-planos-de')!==g)})});
   var f=document.getElementById('form-contato');
   // botões "Contratar" e CTAs pré-selecionam o plano e o objetivo
   document.addEventListener('click',function(e){
     var a=e.target.closest('a[href="#comecar"]');if(!a)return;
-    if(a.dataset.plano){f.plano.value=a.dataset.plano;if(a.dataset.plano==='mei')marcar('mei')}
+    if(a.dataset.plano){f.plano.value=a.dataset.plano}
     if(a.dataset.objetivo)marcar(a.dataset.objetivo);
     setTimeout(function(){f.nome.focus({preventScroll:true})},450);
   });

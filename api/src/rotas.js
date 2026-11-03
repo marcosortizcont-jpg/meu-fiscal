@@ -263,7 +263,8 @@ export function registrarRotas(r, { db, hub }) {
         }
 
         if (op.op === 'salvar' && op.c === 'conversas' && atual && Array.isArray(atual.dados?.mensagens) && Array.isArray(op.dados.mensagens)) {
-          const chave = m => `${m.em}|${m.de}|${String(m.texto || '').slice(0, 60)}`;
+          // identifica a mensagem por data, autor e remetente: editar (ex.: apagar para todos) não duplica
+          const chave = m => `${m.em}|${m.de}|${m.uid || m.waId || String(m.texto || '').slice(0, 60)}`;
           const vistas = new Set(op.dados.mensagens.map(chave));
           const faltam = atual.dados.mensagens.filter(m => !vistas.has(chave(m)));
           if (faltam.length) op.dados.mensagens = [...op.dados.mensagens, ...faltam].sort((a, b) => String(a.em).localeCompare(String(b.em))).slice(-200);
