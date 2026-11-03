@@ -179,3 +179,22 @@ CREATE TABLE IF NOT EXISTS whatsapp_auth (
   atualizado_em  TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (escritorio_id, chave)
 );
+
+-- Histórico de alterações dos cadastros: quem mudou o quê, quando e de qual IP (só o master consulta)
+CREATE TABLE IF NOT EXISTS alteracoes (
+  id            BIGSERIAL PRIMARY KEY,
+  escritorio_id UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  em            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  usuario_id    UUID,
+  usuario_nome  TEXT,
+  ambiente      TEXT,
+  ip            TEXT,
+  colecao       TEXT NOT NULL,
+  registro_id   TEXT,
+  empresa_id    TEXT,
+  acao          TEXT NOT NULL,
+  resumo        TEXT,
+  mudancas      JSONB
+);
+CREATE INDEX IF NOT EXISTS alteracoes_empresa ON alteracoes (escritorio_id, empresa_id, em DESC);
+CREATE INDEX IF NOT EXISTS alteracoes_usuario ON alteracoes (escritorio_id, usuario_id, em DESC);

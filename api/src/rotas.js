@@ -12,6 +12,7 @@ import { MODULOS, FUNCOES, NIVEIS, permissoesEfetivas, funcoesDoEscritorio, pode
 import { registrarGestao } from './gestao.js';
 import { registrarWhatsApp } from './whatsapp.js';
 import { registrarEnvios } from './envios.js';
+import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
 
 const AUD = site => `meufiscal:${site}`;
 export const ROTA_SENHA = { cliente: '/definir-senha', painel: '/admin/definir-senha' };
@@ -22,6 +23,7 @@ const TIPOS_ARQUIVO = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/pn
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'application/octet-stream': 'bin' };
 
 export function registrarRotas(r, { db, hub }) {
+  const alt = criarRegistroAlteracoes(db);
   /* ================= sessões ================= */
   const cache = new Map(); // sid → { u, ate } (10 s) para não ir ao banco em toda requisição
   setInterval(() => { const a = Date.now(); for (const [k, v] of cache) if (v.ate < a) cache.delete(k); }, 30000).unref();
@@ -268,6 +270,7 @@ export function registrarRotas(r, { db, hub }) {
         if (op.op === 'apagar') {
           const res = await q('DELETE FROM registros WHERE escritorio_id = $1 AND colecao = $2 AND id = $3', [u.escritorio_id, op.c, op.id]);
           aplicadas += res.count;
+          if (res.count && atual) await alt.registrar(q, u, ctx.ip, { colecao: op.c, id: op.id, empresaId: atual.empresa_id, acao: 'excluiu', antes: atual.dados });
         } else {
           const res = await q(`INSERT INTO registros (escritorio_id, colecao, id, empresa_id, dados, atualizado_por) VALUES ($1,$2,$3,$4,$5::jsonb,$6)
             ON CONFLICT (escritorio_id, colecao, id) DO UPDATE SET dados = EXCLUDED.dados, empresa_id = EXCLUDED.empresa_id,
@@ -275,6 +278,7 @@ export function registrarRotas(r, { db, hub }) {
             WHERE registros.dados IS DISTINCT FROM EXCLUDED.dados`,
           [u.escritorio_id, op.c, op.id, empresaDe(op.c, op.dados), JSON.stringify(op.dados), u.id]);
           aplicadas += res.count;
+          if (res.count) await alt.registrar(q, u, ctx.ip, { colecao: op.c, id: op.id, empresaId: empresaDe(op.c, op.dados), acao: atual ? 'alterou' : 'criou', antes: atual?.dados, depois: op.dados });
         }
       }
     });
@@ -493,6 +497,9 @@ export function registrarRotas(r, { db, hub }) {
       return { usuario: novo, ...(await enviarConvite(q, novo, ambiente === 'equipe' ? 'painel' : 'cliente', u.nome)) };
     });
     await log(senha ? 'usuario_criado_com_senha' : 'usuario_convidado', { usuarioId: resultado.usuario.id, email, ip: ctx.ip, detalhe: `por ${u.email}` });
+    const resumoU = `${ambiente === 'equipe' ? 'Colaborador' : 'Acesso ao portal'} criado: ${nome} (${email})${senha ? ', com senha definida' : ', convite por link'}`;
+    if (empresas.length) for (const e of empresas) await alt.registrar(db.query, u, ctx.ip, { colecao: 'acesso_portal', id: resultado.usuario.id, empresaId: e.id, acao: 'criou', resumo: resumoU + ' · perfil ' + e.perfil });
+    else await alt.registrar(db.query, u, ctx.ip, { colecao: 'usuario', id: resultado.usuario.id, acao: 'criou', resumo: resumoU });
     return resultado;
   });
 
@@ -532,6 +539,14 @@ export function registrarRotas(r, { db, hub }) {
     limparCacheDe(alvo.id);
     if (c.status === 'bloqueado') hub.encerrarUsuario(alvo.id);
     await log('usuario_alterado', { usuarioId: alvo.id, ip: ctx.ip, detalhe: `por ${u.email}: ${JSON.stringify(c).slice(0, 300)}` });
+    {
+      const partes = []; if (c.nome) partes.push('nome'); if (c.status) partes.push('situação: ' + c.status); if (c.funcao) partes.push('função: ' + c.funcao);
+      if (c.permissoes) partes.push('permissões'); if (Array.isArray(c.empresas)) partes.push('empresas liberadas');
+      const resumoU = `Alterou ${alvo.ambiente === 'equipe' ? 'o colaborador' : 'o acesso de'} ${alvo.nome || ''}${partes.length ? ' (' + partes.join(', ') + ')' : ''}`;
+      const emps = alvo.ambiente === 'cliente' ? (await db.query('SELECT empresa_id FROM usuarios_empresas WHERE usuario_id = $1', [alvo.id])).map(x => x.empresa_id) : [];
+      if (emps.length) for (const e of emps) await alt.registrar(db.query, u, ctx.ip, { colecao: 'acesso_portal', id: alvo.id, empresaId: e, acao: 'alterou', resumo: resumoU, mudancas: [] });
+      else await alt.registrar(db.query, u, ctx.ip, { colecao: 'usuario', id: alvo.id, acao: 'alterou', resumo: resumoU, mudancas: [] });
+    }
     return { ok: true };
   });
 
@@ -551,6 +566,12 @@ export function registrarRotas(r, { db, hub }) {
     limparCacheDe(alvo.id);
     if (alvo.id !== u.id) hub.encerrarUsuario(alvo.id);
     await log('senha_definida_pelo_escritorio', { usuarioId: alvo.id, ip: ctx.ip, detalhe: `por ${u.email}` });
+    {
+      const emps = (await db.query('SELECT empresa_id FROM usuarios_empresas WHERE usuario_id = $1', [alvo.id])).map(x => x.empresa_id);
+      const resumoU = `Definiu uma nova senha para ${alvo.nome || alvo.email || 'o usuário'} (a senha não é registrada)`;
+      if (emps.length) for (const e of emps) await alt.registrar(db.query, u, ctx.ip, { colecao: 'acesso_portal', id: alvo.id, empresaId: e, acao: 'alterou', resumo: resumoU, mudancas: [] });
+      else await alt.registrar(db.query, u, ctx.ip, { colecao: 'usuario', id: alvo.id, acao: 'alterou', resumo: resumoU, mudancas: [] });
+    }
     return { ok: true, status: alvo.status === 'bloqueado' ? 'bloqueado' : 'ativo' };
   });
 
@@ -561,9 +582,10 @@ export function registrarRotas(r, { db, hub }) {
     return db.tx(q => enviarConvite(q, alvo, alvo.ambiente === 'equipe' ? 'painel' : 'cliente', u.nome));
   });
 
-  registrarGestao(r, { db, exigir, log, pode });
+  registrarGestao(r, { db, exigir, log, pode, alt });
   const wa = registrarWhatsApp(r, { db, exigir, log, pode });
   registrarEnvios(r, { db, exigir, log, pode, wa });
+  registrarRotasAlteracoes(r, { db, exigir, log, pode, alt });
 
   return { carregarEmpresas };
 }

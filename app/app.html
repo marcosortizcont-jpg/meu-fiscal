@@ -3830,6 +3830,107 @@ ACT['doc-interno-rm']=el=>{const d=S.docsinternos.find(x=>x.id===el.dataset.id);
 /* migração automática dos regimes quando alguém com acesso abre o painel */
 const conteudoV4=conteudo;conteudo=function(){if(!cfg().regimesV2)setTimeout(migrarRegimesV2,300);return conteudoV4()};
 /* ==== MÓDULOS v5 (fim) ==== */
+/* ==== MÓDULOS v6: exclusão de documentos com senha e histórico de alterações (master) ==== */
+
+/* ---------- excluir documento pedindo a senha ---------- */
+ACT['excluir-com-senha']=el=>{
+  if(MODO!=='api'){toast('A exclusão com senha funciona na versão publicada.',true);return}
+  if(!podeMod('docs','excluir')){toast('Seu acesso não permite excluir documentos.',true);return}
+  openModal(`${mHead('Excluir documento')}<form data-form="excluir-senha" data-c="${esc(el.dataset.c)}" data-id="${esc(el.dataset.id)}"><div class="modal-body">
+   <p>Excluir <b>${esc(el.dataset.nome||'este documento')}</b>? O arquivo é apagado e a exclusão fica registrada no histórico com o seu nome e IP.</p>
+   <label class="f"><span>Digite a sua senha para confirmar</span><input type="password" name="senha" required autocomplete="current-password" maxlength="64" autofocus></label></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn danger">Excluir</button></div></form>`);
+};
+FORM['excluir-senha']=async(fd,form)=>{
+  const c=form.dataset.c,id=form.dataset.id;
+  try{await MF.api('POST','/api/registros/excluir',{colecao:c,id,senha:String(fd.get('senha')||'')});
+    if(Array.isArray(S[c]))S[c]=S[c].filter(x=>x.id!==id);closeModal();invalidarHist();render();toast('Documento excluído.')}
+  catch(er){toast(er.message,true);const i=form.querySelector('[name=senha]');if(i){i.value='';i.focus()}}
+};
+ACT['doc-interno-rm']=el=>{const d=S.docsinternos.find(x=>x.id===el.dataset.id);if(!d)return;ACT['excluir-com-senha']({dataset:{c:'docsinternos',id:d.id,nome:d.nome}})};
+const abaDocsV5=abaDocs;
+abaDocs=function(e){
+  let h=abaDocsV5(e);const i=h.indexOf('<div class="panel"><h2>Arquivos da empresa</h2>');if(i<0)return h;
+  const exc=podeMod('docs','excluir')&&MODO==='api';
+  const R=[];
+  S.checklist.filter(x=>x.empresaId===e.id&&x.arquivo).forEach(x=>{const it=(e.checklist||[]).find(i=>i.id===x.itemId);R.push({c:'checklist',id:x.id,tipo:'Envio mensal',nome:it?.nome||x.itemId,comp:x.comp,arq:x.arquivo,data:x.enviadoEm})});
+  S.documentos.filter(d=>d.empresaId===e.id).forEach(d=>R.push({c:'documentos',id:d.id,tipo:d.categoria||'Documento',nome:d.nome,comp:'',arq:d.arquivo,data:d.enviadoEm}));
+  R.sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
+  const painel=`<div class="panel"><h2>Arquivos da empresa</h2>${R.length?`<div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Documento</th><th>Competência</th><th>Recebido</th><th></th></tr></thead><tbody>${R.slice(0,300).map(r=>`<tr><td class="small">${esc(r.tipo)}</td><td>${esc(r.nome)}<div class="sub">${esc(r.arq?.nome||'')}</div></td><td class="small">${r.comp?fmtComp(r.comp):'—'}</td><td class="small">${r.data?fmtDH(r.data):'—'}</td><td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${linkArq(r.arq)}${exc?`<button class="btn sm danger" data-act="excluir-com-senha" data-c="${r.c}" data-id="${r.id}" data-nome="${esc(r.nome)}">Excluir</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:'<p class="small muted">Nenhum arquivo recebido ainda.</p>'}</div>`;
+  return h.slice(0,i)+painel;
+};
+
+/* ---------- histórico de alterações ---------- */
+const COL_NOME={empresas:'Cadastro da empresa',documentos:'Documentos',docsinternos:'Documentos da equipe',checklist:'Envio mensal',guias:'Guias',obrigacoes:'Obrigações',faturamento:'Faturamento',despesas:'Despesas',lancamentos:'Receitas e despesas',
+  funcionarios:'Funcionários',folhas:'Folha',admissoes:'Admissões',notas:'Notas fiscais',tomadores:'Tomadores',servicos:'Serviços',certificados:'Certificado',certificado_a1:'Certificado A1',cofre:'Cofre de senhas',tickets:'Solicitações',
+  cnds:'Certidões',ecac:'e-CAC',faturas:'Honorários',fechamentos:'Fechamento do mês',acesso_portal:'Acesso ao portal',usuario:'Usuários da equipe',config:'Configurações',catalogo:'Catálogo de obrigações',regimes:'Regimes',leads:'Interessados',operadores:'Operadores'};
+const CAMPO_NOME={razao:'Razão social',fantasia:'Nome fantasia',grupo:'Grupo de empresas',cnpj:'CNPJ',ie:'Inscrição estadual',im:'Inscrição municipal',abertura:'Início das atividades',cnae:'CNAE',atividade:'Atividade',regime:'Regime (base)',regimeId:'Regime tributário',anexo:'Anexo do Simples',
+  telefone:'Telefone',email:'E-mail',municipio:'Município',uf:'UF',status:'Situação',prolabore:'Pró-labore',fatorR:'Fator R',reinf:'EFD-Reinf',socios:'Sócios',contatos:'Contatos',checklist:'Checklist do envio mensal',obrigExtras:'Obrigações avulsas',obrigRemov2:'Obrigações removidas',obrigExtrasDesde:'Início das avulsas',
+  inicioControle:'Controle de obrigações a partir de',operadorId:'Operador',modulos:'Módulos do portal','modulos.docs':'Documentos no portal','modulos.cert':'Certificado digital no portal',responsaveis:'Responsáveis',plano:'Plano','plano.nome':'Plano','plano.valor':'Valor da mensalidade','plano.metodo':'Forma de pagamento',
+  'plano.funcInclusos':'Funcionários inclusos','plano.adicionalFunc':'Valor por funcionário adicional',endereco:'Endereço','endereco.cep':'CEP','endereco.logradouro':'Logradouro','endereco.numero':'Número','endereco.bairro':'Bairro','endereco.complemento':'Complemento',
+  protocolo:'Protocolo',prazoTecnico:'Prazo técnico',responsavel:'Responsável',justificativa:'Justificativa',arquivos:'Anexos',comentarios:'Comentários',valor:'Valor',venc:'Vencimento',arquivo:'Arquivo',comprovante:'Comprovante',nome:'Nome',categoria:'Categoria',depto:'Departamento',descricao:'Descrição',data:'Data',situacao:'Situação',valorGuia:'Valor da guia',entregueEm:'Entregue em',concluidaEm:'Concluída em'};
+const ACAO_PILL={criou:['Incluiu','ok'],alterou:['Alterou','info'],excluiu:['Excluiu','crit'],consultou:['Consultou','warn']};
+function nomeCampo(c){if(CAMPO_NOME[c])return CAMPO_NOME[c];const it=c.match(/^(\w+)\[(.+?)\]\.(.+)$/);if(it)return (CAMPO_NOME[it[1]]||it[1])+' · '+it[2]+' · '+(CAMPO_NOME[it[3]]||({cpf:'CPF',participacao:'Participação (%)',administrador:'Administrador',cargo:'Cargo'})[it[3]]||it[3]);const m=c.match(/^responsaveis\.(.+)$/);if(m)return 'Responsável '+m[1];const b=c.split('.')[0];return CAMPO_NOME[b]?CAMPO_NOME[b]+' · '+c.split('.').slice(1).join('.'):c}
+function valorCampo(c,v){if(v==null||v==='')return '—';let t=String(v).replace(/^"|"$/g,'');
+  if(c==='regimeId'){const r=S.regimes.find(x=>x.id===t);if(r)return r.nome}
+  if(/^responsaveis\.|^responsavel$|^operadorId$/.test(c)){const n=nomeEquipe(t);if(n)return n}
+  if(/^\d{4}-\d{2}-\d{2}T/.test(t))return fmtDH(t);if(/^\d{4}-\d{2}-\d{2}$/.test(t))return fmtData(t);if(/^\d{4}-\d{2}$/.test(t))return fmtComp(t);
+  if(t==='true')return 'Sim';if(t==='false')return 'Não';return t}
+const invalidarHist=()=>Object.keys(APIC).forEach(k=>{if(k.startsWith('alt:'))delete APIC[k]});
+function tabelaHist(lista,{mostrarEmpresa}={}){
+  const f=UI.fhist||(UI.fhist={col:'',usu:'',q:''});const q=(f.q||'').toLowerCase();
+  const L=lista.filter(a=>(!f.col||a.colecao===f.col)&&(!f.usu||a.usuario_id===f.usu)&&(!q||JSON.stringify(a).toLowerCase().includes(q)));
+  const cols=[...new Set(lista.map(a=>a.colecao))];const usus=[...new Map(lista.filter(a=>a.usuario_id).map(a=>[a.usuario_id,a.usuario_nome])).entries()];
+  return `<div class="barra-filtros" style="margin-bottom:10px"><label class="f"><span>Área</span><select data-fhist="col"><option value="">Todas</option>${cols.map(c=>`<option value="${esc(c)}" ${f.col===c?'selected':''}>${esc(COL_NOME[c]||c)}</option>`).join('')}</select></label>
+   <label class="f"><span>Usuário</span><select data-fhist="usu"><option value="">Todos</option>${usus.map(([id,n])=>`<option value="${id}" ${f.usu===id?'selected':''}>${esc(n||id)}</option>`).join('')}</select></label>
+   <label class="f"><span>Pesquisar</span><input type="search" data-fhist="q" value="${esc(f.q)}" placeholder="Campo, valor ou IP"></label></div>
+   <p class="small muted">${L.length} registro(s)${L.length<lista.length?' de '+lista.length:''}.</p>
+   ${L.length?`<div class="table-wrap"><table><thead><tr><th>Data e hora</th><th>Usuário</th><th>IP</th><th>Área</th><th>Ação</th><th>O que mudou</th></tr></thead><tbody>${L.map(a=>{const d=new Date(a.em);const m=Array.isArray(a.mudancas)?a.mudancas:[];
+     return `<tr><td class="num small" style="white-space:nowrap">${fmtDH(a.em)}:${pad(d.getSeconds())}</td><td class="small"><b>${esc(a.usuario_nome||'Sistema')}</b><div class="sub">${a.ambiente==='cliente'?'Portal do cliente':a.ambiente==='equipe'?'Equipe':''}</div></td><td class="mono small">${esc(a.ip||'—')}</td>
+     <td class="small">${esc(COL_NOME[a.colecao]||a.colecao)}${mostrarEmpresa&&a.empresa_id?`<div class="sub">${esc(emp(a.empresa_id)?.fantasia||emp(a.empresa_id)?.razao||'')}</div>`:''}</td><td>${pill(...(ACAO_PILL[a.acao]||[a.acao,'']))}</td>
+     <td class="small">${a.resumo?`<div>${esc(a.resumo)}</div>`:''}${m.length?`<ul style="margin:4px 0 0;padding-left:16px">${m.slice(0,12).map(x=>`<li><b>${esc(nomeCampo(x.campo))}</b>: <span class="muted">${esc(valorCampo(x.campo,x.de))}</span> → ${esc(valorCampo(x.campo,x.para))}</li>`).join('')}${m.length>12?`<li class="muted">e mais ${m.length-12} campo(s)</li>`:''}</ul>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted">Nenhuma alteração registrada.</p>'}`;
+}
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.fhist){(UI.fhist=UI.fhist||{})[el.dataset.fhist]=el.value;if(UI.modal&&UI.histUsuario)abrirHistUsuario();else render()}});
+function abaLogs(e){
+  if(!ehMaster()||MODO!=='api')return `<div class="panel"><p class="small muted">Só o administrador master vê o histórico, na versão publicada.</p></div>`;
+  const d=apiDado('alt:'+e.id,'/api/admin/alteracoes?empresa='+encodeURIComponent(e.id));
+  return `<div class="panel"><div class="panel-head"><div><h2>Histórico de alterações</h2><p class="sub">Tudo o que foi incluído, alterado, excluído ou consultado neste cadastro e nos registros da empresa (documentos, guias, obrigações, acessos, certificado e cofre), com usuário, data, hora e IP. Só o master vê.</p></div><div class="actions"><button class="btn sm" data-act="hist-atualizar">Atualizar</button><button class="btn sm" data-act="hist-csv" data-id="${e.id}">${svg('download')}Exportar</button></div></div>
+   ${d.carregando?carregandoBox():d.erro?`<p class="small muted">${esc(d.erro)}</p>`:tabelaHist(d.dados.alteracoes)}</div>`;
+}
+ACT['hist-atualizar']=()=>{invalidarHist();render()};
+ACT['hist-csv']=el=>{const d=APIC['alt:'+el.dataset.id]?.dados;if(!d)return;const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  baixar('historico-'+(emp(el.dataset.id)?.fantasia||'empresa').replace(/\W+/g,'-')+'-'+hoje()+'.csv','﻿'+['Data e hora;Usuário;Ambiente;IP;Área;Ação;Resumo;Alterações'].concat(d.alteracoes.map(a=>[fmtDH(a.em),a.usuario_nome,a.ambiente,a.ip,COL_NOME[a.colecao]||a.colecao,(ACAO_PILL[a.acao]||[a.acao])[0],a.resumo,(a.mudancas||[]).map(x=>nomeCampo(x.campo)+': '+valorCampo(x.campo,x.de)+' → '+valorCampo(x.campo,x.para)).join(' | ')].map(c).join(';'))).join('\r\n'),'text/csv')};
+// cadastro com a aba nova (só para o master)
+detalheEmpresa=function(){
+  const e=UI.cart.id?emp(UI.cart.id):null;if(UI.cart.id&&!e){UI.cart=null;return aCarteira()}
+  const abasOk=[['dados','Dados gerais e acesso',true],['docs','Documentos',podeMod('docs','ver')],['cert','Certificado digital',podeMod('cert','ver')],['cofre','Cofre de senhas',podeMod('cofre','ver')],['resp','Responsáveis',true],['obrig','Obrigações vinculadas',true],['logs','Histórico de alterações',ehMaster()&&MODO==='api']].filter(a=>a[2]);
+  let aba=e?UI.cart.aba:'dados';if(!abasOk.some(a=>a[0]===aba))aba='dados';
+  if(aba==='logs'&&UI.histEmp!==e.id){UI.histEmp=e.id;UI.fhist={col:'',usu:'',q:''};invalidarHist()}
+  const abas=`<div class="tabs" role="tablist">${abasOk.map(([k,r])=>`<button role="tab" aria-selected="${aba===k}" ${!e&&k!=='dados'?'disabled':''} data-act="cart-aba" data-v="${k}">${r}${e&&(k==='docs'||k==='cert')&&!modAtivo(e,k)?' · desativado':''}</button>`).join('')}</div>`;
+  const corpo={dados:abaDados,docs:abaDocs,cert:abaCertV3,cofre:abaCofre,resp:abaResp,obrig:abaObrig,logs:abaLogs}[aba](e);
+  return `<button class="btn-voltar" data-act="cart-voltar">${svg('back')}Carteira de clientes</button>
+  <div class="page-head"><div><span class="eyebrow">${e?'Cadastro da empresa':'Nova empresa'}</span><h1>${e?esc(e.fantasia||e.razao):'Nova empresa'}</h1>${e?`<p>${esc(e.razao)} · ${fmtCNPJ(e.cnpj)} · ${esc(nomeRegime(e))}${e.grupo?' · '+esc(e.grupo):''}</p>`:'<p>Preencha os dados. Ao salvar, as obrigações do regime escolhido são vinculadas automaticamente.</p>'}</div>${e?`<div class="actions"><button class="btn" data-act="ver-cliente" data-id="${e.id}">Ver como o cliente</button>${ehMaster()&&MODO==='api'?`<button class="btn danger" data-act="emp-excluir" data-id="${e.id}">Excluir cliente</button>`:''}</div>`:''}</div>${soConsulta('carteira')}${abas}${corpo}`;
+};
+// toda gravação nova invalida o histórico aberto, para ele aparecer atualizado
+const mutV1=mut;mut=function(cols,fn,log){const r=mutV1(cols,fn,log);if(UI.cart&&UI.cart.aba==='logs')setTimeout(()=>{invalidarHist();agendarRender()},1500);return r};
+
+/* ---------- equipe: histórico de cada usuário ---------- */
+const aEquipeV3=aEquipe;
+aEquipe=function(){
+  const h=aEquipeV3();if(!ehMaster()||MODO!=='api')return h;
+  return h.replace(/data-act="colab-form" data-id="([0-9a-f-]{36})">Editar<\/button>/g,(m,id)=>m+`<button class="btn sm" data-act="usuario-hist" data-id="${id}">Histórico</button>`);
+};
+ACT['usuario-hist']=el=>{UI.histUsuario=el.dataset.id;UI.fhist={col:'',usu:'',q:''};delete APIC['alt:u:'+el.dataset.id];abrirHistUsuario()};
+function abrirHistUsuario(){
+  const id=UI.histUsuario;const u=(APIC['equipe-admin']?.dados?.usuarios||[]).find(x=>x.id===id);
+  const titulo='Histórico de '+(u?u.nome:'usuário');
+  const corpo=d=>d.carregando?carregandoBox():d.erro?`<p class="small muted">${esc(d.erro)}</p>`:tabelaHist(d.dados.alteracoes,{mostrarEmpresa:true});
+  const d=apiDado('alt:u:'+id,'/api/admin/alteracoes?usuario='+encodeURIComponent(id));
+  openModal(`${mHead(titulo)}<div class="modal-body"><p class="small muted">Alterações feitas por esta pessoa em todos os cadastros, com data, hora e IP.</p><div id="hist-u">${corpo(d)}</div></div><div class="modal-foot"><button class="btn" data-act="close-modal">Fechar</button></div>`,true);
+  if(d.carregando){const t=setInterval(()=>{const x=APIC['alt:u:'+id];if(!x||x.carregando)return;clearInterval(t);const b=document.getElementById('hist-u');if(b)b.innerHTML=corpo(x)},300)}
+}
+const closeModalV1=closeModal;closeModal=function(){UI.histUsuario=null;return closeModalV1()};
+/* ==== MÓDULOS v6 (fim) ==== */
 
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();

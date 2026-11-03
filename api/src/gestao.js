@@ -6,7 +6,8 @@ import { CONFIG } from './config.js';
 import crypto from 'node:crypto';
 import { limitar } from './seguranca.js';
 
-export function registrarGestao(r, { db, exigir, log, pode }) {
+export function registrarGestao(r, { db, exigir, log, pode, alt }) {
+  const hist = (u, ctx, empresaId, acao, colecao, resumo) => alt?.registrar(db.query, u, ctx.ip, { colecao, empresaId: String(empresaId), acao, resumo }).catch(() => { });
   const semChave = () => { if (!CONFIG.cofreChave) throw new ErroHttp(503, 'Cofre indisponível: falta a variável COFRE_CHAVE no servidor.'); };
   async function empresa(u, id) {
     const [e] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas' AND id = $2`, [u.escritorio_id, String(id)]);
@@ -49,6 +50,7 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
       [u.escritorio_id, id, String(ctx.params.empresaId), JSON.stringify(dados), u.id]);
     });
     await log('certificado_a1_salvo', { usuarioId: u.id, ip: ctx.ip, detalhe: `${emp.razao || ''} · válido até ${info.validoAte}` });
+    await hist(u, ctx, ctx.params.empresaId, 'alterou', 'certificado_a1', `Certificado A1 guardado (${info.titular || ''}, válido até ${info.validoAte})`);
     return { ok: true, certificado: { titular: info.titular, cnpj: info.cnpj, emissor: info.emissor, valido_de: info.validoDe, valido_ate: info.validoAte } };
   }, { limite: 200 * 1024 });
 
@@ -61,6 +63,7 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
     const u = await exigir(ctx, { site: 'painel' }); exigirModulo(u, 'cert', 'editar'); semChave();
     const c = await segredoCert(u, ctx.params.empresaId);
     await log('certificado_senha_revelada', { usuarioId: u.id, ip: ctx.ip, detalhe: 'empresa ' + ctx.params.empresaId });
+    await hist(u, ctx, ctx.params.empresaId, 'consultou', 'certificado_a1', 'Revelou a senha do certificado A1');
     return { senha: decifrar(c.senha_cifrada) };
   });
   r.get('/api/certificados/:empresaId/arquivo', async ctx => {
@@ -68,6 +71,7 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
     const c = await segredoCert(u, ctx.params.empresaId);
     const pfx = decifrar(c.pfx_cifrado, false);
     await log('certificado_baixado', { usuarioId: u.id, ip: ctx.ip, detalhe: 'empresa ' + ctx.params.empresaId });
+    await hist(u, ctx, ctx.params.empresaId, 'consultou', 'certificado_a1', 'Baixou o arquivo do certificado A1');
     ctx.res.writeHead(200, { 'Content-Type': 'application/x-pkcs12', 'Content-Length': pfx.length, 'Content-Disposition': `attachment; filename="${(c.nome_arquivo || 'certificado.pfx').replace(/[^\w.\- ]/g, '_')}"` });
     ctx.res.end(pfx);
   });
@@ -75,6 +79,7 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
     const u = await exigir(ctx, { site: 'painel' }); exigirModulo(u, 'cert', 'excluir');
     await db.query('DELETE FROM certificados_a1 WHERE escritorio_id = $1 AND empresa_id = $2', [u.escritorio_id, ctx.params.empresaId]);
     await log('certificado_removido', { usuarioId: u.id, ip: ctx.ip, detalhe: 'empresa ' + ctx.params.empresaId });
+    await hist(u, ctx, ctx.params.empresaId, 'excluiu', 'certificado_a1', 'Certificado A1 removido');
     return { ok: true };
   });
 
@@ -103,12 +108,14 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
         [u.escritorio_id, ctx.params.empresaId, portal, url, login, senha, obs, u.id]);
     }
     await log('cofre_salvo', { usuarioId: u.id, ip: ctx.ip, detalhe: `${portal} · empresa ${ctx.params.empresaId}` });
+    await hist(u, ctx, ctx.params.empresaId, 'alterou', 'cofre', `Senha do portal ${portal} salva no cofre (o valor não é registrado)`);
     return { ok: true, id };
   });
   r.delete('/api/cofre/:empresaId/:id', async ctx => {
     const u = await exigir(ctx, { site: 'painel' }); exigirModulo(u, 'cofre', 'excluir');
     await db.query('DELETE FROM cofre_senhas WHERE id = $1 AND escritorio_id = $2 AND empresa_id = $3', [ctx.params.id, u.escritorio_id, ctx.params.empresaId]);
     await log('cofre_removido', { usuarioId: u.id, ip: ctx.ip, detalhe: `item ${ctx.params.id}` });
+    await hist(u, ctx, ctx.params.empresaId, 'excluiu', 'cofre', 'Senha removida do cofre');
     return { ok: true };
   });
   r.post('/api/cofre/:empresaId/:id/revelar', async ctx => {
@@ -116,6 +123,7 @@ export function registrarGestao(r, { db, exigir, log, pode }) {
     const [c] = await db.query('SELECT portal, senha_cifrada FROM cofre_senhas WHERE id = $1 AND escritorio_id = $2 AND empresa_id = $3', [ctx.params.id, u.escritorio_id, ctx.params.empresaId]);
     if (!c || !c.senha_cifrada) throw new ErroHttp(404, 'Senha não encontrada.');
     await log('cofre_senha_revelada', { usuarioId: u.id, ip: ctx.ip, detalhe: `${c.portal} · empresa ${ctx.params.empresaId}` });
+    await hist(u, ctx, ctx.params.empresaId, 'consultou', 'cofre', `Revelou a senha do portal ${c.portal}`);
     return { senha: decifrar(c.senha_cifrada) };
   });
 
