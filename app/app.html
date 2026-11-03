@@ -1561,7 +1561,7 @@ async function perguntarIA(texto){
   if(!texto) texto=pend.length>1?'Analise os arquivos anexados.':'Analise o arquivo anexado.';
   let prep={arquivos:[],textos:[],imagens:[],avisos:[]};
   if(pend.length){UI.iaDraft='Lendo '+(pend.length>1?pend.length+' arquivos':'o arquivo')+'…';render();prep=await prepararAnexos(pend);UI.iaDraft=null}
-  let c; mut('conversas',()=>{c=conversaAtiva(e.id,true);c.mensagens.push({de:'cliente',texto,em:agora(),uid:ME.id,...(prep.arquivos.length?{arquivos:prep.arquivos}:{})});prep.avisos.forEach(a=>c.mensagens.push({de:'sistema',texto:a,em:agora()}));if(c.mensagens.length>80)c.mensagens.splice(0,c.mensagens.length-80)},null);
+  let c; mut('conversas',()=>{c=conversaAtiva(e.id,true);c.mensagens.push({de:'cliente',texto,em:agora(),uid:ME.id,nome:ME.nome||'',...(prep.arquivos.length?{arquivos:prep.arquivos}:{})});prep.avisos.forEach(a=>c.mensagens.push({de:'sistema',texto:a,em:agora()}));if(c.mensagens.length>80)c.mensagens.splice(0,c.mensagens.length-80)},null);
   c=conversaAtiva(e.id,false); if(!c)return;
   if(c.status!=='ia'){toast('Mensagem enviada para a equipe do escritório.');return}
   if(!CAP.sample){mut('conversas',()=>{c.status='aguardando_humano';c.mensagens.push({de:'sistema',texto:'Mensagem encaminhada para a equipe do escritório.',em:agora()})},['Atendimento','Conversa encaminhada',e.razao]);return}
@@ -2000,7 +2000,7 @@ const FORM={
     closeModal();mut('guias',()=>S.guias.push({id:uid(),empresaId:fd.get('empresaId'),tipo,depto:DEPTO_DA_GUIA[tipo]||'Fiscal',comp,valor:r2(fd.get('valor')),venc:fd.get('venc')||vencPadrao(tipo,comp),status:'rascunho',arquivo:a}),['Guias','Criou guia '+tipo+' '+fmtComp(comp),emp(fd.get('empresaId'))?.razao])},
   'msg-ia':(fd,form)=>{const t=$('#ia-input').value.trim();if(!t&&!UI.iaAnexos.length)return;$('#ia-input').value='';perguntarIA(t)},
   'msg-humano':(fd,form)=>{const c=S.conversas.find(x=>x.id===form.dataset.id);const t=$('#hum-input').value.trim();if(!t)return;$('#hum-input').value='';
-    mut('conversas',()=>{c.mensagens.push({de:'humano',texto:t,em:agora(),uid:ME.id,nome:(ME.nome||'Equipe')+' · escritório'});if(c.mensagens.length>80)c.mensagens.splice(0,c.mensagens.length-80)},null)},
+    mut('conversas',()=>{c.mensagens.push({de:'humano',texto:t,em:agora(),uid:ME.id,nome:ME.nome||'Equipe'});if(c.mensagens.length>80)c.mensagens.splice(0,c.mensagens.length-80)},null)},
   ticket:(fd)=>{const eid=fd.get('empresaId')||UI.empresaId;const dep=fd.get('departamento');const tit=String(fd.get('titulo')||'').trim(),desc=String(fd.get('descricao')||'').trim();
     if(!DEPTOS_TICKET.includes(dep)){toast('Escolha o departamento responsável.',true);return}if(tit.length<3){toast('Escreva um título para a solicitação.',true);return}if(desc.length<5){toast('Descreva o que você precisa.',true);return}
     const t=novoTicket(eid,undefined,tit,desc,dep);t.tipo='Solicitação';closeModal();mut('tickets',()=>S.tickets.push(t),['Demandas','Abriu ('+dep+'): '+t.titulo,emp(eid)?.razao]);UI.tab.dem='andamento';toast('Solicitação enviada ao Departamento '+dep+'. Prazo: '+fmtData(t.prazo)+'.')},
@@ -3080,7 +3080,7 @@ function retomarCopiloto(e){
 perguntarIA=async function(texto){
   const e=empAtual();retomarCopiloto(e);
   if(e&&texto&&PEDE_HUMANO.test(texto)&&!UI.iaAnexos.length&&UI.iaDraft==null){
-    mut('conversas',()=>{const c=conversaAtiva(e.id,true);c.mensagens.push({de:'cliente',texto,em:agora(),uid:ME.id});if(c.status==='ia'){c.status='aguardando_humano';c.mensagens.push({de:'sistema',texto:'Pronto! Chamamos a equipe do escritório. Um atendente vai continuar esta conversa por aqui.',em:agora()})}},['Atendimento','Cliente pediu atendente',e.razao]);
+    mut('conversas',()=>{const c=conversaAtiva(e.id,true);c.mensagens.push({de:'cliente',texto,em:agora(),uid:ME.id,nome:ME.nome||''});if(c.status==='ia'){c.status='aguardando_humano';c.mensagens.push({de:'sistema',texto:'Pronto! Chamamos a equipe do escritório. Um atendente vai continuar esta conversa por aqui.',em:agora()})}},['Atendimento','Cliente pediu atendente',e.razao]);
     return;
   }
   return perguntarIABase(texto);
@@ -3931,6 +3931,209 @@ function abrirHistUsuario(){
 }
 const closeModalV1=closeModal;closeModal=function(){UI.histUsuario=null;return closeModalV1()};
 /* ==== MÓDULOS v6 (fim) ==== */
+/* ==== MÓDULOS v7: atendimento com o Théo, arquivos, emojis e áudio na conversa, primeiros nomes e histórico ==== */
+(function(){const st=document.createElement('style');st.textContent=`
+.msg .anx{margin-top:6px;display:flex;flex-direction:column;gap:6px}
+.msg .anx-img img{display:block;max-width:240px;max-height:240px;border-radius:10px;border:1px solid rgb(0 0 0 / .08);background:#fff}
+.msg audio{width:240px;max-width:100%;height:36px}
+.msg video{max-width:260px;border-radius:10px}
+.msg .anx-arq{display:flex;gap:8px;align-items:center;background:rgb(255 255 255 / .85);color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:8px 10px;max-width:280px;text-decoration:none}
+.msg .anx-arq svg{width:22px;height:22px;flex-shrink:0;color:var(--accent)}
+.msg .anx-arq span{display:flex;flex-direction:column;min-width:0}.msg .anx-arq b{font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.msg .anx-arq small{font-size:11px;color:var(--muted)}
+.composer .btn.ico{padding:8px 10px;min-width:40px}
+.composer .btn.ico svg{width:18px;height:18px}
+.composer .btn.gravando{background:var(--crit);color:#fff;border-color:var(--crit)}
+@media (max-width:640px){.composer{flex-wrap:wrap}.composer textarea{order:-1;flex:1 1 100%!important;width:100%;min-height:64px}.composer .btn.primary{margin-left:auto}}
+#emoji-pop{position:fixed;z-index:80;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgb(0 0 0 / .15);padding:8px;display:grid;grid-template-columns:repeat(8,34px);gap:2px}
+#emoji-pop button{border:0;background:transparent;font-size:20px;line-height:1;padding:6px 0;border-radius:6px;cursor:pointer}#emoji-pop button:hover{background:var(--surface-2)}
+`;document.head.appendChild(st)})();
+Object.assign(TIPOS_UP,{webm:'audio/webm',ogg:'audio/ogg',mp3:'audio/mpeg',m4a:'audio/mp4',aac:'audio/aac',wav:'audio/wav',mp4:'video/mp4',gif:'image/gif',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+const EXT_CHAT=['jpg','jpeg','png','webp','gif','pdf','txt','csv','xml','ofx','docx','xlsx','webm','ogg','mp3','m4a','aac','wav','mp4'];
+const ehAudio=a=>/audio\/|\.(webm|ogg|mp3|m4a|aac|wav)$/i.test((a.tipo||a.type||'')+' '+(a.nome||a.name||''));
+const IA_NOME='Théo';
+if(!IC.mic)IC.mic='<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>';
+if(!IC.smile)IC.smile='<circle cx="12" cy="12" r="9"/><path d="M8.5 14.5c1 1.3 2.2 2 3.5 2s2.5-.7 3.5-2M9 9.5h.01M15 9.5h.01"/>';
+
+/* ---------- nomes: primeiro nome do cliente e do atendente; a IA é o Théo ---------- */
+const primeiroNome=n=>String(n||'').replace(/ · .*$/,'').trim().split(/\s+/)[0]||'';
+function nomeQuemEnviou(m,c){
+  if(m.de==='ia')return IA_NOME;
+  if(m.de==='cliente')return primeiroNome(m.nome||UI.nomes[m.uid]||(m.uid&&m.uid===ME.id?ME.nome:'')||c?.contatoNome)||'Cliente';
+  return primeiroNome(m.nome||UI.nomes[m.uid]||(m.uid&&m.uid===ME.id?ME.nome:''))||'Equipe';
+}
+function anexoChat(a){
+  if(!a.url)return `<span class="anx-arq">${svg('clip')}<span><b>${esc(a.nome||'Arquivo')}</b><small>disponível no WhatsApp do celular</small></span></span>`;
+  const t=(a.tipo||'')+' '+(a.nome||'');
+  if(/image\/|\.(png|jpe?g|webp|gif)$/i.test(t))return `<a class="anx-img" href="${esc(a.url)}" target="_blank" rel="noopener" title="${esc(a.nome||'Imagem')}"><img src="${esc(a.url)}" alt="${esc(a.nome||'Imagem')}" loading="lazy"></a>`;
+  if(ehAudio(a))return `<audio controls preload="metadata" src="${esc(a.url)}"></audio>`;
+  if(/video\/|\.mp4$/i.test(t))return `<video controls preload="metadata" src="${esc(a.url)}"></video>`;
+  return `<a class="anx-arq" href="${esc(a.url)}" target="_blank" rel="noopener">${svg(/pdf/i.test(t)?'filetext':'clip')}<span><b>${esc(a.nome||'Arquivo')}</b><small>${a.tamanho?fmtBytes(a.tamanho)+' · ':''}toque para abrir</small></span></a>`;
+}
+bolhas=function(c,lado){
+  return (c?.mensagens||[]).map(m=>{
+    if(m.de==='sistema')return `<div class="msg sys">${esc(String(m.texto).replace(/copiloto/gi,IA_NOME))}</div>`;
+    const mine=lado==='cliente'?m.de==='cliente':m.de!=='cliente';
+    const who=nomeQuemEnviou(m,c);
+    const att=(m.anexos||[]).map(id=>S.guias.find(g=>g.id===id)).filter(Boolean);
+    const arqs=(m.arquivos||[]).map(anexoChat).join('');
+    const txt=String(m.texto||'').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi,'').trim();
+    const soMidia=arqs&&/^(\[.*(recebid|áudio|imagem).*\]|🎤 Mensagem de voz)$/i.test(txt);
+    return `<div class="msg ${mine?'me':'them'}"><span class="who">${esc(who)}${m.de==='ia'?' · assistente virtual':''}${m.de==='ia'&&m.confianca&&lado!=='cliente'?' · confiança '+esc(m.confianca):''}${m.canal==='whatsapp'&&lado!=='cliente'?' · WhatsApp':''}</span>${soMidia?'':esc(txt)}${arqs?`<div class="anx">${arqs}</div>`:''}${att.length?`<div class="att">${att.map(g=>g.arquivo&&g.arquivo.url?`<a class="btn sm" href="${esc(g.arquivo.url)}" target="_blank" rel="noopener">${esc(g.tipo)} ${fmtComp(g.comp)}</a>`:`<a class="btn sm" href="#c-guias">${esc(g.tipo)} ${fmtComp(g.comp)} · ${brl(g.valor)}</a>`).join('')}</div>`:''}</div>`}).join('');
+};
+limparIA=function(t){return String(t||'').replace(/^\s*ANEXAR:.*$/gim,'').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi,'').trim()};
+const regrasIAV3=regrasIA;
+regrasIA=function(e){return regrasIAV3(e).replace(/Você é o Copiloto Contábil do escritório/,'Você é o Théo, assistente virtual do escritório').replace('- A última linha da resposta','- Seu nome é Théo. Se você disser que vai solicitar algo à equipe (gerar ou enviar guia, conferir documento), use CONFIANCA: baixa para a equipe assumir.\n- A última linha da resposta')};
+// os nomes dos clientes no painel vêm do cadastro de usuários
+const posV1=pos;pos=function(){posV1();if(UI.modo==='painel'&&UI.view==='a-chat'){const ids=[];S.conversas.forEach(c=>(c.mensagens||[]).forEach(m=>{if(m.uid&&!m.nome)ids.push(m.uid)}));if(ids.length)resolverNomes(ids)}};
+
+/* ---------- emojis ---------- */
+const EMOJIS='😀 😃 😊 🙂 😉 😍 🤩 😅 😂 🤔 😐 😕 😢 😡 🙏 👍 👎 👏 🙌 💪 🤝 👋 ✅ ❌ ⚠️ ❗ ❓ ⏰ 📅 📄 📎 📊 💰 💵 🧾 🏦 📌 ✍️ 📞 💬 🎉 ❤️ 👀 🚀 ☕ 🌞'.split(' ');
+ACT['emoji']=el=>{
+  let p=document.getElementById('emoji-pop');if(p){p.remove();if(p.dataset.alvo===el.dataset.alvo)return}
+  p=document.createElement('div');p.id='emoji-pop';p.dataset.alvo=el.dataset.alvo;p.innerHTML=EMOJIS.map(x=>`<button type="button" data-emoji="${x}">${x}</button>`).join('');
+  document.body.appendChild(p);const r=el.getBoundingClientRect();const w=p.offsetWidth,h=p.offsetHeight;
+  p.style.left=Math.max(8,Math.min(innerWidth-w-8,r.left))+'px';p.style.top=Math.max(8,r.top-h-8)+'px';
+};
+document.addEventListener('click',ev=>{
+  const b=ev.target.closest('#emoji-pop button');const p=document.getElementById('emoji-pop');
+  if(b){const t=document.getElementById(p.dataset.alvo);if(t&&!t.disabled){const i=t.selectionStart??t.value.length,f=t.selectionEnd??i;t.value=t.value.slice(0,i)+b.dataset.emoji+t.value.slice(f);t.focus();t.setSelectionRange(i+b.dataset.emoji.length,i+b.dataset.emoji.length)}return}
+  if(p&&!ev.target.closest('[data-act=emoji]'))p.remove();
+});
+
+/* ---------- gravação de áudio ---------- */
+function formatoAudio(){for(const [m,e] of [['audio/ogg;codecs=opus','ogg'],['audio/mp4','m4a'],['audio/webm;codecs=opus','webm'],['audio/webm','webm']])if(window.MediaRecorder&&MediaRecorder.isTypeSupported&&MediaRecorder.isTypeSupported(m))return {m,e};return {m:'',e:'webm'}}
+ACT['gravar']=async el=>{
+  if(UI.gravando){UI.gravando.rec.stop();return}
+  if(!navigator.mediaDevices||!window.MediaRecorder){toast('Este navegador não grava áudio. Anexe um arquivo de áudio pelo clipe.',true);return}
+  let stream;try{stream=await navigator.mediaDevices.getUserMedia({audio:true})}catch(e){toast('Libere o microfone para gravar o áudio.',true);return}
+  const fmt=formatoAudio();const rec=new MediaRecorder(stream,fmt.m?{mimeType:fmt.m}:undefined);const partes=[];
+  UI.gravando={rec,alvo:el.dataset.alvo,id:el.dataset.id||'',inicio:Date.now()};
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)partes.push(e.data)};
+  rec.onstop=async()=>{stream.getTracks().forEach(t=>t.stop());const g=UI.gravando;UI.gravando=null;clearInterval(UI.gravTimer);render();
+    const seg=(Date.now()-g.inicio)/1000;if(seg<1){toast('Áudio muito curto.',true);return}
+    const tipo=(rec.mimeType||fmt.m||'audio/webm').split(';')[0];const ext=tipo==='audio/ogg'?'ogg':tipo==='audio/mp4'?'m4a':'webm';
+    const file=new File([new Blob(partes,{type:tipo})],`audio-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.${ext}`,{type:tipo});
+    if(g.alvo==='ia'){UI.iaAnexos=[file];perguntarIA('🎤 Mensagem de voz')}else enviarArquivosHumano(g.id,[file]);
+  };
+  rec.start();render();
+  UI.gravTimer=setInterval(()=>{const b=document.querySelector('[data-act=gravar].gravando span');if(b&&UI.gravando){const s=Math.floor((Date.now()-UI.gravando.inicio)/1000);b.textContent=Math.floor(s/60)+':'+pad(s%60)}},500);
+};
+const botoesComposer=(alvo,id)=>`<button type="button" class="btn ico" data-act="emoji" data-alvo="${alvo==='ia'?'ia-input':'hum-input'}" title="Emojis" aria-label="Inserir emoji">${svg('smile')}</button><button type="button" class="btn ico ${UI.gravando&&UI.gravando.alvo===alvo?'gravando':''}" data-act="gravar" data-alvo="${alvo}" data-id="${id||''}" title="${UI.gravando?'Parar e enviar':'Gravar áudio'}" aria-label="Gravar áudio">${svg('mic')}${UI.gravando&&UI.gravando.alvo===alvo?'<span>0:00</span>':''}</button>`;
+
+/* ---------- portal: Atendimento com o Théo ---------- */
+const vIAV3=vIA;
+vIA=function(e){
+  let h=vIAV3(e);
+  h=h.replace('Copiloto respondendo','Théo respondendo').replace(/<span class="who">Copiloto IA<\/span>/g,`<span class="who">${IA_NOME} · assistente virtual</span>`)
+   .replace(/Tire dúvidas com o copiloto de IA, que conhece os dados da sua empresa,/,'Converse com o Théo, nosso assistente virtual que conhece os dados da sua empresa,')
+   .replace('accept="image/jpeg,image/png,image/webp,.pdf,.txt,.csv,.xml,.ofx,.docx"','accept="image/*,audio/*,video/mp4,.pdf,.txt,.csv,.xml,.ofx,.docx,.xlsx"')
+   .replace(/(<textarea id="ia-input")/,botoesComposer('ia')+'$1')
+   .replace('Escreva sua dúvida ou anexe uma foto, PDF ou documento','Escreva sua mensagem, mande um áudio ou anexe um arquivo')
+   .replace('Respostas da IA são orientativas','Respostas do Théo são orientativas');
+  const c=conversaAtiva(e.id,false);if(c&&c.status==='humano'){const m=[...c.mensagens].reverse().find(x=>x.de==='humano');h=h.replace(/Atendente: [^<]*/,'Atendente: '+esc(primeiroNome(m&&m.nome)||'equipe do escritório'))}
+  return h;
+};
+const perguntarIAV3=perguntarIA;
+perguntarIA=async function(texto){
+  const e=empAtual();
+  // áudio: o Théo ainda não ouve; a mensagem vai com o arquivo e a equipe assume
+  if(e&&UI.iaAnexos.some(ehAudio)&&UI.iaDraft==null){
+    const lista=UI.iaAnexos.slice();UI.iaAnexos=[];UI.iaDraft='Enviando…';render();
+    const arquivos=[];for(const f of lista){try{arquivos.push(await enviarArquivo(f))}catch(er){toast(er.message,true)}}
+    UI.iaDraft=null;if(!arquivos.length){render();return}
+    mut('conversas',()=>{const c=conversaAtiva(e.id,true);c.mensagens.push({de:'cliente',texto:texto&&texto!=='🎤 Mensagem de voz'?texto:'🎤 Mensagem de voz',em:agora(),uid:ME.id,nome:ME.nome||'',arquivos});
+      if(c.status==='ia'){c.status='aguardando_humano';c.mensagens.push({de:'sistema',texto:'Recebemos seu áudio! O Théo chamou a equipe para ouvir e responder por aqui.',em:agora()})}},['Atendimento','Cliente enviou áudio',e.razao]);
+    return;
+  }
+  return perguntarIAV3(texto);
+};
+const onUploadV5=onUpload;
+onUpload=async function(inp){
+  if(inp.dataset.up==='ia-anexo'){const files=[...inp.files];inp.value='';const ok=[];
+    for(const f of files){if(f.size>20*1024*1024){toast(f.name+': acima de 20 MB.',true);continue}if(!EXT_CHAT.includes(extDe(f.name))){toast(f.name+': formato não suportado.',true);continue}ok.push(f)}
+    UI.iaAnexos=UI.iaAnexos.concat(ok).slice(0,5);render();const i=$('#ia-input');if(i)i.focus();return}
+  if(inp.dataset.up==='hum-anexo'){const files=[...inp.files];inp.value='';return enviarArquivosHumano(inp.dataset.id,files)}
+  return onUploadV5(inp);
+};
+
+/* ---------- painel: arquivos, emojis e áudio na resposta ---------- */
+async function enviarArquivosHumano(convId,files){
+  const c=S.conversas.find(x=>x.id===convId);if(!c||!files.length)return;
+  const validos=files.filter(f=>{if(!EXT_CHAT.includes(extDe(f.name))){toast(f.name+': formato não suportado.',true);return false}return true});if(!validos.length)return;
+  const antes=UI.empresaId;UI.empresaId=c.empresaId||null;const arquivos=[];
+  try{for(const f of validos){const m=await enviarArquivo(f);if(!m.id&&MODO==='api')throw new Error('Não foi possível guardar '+f.name+'.');arquivos.push(m)}}catch(er){toast(er.message,true);UI.empresaId=antes;return}
+  UI.empresaId=antes;
+  const inp=$('#hum-input');const texto=(inp?.value||'').trim();if(inp)inp.value='';
+  if(c.canal==='whatsapp'){
+    try{await MF.api('POST','/api/whatsapp/enviar',{conversaId:c.id,texto,arquivos:arquivos.map(a=>({id:a.id,nome:a.nome,tipo:TIPOS_UP[extDe(a.nome)]||a.tipo,tamanho:a.tamanho}))});toast('Enviado pelo WhatsApp.')}catch(er){toast(er.message,true)}
+    return;
+  }
+  mut('conversas',()=>{if(c.status!=='humano'){c.status='humano';c.atendenteUid=ME.id;c.mensagens.push({de:'sistema',texto:(primeiroNome(ME.nome)||'Um atendente')+' assumiu a conversa.',em:agora()})}
+    c.mensagens.push({de:'humano',texto:texto||(arquivos.every(ehAudio)?'🎤 Mensagem de voz':''),em:agora(),uid:ME.id,nome:ME.nome||'',arquivos})},['Atendimento','Enviou arquivo no atendimento',emp(c.empresaId)?.razao]);
+}
+/* ---------- painel: Atendimento com abas (caixa de entrada e histórico) ---------- */
+const aChatV3=aChat;
+aChat=function(){
+  const t=UI.tab.atend||'caixa';
+  const abas=`<div class="tabs" role="tablist">${[['caixa','Caixa de entrada'],['historico','Histórico de atendimentos']].map(([k,r])=>`<button role="tab" aria-selected="${t===k}" data-act="tab" data-k="atend" data-v="${k}">${r}</button>`).join('')}</div>`;
+  if(t==='historico')return head('Atendimento','Histórico de todos os atendimentos, do portal e do WhatsApp, com busca por cliente, data, competência, canal e atendente.')+abas+historicoAtend();
+  let h=aChatV3();
+  h=h.replace(/<\/div>(\s*<div class="panel"><div class="wa-card">|\s*<div class="inbox">)/,'</div>'+abas+'$1');
+  h=h.replace("O copiloto responde primeiro e passa para a equipe quando precisa; ao assumir, a IA para de responder até você devolver.","O Théo (assistente virtual) responde primeiro e passa para a equipe quando precisa; ao assumir, ele para de responder até você devolver.")
+   .replace(/>Copiloto (\d+)</,'>Théo $1<').replace(/>Copiloto</g,'>Théo<').replace('Devolver ao copiloto','Devolver ao Théo').replace('copiloto atendendo','Théo atendendo')
+   .replace('Copiloto responde primeiro','Théo responde primeiro').replace('Copiloto desligado no WhatsApp','Théo desligado no WhatsApp').replace(/Desligar IA no WhatsApp/,'Desligar o Théo no WhatsApp').replace(/Ligar IA no WhatsApp/,'Ligar o Théo no WhatsApp');
+  // composer com anexo, emoji e áudio
+  h=h.replace(/(<form class="composer" data-form="msg-humano" data-id="([^"]+)">)(<textarea id="hum-input")/,(m,f,id,ta)=>f+`<label class="btn ico" title="Anexar arquivo" aria-label="Anexar arquivo">${svg('clip')}<input type="file" hidden multiple accept="image/*,audio/*,video/mp4,.pdf,.txt,.csv,.xml,.docx,.xlsx" data-up="hum-anexo" data-id="${id}"></label>`+botoesComposer('hum',id)+ta);
+  return h;
+};
+UI.fat=UI.fat||{empresa:'',canal:'',atend:'',sit:'',de:'',ate:'',comp:'',q:''};
+function resumoConv(c){
+  const ms=c.mensagens||[];const ini=c.criadoEm||ms[0]?.em||'';const fim=c.encerradaEm||ms.at(-1)?.em||ini;
+  const humanos=[...new Set(ms.filter(m=>m.de==='humano').map(m=>primeiroNome(m.nome||UI.nomes[m.uid]||'')).filter(Boolean))];
+  const soIA=!ms.some(m=>m.de==='humano');
+  return {c,e:emp(c.empresaId),ini,fim,humanos,soIA,n:ms.filter(m=>m.de!=='sistema').length,comps:new Set(ms.map(m=>String(m.em||'').slice(0,7)).filter(Boolean))};
+}
+function historicoAtend(){
+  const f=UI.fat;const q=(f.q||'').toLowerCase().trim();
+  const todos=S.conversas.map(resumoConv).sort((a,b)=>String(b.fim).localeCompare(String(a.fim)));
+  const L=todos.filter(r=>{
+    if(f.empresa&&(f.empresa==='__sem'?!!r.c.empresaId:r.c.empresaId!==f.empresa))return false;
+    if(f.canal&&(r.c.canal==='whatsapp'?'whatsapp':'portal')!==f.canal)return false;
+    if(f.sit&&(f.sit==='encerrada'?r.c.status!=='encerrada':f.sit==='aberta'?r.c.status==='encerrada':!r.soIA))return false;
+    if(f.atend&&!r.humanos.includes(f.atend))return false;
+    if(f.de&&String(r.fim).slice(0,10)<f.de)return false;if(f.ate&&String(r.ini).slice(0,10)>f.ate)return false;
+    if(f.comp&&!r.comps.has(f.comp))return false;
+    if(q&&!((r.e?.razao||'')+' '+(r.e?.fantasia||'')+' '+(r.c.contatoNome||'')+' '+(r.c.waFone||'')+' '+(r.c.mensagens||[]).map(m=>m.texto).join(' ')).toLowerCase().includes(q))return false;
+    return true});
+  const atendentes=[...new Set(todos.flatMap(r=>r.humanos))].sort();
+  const enc=L.filter(r=>r.c.status==='encerrada').length,ia=L.filter(r=>r.soIA).length,wa=L.filter(r=>r.c.canal==='whatsapp').length;
+  const sel=(k,rot,ops)=>`<label class="f"><span>${rot}</span><select data-fat="${k}"><option value="">Todos</option>${ops.map(([v,r])=>`<option value="${esc(v)}" ${f[k]===v?'selected':''}>${esc(r)}</option>`).join('')}</select></label>`;
+  const ST={ia:['Com o Théo','acc'],aguardando_humano:['Aguardando','warn'],humano:['Em atendimento','ok'],encerrada:['Encerrada','']};
+  return `<div class="panel nao-imprimir"><div class="barra-filtros">
+   <label class="f busca"><span>Pesquisar</span><input type="search" id="busca-fat" data-live="1" value="${esc(f.q)}" placeholder="Cliente, telefone ou palavra dita na conversa"></label>
+   ${sel('empresa','Cliente',[...S.empresas.slice().sort((a,b)=>(a.fantasia||a.razao).localeCompare(b.fantasia||b.razao)).map(e=>[e.id,e.fantasia||e.razao]),['__sem','Contato não identificado']])}
+   ${sel('canal','Canal',[['portal','Portal do cliente'],['whatsapp','WhatsApp']])}
+   ${sel('atend','Atendente',atendentes.map(a=>[a,a]))}
+   ${sel('sit','Situação',[['aberta','Em aberto'],['encerrada','Encerrada'],['humano','Teve atendente']])}
+   <label class="f"><span>De</span><input type="date" data-fat="de" value="${esc(f.de)}"></label><label class="f"><span>Até</span><input type="date" data-fat="ate" value="${esc(f.ate)}"></label>
+   <label class="f"><span>Competência</span><input type="month" data-fat="comp" value="${esc(f.comp)}"></label>
+  </div><div class="filtro-resumo"><span class="small muted">${L.length} atendimento(s) · ${enc} encerrado(s) · ${ia} resolvido(s) só pelo Théo · ${wa} pelo WhatsApp</span><div class="actions"><button class="btn sm ghost" data-act="fat-limpar">Limpar filtros</button><button class="btn sm" data-act="fat-csv">${svg('download')}Exportar</button><button class="btn sm" data-act="ctrl-imprimir">Imprimir / PDF</button></div></div></div>
+  <div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Canal</th><th>Início</th><th>Última mensagem</th><th>Atendido por</th><th class="r">Mensagens</th><th>Situação</th><th class="nao-imprimir"></th></tr></thead><tbody>${L.slice(0,500).map(r=>`<tr><td><b>${esc(r.e?(r.e.fantasia||r.e.razao):(r.c.contatoNome||'Contato não identificado'))}</b>${r.c.waFone?`<div class="sub">+${esc(r.c.waFone)}</div>`:''}</td><td>${canalTag(r.c)}</td><td class="num small">${r.ini?fmtDH(r.ini):'—'}</td><td class="num small">${r.fim?fmtDH(r.fim):'—'}</td><td class="small">${r.humanos.length?esc(r.humanos.join(', ')):IA_NOME}</td><td class="r num">${r.n}</td><td>${pill(...(ST[r.c.status]||[r.c.status,'']))}</td>
+    <td class="r nao-imprimir"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-act="fat-ver" data-id="${r.c.id}">Ver conversa</button>${r.c.status==='encerrada'&&podeMod('chat','editar')?`<button class="btn sm ghost" data-act="fat-reabrir" data-id="${r.c.id}">Reabrir</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhum atendimento com esses filtros.')}</div>`;
+}
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.fat){UI.fat[el.dataset.fat]=el.value;render()}});
+Object.assign(buscaVivas,{'busca-fat':v=>{UI.fat.q=v}});
+ACT['fat-limpar']=()=>{UI.fat={empresa:'',canal:'',atend:'',sit:'',de:'',ate:'',comp:'',q:''};render()};
+ACT['fat-ver']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.id);if(!c)return;const r=resumoConv(c);
+  openModal(`${mHead((r.e?(r.e.fantasia||r.e.razao):(c.contatoNome||'Contato'))+' · '+(c.canal==='whatsapp'?'WhatsApp':'Portal'))}<div class="modal-body"><p class="small muted">${r.ini?fmtDH(r.ini):''} a ${r.fim?fmtDH(r.fim):''} · atendido por ${esc(r.humanos.join(', ')||IA_NOME)}</p><div class="chat"><div class="msgs" style="max-height:60vh">${bolhas(c,'painel')}</div></div></div><div class="modal-foot">${c.status!=='encerrada'?`<button class="btn" data-act="fat-abrir" data-id="${c.id}">Abrir na caixa de entrada</button>`:''}<button class="btn primary" data-act="close-modal">Fechar</button></div>`,true)};
+ACT['fat-abrir']=el=>{closeModal();UI.tab.atend='caixa';UI.convSel=el.dataset.id;UI.convFiltro='todas';render()};
+ACT['fat-reabrir']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.id);if(!c)return;
+  if(S.conversas.some(x=>x.id!==c.id&&x.status!=='encerrada'&&x.empresaId===c.empresaId&&(x.canal||'portal')===(c.canal||'portal')&&c.empresaId)){toast('Este cliente já tem uma conversa aberta neste canal.',true);return}
+  mut('conversas',()=>{c.status='aguardando_humano';delete c.encerradaEm;c.mensagens.push({de:'sistema',texto:(primeiroNome(ME.nome)||'A equipe')+' reabriu o atendimento.',em:agora()})},['Atendimento','Reabriu atendimento',emp(c.empresaId)?.razao]);UI.tab.atend='caixa';UI.convSel=c.id;render()};
+ACT['fat-csv']=()=>{const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const f=UI.fat;
+  const L=S.conversas.map(resumoConv).sort((a,b)=>String(b.fim).localeCompare(String(a.fim)));
+  baixar('atendimentos-'+hoje()+'.csv','\ufeff'+['Cliente;Canal;Telefone;Início;Última mensagem;Atendido por;Mensagens;Situação'].concat(L.map(r=>[r.e?(r.e.razao):(r.c.contatoNome||''),r.c.canal==='whatsapp'?'WhatsApp':'Portal',r.c.waFone||'',r.ini?fmtDH(r.ini):'',r.fim?fmtDH(r.fim):'',r.humanos.join(', ')||IA_NOME,r.n,r.c.status].map(c).join(';'))).join('\r\n'),'text/csv')};
+/* ==== MÓDULOS v7 (fim) ==== */
 
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();

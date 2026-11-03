@@ -20,7 +20,9 @@ const AUD_TR = 'meufiscal:tempo-real';
 const MSG_CLIENTE_NO_PAINEL = 'Este ambiente é exclusivo da equipe interna da contabilidade. Clientes entram pelo Portal do Cliente.';
 const MSG_EQUIPE_NO_PORTAL = 'Esta conta é da equipe do escritório. Entre pelo Painel Contábil.';
 const TIPOS_ARQUIVO = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'text/plain': 'txt', 'text/csv': 'csv', 'application/json': 'json', 'text/xml': 'xml', 'application/xml': 'xml',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'application/octet-stream': 'bin' };
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx', 'application/octet-stream': 'bin',
+  'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/aac': 'aac', 'audio/wav': 'wav', 'video/mp4': 'mp4', 'image/gif': 'gif',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx' };
 
 export function registrarRotas(r, { db, hub }) {
   const alt = criarRegistroAlteracoes(db);

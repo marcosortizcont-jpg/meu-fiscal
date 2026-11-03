@@ -8,16 +8,22 @@ import crypto from 'node:crypto';
 import { CONFIG } from './config.js';
 import { ErroHttp } from './http.js';
 import { perguntarIA, iaDisponivel } from './externos.js';
-import { urlEnvio, gravarDisco } from './arquivos.js';
+import fs from 'node:fs';
+import { urlEnvio, gravarDisco, caminhoDisco, urlDownload } from './arquivos.js';
 
 const nada = () => { };
 const LOG = { level: 'silent', child: () => LOG, trace: nada, debug: nada, info: nada, warn: nada, error: nada, fatal: nada };
 const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'video/mp4': 'mp4' };
 const chaveFone = f => { let d = String(f || '').replace(/\D/g, ''); if (d.length >= 12 && d.startsWith('55')) d = d.slice(2); return d.length >= 10 ? d.slice(0, 2) + d.slice(-8) : null; };
-const limpar = t => String(t || '').replace(/^\s*ANEXAR:.*$/gim, '').replace(/^\s*CONFIAN[CÇ]A:.*$/gim, '').replace(/\*\*/g, '*').trim();
+const limpar = t => String(t || '').replace(/^\s*ANEXAR:.*$/gim, '').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi, '').replace(/\*\*/g, '*').trim();
 const PEDE_HUMANO = /\b(atendente|humano|falar com (o |a |um |uma )?(contador|contadora|algu[eé]m|pessoa|atendente))\b/i;
 
 export function registrarWhatsApp(r, { db, exigir, log, pode }) {
+  async function lerArquivo(a) {
+    if (a.local === 'banco') { const [c] = await db.query('SELECT conteudo FROM arquivos_conteudo WHERE id = $1', [a.id]); if (!c) throw new ErroHttp(404, 'Arquivo vazio.'); return c.conteudo; }
+    if (a.local === 'disco') return fs.promises.readFile(caminhoDisco(a));
+    const resp = await fetch(urlDownload(a)); if (!resp.ok) throw new ErroHttp(502, 'Falha ao ler o arquivo.'); return Buffer.from(await resp.arrayBuffer());
+  }
   const W = { status: 'desligado', qr: null, numero: null, nome: null, erro: null, sock: null, esc: null, tentativas: 0, qrs: 0, parando: false, vivo: null };
   const enviadas = new Map();   // id → mensagem enviada (a biblioteca pede para reenvios)
   let libCache;
@@ -227,6 +233,7 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     if (nova && c.status === 'aguardando_humano') c.mensagens.push({ de: 'sistema', texto: 'Nova conversa pelo WhatsApp aguardando um atendente.', em: new Date().toISOString() });
     await salvarConversa(esc, c);
 
+    if (tipoEvento === 'notify' && c.status === 'ia' && midia && midia[0] === 'áudio' && !texto) { await passarParaEquipe(esc, c, 'Recebi seu áudio! Vou passar para alguém da equipe ouvir e já te respondemos. 😊'); return; }
     if (tipoEvento === 'notify' && c.status === 'ia') await responderIA(esc, c, k, texto, imagemIA);
   }
 
@@ -262,14 +269,14 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     const cfg = await configEscritorio(esc);
     if (PEDE_HUMANO.test(texto || '')) return passarParaEquipe(esc, c, 'Certo! Vou chamar alguém da equipe do escritório para continuar com você. Aguarde um instante, por favor.');
     const dados = await contexto(esc, c.empresaId);
-    const regras = `Você responde pelo WhatsApp do escritório "${cfg.escritorio || 'de contabilidade'}".
+    const regras = `Você é o Théo, assistente virtual do escritório "${cfg.escritorio || 'de contabilidade'}", e responde pelo WhatsApp. Apresente-se como Théo na primeira resposta da conversa.
 Regras:
 - Português do Brasil, até 4 frases curtas, tom cordial, sem markdown, sem listas longas.
 - Se "contato_identificado" for false: não fale de nenhuma empresa nem de valores. Cumprimente, pergunte o nome, a empresa (CNPJ) e o que a pessoa precisa, e diga que a equipe vai retornar. Use CONFIANCA: baixa quando a pessoa já tiver dito o que precisa.
 - Com contato identificado: use só os DADOS. Guias e boletos ficam no Portal do Cliente (menu Guias e impostos); informe valor e vencimento se estiverem nos DADOS.
 - Valores calculados são estimativas. Nunca invente informação.
 - Assuntos que exigem análise humana (rescisão, autuação, intimação, parcelamento, mudança de regime, alteração contratual, divergência de valores, envio de documentos para análise) recebem orientação geral e CONFIANCA: baixa.
-- Se a pessoa pedir para falar com alguém, use CONFIANCA: baixa.
+- Se a pessoa pedir para falar com alguém, ou se você disser que vai solicitar algo à equipe, use CONFIANCA: baixa.
 - Imagens recebidas: diga o que é o documento e os dados principais; a equipe confere.
 - A última linha deve ser exatamente "CONFIANCA: alta", "CONFIANCA: media" ou "CONFIANCA: baixa".
 DADOS (JSON): ${JSON.stringify(dados)}`;
@@ -321,14 +328,25 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
     if (!pode(u, 'chat', 'editar')) throw new ErroHttp(403, 'Seu acesso ao Atendimento é só de consulta.');
     if (limitar_(u.id)) throw new ErroHttp(429, 'Muitas mensagens seguidas. Aguarde um instante.');
     const texto = String(ctx.corpo.texto || '').trim().slice(0, 4000);
-    if (!texto) throw new ErroHttp(400, 'Escreva a mensagem.');
+    const anexos = (Array.isArray(ctx.corpo.arquivos) ? ctx.corpo.arquivos : []).filter(a => a && /^[0-9a-f-]{36}$/.test(a.id)).slice(0, 5);
+    if (!texto && !anexos.length) throw new ErroHttp(400, 'Escreva a mensagem ou anexe um arquivo.');
     const esc = u.escritorio_id;
     const [l] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND id = $2`, [esc, String(ctx.corpo.conversaId || '')]);
     if (!l || l.dados.canal !== 'whatsapp') throw new ErroHttp(404, 'Conversa do WhatsApp não encontrada.');
     const c = l.dados;
-    await enviarTexto(c.waJid, texto);
+    if (texto) await enviarTexto(c.waJid, texto);
+    for (const a of anexos) {
+      const [arq] = await db.query('SELECT id, chave, tipo, tamanho, local FROM arquivos WHERE id = $1 AND escritorio_id = $2', [a.id, esc]);
+      if (!arq) continue;
+      const buf = await lerArquivo(arq);
+      const tipo = arq.tipo; const nome = String(a.nome || 'arquivo').slice(0, 120);
+      const msg = /^image\//.test(tipo) && !/gif/.test(tipo) ? { image: buf } : /^audio\/(ogg|mp4|mpeg|aac)/.test(tipo) ? { audio: buf, mimetype: tipo === 'audio/ogg' ? 'audio/ogg; codecs=opus' : tipo, ptt: tipo === 'audio/ogg' }
+        : /^video\//.test(tipo) ? { video: buf } : { document: buf, mimetype: tipo, fileName: nome };
+      const r = await W.sock.sendMessage(c.waJid, msg);
+      if (r?.key?.id) enviadas.set(r.key.id, r.message);
+    }
     if (c.status !== 'humano') { c.status = 'humano'; c.atendenteUid = u.id; c.mensagens.push({ de: 'sistema', texto: `${u.nome} assumiu a conversa.`, em: new Date().toISOString() }); }
-    c.mensagens.push({ de: 'humano', texto, em: new Date().toISOString(), uid: u.id, nome: u.nome + ' · escritório', canal: 'whatsapp' });
+    c.mensagens.push({ de: 'humano', texto, em: new Date().toISOString(), uid: u.id, nome: u.nome, canal: 'whatsapp', ...(anexos.length ? { arquivos: anexos.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, tamanho: a.tamanho, url: `/api/arquivos/${a.id}` })) } : {}) });
     c.naoLidas = 0;
     await salvarConversa(esc, c);
     return { ok: true };

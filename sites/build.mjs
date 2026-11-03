@@ -34,6 +34,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   `img-src 'self' data: blob: ${ARQ_HOST}`,
+  `media-src 'self' blob: ${ARQ_HOST}`,
   `connect-src 'self' ${API} ${ARQ_HOST}`,
   "worker-src 'self' blob:",
   `frame-src 'self' blob: ${ARQ_HOST}`,
@@ -44,7 +45,7 @@ const SEGURANCA = [
   { key: 'X-Frame-Options', value: 'DENY' },
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
-  { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(), payment=()' },
+  { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), payment=()' },
   ...(site === 'painel' ? [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] : []),
 ];
 const ROTAS = site === 'cliente' ? {

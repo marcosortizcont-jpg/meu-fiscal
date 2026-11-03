@@ -63,6 +63,8 @@ Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site
 - **Documentos para a equipe:** no cadastro do cliente, aba Documentos, anexe arquivos com nome e departamento (ou todos). Só a equipe vê, a menos que marque "mostrar no portal".
 - **Gestão do negócio (portal do cliente):** o próprio cliente lança receitas e despesas com categoria, cliente/fornecedor, forma de pagamento, situação (pago/pendente), vencimento, repetição mensal e comprovante. Abas: Visão geral (resultado, margem, a receber, a pagar, gráfico mensal, receitas por categoria, maiores gastos, principais clientes e fornecedores, alertas), Receitas, Despesas, Consolidação (DRE simplificada por mês, exportável) e Indicadores fiscais.
 
+- **Atendimento:** a IA se chama **Théo**. Na conversa (portal e painel) dá para enviar e receber arquivos, fotos, áudios (gravados no microfone ou anexados) e emojis; imagens, áudios e vídeos aparecem na própria conversa. As mensagens mostram o primeiro nome do cliente e do atendente. Áudios do cliente vão direto para a equipe (o Théo ainda não ouve áudio). A aba **Histórico de atendimentos** filtra por cliente, canal, atendente, situação, período e competência, com exportação.
+
 #### Copiloto com IA gratuita (Groq)
 1. Entre em **console.groq.com** e crie a conta (Google ou e-mail). **Não pede cartão de crédito.**
 2. Menu **API Keys** → **Create API Key** → dê um nome (ex.: Meu Fiscal) → copie a chave (começa com `gsk_`).
