@@ -346,5 +346,22 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
     } catch (e) { console.error('[whatsapp] religar', e.message); }
   }, 3000).unref();
 
-  return { status: () => W.status };
+  // envia um arquivo para o WhatsApp da empresa (usado na entrega de obrigações)
+  async function enviarArquivo({ esc, empresaId, fone, buffer, tipo, nome, legenda }) {
+    if (!W.sock || W.status !== 'conectado') throw new Error('O WhatsApp do escritório está desconectado.');
+    let jid = null;
+    if (empresaId) { const [c] = await db.query(`SELECT dados->>'waJid' AS jid FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND empresa_id = $2 AND dados->>'canal' = 'whatsapp' ORDER BY atualizado_em DESC LIMIT 1`, [esc, empresaId]); jid = c?.jid || null; }
+    if (!jid) {
+      let d = String(fone || '').replace(/\D/g, ''); if (!d) throw new Error('A empresa não tem telefone/WhatsApp no cadastro.');
+      if (!d.startsWith('55')) d = '55' + d;
+      const opcoes = [d]; if (d.length === 13) opcoes.push(d.slice(0, 4) + d.slice(5)); else if (d.length === 12) opcoes.push(d.slice(0, 4) + '9' + d.slice(4));
+      for (const n of opcoes) { try { const [r] = await W.sock.onWhatsApp(n); if (r?.exists) { jid = r.jid; break; } } catch { } }
+      if (!jid) throw new Error('O telefone da empresa não tem WhatsApp.');
+    }
+    const ehImagem = /^image\//.test(tipo);
+    const r = await W.sock.sendMessage(jid, ehImagem ? { image: buffer, caption: legenda || '' } : { document: buffer, mimetype: tipo, fileName: nome, caption: legenda || '' });
+    if (r?.key?.id) enviadas.set(r.key.id, r.message);
+    return { para: '+' + jid.split('@')[0] };
+  }
+  return { status: () => W.status, enviarArquivo };
 }

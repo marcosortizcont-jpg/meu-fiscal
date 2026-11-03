@@ -34,7 +34,7 @@ export const FUNCAO_PADRAO = 'Analista Fiscal';
 export const MODULO_DA_COLECAO = {
   empresas: 'carteira', leads: 'carteira',
   catalogo: 'obrig', regimes: 'obrig', obrigacoes: 'obrig', fechamentos: 'obrig',
-  guias: 'guias', faturamento: 'guias', despesas: 'guias', notas: 'guias', tomadores: 'guias', servicos: 'guias',
+  guias: 'guias', faturamento: 'guias', despesas: 'guias', lancamentos: 'guias', notas: 'guias', tomadores: 'guias', servicos: 'guias',
   documentos: 'docs', checklist: 'docs',
   conversas: 'chat',
   cnds: 'fiscal', ecac: 'fiscal',

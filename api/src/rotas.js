@@ -11,6 +11,7 @@ import { enviarEmail, emailLink, perguntarIA } from './externos.js';
 import { MODULOS, FUNCOES, NIVEIS, permissoesEfetivas, funcoesDoEscritorio, pode, limparPermissoes } from './permissoes.js';
 import { registrarGestao } from './gestao.js';
 import { registrarWhatsApp } from './whatsapp.js';
+import { registrarEnvios } from './envios.js';
 
 const AUD = site => `meufiscal:${site}`;
 export const ROTA_SENHA = { cliente: '/definir-senha', painel: '/admin/definir-senha' };
@@ -561,7 +562,8 @@ export function registrarRotas(r, { db, hub }) {
   });
 
   registrarGestao(r, { db, exigir, log, pode });
-  registrarWhatsApp(r, { db, exigir, log, pode });
+  const wa = registrarWhatsApp(r, { db, exigir, log, pode });
+  registrarEnvios(r, { db, exigir, log, pode, wa });
 
   return { carregarEmpresas };
 }

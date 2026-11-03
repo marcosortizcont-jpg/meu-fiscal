@@ -488,7 +488,7 @@ function obrigacoesDevidasFixas(e,comp,funcs){
 }
 
 /* ===================== Estado e persistência ===================== */
-const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads'];
+const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos'];
 const S={}; COLS.forEach(c=>S[c]=[]);
 const CAP={db:null,user:null,sample:null,assets:null,downloads:null};
 const ME={id:null,nome:'',canEdit:true};
@@ -638,7 +638,7 @@ function gerarExemplo(){
 }
 /*SEED_END*/
 const TIPOS_TICKET={'Abertura de filial':15,'Alteração contratual':10,'Rescisão de funcionário':5,'Admissão de funcionário':3,'Emissão de certidão':3,'Renovação de certificado':5,'Parcelamento de débitos':5,'Pedido de titular (LGPD)':15,'Outros':5};
-const CATEGORIAS_DOC=['Contrato Social','Alterações Contratuais','Cartão CNPJ','Inscrição Estadual','Inscrição Municipal','Alvarás e Licenças','Certidões','Outros'];
+const CATEGORIAS_DOC=['Obrigações entregues','Contrato Social','Alterações Contratuais','Cartão CNPJ','Inscrição Estadual','Inscrição Municipal','Alvarás e Licenças','Certidões','Outros'];
 const ST_TICKET={aberto:'Aberto',em_andamento:'Em andamento',aguardando_cliente:'Aguardando você',concluido:'Concluído'};
 const DEPTOS_TICKET=['Fiscal','Pessoal','Contábil','Legalização','Financeiro'];
 const SLA_DEPTO={Fiscal:5,Pessoal:5,'Contábil':5,'Legalização':15,Financeiro:3};
@@ -684,7 +684,7 @@ function motor(eid,publico){
     const aguard=env.filter(x=>x.status==='enviado').length;
     if(aguard&&publico!=='c')add('info',e,'Envio mensal',`${aguard} arquivo${aguard>1?'s':''} de ${fmtComp(ant)} aguardando aprovação`,'a-docs');
     if(publico!=='c'){
-      S.obrigacoes.filter(o=>o.empresaId===e.id&&o.status!=='entregue').forEach(o=>{const n=diasAte(o.prazo);
+      S.obrigacoes.filter(o=>o.empresaId===e.id&&!obrOk(o)).forEach(o=>{const n=diasAte(o.prazo);
         if(n<0)add('crit',e,'Obrigações',`${o.tipo} de ${fmtComp(o.comp)} fora do prazo (${fmtData(o.prazo)})`,'a-obrig');
         else if(n<=3)add('warn',e,'Obrigações',`${o.tipo} de ${fmtComp(o.comp)} vence em ${n} dia${n!==1?'s':''}`,'a-obrig');});
       S.ecac.filter(m=>m.empresaId===e.id&&!m.lida&&m.relevancia==='alta').forEach(m=>add('crit',e,'e-CAC',`Caixa Postal: ${m.assunto}`,'a-fiscal'));
@@ -1635,11 +1635,11 @@ function aHome(){
   const ant=addMes(compAtual(),-1);
   const atrasoG=S.guias.filter(g=>statusGuia(g).k==='atraso');
   const aprov=S.checklist.filter(x=>x.status==='enviado').length;
-  const obr=S.obrigacoes.filter(o=>o.comp===ant); const obrOk=obr.filter(o=>o.status==='entregue').length;
+  const obr=S.obrigacoes.filter(o=>o.comp===ant); const obrOk_=obr.filter(o=>obrOk(o)).length;
   return `${head('Central de alertas','Resultado do motor de automação sobre toda a carteira: prazos, guias, documentos, certidões, certificados e atendimento.')}
   <div class="kpis"><div class="kpi"><span class="eyebrow">Clientes ativos</span><b>${S.empresas.filter(e=>e.status!=='inativo').length}</b><small>${S.empresas.filter(e=>!e.operadorId).length} sem responsável</small></div>
   <div class="kpi"><span class="eyebrow">Guias em atraso</span><b>${atrasoG.length}</b><small>${brl(atrasoG.reduce((a,g)=>a+g.valor,0))}</small></div>
-  <div class="kpi"><span class="eyebrow">Obrigações de ${fmtComp(ant)}</span><b>${obr.length?Math.round(obrOk/obr.length*100)+'%':'—'}</b><small>${obrOk} de ${obr.length} entregues</small></div>
+  <div class="kpi"><span class="eyebrow">Obrigações de ${fmtComp(ant)}</span><b>${obr.length?Math.round(obrOk_/obr.length*100)+'%':'—'}</b><small>${obrOk_} de ${obr.length} entregues</small></div>
   <div class="kpi"><span class="eyebrow">Arquivos para aprovar</span><b>${aprov}</b><small>envio mensal dos clientes</small></div></div>
   <div class="panel"><div class="panel-head"><h2>${A.length} alerta${A.length!==1?'s':''}</h2><select data-change="alerta-area" style="width:auto"><option value="">Todas as áreas</option>${areas.map(a=>`<option ${a===filtro?'selected':''}>${esc(a)}</option>`).join('')}</select></div>${listaAlertas(filtro?A.filter(a=>a.area===filtro):A,200)}</div>`;
 }
@@ -1702,13 +1702,13 @@ function aObrigMatriz(){
   const obs=S.obrigacoes.filter(o=>o.comp===comp);
   const tipos=[...new Set(obs.map(o=>o.tipo))];
   return `${head('Obrigações e fechamento','Matriz de entregas por empresa. O mês só fecha com todos os documentos aprovados, obrigações entregues e guias liberadas.',`${compSelect('comp-obrig',comp)}<button class="btn primary" data-act="gerar-obrig">Gerar obrigações de ${fmtComp(comp)}</button>`)}
-  <div class="panel">${obs.length?`<div class="table-wrap"><table class="matrix"><thead><tr><th>Empresa</th>${tipos.map(t=>`<th class="r" style="text-align:center">${esc(t)}</th>`).join('')}<th style="text-align:center">Fechamento</th></tr></thead><tbody>${es.map(e=>{const fech=S.fechamentos.find(f=>f.empresaId===e.id&&f.comp===comp);return `<tr><td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted">${esc(opNome(e.operadorId))}</div></td>${tipos.map(t=>{const o=obs.find(x=>x.empresaId===e.id&&x.tipo===t);if(!o)return '<td class="cell muted">—</td>';const k=o.status!=='entregue'&&diasAte(o.prazo)<0?'atraso':o.status;return `<td class="cell"><button class="cellbtn ${k}" data-act="ciclo-obrig" data-id="${o.id}" title="Prazo ${fmtData(o.prazo)}" ${fech?'disabled':''}>${{entregue:'Entregue',em_andamento:'Em andamento',pendente:'Pendente',atraso:'Atrasada'}[k]}</button><div class="small muted">${fmtData(o.prazo).slice(0,5)}</div></td>`}).join('')}<td class="cell">${fech?`<span class="lockbadge">Fechado ${fmtData(fech.em.slice(0,10))}</span><br><button class="btn ghost sm" data-act="reabrir" data-id="${e.id}">Reabrir</button>`:`<button class="btn sm" data-act="fechar-mes" data-id="${e.id}">Encerrar</button>`}</td></tr>`}).join('')}</tbody></table></div>`:vazio(`Nenhuma obrigação gerada para ${fmtComp(comp)}.`,`<button class="btn primary" data-act="gerar-obrig">Gerar agora</button>`)}</div>
+  <div class="panel">${obs.length?`<div class="table-wrap"><table class="matrix"><thead><tr><th>Empresa</th>${tipos.map(t=>`<th class="r" style="text-align:center">${esc(t)}</th>`).join('')}<th style="text-align:center">Fechamento</th></tr></thead><tbody>${es.map(e=>{const fech=S.fechamentos.find(f=>f.empresaId===e.id&&f.comp===comp);return `<tr><td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted">${esc(opNome(e.operadorId))}</div></td>${tipos.map(t=>{const o=obs.find(x=>x.empresaId===e.id&&x.tipo===t);if(!o)return '<td class="cell muted">—</td>';const k=!obrOk(o)&&diasAte(o.prazo)<0?'atraso':o.status;return `<td class="cell"><button class="cellbtn ${k}" data-act="ciclo-obrig" data-id="${o.id}" title="Prazo ${fmtData(o.prazo)}" ${fech?'disabled':''}>${{entregue:'Entregue',em_andamento:'Em andamento',pendente:'Pendente',atraso:'Atrasada',justificada:'Justificada',dispensada:'Dispensada'}[k]}</button><div class="small muted">${fmtData(o.prazo).slice(0,5)}</div></td>`}).join('')}<td class="cell">${fech?`<span class="lockbadge">Fechado ${fmtData(fech.em.slice(0,10))}</span><br><button class="btn ghost sm" data-act="reabrir" data-id="${e.id}">Reabrir</button>`:`<button class="btn sm" data-act="fechar-mes" data-id="${e.id}">Encerrar</button>`}</td></tr>`}).join('')}</tbody></table></div>`:vazio(`Nenhuma obrigação gerada para ${fmtComp(comp)}.`,`<button class="btn primary" data-act="gerar-obrig">Gerar agora</button>`)}</div>
   <p class="small muted">Clique em uma célula para avançar a situação: pendente, em andamento, entregue. Prazos ajustados para fim de semana; confira feriados locais.</p>`;
 }
 function travasFechamento(e,comp){
   const T=[]; const env=S.checklist.filter(x=>x.empresaId===e.id&&x.comp===comp);
   (e.checklist||[]).forEach(it=>{const x=env.find(z=>z.itemId===it.id);if(!x)T.push(`${it.nome}: não enviado pelo cliente`);else if(x.status!=='aprovado')T.push(`${it.nome}: ${x.status==='enviado'?'aguardando sua aprovação':'recusado, aguardando reenvio'}`)});
-  S.obrigacoes.filter(o=>o.empresaId===e.id&&o.comp===comp&&o.status!=='entregue').forEach(o=>T.push(`${o.tipo}: não entregue`));
+  S.obrigacoes.filter(o=>o.empresaId===e.id&&o.comp===comp&&!obrOk(o)).forEach(o=>T.push(`${o.tipo}: não entregue`));
   if(!S.obrigacoes.some(o=>o.empresaId===e.id&&o.comp===comp)) T.push('Obrigações da competência não geradas');
   const gTipo=e.regime==='MEI'?'DAS-MEI':'DAS';
   const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo===gTipo);
@@ -1857,7 +1857,7 @@ const ACT={
     mut('empresas',()=>{sem.forEach(e=>{const dep=e.regime==='MEI'?['Legalização','Fiscal']:['Fiscal','Contábil'];const cands=S.operadores.filter(o=>dep.includes(o.depto));const pool=cands.length?cands:S.operadores;
       const carga=o=>S.empresas.filter(x=>x.operadorId===o.id).length;e.operadorId=pool.slice().sort((a,b)=>carga(a)-carga(b))[0].id})},['Carteira','Distribuição automática',sem.length+' empresa(s)']);toast(sem.length+' cliente(s) distribuído(s) pela menor carga.')},
   'gerar-obrig':()=>{const comp=compDe('obrig');let n=0;mut('obrigacoes',()=>{S.empresas.filter(e=>e.status!=='inativo').forEach(e=>obrigacoesDevidas(e,comp).forEach(o=>{if(!S.obrigacoes.some(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo===o.tipo)){S.obrigacoes.push({id:uid(),empresaId:e.id,comp,...o,status:'pendente',responsavel:e.operadorId});n++}}))},['Obrigações','Gerou matriz de '+fmtComp(comp),'']);toast(n?n+' obrigação(ões) gerada(s).':'A matriz já estava completa.')},
-  'ciclo-obrig':el=>{const o=S.obrigacoes.find(x=>x.id===el.dataset.id);const prox={pendente:'em_andamento',em_andamento:'entregue',entregue:'pendente'}[o.status];mut('obrigacoes',()=>{o.status=prox;if(prox==='entregue'){o.entregueEm=agora();o.entreguePor=ME.id}},['Obrigações',o.tipo+' → '+prox,emp(o.empresaId)?.razao+' '+o.comp])},
+  'ciclo-obrig':el=>{const o=S.obrigacoes.find(x=>x.id===el.dataset.id);const prox={pendente:'em_andamento',em_andamento:'entregue',entregue:'pendente'}[o.status]||'pendente';mut('obrigacoes',()=>{o.status=prox;if(prox==='entregue'){o.entregueEm=agora();o.entreguePor=ME.id}},['Obrigações',o.tipo+' → '+prox,emp(o.empresaId)?.razao+' '+o.comp])},
   'fechar-mes':el=>{const e=emp(el.dataset.id);const comp=compDe('obrig');const T=travasFechamento(e,comp);
     if(T.length){openModal(`${mHead('Não é possível encerrar '+fmtComp(comp))}<div class="modal-body"><p>${esc(e.fantasia||e.razao)} tem pendências que travam o fechamento:</p><ul style="margin:0;padding-left:18px">${T.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div><div class="modal-foot"><button class="btn primary" data-act="close-modal">Entendi</button></div>`);return}
     mut('fechamentos',()=>S.fechamentos.push({id:uid(),empresaId:e.id,comp,em:agora(),por:ME.id}),['Obrigações','Encerrou competência '+fmtComp(comp),e.razao]);toast('Competência encerrada.')},
@@ -2357,6 +2357,7 @@ ACT['obrigacao-form']=el=>{
   <label class="f"><span>Dia (ou nº do dia útil)</span><input type="number" name="vdia" min="1" max="31" value="${v.dia||20}"></label>
   <label class="f"><span>Mês do vencimento (mensal e trimestral)</span>${sel('vmeses',{0:'No mês da competência',1:'No mês seguinte',2:'No 2º mês seguinte'},v.mesesApos??1)}</label>
   <label class="f"><span>Mês do vencimento (anual, ano seguinte)</span>${sel('vmes',Object.fromEntries(MESES_N.map((m,i)=>[i+1,m])),v.mes||3)}</label>
+  <label class="f"><span>Prazo técnico (dias antes do vencimento legal)</span><input type="number" name="vtec" min="0" max="60" value="${o.diasTecnico??3}"></label>
   <label class="f"><span>Se cair em fim de semana</span>${sel('vajuste',{prorroga:'Prorroga para o dia útil seguinte',antecipa:'Antecipa para o dia útil anterior'},v.ajuste||'prorroga')}</label>
   <label class="f"><span>Condição</span>${sel('condicao',CONDICOES,o.condicao||'')}</label>
   <label class="f full"><span>Observação</span><input type="text" name="obs" maxlength="200" value="${esc(o.obs||'')}"></label>
@@ -2370,7 +2371,7 @@ ACT['obrigacao-form']=el=>{
 FORM['obrigacao']=(fd,form)=>{
   const id=form.dataset.id||('obr-'+uid());const nome=String(fd.get('nome')||'').trim();if(!nome){toast('Informe o nome.',true);return}
   if(S.catalogo.some(c=>c.nome.toLowerCase()===nome.toLowerCase()&&c.id!==id)){toast('Já existe uma obrigação com este nome.',true);return}
-  const dados={id,nome,depto:fd.get('depto'),recorrencia:fd.get('recorrencia'),venc:{tipo:fd.get('vtipo'),dia:Number(fd.get('vdia')||20),mesesApos:Number(fd.get('vmeses')),mes:Number(fd.get('vmes')),ajuste:fd.get('vajuste')},condicao:fd.get('condicao')||'',obs:String(fd.get('obs')||'').trim(),ativo:!!fd.get('ativo')};
+  const dados={id,nome,diasTecnico:Math.max(0,Math.min(60,Number(fd.get('vtec')??3)||0)),depto:fd.get('depto'),recorrencia:fd.get('recorrencia'),venc:{tipo:fd.get('vtipo'),dia:Number(fd.get('vdia')||20),mesesApos:Number(fd.get('vmeses')),mes:Number(fd.get('vmes')),ajuste:fd.get('vajuste')},condicao:fd.get('condicao')||'',obs:String(fd.get('obs')||'').trim(),ativo:!!fd.get('ativo')};
   const regs=new Set(fd.getAll('lote_regime')),emps=new Set(fd.getAll('lote_empresa'));
   closeModal();
   mut(['catalogo','regimes','empresas'],()=>{
@@ -2595,7 +2596,7 @@ function abaResp(e){
   <div class="panel"><h2>Carteira de cada responsável</h2><div class="list">${lista.map(p=>{const n=S.empresas.filter(x=>x.status!=='inativo'&&Object.values(x.responsaveis||{}).includes(p.id)).length;return `<div class="row"><div class="grow"><b>${esc(p.nome)}</b> <span class="small muted">${esc(p.funcao||'')}</span></div><span class="num small">${n} empresa${n!==1?'s':''}</span></div>`}).join('')}</div></div>`;
 }
 FORM['responsaveis']=(fd,form)=>{const e=emp(form.dataset.id);const r={};SETORES.forEach(([k])=>{const v=fd.get(k);if(v)r[k]=v});
-  mut(['empresas','obrigacoes'],()=>{e.responsaveis=r;S.obrigacoes.filter(o=>o.empresaId===e.id&&o.status!=='entregue').forEach(o=>{const n=respDe(e,o.depto);if(n)o.responsavel=n})},['Carteira','Definiu responsáveis',e.razao]);toast('Responsáveis salvos.')};
+  mut(['empresas','obrigacoes'],()=>{e.responsaveis=r;S.obrigacoes.filter(o=>o.empresaId===e.id&&!obrOk(o)).forEach(o=>{const n=respDe(e,o.depto);if(n)o.responsavel=n})},['Carteira','Definiu responsáveis',e.razao]);toast('Responsáveis salvos.')};
 
 /* obrigações vinculadas */
 function abaObrig(e){
@@ -3088,6 +3089,461 @@ const vIABase=vIA;
 vIA=function(e){const c=conversaAtiva(e.id,false);const h=vIABase(e);if(c&&c.status!=='ia')return h;return h.replace('<div class="suggest">',`<div class="suggest"><button class="btn sm" data-act="ia-humano" style="font-weight:600">Falar com um atendente</button>`)};
 ACT['ia-humano']=()=>perguntarIA('Quero falar com um atendente');
 /* ==== MÓDULOS v3 (fim) ==== */
+/* ==== MÓDULOS v4: gestão de obrigações (protocolo, anexos, envio ao cliente, comentários e histórico)
+        e lançamentos de receitas e despesas pelo próprio cliente, com indicadores ==== */
+(function(){const st=document.createElement('style');st.textContent=`
+.obr-filtros{display:grid;gap:8px}
+.obr-linha1{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.obr-linha1 input[type=search]{flex:1 1 220px;min-width:0}
+.obr-sits{display:flex;flex-wrap:wrap;gap:6px}
+.obr-sits label{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:5px 10px;font-size:13px;cursor:pointer;background:var(--surface)}
+.obr-sits label.on{background:var(--info-soft);border-color:color-mix(in srgb,var(--info) 35%,transparent)}
+.obr-datas{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}
+.obr-datas .f span{font-size:11px}
+.obr-tags{display:flex;flex-wrap:wrap;gap:6px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px;min-height:40px;background:var(--surface)}
+.obr-tag{display:inline-flex;gap:4px;align-items:center;background:var(--surface-2);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-size:12px}
+.obr-tag button{border:0;background:transparent;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:0 2px}
+.obr-tags select{width:auto;border:0;background:transparent;font-size:12px;color:var(--muted)}
+.obr-tab{width:100%;border-collapse:collapse}
+.obr-tab th{font-size:12px;text-align:left;padding:8px;border-bottom:1px solid var(--line);color:var(--muted);font-weight:600;vertical-align:bottom}
+.obr-tab th button{border:0;background:transparent;font:inherit;color:var(--accent);cursor:pointer;padding:0;font-weight:600}
+.obr-tab td{padding:8px;border-top:1px solid var(--line);vertical-align:top;font-size:13px}
+.obr-tab tr.obr-row{cursor:pointer}
+.obr-tab tr.obr-row:hover td{background:var(--surface-2)}
+.obr-tab tr.aberta td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+.obr-nome{font-weight:700;color:var(--crit)}
+.obr-nome.ok{color:var(--ok)}
+.obr-det{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:6px 2px}
+.obr-det .f span{font-size:12px}
+.obr-hist{grid-column:1/-1;border-top:1px dashed var(--line);padding-top:8px;display:grid;gap:6px;max-height:280px;overflow:auto}
+.obr-hist .ev{font-size:13px}.obr-hist .quem{font-size:11px;color:var(--crit)}
+.obr-anexos{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.obr-det svg{width:16px;height:16px;vertical-align:-3px;flex-shrink:0}
+.obr-anexos .chip-anexo a{color:inherit}
+.obr-lote{display:flex;flex-wrap:wrap;gap:8px;align-items:center;background:var(--info-soft);border:1px solid color-mix(in srgb,var(--info) 30%,transparent);border-radius:8px;padding:8px 12px}
+@media (max-width:900px){.obr-det{grid-template-columns:1fr}.obr-tab .col-esconde{display:none}}
+.lanc-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
+.barras{display:grid;gap:8px}
+.barra{display:grid;grid-template-columns:minmax(110px,190px) 1fr auto;gap:10px;align-items:center;font-size:13px}
+.barra .trilho{height:10px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+.barra .trilho i{display:block;height:100%;border-radius:99px}
+.graf-mes{display:flex;align-items:flex-end;gap:6px;height:170px;padding-top:8px}
+.graf-mes .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;min-width:0}
+.graf-mes .par{display:flex;gap:2px;align-items:flex-end;height:130px;width:100%;justify-content:center}
+.graf-mes .par i{display:block;width:42%;max-width:16px;border-radius:3px 3px 0 0}
+.graf-mes small{font-size:10px;color:var(--muted)}
+.dre td,.dre th{font-size:13px}.dre .tot td{font-weight:700;border-top:2px solid var(--line)}.dre .sub td{color:var(--muted)}
+.dre td.num,.dre th.num{text-align:right;white-space:nowrap}
+`;document.head.appendChild(st)})();
+
+/* ---------- situação das obrigações ---------- */
+function obrOk(o){return ['entregue','justificada','dispensada'].includes(o.status)}
+function isoMenosDias(iso,n){if(!iso)return '';const d=new Date(iso+'T12:00:00');d.setDate(d.getDate()-n);while([0,6].includes(d.getDay()))d.setDate(d.getDate()-1);return d.toISOString().slice(0,10)}
+function prazoTec(o){if(o.prazoTecnico)return o.prazoTecnico;const c=S.catalogo.find(x=>x.id===o.catId||x.nome===o.tipo);return isoMenosDias(o.prazo,c&&c.diasTecnico!=null?Number(c.diasTecnico):3)}
+const dataDe=v=>v?String(v).slice(0,10):'';
+function sitObr(o){
+  const tec=prazoTec(o),leg=o.prazo,h=hoje();
+  if(o.status==='entregue'){const d=dataDe(o.entregueEm);return d&&tec&&d<=tec?{k:'antecipada',t:'Ent. antecipada',c:'info',d}:d&&leg&&d<=leg?{k:'noprazo',t:'Ent. no prazo',c:'ok',d}:{k:'atrasada_ent',t:'Ent. com atraso',c:'warn',d}}
+  if(o.status==='justificada')return{k:'justificada',t:'Justificada',c:'',d:dataDe(o.concluidaEm)};
+  if(o.status==='dispensada')return{k:'dispensada',t:'Dispensada',c:'',d:dataDe(o.concluidaEm)};
+  if(leg&&h>leg)return{k:'atrasada',t:'Atrasada',c:'crit'};
+  if(tec&&h>tec)return{k:'fora_tec',t:'Fora do prazo técnico',c:'warn'};
+  return o.status==='em_andamento'?{k:'andamento',t:'Em andamento',c:'info'}:{k:'pendente',t:'Pendente',c:'warn'};
+}
+const GRUPO_SIT=o=>['entregue','justificada','dispensada'].includes(o.status)?o.status==='entregue'?'entregues':o.status==='justificada'?'justificadas':'dispensadas':'pendentes';
+function logObr(o,ev){(o.log=o.log||[]).push({em:agora(),uid:ME.id,nome:ME.nome||'Equipe',...ev});if(o.log.length>200)o.log.splice(0,o.log.length-200)}
+const NOME_ST={pendente:'Pendente',em_andamento:'Em andamento',entregue:'Entregue',justificada:'Justificada',dispensada:'Dispensada'};
+function mudarStatus(o,novo,extra){const de=o.status;if(de===novo)return;o.status=novo;
+  if(novo==='entregue'){o.entregueEm=agora();o.entreguePor=ME.id}
+  if(novo==='justificada'||novo==='dispensada'){o.concluidaEm=agora()}
+  if(novo==='pendente'||novo==='em_andamento'){delete o.entregueEm;delete o.concluidaEm}
+  logObr(o,{tipo:'status',de,para:novo,...(extra||{})})}
+
+/* ---------- filtros ---------- */
+function mesAtualIntervalo(){const h=hoje();return [h.slice(0,8)+'01',h.slice(0,8)+pad(ultimoDiaMes(+h.slice(0,4),+h.slice(5,7)))]}
+function fobr(){if(!UI.fobr){const [a,b]=mesAtualIntervalo();UI.fobr={q:'',sit:{pendentes:true,justificadas:true,entregues:true,dispensadas:false},compDe:'',compAte:'',tecDe:'',tecAte:'',legDe:a,legAte:b,entDe:'',entAte:'',tags:[],ord:'legal',dir:1,pag:0}}return UI.fobr}
+function linhasObr(){
+  const f=fobr();const q=(f.q||'').toLowerCase().trim();const qd=soDig(q);
+  const tag=k=>f.tags.filter(t=>t.k===k).map(t=>t.v);
+  const tObr=tag('obr'),tResp=tag('resp'),tDep=tag('depto'),tEmp=tag('emp');
+  const rows=S.obrigacoes.map(o=>{const e=emp(o.empresaId);if(!e)return null;return {o,e,tec:prazoTec(o),leg:o.prazo,sit:sitObr(o),guia:S.guias.find(g=>g.empresaId===o.empresaId&&g.comp===o.comp&&g.tipo===o.tipo),resp:o.responsavel||respDe(e,o.depto||'Fiscal')}}).filter(Boolean).filter(r=>{
+    const o=r.o,e=r.e;
+    if(!f.sit[GRUPO_SIT(o)])return false;
+    if(q&&!([e.razao,e.fantasia,e.grupo,o.tipo,o.protocolo].join(' ').toLowerCase().includes(q)||(qd.length>=3&&soDig(e.cnpj).includes(qd))))return false;
+    if(f.compDe&&o.comp<f.compDe)return false; if(f.compAte&&o.comp>f.compAte)return false;
+    if(f.tecDe&&(!r.tec||r.tec<f.tecDe))return false; if(f.tecAte&&(!r.tec||r.tec>f.tecAte))return false;
+    if(f.legDe&&(!r.leg||r.leg<f.legDe))return false; if(f.legAte&&(!r.leg||r.leg>f.legAte))return false;
+    const dc=dataDe(o.entregueEm||o.concluidaEm);
+    if(f.entDe&&(!dc||dc<f.entDe))return false; if(f.entAte&&(!dc||dc>f.entAte))return false;
+    if(tObr.length&&!tObr.includes(o.tipo))return false;
+    if(tResp.length&&!tResp.includes(r.resp))return false;
+    if(tDep.length&&!tDep.includes(o.depto||''))return false;
+    if(tEmp.length&&!tEmp.includes(e.id))return false;
+    return true;
+  });
+  const nomeE=e=>(e.fantasia||e.razao||'').toLowerCase();
+  const K={obr:r=>r.o.tipo.toLowerCase(),emp:r=>nomeE(r.e),tec:r=>r.tec||'9',legal:r=>r.leg||'9',comp:r=>r.o.comp,resp:r=>nomeEquipe(r.resp).toLowerCase()};
+  const k=K[f.ord]||K.legal;
+  return rows.sort((a,b)=>{const x=k(a),y=k(b);return (x<y?-1:x>y?1:0)*f.dir||nomeE(a.e).localeCompare(nomeE(b.e))});
+}
+const POR_PAG=50;
+
+/* ---------- tela ---------- */
+function gestaoObrig(){
+  const f=fobr();const rows=linhasObr();const ed=podeMod('obrig','editar');const exc=podeMod('obrig','excluir');
+  UI.obrSel=UI.obrSel||new Set();for(const id of [...UI.obrSel])if(!S.obrigacoes.some(o=>o.id===id))UI.obrSel.delete(id);
+  const paginas=Math.max(1,Math.ceil(rows.length/POR_PAG));if(f.pag>=paginas)f.pag=paginas-1;
+  const vis=rows.slice(f.pag*POR_PAG,(f.pag+1)*POR_PAG);
+  const cont={pendentes:0,justificadas:0,entregues:0,dispensadas:0};S.obrigacoes.forEach(o=>cont[GRUPO_SIT(o)]++);
+  const eq=listaEquipe()||[];const tipos=[...new Set(S.obrigacoes.map(o=>o.tipo))].sort();const deptos=[...new Set(S.obrigacoes.map(o=>o.depto).filter(Boolean))].sort();
+  const rotTag=t=>({obr:'Obr',resp:'Resp',depto:'Depto',emp:'Cliente'}[t.k])+': '+(t.k==='resp'?nomeEquipe(t.v):t.k==='emp'?(emp(t.v)?.fantasia||emp(t.v)?.razao||t.v):t.v);
+  const thO=(k,r)=>`<button data-act="obr-ord" data-v="${k}">${r}</button>${f.ord===k?(f.dir>0?' ↑':' ↓'):''}`;
+  const atras=rows.filter(r=>r.sit.k==='atrasada').length,tecs=rows.filter(r=>r.sit.k==='fora_tec').length;
+  const filtros=`<div class="panel nao-imprimir"><div class="obr-filtros">
+   <div class="obr-linha1"><input type="search" id="busca-obr" data-live="1" value="${esc(f.q)}" placeholder="Filtrar por empresa, CNPJ, obrigação ou protocolo">
+    <div class="obr-sits">${[['pendentes','Pendentes'],['justificadas','Justificadas'],['entregues','Entregues'],['dispensadas','Dispensadas']].map(([k,r])=>`<label class="${f.sit[k]?'on':''}"><input type="checkbox" data-obr-sit="${k}" ${f.sit[k]?'checked':''}> ${r} <span class="small muted">${cont[k]}</span></label>`).join('')}</div>
+    <div class="actions"><button class="btn sm" data-act="obr-limpar">Limpar filtros</button><button class="btn sm" data-act="obr-csv">${svg('download')}Exportar</button><button class="btn sm" data-act="ctrl-imprimir">Imprimir / PDF</button></div></div>
+   <div class="obr-datas">
+    <label class="f"><span>Competência de</span><input type="month" data-fobr="compDe" value="${esc(f.compDe)}"></label><label class="f"><span>Competência até</span><input type="month" data-fobr="compAte" value="${esc(f.compAte)}"></label>
+    <label class="f"><span>Prazo técnico de</span><input type="date" data-fobr="tecDe" value="${esc(f.tecDe)}"></label><label class="f"><span>Prazo técnico até</span><input type="date" data-fobr="tecAte" value="${esc(f.tecAte)}"></label>
+    <label class="f"><span>Prazo legal de</span><input type="date" data-fobr="legDe" value="${esc(f.legDe)}"></label><label class="f"><span>Prazo legal até</span><input type="date" data-fobr="legAte" value="${esc(f.legAte)}"></label>
+    <label class="f"><span>Entregue/dispensada de</span><input type="date" data-fobr="entDe" value="${esc(f.entDe)}"></label><label class="f"><span>Entregue/dispensada até</span><input type="date" data-fobr="entAte" value="${esc(f.entAte)}"></label>
+   </div>
+   <div class="obr-tags">${f.tags.map((t,i)=>`<span class="obr-tag">${esc(rotTag(t))}<button data-act="obr-tag-rm" data-i="${i}" aria-label="Remover filtro">×</button></span>`).join('')}
+    <select data-obr-tag="obr" aria-label="Filtrar obrigação"><option value="">+ Obrigação</option>${tipos.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+    <select data-obr-tag="resp" aria-label="Filtrar responsável"><option value="">+ Responsável</option>${eq.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select>
+    <select data-obr-tag="depto" aria-label="Filtrar departamento"><option value="">+ Departamento</option>${deptos.map(t=>`<option>${esc(t)}</option>`).join('')}</select>
+    <select data-obr-tag="emp" aria-label="Filtrar cliente"><option value="">+ Cliente</option>${S.empresas.slice().sort((a,b)=>(a.fantasia||a.razao).localeCompare(b.fantasia||b.razao)).map(e=>`<option value="${e.id}">${esc(e.fantasia||e.razao)}</option>`).join('')}</select>
+   </div>
+   <div class="filtro-resumo"><span class="small muted">${rows.length} obrigação(ões)${atras?` · <b style="color:var(--crit)">${atras} atrasada(s)</b>`:''}${tecs?` · ${tecs} fora do prazo técnico`:''}</span><div class="actions"><button class="btn sm ghost" data-act="obr-rapido" data-v="mes">Prazo legal neste mês</button><button class="btn sm ghost" data-act="obr-rapido" data-v="semana">Vencem em 7 dias</button><button class="btn sm ghost" data-act="obr-rapido" data-v="atrasadas">Atrasadas</button></div></div>
+  </div></div>`;
+  const lote=UI.obrSel.size&&ed?`<div class="obr-lote nao-imprimir"><b>${UI.obrSel.size} selecionada(s)</b><button class="btn sm primary" data-act="obr-lote" data-v="entregue">Marcar entregues</button><button class="btn sm" data-act="obr-lote" data-v="dispensada">Dispensar</button><label class="small" style="display:flex;gap:6px;align-items:center">Responsável<select data-obr-lote-resp style="width:auto"><option value="">Escolha…</option>${eq.map(p=>`<option value="${p.id}">${esc(p.nome)}</option>`).join('')}</select></label><button class="btn sm ghost" data-act="obr-lote" data-v="limpar">Limpar seleção</button></div>`:'';
+  const linha=r=>{const o=r.o,e=r.e,s=r.sit,aberta=UI.obrAberta===o.id;const cnpj=fmtCNPJ(e.cnpj);const nc=(o.comentarios||[]).length,na=(o.arquivos||[]).length;const enviado=(o.envios||[]).length;
+    return `<tr class="obr-row ${aberta?'aberta':''}" data-act="obr-abrir" data-id="${o.id}">
+     <td class="nao-imprimir" data-act="noop">${ed?`<input type="checkbox" data-obr-sel="${o.id}" ${UI.obrSel.has(o.id)?'checked':''} aria-label="Selecionar">`:''}</td>
+     <td><div class="obr-nome ${obrOk(o)?'ok':''}">${esc(o.tipo)}</div><div>${esc(e.fantasia||e.razao)} <span class="small muted mono">[${cnpj.slice(-7)}]</span></div></td>
+     <td><div>${r.tec?fmtData(r.tec).slice(0,6)+fmtData(r.tec).slice(8):'—'} ${pill(s.t+(s.d?' '+fmtData(s.d).slice(0,5):''),s.c)}${r.guia&&r.guia.valor?` <span title="Guia ${brl(r.guia.valor)}" style="color:var(--crit);font-weight:700">$</span>`:''}</div><div class="small">${esc(o.depto||'—')} · ${esc(nomeEquipe(r.resp)||'sem responsável')}</div></td>
+     <td><div>${r.leg?fmtData(r.leg):'—'}</div><div class="small" style="color:var(--crit);font-weight:600">${fmtComp(o.comp)}</div></td>
+     <td class="col-esconde"><div class="small">${o.protocolo?esc(o.protocolo):'<span class="muted">—</span>'}</div><div class="small muted">${nc?nc+' comentário(s)':''}${nc&&na?' · ':''}${na?na+' anexo(s)':''}${enviado?' · ✉ enviada':''}</div></td></tr>
+     ${aberta?`<tr class="nao-imprimir"><td colspan="5">${detalheObr(o,r)}</td></tr>`:''}`};
+  return `${filtros}${lote}<div class="panel"><div class="so-impressao"><h2 style="margin:0">Gestão de obrigações · ${esc(cfg().escritorio||'')}</h2><p class="small">Emitido em ${fmtDH(agora())} · ${rows.length} obrigação(ões)${f.legDe||f.legAte?' · prazo legal '+(f.legDe?fmtData(f.legDe):'…')+' a '+(f.legAte?fmtData(f.legAte):'…'):''}</p></div>
+   ${rows.length?`<div class="table-wrap"><table class="obr-tab"><thead><tr><th class="nao-imprimir">${ed?`<input type="checkbox" data-obr-sel-todas ${vis.length&&vis.every(r=>UI.obrSel.has(r.o.id))?'checked':''} aria-label="Selecionar todas">`:''}</th><th>${thO('obr','Obrigação')}<br>${thO('emp','Empresa')} [final CNPJ]</th><th>${thO('tec','Prazo técnico')} · situação<br>Depto · ${thO('resp','Responsável')}</th><th>${thO('legal','Prazo legal')}<br>${thO('comp','Competência')}</th><th class="col-esconde">Protocolo<br>Comentários e anexos</th></tr></thead><tbody>${vis.map(linha).join('')}</tbody></table></div>
+   ${paginas>1?`<div class="filtro-resumo nao-imprimir"><span class="small muted">Página ${f.pag+1} de ${paginas}</span><div class="actions"><button class="btn sm" data-act="obr-pag" data-v="-1" ${f.pag?'':'disabled'}>« Anterior</button><button class="btn sm" data-act="obr-pag" data-v="1" ${f.pag<paginas-1?'':'disabled'}>Próxima »</button></div></div>`:''}`
+   :vazio(S.obrigacoes.length?'Nenhuma obrigação com esses filtros.':'Nenhuma obrigação gerada ainda. Gere a matriz do mês em Matriz e catálogo.',S.obrigacoes.length?`<button class="btn" data-act="obr-limpar">Limpar filtros</button>`:`<a class="btn primary" href="#a-obrig">Abrir Matriz e catálogo</a>`)}</div>`;
+}
+function detalheObr(o,r){
+  const ed=podeMod('obrig','editar');const exc=podeMod('obrig','excluir');const e=r.e;const eq=listaEquipe()||[];
+  const canEmail=!!(e.email||(e.contatos||[]).some(c=>c.email));const canWa=!!(e.telefone||(e.contatos||[]).some(c=>c.telefone));
+  const hist=[...(o.log||[])].sort((a,b)=>String(b.em).localeCompare(String(a.em)));
+  const ev=l=>{let t='';
+    if(l.tipo==='status')t=`<b>Mudou o status:</b> de ${pill(NOME_ST[l.de]||l.de||'—','')} para ${pill(NOME_ST[l.para]||l.para,l.para==='entregue'?'ok':l.para==='dispensada'||l.para==='justificada'?'':'warn')}${l.motivo?` · <i>${esc(l.motivo)}</i>`:''}`;
+    else if(l.tipo==='anexo')t=`<b>Anexo:</b> ${l.arquivo&&l.arquivo.url?`<a href="${esc(l.arquivo.url)}" target="_blank" rel="noopener">${esc(l.arquivo.nome)}</a>`:esc(l.arquivo?.nome||'')}`;
+    else if(l.tipo==='anexo_rm')t=`<b>Removeu o anexo:</b> ${esc(l.texto)}`;
+    else if(l.tipo==='comentario')t=`<b>Comentário:</b> ${esc(l.texto)}`;
+    else if(l.tipo==='envio')t=`<span style="color:var(--ok)">•</span> ${esc(l.texto)}`;
+    else t=esc(l.texto||'');
+    return `<div class="ev"><div class="quem">${esc(l.nome||'')} em ${fmtDH(l.em)}:${pad(new Date(l.em).getSeconds())}</div>${t}</div>`};
+  return `<form data-form="obr-salvar" data-id="${o.id}" class="obr-det">
+   <div><label class="f"><span>Número do protocolo da entrega</span><input name="protocolo" value="${esc(o.protocolo||'')}" maxlength="80" ${ed?'':'disabled'} placeholder="Ex.: recibo, número da declaração ou OK"></label>
+    ${ed?`<button class="btn primary" style="width:100%;margin-top:8px">${o.status==='entregue'?'Salvar':'Entregue · Salvar'}</button>`:''}</div>
+   <div><span class="small" style="font-weight:600;color:var(--muted)">${svg('clip')} Anexar arquivo (guia, recibo, declaração)</span>
+    ${ed?`<label class="btn" style="width:100%;margin-top:4px">${svg('upload')}Escolher arquivos<input type="file" hidden multiple accept=".pdf,.jpg,.jpeg,.png,.xml,.txt,.csv" data-up="obr-anexo" data-id="${o.id}"></label>`:''}
+    <div class="obr-anexos">${(o.arquivos||[]).map((a,i)=>`<span class="chip-anexo">${svg('clip')}${a.url?`<a href="${esc(a.url)}" target="_blank" rel="noopener" title="${esc(a.nome)}">${esc(a.nome)}</a>`:`<span>${esc(a.nome)}</span>`}${a.enviadoEm?' ✉':''}${exc?`<button type="button" data-act="obr-anexo-rm" data-id="${o.id}" data-i="${i}" aria-label="Remover ${esc(a.nome)}">×</button>`:''}</span>`).join('')||'<span class="small muted">Nenhum anexo.</span>'}</div></div>
+   <div><label class="f"><span>Enviar ao cliente ao salvar?</span><select name="envio" ${ed?'':'disabled'}>
+     <option value="nao">Não enviar</option><option value="portal" ${o.status!=='entregue'&&(o.arquivos||[]).some(a=>!a.enviadoEm)?'selected':''}>Portal do cliente</option>
+     <option value="portal_email" ${canEmail?'':'disabled'}>Portal + e-mail${canEmail?'':' (sem e-mail no cadastro)'}</option>
+     <option value="portal_whatsapp" ${canWa?'':'disabled'}>Portal + WhatsApp${canWa?'':' (sem telefone)'}</option>
+     <option value="todos" ${canEmail&&canWa?'':'disabled'}>Portal + e-mail + WhatsApp</option></select></label>
+    <p class="small muted" style="margin:6px 0 0">Só os anexos ainda não enviados seguem. Eles aparecem em "Documentos da empresa" no portal.</p></div>
+   <div><div class="grid-f" style="grid-template-columns:1fr 1fr;gap:8px">
+     <label class="f"><span>Prazo técnico</span><input type="date" name="prazoTecnico" value="${esc(prazoTec(o))}" ${ed?'':'disabled'}></label>
+     <label class="f"><span>Responsável</span><select name="responsavel" ${ed?'':'disabled'}><option value="">—</option>${eq.map(p=>`<option value="${p.id}" ${p.id===r.resp?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></label></div></div>
+   <div><label class="f"><span>Adicionar comentário</span><span style="display:flex;gap:6px"><input id="obr-com-${o.id}" maxlength="500" placeholder="Visível só para a equipe"><button type="button" class="btn sm" data-act="obr-comentar" data-id="${o.id}">Comentar</button></span></label></div>
+   <div><label class="f"><span>Justificativa de atraso ou dispensa</span><input name="justificativa" maxlength="300" value="${esc(o.justificativa||'')}" ${ed?'':'disabled'}></label>
+    ${ed?`<div class="actions" style="margin-top:6px">${obrOk(o)?`<button type="button" class="btn sm" data-act="obr-reabrir" data-id="${o.id}">Reabrir</button>`:`<button type="button" class="btn sm" data-act="obr-justificar" data-id="${o.id}" data-v="justificada">Justificar</button><button type="button" class="btn sm" data-act="obr-justificar" data-id="${o.id}" data-v="dispensada">Dispensar</button>`}</div>`:''}</div>
+   <div class="obr-hist">${hist.length?hist.map(ev).join(''):'<p class="small muted">Sem movimentações ainda.</p>'}</div>
+  </form>`;
+}
+/* Controle de obrigações: a gestão vira a primeira aba */
+const aGuiasV3=aGuias;
+aGuias=function(){
+  const t=UI.tab.ctrl==='apuracao'?'apuracao':'gestao';
+  if(t==='apuracao')return aGuiasV3().replace(/<div class="tabs" role="tablist">[\s\S]*?<\/div>/,abasCtrl('apuracao'));
+  return head('Controle de obrigações','Cada obrigação da carteira com prazo técnico e legal, protocolo de entrega, anexos, envio ao cliente, comentários e histórico de quem fez o quê.')+`<div class="nao-imprimir">${abasCtrl('gestao')}</div>`+gestaoObrig();
+};
+const abasCtrl=t=>`<div class="tabs" role="tablist">${[['gestao','Gestão de obrigações'],['apuracao','Apuração do Simples e guias']].map(([k,r])=>`<button role="tab" aria-selected="${t===k}" data-act="tab" data-k="ctrl" data-v="${k}">${r}</button>`).join('')}</div>`;
+
+/* ---------- ações ---------- */
+ACT['noop']=()=>{};
+ACT['obr-abrir']=(el,ev)=>{if(ev&&ev.target&&ev.target.closest('input,button,a,select,label'))return;UI.obrAberta=UI.obrAberta===el.dataset.id?null:el.dataset.id;render()};
+ACT['obr-ord']=el=>{const f=fobr();if(f.ord===el.dataset.v)f.dir*=-1;else{f.ord=el.dataset.v;f.dir=1}render()};
+ACT['obr-pag']=el=>{fobr().pag+=Number(el.dataset.v);render()};
+ACT['obr-limpar']=()=>{UI.fobr=null;const f=fobr();f.legDe='';f.legAte='';f.sit={pendentes:true,justificadas:true,entregues:true,dispensadas:true};render()};
+ACT['obr-tag-rm']=el=>{fobr().tags.splice(Number(el.dataset.i),1);render()};
+ACT['obr-rapido']=el=>{const f=fobr();const h=hoje();f.compDe=f.compAte=f.tecDe=f.tecAte=f.entDe=f.entAte='';f.pag=0;
+  if(el.dataset.v==='mes'){[f.legDe,f.legAte]=mesAtualIntervalo();f.sit={pendentes:true,justificadas:true,entregues:true,dispensadas:false}}
+  else if(el.dataset.v==='semana'){const d=new Date(h+'T12:00:00');d.setDate(d.getDate()+7);f.legDe=h;f.legAte=d.toISOString().slice(0,10);f.sit={pendentes:true,justificadas:false,entregues:false,dispensadas:false}}
+  else{const d=new Date(h+'T12:00:00');d.setDate(d.getDate()-1);f.legDe='';f.legAte=d.toISOString().slice(0,10);f.sit={pendentes:true,justificadas:false,entregues:false,dispensadas:false}}
+  render()};
+document.addEventListener('change',ev=>{
+  const el=ev.target;
+  if(el.dataset.obrSit){fobr().sit[el.dataset.obrSit]=el.checked;fobr().pag=0;render()}
+  else if(el.dataset.fobr){fobr()[el.dataset.fobr]=el.value;fobr().pag=0;render()}
+  else if(el.dataset.obrTag){if(el.value&&!fobr().tags.some(t=>t.k===el.dataset.obrTag&&t.v===el.value))fobr().tags.push({k:el.dataset.obrTag,v:el.value});fobr().pag=0;render()}
+  else if(el.dataset.obrSel){el.checked?UI.obrSel.add(el.dataset.obrSel):UI.obrSel.delete(el.dataset.obrSel);render()}
+  else if(el.hasAttribute('data-obr-sel-todas')){const f=fobr();linhasObr().slice(f.pag*POR_PAG,(f.pag+1)*POR_PAG).forEach(r=>el.checked?UI.obrSel.add(r.o.id):UI.obrSel.delete(r.o.id));render()}
+  else if(el.hasAttribute('data-obr-lote-resp')&&el.value){const ids=[...UI.obrSel];const p=el.value;
+    mut('obrigacoes',()=>ids.forEach(id=>{const o=S.obrigacoes.find(x=>x.id===id);if(o&&o.responsavel!==p){logObr(o,{tipo:'resp',texto:'Responsável alterado para '+nomeEquipe(p)});o.responsavel=p}}),['Obrigações','Trocou responsável em lote',ids.length+' obrigações']);toast('Responsável atualizado.')}
+});
+Object.assign(buscaVivas,{'busca-obr':v=>{fobr().q=v;fobr().pag=0}});
+ACT['obr-lote']=el=>{const v=el.dataset.v;const ids=[...UI.obrSel];
+  if(v==='limpar'){UI.obrSel.clear();render();return}
+  const fazer=motivo=>{mut('obrigacoes',()=>ids.forEach(id=>{const o=S.obrigacoes.find(x=>x.id===id);if(o&&!obrOk(o)){if(motivo)o.justificativa=motivo;mudarStatus(o,v,motivo?{motivo}:null)}}),['Obrigações',(v==='entregue'?'Entregou':'Dispensou')+' em lote',ids.length+' obrigações']);UI.obrSel.clear();toast(ids.length+' obrigação(ões) atualizada(s).')};
+  if(v==='dispensada')pedirMotivo('Dispensar obrigações','Informe o motivo da dispensa (fica no histórico de cada uma).',m=>fazer(m));else fazer('');
+};
+ACT['obr-comentar']=el=>{const o=S.obrigacoes.find(x=>x.id===el.dataset.id);const i=document.getElementById('obr-com-'+o.id);const t=(i?.value||'').trim();if(!t){toast('Escreva o comentário.',true);return}
+  i.value='';mut('obrigacoes',()=>{(o.comentarios=o.comentarios||[]).push({texto:t,em:agora(),uid:ME.id,nome:ME.nome||''});logObr(o,{tipo:'comentario',texto:t})},null)};
+ACT['obr-justificar']=el=>{const o=S.obrigacoes.find(x=>x.id===el.dataset.id);const f=el.closest('form');const m=(f?.justificativa?.value||'').trim();
+  if(!m){toast('Escreva a justificativa antes.',true);f?.justificativa?.focus();return}
+  mut('obrigacoes',()=>{o.justificativa=m;mudarStatus(o,el.dataset.v,{motivo:m})},['Obrigações',(el.dataset.v==='dispensada'?'Dispensou ':'Justificou ')+o.tipo,emp(o.empresaId)?.razao])};
+ACT['obr-reabrir']=el=>{const o=S.obrigacoes.find(x=>x.id===el.dataset.id);mut('obrigacoes',()=>mudarStatus(o,'pendente'),['Obrigações','Reabriu '+o.tipo,emp(o.empresaId)?.razao])};
+ACT['obr-anexo-rm']=el=>{const o=S.obrigacoes.find(x=>x.id===el.dataset.id);const a=(o.arquivos||[])[Number(el.dataset.i)];if(!a)return;
+  confirmar('Remover anexo',`Remover "${esc(a.nome)}" desta obrigação? Se já foi enviado ao portal, o documento do cliente continua lá.`,'Remover',()=>mut('obrigacoes',()=>{o.arquivos.splice(Number(el.dataset.i),1);logObr(o,{tipo:'anexo_rm',texto:a.nome})},['Obrigações','Removeu anexo de '+o.tipo,emp(o.empresaId)?.razao]))};
+ACT['obr-csv']=()=>{const L=linhasObr();const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const txt=['Obrigação;Empresa;CNPJ;Departamento;Responsável;Competência;Prazo técnico;Prazo legal;Situação;Data entrega/dispensa;Protocolo;Justificativa'].concat(L.map(r=>[r.o.tipo,r.e.razao,fmtCNPJ(r.e.cnpj),r.o.depto,nomeEquipe(r.resp),fmtComp(r.o.comp),r.tec?fmtData(r.tec):'',r.leg?fmtData(r.leg):'',r.sit.t,r.sit.d?fmtData(r.sit.d):'',r.o.protocolo,r.o.justificativa].map(c).join(';'))).join('\r\n');
+  baixar('obrigacoes-'+hoje()+'.csv','﻿'+txt,'text/csv')};
+
+FORM['obr-salvar']=async(fd,form)=>{
+  const o=S.obrigacoes.find(x=>x.id===form.dataset.id);if(!o)return;const e=emp(o.empresaId);
+  const prot=String(fd.get('protocolo')||'').trim(),tec=String(fd.get('prazoTecnico')||''),resp=String(fd.get('responsavel')||''),just=String(fd.get('justificativa')||'').trim(),envio=String(fd.get('envio')||'nao');
+  const pend=(o.arquivos||[]).filter(a=>!a.enviadoEm);
+  if(envio!=='nao'&&!pend.length){toast('Não há anexo novo para enviar. Anexe o arquivo ou escolha "Não enviar".',true);return}
+  const canais=envio==='portal_email'?['email']:envio==='portal_whatsapp'?['whatsapp']:envio==='todos'?['email','whatsapp']:[];
+  mut(['obrigacoes',...(envio!=='nao'?['documentos']:[])],()=>{
+    if(prot!==(o.protocolo||'')){logObr(o,{tipo:'protocolo',texto:'Protocolo: '+(prot||'(apagado)')});o.protocolo=prot}
+    if(tec&&tec!==prazoTec(o)){logObr(o,{tipo:'prazo',texto:'Prazo técnico alterado para '+fmtData(tec)});o.prazoTecnico=tec}
+    if(resp!==(o.responsavel||'')&&resp){logObr(o,{tipo:'resp',texto:'Responsável alterado para '+nomeEquipe(resp)});o.responsavel=resp}
+    if(just!==(o.justificativa||''))o.justificativa=just;
+    if(o.status!=='entregue')mudarStatus(o,'entregue');
+    if(envio!=='nao'){const quando=agora();pend.forEach(a=>{S.documentos.push({id:uid(),empresaId:o.empresaId,nome:`${o.tipo} ${fmtComp(o.comp)} · ${a.nome}`,categoria:'Obrigações entregues',arquivo:a,enviadoEm:quando,origem:'obrigacao',obrigacaoId:o.id});a.enviadoEm=quando});
+      (o.envios=o.envios||[]).push({em:quando,canais:['portal',...canais]});logObr(o,{tipo:'envio',texto:`${fmtDH(quando)} ${pend.length>1?pend.length+' arquivos publicados':'Arquivo publicado'} no Portal do Cliente para ${e?.razao||''}`})}
+  },['Obrigações','Entregou '+o.tipo+' '+fmtComp(o.comp),e?.razao]);
+  toast(o.tipo+' marcada como entregue'+(envio!=='nao'?' e publicada no portal':'')+'.');
+  if(canais.length){
+    if(MODO!=='api'){toast('O envio por e-mail/WhatsApp funciona na versão publicada.',true);return}
+    const ids=pend.map(a=>a.id).filter(Boolean);
+    if(!ids.length){toast('Os anexos não foram guardados no servidor; envie de novo.',true);return}
+    try{
+      const r=await MF.api('POST','/api/envios/obrigacao',{empresaId:o.empresaId,arquivos:ids,nomes:pend.filter(a=>a.id).map(a=>a.nome),canais,
+        assunto:`${o.tipo} · ${fmtComp(o.comp)} · ${e?.fantasia||e?.razao||''}`,
+        mensagem:`Olá! Segue ${o.tipo} da competência ${fmtComp(o.comp)} de ${e?.fantasia||e?.razao||''}${o.prazo?', com vencimento em '+fmtData(o.prazo):''}. Qualquer dúvida, responda esta mensagem ou fale pelo Portal do Cliente. ${cfg().escritorio||''}`});
+      const res=r.resultados||{};const rot={email:'e-mail',whatsapp:'WhatsApp'};
+      mut('obrigacoes',()=>Object.entries(res).forEach(([k,v])=>logObr(o,{tipo:'envio',texto:v.ok?`${fmtDH(agora())} Enviada por ${rot[k]} para ${v.para}`:`Envio por ${rot[k]} falhou: ${v.erro}`})),null);
+      const falhas=Object.entries(res).filter(([k,v])=>!v.ok);
+      if(falhas.length)toast(falhas.map(([k,v])=>rot[k]+': '+v.erro).join(' · '),true);else toast('Enviada ao cliente por '+Object.keys(res).map(k=>rot[k]).join(' e ')+'.');
+    }catch(er){toast(er.message,true);mut('obrigacoes',()=>logObr(o,{tipo:'envio',texto:'Envio ao cliente falhou: '+er.message}),null)}
+  }
+};
+
+/* uploads novos: anexos da obrigação e comprovante de lançamento */
+const onUploadV3=onUpload;
+onUpload=async function(inp){
+  const tipo=inp.dataset.up;
+  if(tipo==='obr-anexo'){
+    const o=S.obrigacoes.find(x=>x.id===inp.dataset.id);const files=[...inp.files];inp.value='';if(!o||!files.length)return;
+    const antes=UI.empresaId;UI.empresaId=o.empresaId;
+    try{const metas=[];for(const f of files){if(!['pdf','jpg','jpeg','png','xml','txt','csv'].includes(extDe(f.name))){toast(f.name+': formato não aceito.',true);continue}metas.push(await enviarArquivo(f))}
+      if(metas.length)mut('obrigacoes',()=>{o.arquivos=o.arquivos||[];metas.forEach(m=>{o.arquivos.push({...m,anexadoEm:agora(),uid:ME.id});logObr(o,{tipo:'anexo',arquivo:m})})},['Obrigações','Anexou arquivo em '+o.tipo,emp(o.empresaId)?.razao]);
+    }catch(er){toast(er.message,true)}finally{UI.empresaId=antes}
+    return;
+  }
+  if(tipo==='lanc-comp'){const files=[...inp.files];inp.value='';if(!files.length)return;
+    try{UI.lancComp=await enviarArquivo(files[0]);const s=document.getElementById('lanc-comp-nome');if(s)s.textContent=UI.lancComp.nome}catch(er){toast(er.message,true)}return}
+  return onUploadV3(inp);
+};
+/* ACT recebe o evento para saber em que parte da linha o clique caiu */
+document.addEventListener('click',ev=>{const r=ev.target.closest('tr.obr-row');if(!r)return;if(ev.target.closest('input,button,a,select,label'))ev.stopImmediatePropagation()},true);
+
+/* ==================== Cliente: lançamentos de receitas e despesas ==================== */
+const CAT_REC=[['servicos','Prestação de serviços'],['vendas','Venda de produtos'],['comissoes','Comissões e intermediações'],['financeiras','Receitas financeiras (rendimentos e juros)'],['aportes','Aportes e empréstimos recebidos'],['outras_rec','Outras receitas']];
+const CAT_DESP=[['mercadorias','Compra de mercadorias e matéria-prima','custo'],['custo_servico','Custo direto do serviço (terceiros)','custo'],['salarios','Salários, encargos e benefícios','pessoal'],['prolabore','Pró-labore','pessoal'],['impostos','Impostos, taxas e guias','impostos'],
+  ['aluguel','Aluguel e condomínio','operacional'],['utilidades','Energia, água, internet e telefone','operacional'],['marketing','Marketing e publicidade','operacional'],['sistemas','Sistemas e assinaturas','operacional'],['servicos_prof','Contabilidade e serviços profissionais','operacional'],
+  ['transporte','Combustível, transporte e fretes','operacional'],['manutencao','Manutenção e limpeza','operacional'],['material','Material de escritório e consumo','operacional'],['viagens','Viagens e alimentação','operacional'],
+  ['tarifas','Tarifas bancárias, juros e taxas de cartão','financeiro'],['investimentos','Equipamentos e investimentos','nao_operacional'],['emprestimos','Empréstimos pagos e retiradas dos sócios','nao_operacional'],['outras_desp','Outras despesas','operacional']];
+const GRUPO_DESP={custo:'Custos diretos',pessoal:'Pessoal',impostos:'Impostos e taxas',operacional:'Despesas operacionais',financeiro:'Despesas financeiras',nao_operacional:'Não operacional (investimentos e retiradas)'};
+const FORMAS=['Pix','Transferência','Boleto','Cartão de crédito','Cartão de débito','Dinheiro','Débito automático','Outra'];
+const nomeCat=(tipo,k)=>((tipo==='receita'?CAT_REC:CAT_DESP).find(c=>c[0]===k)||[k,k])[1];
+const grupoCat=k=>(CAT_DESP.find(c=>c[0]===k)||[,,'operacional'])[2];
+const CORES=['#059669','#2563eb','#d97706','#7c3aed','#db2777','#0891b2','#65a30d','#dc2626','#475569','#9333ea','#0d9488','#ea580c'];
+// despesas declaradas no modelo antigo entram nos indicadores
+function lancamentosDe(eid){
+  const L=S.lancamentos.filter(l=>l.empresaId===eid);
+  S.despesas.filter(d=>d.empresaId===eid).forEach(d=>L.push({id:'old-'+d.id,antigo:true,empresaId:eid,tipo:'despesa',data:d.comp+'-01',comp:d.comp,descricao:d.descricao||d.fornecedor||'Despesa declarada',contraparte:d.fornecedor||'',categoria:d.categoria==='CMV'?'mercadorias':d.categoria==='Custo do serviço'?'custo_servico':'outras_desp',valor:Number(d.valor)||0,situacao:'realizado'}));
+  return L;
+}
+function periodoLanc(){const p=UI.lancPer||'12m';const ca=compAtual();
+  if(p==='mes')return [ca,ca];if(p==='ant')return [addMes(ca,-1),addMes(ca,-1)];if(p==='3m')return [addMes(ca,-2),ca];if(p==='6m')return [addMes(ca,-5),ca];if(p==='ano')return [ca.slice(0,4)+'-01',ca];return [addMes(ca,-11),ca]}
+const PERIODOS=[['mes','Este mês'],['ant','Mês passado'],['3m','Últimos 3 meses'],['6m','Últimos 6 meses'],['ano','Este ano'],['12m','Últimos 12 meses']];
+function barrasCat(lista,total,vazioTxt){
+  if(!lista.length)return `<p class="small muted">${vazioTxt}</p>`;
+  const max=Math.max(...lista.map(x=>x.v));
+  return `<div class="barras">${lista.map((x,i)=>`<div class="barra"><span title="${esc(x.n)}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.n)}</span><span class="trilho"><i style="width:${max?Math.max(2,x.v/max*100):0}%;background:${CORES[i%CORES.length]}"></i></span><span class="num small">${brl(x.v)} <span class="muted">${total?pct(x.v/total):''}</span></span></div>`).join('')}</div>`;
+}
+function somaPor(L,chave){const m={};L.forEach(l=>{const k=chave(l);m[k]=(m[k]||0)+Number(l.valor||0)});return Object.entries(m).map(([n,v])=>({n,v})).sort((a,b)=>b.v-a.v)}
+const vBIV1=vBI;
+vBI=function(e){
+  const t=UI.tab.lanc||'visao';
+  const abas=`<div class="tabs" role="tablist">${[['visao','Visão geral'],['receitas','Receitas'],['despesas','Despesas'],['consolidacao','Consolidação'],['indicadores','Indicadores fiscais']].map(([k,r])=>`<button role="tab" aria-selected="${t===k}" data-act="tab" data-k="lanc" data-v="${k}">${r}</button>`).join('')}</div>`;
+  const acoes=`<button class="btn" data-act="lanc-novo" data-v="despesa">${svg('plus')}Despesa</button><button class="btn primary" data-act="lanc-novo" data-v="receita">${svg('plus')}Receita</button>`;
+  const cab=head('Gestão do negócio','Lance as receitas e despesas da empresa e acompanhe de onde vem o dinheiro, para onde ele vai e quanto sobra. Os dados são seus e o escritório também enxerga, para orientar você.',acoes);
+  if(t==='indicadores'){const h=vBIV1(e);return cab+abas+h.slice(h.indexOf('<div class="kpis">'))}
+  if(t==='receitas'||t==='despesas')return cab+abas+listaLanc(e,t==='receitas'?'receita':'despesa');
+  if(t==='consolidacao')return cab+abas+consolidacao(e);
+  return cab+abas+visaoGeral(e);
+};
+function seletorPeriodo(){return `<div class="filtros" role="group" aria-label="Período">${PERIODOS.map(([k,r])=>`<button aria-pressed="${(UI.lancPer||'12m')===k}" data-act="lanc-per" data-v="${k}">${r}</button>`).join('')}</div>`}
+function visaoGeral(e){
+  const [de,ate]=periodoLanc();const L=lancamentosDe(e.id).filter(l=>l.comp>=de&&l.comp<=ate);
+  const R=L.filter(l=>l.tipo==='receita'&&l.situacao!=='pendente'),D=L.filter(l=>l.tipo==='despesa'&&l.situacao!=='pendente');
+  const rec=R.reduce((a,l)=>a+Number(l.valor),0),desp=D.reduce((a,l)=>a+Number(l.valor),0);
+  const aRec=lancamentosDe(e.id).filter(l=>l.tipo==='receita'&&l.situacao==='pendente').reduce((a,l)=>a+Number(l.valor),0);
+  const aPag=lancamentosDe(e.id).filter(l=>l.tipo==='despesa'&&l.situacao==='pendente').reduce((a,l)=>a+Number(l.valor),0);
+  const res=rec-desp;const marg=rec?res/rec:null;
+  const opRec=R.filter(l=>!['aportes','financeiras'].includes(l.categoria)&&l.situacao!=='pendente').reduce((a,l)=>a+Number(l.valor),0);
+  const meses=[];for(let c=de;c<=ate;c=addMes(c,1))meses.push(c);const nM=meses.length||1;
+  // série mensal (últimos 12 meses sempre, para o gráfico)
+  const ca=compAtual();const serie=[];for(let i=11;i>=0;i--){const c=addMes(ca,-i);const x=lancamentosDe(e.id).filter(l=>l.comp===c&&l.situacao!=='pendente');serie.push({c,r:x.filter(l=>l.tipo==='receita').reduce((a,l)=>a+Number(l.valor),0),d:x.filter(l=>l.tipo==='despesa').reduce((a,l)=>a+Number(l.valor),0)})}
+  const maxS=Math.max(1,...serie.map(s=>Math.max(s.r,s.d)));
+  const recCat=somaPor(R,l=>nomeCat('receita',l.categoria)),despCat=somaPor(D,l=>nomeCat('despesa',l.categoria));
+  const recCli=somaPor(R.filter(l=>l.contraparte),l=>l.contraparte).slice(0,5),despForn=somaPor(D.filter(l=>l.contraparte),l=>l.contraparte).slice(0,5);
+  const maiores=D.slice().sort((a,b)=>b.valor-a.valor).slice(0,5);
+  // variação da maior categoria de despesa contra o período anterior
+  const durac=nM;const deAnt=addMes(de,-durac),ateAnt=addMes(de,-1);
+  const Dant=lancamentosDe(e.id).filter(l=>l.tipo==='despesa'&&l.situacao!=='pendente'&&l.comp>=deAnt&&l.comp<=ateAnt);
+  const varCat=despCat.slice(0,6).map(x=>{const ant=Dant.filter(l=>nomeCat('despesa',l.categoria)===x.n).reduce((a,l)=>a+Number(l.valor),0);return {...x,ant,var:ant?(x.v-ant)/ant:null}}).filter(x=>x.var!=null&&x.var>0.15).sort((a,b)=>b.var-a.var)[0];
+  const insights=[];
+  if(!L.length)insights.push(['info','Ainda não há lançamentos no período. Comece pelo botão "+ Receita" ou "+ Despesa".']);
+  if(rec&&res<0)insights.push(['crit',`As despesas passaram as receitas em ${brl(-res)} no período.`]);
+  if(recCat[0]&&rec&&recCat[0].v/rec>0.7&&recCat.length>1)insights.push(['warn',`${pct(recCat[0].v/rec)} da receita vem de "${recCat[0].n}". Depender de uma só fonte aumenta o risco.`]);
+  if(recCli[0]&&rec&&recCli[0].v/rec>0.4)insights.push(['warn',`O cliente "${recCli[0].n}" representa ${pct(recCli[0].v/rec)} da receita.`]);
+  if(varCat)insights.push(['warn',`"${varCat.n}" subiu ${pct(varCat.var)} em relação ao período anterior (${brl(varCat.ant)} → ${brl(varCat.v)}).`]);
+  if(marg!=null&&marg>=0.2)insights.push(['ok',`Margem de ${pct(marg)}: para cada R$ 100 que entram, sobram ${brl(100*marg)}.`]);
+  if(aPag)insights.push(['info',`Há ${brl(aPag)} em contas a pagar lançadas como pendentes.`]);
+  return `<div class="panel" style="padding:10px 14px">${seletorPeriodo()}</div>
+  <div class="lanc-kpis">
+   <div class="kpi"><span class="eyebrow">Receitas</span><b style="color:var(--ok)">${brl(rec)}</b><small>média ${brl(rec/nM)} por mês</small></div>
+   <div class="kpi"><span class="eyebrow">Despesas</span><b style="color:var(--crit)">${brl(desp)}</b><small>média ${brl(desp/nM)} por mês</small></div>
+   <div class="kpi"><span class="eyebrow">Resultado</span><b style="color:${res<0?'var(--crit)':'var(--navy)'}">${brl(res)}</b><small>${marg==null?'sem receitas no período':'margem de '+pct(marg)}</small></div>
+   <div class="kpi"><span class="eyebrow">A receber</span><b>${brl(aRec)}</b><small>receitas pendentes</small></div>
+   <div class="kpi"><span class="eyebrow">A pagar</span><b>${brl(aPag)}</b><small>despesas pendentes</small></div>
+   <div class="kpi"><span class="eyebrow">Ticket médio</span><b>${R.length?brl(rec/R.length):'—'}</b><small>${R.length} receita(s) recebida(s)</small></div>
+  </div>
+  ${insights.length?`<div class="panel"><h2>O que os números mostram</h2><div class="alerts">${insights.map(([n,t])=>`<div class="alert ${n==='ok'?'info':n}"><span class="sev"></span><div><p>${esc(t)}</p></div></div>`).join('')}</div></div>`:''}
+  <div class="panel"><div class="panel-head"><h2>Receitas × despesas por mês</h2><span class="small muted"><span style="color:#059669">■</span> receitas · <span style="color:#dc2626">■</span> despesas · últimos 12 meses</span></div>
+   <div class="graf-mes">${serie.map(s=>`<div class="col" title="${fmtComp(s.c)}: receitas ${brl(s.r)} · despesas ${brl(s.d)} · resultado ${brl(s.r-s.d)}"><div class="par"><i style="height:${s.r/maxS*100}%;background:#059669"></i><i style="height:${s.d/maxS*100}%;background:#dc2626"></i></div><small>${fmtComp(s.c).slice(0,3)}</small></div>`).join('')}</div></div>
+  <div class="cols"><div class="panel"><h2>De onde vêm as receitas</h2>${barrasCat(recCat,R.reduce((a,l)=>a+Number(l.valor),0),'Nenhuma receita no período.')}</div>
+   <div class="panel"><h2>Para onde vai o dinheiro</h2>${barrasCat(despCat,D.reduce((a,l)=>a+Number(l.valor),0),'Nenhuma despesa no período.')}</div></div>
+  <div class="cols"><div class="panel"><h2>Principais clientes</h2>${barrasCat(recCli,rec,'Informe o cliente ao lançar receitas para ver este ranking.')}</div>
+   <div class="panel"><h2>Maiores despesas do período</h2>${maiores.length?`<div class="list">${maiores.map(l=>`<div class="row"><div class="grow"><b>${esc(l.descricao)}</b><div class="small muted">${esc(nomeCat('despesa',l.categoria))}${l.contraparte?' · '+esc(l.contraparte):''} · ${fmtData(l.data)}</div></div><b class="num">${brl(l.valor)}</b></div>`).join('')}</div>`:'<p class="small muted">Nenhuma despesa no período.</p>'}
+   ${despForn.length?`<h3 style="margin-top:14px">Principais fornecedores</h3>${barrasCat(despForn,desp,'')}`:''}</div></div>
+  <p class="small muted">Indicadores gerenciais a partir dos seus lançamentos (receitas e despesas pagas; pendentes aparecem em "A receber" e "A pagar"). ${opRec&&opRec!==rec?'Aportes e rendimentos estão incluídos nas receitas.':''} Não substituem a contabilidade oficial.</p>`;
+}
+function listaLanc(e,tipo){
+  const fl=UI.flanc||(UI.flanc={});const k=tipo;fl[k]=fl[k]||{mes:compAtual(),cat:'',sit:'',q:''};const f=fl[k];
+  const cats=tipo==='receita'?CAT_REC:CAT_DESP;const q=(f.q||'').toLowerCase();
+  const L=lancamentosDe(e.id).filter(l=>l.tipo===tipo&&(!f.mes||l.comp===f.mes)&&(!f.cat||l.categoria===f.cat)&&(!f.sit||(f.sit==='pendente'?l.situacao==='pendente':l.situacao!=='pendente'))&&(!q||[l.descricao,l.contraparte,l.obs].join(' ').toLowerCase().includes(q))).sort((a,b)=>String(b.data).localeCompare(String(a.data)));
+  const tot=L.reduce((a,l)=>a+Number(l.valor),0),pend=L.filter(l=>l.situacao==='pendente').reduce((a,l)=>a+Number(l.valor),0);
+  const nomes={receita:['Receitas','receita','Recebido','A receber','Cliente'],despesa:['Despesas','despesa','Pago','A pagar','Fornecedor']}[tipo];
+  const meses=[];for(let i=0;i<24;i++)meses.push(addMes(compAtual(),-i));
+  const notasMes=tipo==='receita'?S.notas.filter(n=>n.empresaId===e.id&&n.status==='autorizada'&&n.comp===f.mes&&!S.lancamentos.some(l=>l.notaId===n.id)):[];
+  return `<div class="panel"><div class="barra-filtros">
+   <label class="f"><span>Mês</span><select data-flanc="${k}" data-c="mes"><option value="">Todos</option>${meses.map(c=>`<option value="${c}" ${f.mes===c?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>
+   <label class="f"><span>Categoria</span><select data-flanc="${k}" data-c="cat"><option value="">Todas</option>${cats.map(([v,r])=>`<option value="${v}" ${f.cat===v?'selected':''}>${esc(r)}</option>`).join('')}</select></label>
+   <label class="f"><span>Situação</span><select data-flanc="${k}" data-c="sit"><option value="">Todas</option><option value="realizado" ${f.sit==='realizado'?'selected':''}>${nomes[2]}</option><option value="pendente" ${f.sit==='pendente'?'selected':''}>${nomes[3]}</option></select></label>
+   <label class="f"><span>Pesquisar</span><input type="search" id="busca-lanc-${k}" data-live="1" value="${esc(f.q)}" placeholder="Descrição ou ${nomes[4].toLowerCase()}"></label>
+  </div><div class="filtro-resumo"><span class="small muted">${L.length} lançamento(s) · total ${brl(tot)}${pend?' · '+nomes[3].toLowerCase()+' '+brl(pend):''}</span><div class="actions">${notasMes.length?`<button class="btn sm" data-act="lanc-notas" data-v="${f.mes}">Trazer ${notasMes.length} nota(s) emitida(s) de ${fmtComp(f.mes)}</button>`:''}<button class="btn sm" data-act="lanc-csv" data-v="${tipo}">${svg('download')}Exportar</button><button class="btn sm primary" data-act="lanc-novo" data-v="${tipo}">${svg('plus')}Nova ${nomes[1]}</button></div></div></div>
+  <div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>${nomes[4]}</th><th>Forma</th><th>Situação</th><th class="r">Valor</th><th></th></tr></thead><tbody>${L.map(l=>`<tr><td class="num small">${fmtData(l.data)}</td><td><b>${esc(l.descricao)}</b>${l.obs?`<div class="sub">${esc(l.obs)}</div>`:''}</td><td class="small">${esc(nomeCat(tipo,l.categoria))}</td><td class="small">${esc(l.contraparte||'—')}</td><td class="small">${esc(l.forma||'—')}</td><td>${l.situacao==='pendente'?pill(nomes[3]+(l.vencimento?' · '+fmtData(l.vencimento).slice(0,5):''),l.vencimento&&l.vencimento<hoje()?'crit':'warn'):pill(nomes[2],'ok')}</td><td class="r num" style="font-weight:600;color:${tipo==='receita'?'var(--ok)':'var(--crit)'}">${brl(l.valor)}</td>
+    <td class="r"><div class="actions" style="flex-wrap:nowrap;justify-content:flex-end">${l.comprovante?linkArq(l.comprovante,'Comprovante'):''}${l.antigo?'<span class="small muted">declarada antes</span>':`${l.situacao==='pendente'?`<button class="btn sm" data-act="lanc-baixar" data-id="${l.id}">${tipo==='receita'?'Recebi':'Paguei'}</button>`:''}<button class="btn sm" data-act="lanc-editar" data-id="${l.id}">Editar</button>`}</div></td></tr>`).join('')}</tbody></table></div>`
+   :vazio(`Nenhuma ${nomes[1]} lançada${f.mes?' em '+fmtComp(f.mes):''}.`,`<button class="btn primary" data-act="lanc-novo" data-v="${tipo}">${svg('plus')}Lançar ${nomes[1]}</button>`)}</div>`;
+}
+function consolidacao(e){
+  const ano=UI.lancAno||compAtual().slice(0,4);const meses=[];for(let m=1;m<=12;m++)meses.push(ano+'-'+pad(m));
+  const L=lancamentosDe(e.id).filter(l=>l.comp.startsWith(ano+'-')&&l.situacao!=='pendente');
+  const soma=(f,c)=>L.filter(l=>l.comp===c&&f(l)).reduce((a,l)=>a+Number(l.valor),0);
+  const linha=(rot,f,cls)=>{const vs=meses.map(c=>soma(f,c));const t=vs.reduce((a,b)=>a+b,0);return {rot,vs,t,cls}};
+  const recOp=linha('Receita operacional',l=>l.tipo==='receita'&&!['financeiras','aportes'].includes(l.categoria),'tot');
+  const recCats=CAT_REC.map(([k,r])=>linha('  '+r,l=>l.tipo==='receita'&&l.categoria===k,'sub')).filter(x=>x.t);
+  const G=k=>linha('(−) '+GRUPO_DESP[k],l=>l.tipo==='despesa'&&grupoCat(l.categoria)===k,'');
+  const custos=G('custo'),pessoal=G('pessoal'),impostos=G('impostos'),oper=G('operacional'),fin=G('financeiro'),nop=G('nao_operacional');
+  const recFin=linha('(+) Receitas financeiras',l=>l.tipo==='receita'&&l.categoria==='financeiras','');
+  const aportes=linha('(+) Aportes e empréstimos recebidos',l=>l.tipo==='receita'&&l.categoria==='aportes','');
+  const calc=(rot,fn,cls)=>{const vs=meses.map((c,i)=>fn(i));return {rot,vs,t:vs.reduce((a,b)=>a+b,0),cls}};
+  const bruto=calc('= Lucro bruto',i=>recOp.vs[i]-custos.vs[i],'tot');
+  const operac=calc('= Resultado operacional',i=>bruto.vs[i]-pessoal.vs[i]-impostos.vs[i]-oper.vs[i],'tot');
+  const liquido=calc('= Resultado do período',i=>operac.vs[i]+recFin.vs[i]-fin.vs[i],'tot');
+  const caixa=calc('= Geração de caixa (após investimentos e retiradas)',i=>liquido.vs[i]+aportes.vs[i]-nop.vs[i],'tot');
+  const L2=[recOp,...recCats,custos,bruto,pessoal,impostos,oper,operac,recFin,fin,liquido,aportes,nop,caixa];
+  const anos=[...new Set(lancamentosDe(e.id).map(l=>l.comp.slice(0,4)).concat([compAtual().slice(0,4)]))].sort().reverse();
+  const margem=recOp.t?liquido.t/recOp.t:null;
+  return `<div class="panel"><div class="panel-head"><div><h2>Demonstrativo de resultado simplificado · ${ano}</h2><p class="sub">Receitas e despesas já recebidas ou pagas, agrupadas como numa DRE. ${margem!=null?'Margem líquida no ano: <b>'+pct(margem)+'</b>.':''}</p></div><div class="actions"><select data-lanc-ano style="width:auto">${anos.map(a=>`<option ${a===ano?'selected':''}>${a}</option>`).join('')}</select><button class="btn sm" data-act="lanc-dre-csv">${svg('download')}Exportar</button><button class="btn sm" data-act="ctrl-imprimir">Imprimir / PDF</button></div></div>
+  <div class="table-wrap"><table class="dre"><thead><tr><th>Conta</th>${meses.map(c=>`<th class="num">${fmtComp(c).slice(0,3)}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>${L2.map(x=>`<tr class="${x.cls}"><td style="white-space:nowrap">${esc(x.rot)}</td>${x.vs.map(v=>`<td class="num ${v<0?'neg':''}" style="${v<0?'color:var(--crit)':''}">${v?brl(v).replace('R$ ',''):'—'}</td>`).join('')}<td class="num" style="${x.t<0?'color:var(--crit)':''}">${brl(x.t)}</td></tr>`).join('')}</tbody></table></div>
+  <p class="small muted">Valores em reais. Lançamentos pendentes (a receber e a pagar) entram quando forem marcados como recebidos ou pagos.</p></div>`;
+}
+ACT['lanc-per']=el=>{UI.lancPer=el.dataset.v;render()};
+document.addEventListener('change',ev=>{const el=ev.target;
+  if(el.dataset.flanc){UI.flanc[el.dataset.flanc][el.dataset.c]=el.value;render()}
+  else if(el.hasAttribute('data-lanc-ano')){UI.lancAno=el.value;render()}
+  else if(el.name==='categoria'&&el.closest('form[data-form=lancamento]')){}});
+Object.assign(buscaVivas,{'busca-lanc-receita':v=>{UI.flanc.receita.q=v},'busca-lanc-despesa':v=>{UI.flanc.despesa.q=v}});
+ACT['lanc-novo']=el=>abrirLanc(el.dataset.v,null);
+ACT['lanc-editar']=el=>{const l=S.lancamentos.find(x=>x.id===el.dataset.id);if(l)abrirLanc(l.tipo,l)};
+function abrirLanc(tipo,l){
+  UI.lancComp=l?.comprovante||null;const cats=tipo==='receita'?CAT_REC:CAT_DESP;const x=l||{data:hoje(),situacao:'realizado',forma:'Pix'};
+  const nomes=tipo==='receita'?{t:'receita',c:'Cliente / pagador',s:['Recebido','A receber']}:{t:'despesa',c:'Fornecedor / favorecido',s:['Pago','A pagar']};
+  const sugest=[...new Set(S.lancamentos.filter(z=>z.empresaId===UI.empresaId&&z.tipo===tipo&&z.contraparte).map(z=>z.contraparte))].slice(0,60);
+  const grupos=tipo==='despesa'?Object.entries(GRUPO_DESP).map(([g,r])=>`<optgroup label="${esc(r)}">${cats.filter(c=>c[2]===g).map(([v,n])=>`<option value="${v}" ${x.categoria===v?'selected':''}>${esc(n)}</option>`).join('')}</optgroup>`).join(''):cats.map(([v,n])=>`<option value="${v}" ${x.categoria===v?'selected':''}>${esc(n)}</option>`).join('');
+  openModal(`${mHead((l?'Editar ':'Nova ')+nomes.t)}<form data-form="lancamento" data-tipo="${tipo}" data-id="${l?.id||''}"><div class="modal-body"><div class="grid-f">
+   <label class="f"><span>Valor (R$) *</span><input name="valor" type="number" step="0.01" min="0.01" required inputmode="decimal" value="${l?l.valor:''}" autofocus></label>
+   <label class="f"><span>Data *</span><input name="data" type="date" required value="${esc(x.data)}"></label>
+   <label class="f full"><span>Descrição *</span><input name="descricao" required maxlength="120" value="${esc(x.descricao||'')}" placeholder="${tipo==='receita'?'Ex.: Serviço de consultoria de março':'Ex.: Aluguel da sala'}"></label>
+   <label class="f full"><span>Categoria *</span><select name="categoria" required><option value="">Escolha…</option>${grupos}</select></label>
+   <label class="f"><span>${nomes.c}</span><input name="contraparte" maxlength="80" list="lanc-contrapartes" value="${esc(x.contraparte||'')}"><datalist id="lanc-contrapartes">${sugest.map(s=>`<option value="${esc(s)}">`).join('')}</datalist></label>
+   <label class="f"><span>Forma de pagamento</span><select name="forma">${FORMAS.map(f=>`<option ${x.forma===f?'selected':''}>${f}</option>`).join('')}</select></label>
+   <label class="f"><span>Situação</span><select name="situacao"><option value="realizado" ${x.situacao!=='pendente'?'selected':''}>${nomes.s[0]}</option><option value="pendente" ${x.situacao==='pendente'?'selected':''}>${nomes.s[1]}</option></select></label>
+   <label class="f"><span>Vencimento (se pendente)</span><input name="vencimento" type="date" value="${esc(x.vencimento||'')}"></label>
+   ${l?'':`<label class="f"><span>Repetir</span><select name="repetir"><option value="0">Não repetir</option><option value="2">Por 2 meses</option><option value="3">Por 3 meses</option><option value="6">Por 6 meses</option><option value="12">Por 12 meses</option></select></label>`}
+   <label class="f ${l?'':''}"><span>Comprovante (opcional)</span><span style="display:flex;gap:6px;align-items:center"><label class="btn sm">${svg('clip')}Anexar<input type="file" hidden accept=".pdf,.jpg,.jpeg,.png" data-up="lanc-comp"></label><span id="lanc-comp-nome" class="small muted">${esc(UI.lancComp?.nome||'')}</span></span></label>
+   <label class="f full"><span>Observação</span><input name="obs" maxlength="200" value="${esc(x.obs||'')}"></label>
+  </div></div><div class="modal-foot">${l?`<button type="button" class="btn danger" data-act="lanc-excluir" data-id="${l.id}">Excluir</button>`:''}<span class="grow"></span><button type="button" class="btn" data-act="close-modal">Cancelar</button>${l?'':`<button class="btn" name="mais" value="1">Salvar e lançar outra</button>`}<button class="btn primary">Salvar</button></div></form>`);
+}
+FORM['lancamento']=(fd,form,ev)=>{
+  const e=empAtual();if(!e)return;const tipo=form.dataset.tipo;const id=form.dataset.id;
+  const valor=Math.round(Number(String(fd.get('valor')).replace(',','.'))*100)/100;const data=String(fd.get('data')||'');const desc=String(fd.get('descricao')||'').trim();const cat=String(fd.get('categoria')||'');
+  if(!(valor>0)){toast('Informe um valor maior que zero.',true);return}if(!data){toast('Informe a data.',true);return}if(!desc){toast('Informe a descrição.',true);return}if(!cat){toast('Escolha a categoria.',true);return}
+  const base={empresaId:e.id,tipo,valor,data,comp:data.slice(0,7),descricao:desc,categoria:cat,contraparte:String(fd.get('contraparte')||'').trim(),forma:String(fd.get('forma')||''),situacao:fd.get('situacao')==='pendente'?'pendente':'realizado',vencimento:String(fd.get('vencimento')||''),obs:String(fd.get('obs')||'').trim(),comprovante:UI.lancComp||null};
+  const rep=Number(fd.get('repetir')||0);const mais=!!UI.lancMais;UI.lancMais=false;
+  mut('lancamentos',()=>{
+    if(id){const l=S.lancamentos.find(x=>x.id===id);Object.assign(l,base,{alteradoEm:agora()})}
+    else{const n=Math.max(1,rep);for(let i=0;i<n;i++){const d=new Date(data+'T12:00:00');d.setMonth(d.getMonth()+i);const di=d.toISOString().slice(0,10);
+      S.lancamentos.push({id:uid(),...base,data:di,comp:di.slice(0,7),situacao:i===0?base.situacao:'pendente',vencimento:i===0?base.vencimento:di,comprovante:i===0?base.comprovante:null,criadoEm:agora(),uid:ME.id,...(n>1?{serie:i+1+'/'+n}:{})})}}
+  },['Gestão do negócio',(id?'Editou ':'Lançou ')+tipo,e.razao]);
+  UI.lancComp=null;
+  if(mais){toast('Lançamento salvo. Pode lançar o próximo.');abrirLanc(tipo,null);return}
+  closeModal();toast(tipo==='receita'?'Receita lançada.':'Despesa lançada.');
+  if(!id){UI.flanc=UI.flanc||{};UI.flanc[tipo]={...(UI.flanc[tipo]||{cat:'',sit:'',q:''}),mes:data.slice(0,7)}}
+};
+ACT['lanc-excluir']=el=>{const l=S.lancamentos.find(x=>x.id===el.dataset.id);if(!l)return;closeModal();
+  confirmar('Excluir lançamento',`Excluir "${esc(l.descricao)}" de ${brl(l.valor)}?`,'Excluir',()=>mut('lancamentos',()=>{S.lancamentos=S.lancamentos.filter(x=>x.id!==l.id)},['Gestão do negócio','Excluiu lançamento',emp(l.empresaId)?.razao]))};
+ACT['lanc-baixar']=el=>{const l=S.lancamentos.find(x=>x.id===el.dataset.id);if(!l)return;mut('lancamentos',()=>{l.situacao='realizado';l.realizadoEm=agora();},null);toast(l.tipo==='receita'?'Marcada como recebida.':'Marcada como paga.')};
+ACT['lanc-notas']=el=>{const e=empAtual();const comp=el.dataset.v;const notas=S.notas.filter(n=>n.empresaId===e.id&&n.status==='autorizada'&&n.comp===comp&&!S.lancamentos.some(l=>l.notaId===n.id));
+  mut('lancamentos',()=>notas.forEach(n=>{const d=String(n.emitidaEm||n.dataEmissao||comp+'-01').slice(0,10);S.lancamentos.push({id:uid(),empresaId:e.id,tipo:'receita',valor:Number(n.valor)||0,data:d,comp:d.slice(0,7),descricao:'NFS-e '+(n.numero||'')+(n.descricao?' · '+String(n.descricao).slice(0,60):''),categoria:'servicos',contraparte:n.tomador?.nome||'',forma:'',situacao:'pendente',vencimento:'',obs:'Importada da nota emitida',notaId:n.id,criadoEm:agora(),uid:ME.id})}),['Gestão do negócio','Importou notas como receitas',e.razao]);
+  toast(notas.length+' nota(s) lançada(s) como receita a receber. Marque "Recebi" quando o dinheiro entrar.')};
+ACT['lanc-csv']=el=>{const e=empAtual();const tipo=el.dataset.v;const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const L=lancamentosDe(e.id).filter(l=>l.tipo===tipo).sort((a,b)=>String(a.data).localeCompare(String(b.data)));
+  baixar(tipo+'s-'+hoje()+'.csv','﻿'+['Data;Descrição;Categoria;'+(tipo==='receita'?'Cliente':'Fornecedor')+';Forma;Situação;Vencimento;Valor'].concat(L.map(l=>[fmtData(l.data),l.descricao,nomeCat(tipo,l.categoria),l.contraparte,l.forma,l.situacao==='pendente'?'Pendente':'Realizado',l.vencimento?fmtData(l.vencimento):'',String(l.valor).replace('.',',')].map(c).join(';'))).join('\r\n'),'text/csv')};
+ACT['lanc-dre-csv']=()=>{const h=document.querySelector('table.dre');if(!h)return;const txt=[...h.querySelectorAll('tr')].map(tr=>[...tr.children].map(td=>'"'+td.textContent.trim().replace(/"/g,'""')+'"').join(';')).join('\r\n');baixar('dre-'+(UI.lancAno||compAtual().slice(0,4))+'.csv','﻿'+txt,'text/csv')};
+document.addEventListener('click',ev=>{const b=ev.target.closest('form[data-form=lancamento] button');if(b)UI.lancMais=b.name==='mais'},true);
+/* ==== MÓDULOS v4 (fim) ==== */
 
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();

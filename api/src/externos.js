@@ -1,14 +1,17 @@
 // Serviços externos opcionais: e-mail transacional (Resend) e IA (Groq, Google Gemini ou Anthropic). Sem chave, a API continua funcionando.
 import { CONFIG } from './config.js';
 
-export async function enviarEmail({ para, assunto, html, texto }) {
-  if (!CONFIG.email.resend) { console.log(`[e-mail não enviado: RESEND_API_KEY ausente] para ${para} · ${assunto}\n${texto}`); return { enviado: false }; }
+// anexos: [{ nome, conteudo: Buffer }]
+export async function enviarEmail({ para, assunto, html, texto, anexos = [] }) {
+  const lista = (Array.isArray(para) ? para : [para]).filter(Boolean);
+  if (!CONFIG.email.resend) { console.log(`[e-mail não enviado: RESEND_API_KEY ausente] para ${lista.join(', ')} · ${assunto}`); return { enviado: false, motivo: 'O envio de e-mail não está configurado no servidor (falta RESEND_API_KEY).' }; }
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${CONFIG.email.resend}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: CONFIG.email.remetente, to: [para], subject: assunto, html, text: texto }),
+    body: JSON.stringify({ from: CONFIG.email.remetente, to: lista, subject: assunto, html, text: texto,
+      ...(anexos.length ? { attachments: anexos.map(a => ({ filename: a.nome, content: a.conteudo.toString('base64') })) } : {}) }),
   });
-  if (!r.ok) { console.error('[e-mail] falha', r.status, await r.text().catch(() => '')); return { enviado: false }; }
+  if (!r.ok) { const t = await r.text().catch(() => ''); console.error('[e-mail] falha', r.status, t); return { enviado: false, motivo: 'O provedor de e-mail recusou o envio (' + r.status + ').' }; }
   return { enviado: true };
 }
 
