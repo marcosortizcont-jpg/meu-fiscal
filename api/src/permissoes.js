@@ -35,7 +35,7 @@ export const MODULO_DA_COLECAO = {
   empresas: 'carteira', leads: 'carteira',
   catalogo: 'obrig', regimes: 'obrig', obrigacoes: 'obrig', fechamentos: 'obrig',
   guias: 'guias', faturamento: 'guias', despesas: 'guias', lancamentos: 'guias', notas: 'guias', tomadores: 'guias', servicos: 'guias',
-  documentos: 'docs', checklist: 'docs',
+  documentos: 'docs', checklist: 'docs', docsinternos: 'docs',
   conversas: 'chat',
   cnds: 'fiscal', ecac: 'fiscal',
   certificados: 'cert',

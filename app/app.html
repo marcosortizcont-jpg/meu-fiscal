@@ -488,7 +488,7 @@ function obrigacoesDevidasFixas(e,comp,funcs){
 }
 
 /* ===================== Estado e persistência ===================== */
-const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos'];
+const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos','docsinternos'];
 const S={}; COLS.forEach(c=>S[c]=[]);
 const CAP={db:null,user:null,sample:null,assets:null,downloads:null};
 const ME={id:null,nome:'',canEdit:true};
@@ -2438,7 +2438,7 @@ function abaDados(e){
    ${c('cnae','CNAE principal',x.cnae)}${c('atividade','Atividade principal',x.atividade,'','full')}
   </div></div>
   <div class="form-sec"><h3>Regime tributário</h3><div class="grid-f">
-   ${S.regimes.length?`<label class="f full"><span>Regime (define o pacote de obrigações) *</span><select name="regimeId" required>${S.regimes.map(r=>`<option value="${r.id}" ${reg&&reg.id===r.id?'selected':''}>${esc(r.nome)}</option>`).join('')}</select></label>`
+   ${S.regimes.length?`<label class="f full"><span>Regime (define o pacote de obrigações) *</span><select name="regimeId" required>${S.regimes.map(r=>`<option value="${r.id}" ${reg&&reg.id===r.id?'selected':''}>${esc(r.nome)}</option>`).join('')}</select></label><label class="f"><span>Anexo do Simples (se for Simples Nacional)</span><select name="anexo">${Object.keys(ANEXOS).map(a=>`<option value="${a}" ${(x.anexo||'III')===a?'selected':''}>${ANEXO_NOME[a]}</option>`).join('')}</select></label><label class="f"><span>Controlar obrigações a partir da competência</span><input type="month" name="inicioControle" value="${esc(x.inicioControle||addMes(compAtual(),-1))}"></label>`
     :`<label class="f"><span>Regime</span><select name="regime"><option value="SN" ${x.regime==='SN'?'selected':''}>Simples Nacional</option><option value="MEI" ${x.regime==='MEI'?'selected':''}>MEI</option></select></label><label class="f"><span>Anexo do Simples</span><select name="anexo">${Object.keys(ANEXOS).map(a=>`<option value="${a}" ${x.anexo===a?'selected':''}>${ANEXO_NOME[a]}</option>`).join('')}</select></label><p class="small muted full">Para usar regimes com pacote automático de obrigações, crie o catálogo em Obrigações › Catálogo.</p>`}
    <label class="f"><span>Atividade do MEI</span><select name="meiAtividade">${Object.entries(DAS_MEI_NOME).map(([k,v])=>`<option value="${k}" ${x.meiAtividade===k?'selected':''}>${v}</option>`).join('')}</select></label>
    ${c('prolabore','Pró-labore mensal (R$)',x.prolabore||0,'type="number" step="0.01" min="0"')}
@@ -2477,7 +2477,7 @@ FORM['empresa360']=async(fd,form)=>{
   const dados={razao:g('razao'),fantasia:g('fantasia'),grupo:g('grupo'),cnpj,ie:g('ie'),im:g('im'),abertura:g('abertura'),cnae:g('cnae'),atividade:g('atividade'),meiAtividade:g('meiAtividade'),prolabore:Number(g('prolabore')||0),fatorR:!!fd.get('fatorR'),reinf:!!fd.get('reinf'),
     endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},municipio:g('municipio'),uf:g('uf').toUpperCase(),ibge:soDig(g('ibge')),telefone:soDig(g('telefone')),email:g('email'),socios,contatos,status:g('status')||'ativo',
     plano:{...(prev?.plano||{metodo:'pix'}),nome:g('pNome'),valor:Number(g('pValor')||0),funcInclusos:Number(g('pInc')||0),adicionalFunc:Number(g('pAdd')||0)},checklist:ck};
-  if(fd.has('regimeId')){const r=S.regimes.find(x=>x.id===fd.get('regimeId'));dados.regimeId=r.id;dados.regime=r.base;if(r.base==='SN')dados.anexo=r.anexo||prev?.anexo||'III'}
+  if(fd.has('regimeId')){const r=S.regimes.find(x=>x.id===fd.get('regimeId'));dados.regimeId=r.id;dados.regime=r.base;if(r.base==='SN')dados.anexo=fd.get('anexo')||r.anexo||prev?.anexo||'III'}if(fd.get('inicioControle'))dados.inicioControle=String(fd.get('inicioControle'));
   else{dados.regime=g('regime')||'SN';dados.anexo=g('anexo')||'III'}
   if(dados.regime!=='SN')dados.fatorR=false;
   let nova=null,n=0;const comp=compDe('obrig');
@@ -3544,6 +3544,292 @@ ACT['lanc-csv']=el=>{const e=empAtual();const tipo=el.dataset.v;const c=v=>'"'+S
 ACT['lanc-dre-csv']=()=>{const h=document.querySelector('table.dre');if(!h)return;const txt=[...h.querySelectorAll('tr')].map(tr=>[...tr.children].map(td=>'"'+td.textContent.trim().replace(/"/g,'""')+'"').join(';')).join('\r\n');baixar('dre-'+(UI.lancAno||compAtual().slice(0,4))+'.csv','﻿'+txt,'text/csv')};
 document.addEventListener('click',ev=>{const b=ev.target.closest('form[data-form=lancamento] button');if(b)UI.lancMais=b.name==='mais'},true);
 /* ==== MÓDULOS v4 (fim) ==== */
+/* ==== MÓDULOS v5: obrigações geradas a partir do cadastro (todas as competências, com vencimento certo),
+        4 regimes, remoção com dispensa das próximas, guia publicada no portal, documentos internos por departamento ==== */
+
+/* ---------- catálogo e regimes ---------- */
+const CATALOGO_EXTRA=()=>{const c=(id,nome,depto,recorrencia,venc,obs='')=>({id,nome,depto,recorrencia,venc,condicao:'',obs,diasTecnico:3,ativo:true,criadoEm:agora()});return [
+  c('parc-federal','Parcelamento federal (Receita Federal)','Fiscal','mensal',{tipo:'ultimo_util',mesesApos:0},'Parcela vence no último dia útil do mês.'),
+  c('parc-simples','Parcelamento do Simples Nacional','Fiscal','mensal',{tipo:'ultimo_util',mesesApos:0},'Parcela vence no último dia útil do mês.'),
+  c('parc-pgfn','Parcelamento PGFN (dívida ativa da União)','Fiscal','mensal',{tipo:'ultimo_util',mesesApos:0},'Parcela vence no último dia útil do mês.'),
+  c('parc-estadual','Parcelamento estadual (ICMS)','Fiscal','mensal',{tipo:'dia',dia:20,ajuste:'antecipa',mesesApos:0},'Confira o dia de vencimento no termo de parcelamento da SEFAZ.'),
+  c('parc-municipal','Parcelamento municipal (ISS/taxas)','Fiscal','mensal',{tipo:'dia',dia:10,ajuste:'prorroga',mesesApos:0},'Confira o dia de vencimento no termo da prefeitura.')]};
+const catalogoPadraoV1=catalogoPadrao;
+catalogoPadrao=function(){return [...catalogoPadraoV1().map(o=>({...o,condicao:'',diasTecnico:3})),...CATALOGO_EXTRA()]};
+const PACOTE_FOLHA=['esocial','dctfweb','fgts'];
+regimesPadrao=function(){
+  const sn=['pgdas','defis','contabilidade',...PACOTE_FOLHA];
+  return [
+    {id:'reg2-mei',codigo:'MEI',nome:'MEI',base:'MEI',anexo:null,obrigacoes:['das-mei','dasn-simei',...PACOTE_FOLHA]},
+    {id:'reg2-sn-sem-ie',codigo:'SN-SEM-IE',nome:'Simples Nacional S/ Inscrição Estadual',base:'SN',anexo:null,obrigacoes:sn},
+    {id:'reg2-sn-com-ie',codigo:'SN-COM-IE',nome:'Simples Nacional C/ Inscrição Estadual',base:'SN',anexo:null,obrigacoes:[...sn,'efd-icms-ipi']},
+    {id:'reg2-outros',codigo:'OUTROS',nome:'Outros',base:'OUTRO',anexo:null,obrigacoes:['contabilidade']},
+  ];
+};
+const temIE=e=>!!(e.ie&&!/isent|^\s*$/i.test(e.ie));
+const regimeNovoDe=e=>e.regime==='MEI'?'reg2-mei':e.regime==='SN'?(temIE(e)?'reg2-sn-com-ie':'reg2-sn-sem-ie'):'reg2-outros';
+// troca única: catálogo completo, 4 regimes, empresas remapeadas sem perder obrigações e início do controle
+function migrarRegimesV2(){
+  if(UI.migrandoReg||cfg().regimesV2||UI.modo!=='painel'||!podeMod('obrig','editar')||!S.empresas.length)return;
+  UI.migrandoReg=true;
+  mut(['catalogo','regimes','empresas','config'],()=>{
+    catalogoPadrao().forEach(x=>{const ex=S.catalogo.find(y=>y.id===x.id);if(!ex)S.catalogo.push(x);else{if(ex.condicao)ex.condicao='';if(ex.diasTecnico==null)ex.diasTecnico=3}});
+    const antigos=S.regimes.slice();const novos=regimesPadrao();
+    S.empresas.forEach(e=>{
+      const velho=regimeDe(e);const destino=regimeNovoDe(e);const pac=new Set(novos.find(r=>r.id===destino).obrigacoes);
+      const tinha=[...(velho?velho.obrigacoes||[]:[]),...(e.obrigExtras||[])].filter(id=>!(e.obrigRemovidas||[]).includes(id));
+      const extras=new Set(e.obrigExtras||[]);
+      tinha.forEach(id=>{if(pac.has(id))return;if(id==='reinf'&&!e.reinf)return;if(['pgdas','das-mei','dasn-simei','defis'].includes(id)&&destino!=='reg2-outros')return;extras.add(id)});
+      e.obrigExtras=[...extras].filter(id=>!pac.has(id));
+      e.regimeId=destino;if(destino==='reg2-outros'&&!['LP','LR','OUTRO'].includes(e.regime))e.regime='OUTRO';
+      if(!e.inicioControle)e.inicioControle=addMes(compAtual(),-1);
+    });
+    S.regimes.splice(0,S.regimes.length,...novos);
+    const c=S.config[0]||(S.config[0]={id:'cfg'});c.regimesV2=true;
+  },['Obrigações','Atualizou para os 4 regimes (MEI, Simples S/ IE, Simples C/ IE, Outros)','']);
+  toast('Regimes atualizados: MEI, Simples Nacional S/ IE, Simples Nacional C/ IE e Outros.');
+}
+const aObrigV1=aObrig;
+aObrig=function(){return aObrigV1().replace(/<button class="btn primary" data-act="regime-form">[\s\S]*?<\/button>/,'')};
+// condições não escondem mais obrigações: o que está no pacote da empresa entra todo mês
+obrigacoesDevidas=function(e,comp,funcs){
+  if(!S.catalogo||!S.catalogo.length)return obrigacoesDevidasFixas(e,comp,funcs);
+  return itensAtivosNaComp(e,comp).map(({o})=>({tipo:o.nome,prazo:vencimentoDe(o,comp),depto:o.depto,catId:o.id}));
+};
+
+/* ---------- motor: o que cada empresa deve em cada competência ---------- */
+const inicioControle=e=>e.inicioControle||addMes(compAtual(),-1);
+function itensDaEmpresa(e){
+  const r=regimeDe(e);const doReg=r?r.obrigacoes||[]:[];const leg=new Set(e.obrigRemovidas||[]);
+  const ids=[...new Set([...doReg,...(e.obrigExtras||[]),...Object.keys(e.obrigRemov2||{})])].filter(id=>!leg.has(id));
+  return ids.map(id=>S.catalogo.find(c=>c.id===id)).filter(o=>o&&o.ativo!==false).map(o=>({o,origem:doReg.includes(o.id)?'regime':'avulsa',desde:(e.obrigExtrasDesde||{})[o.id]||null,removidaEm:(e.obrigRemov2||{})[o.id]||null}));
+}
+function itensAtivosNaComp(e,comp){return itensDaEmpresa(e).filter(x=>devidaNaComp(x.o,comp)&&(!x.desde||comp>=x.desde)&&!(x.removidaEm&&comp>=x.removidaEm))}
+function faixaComps(f){
+  // competências que podem cair nos filtros: anuais vencem até ~19 meses depois da competência
+  const ca=compAtual();let de=f.compDe||'',ate=f.compAte||'';
+  const legDe=f.legDe||f.tecDe,legAte=f.legAte||f.tecAte;
+  if(!de)de=legDe?addMes(legDe.slice(0,7),-20):addMes(ca,-3);
+  if(!ate)ate=legAte?legAte.slice(0,7):ca;
+  if(ate<de)return [];const out=[];for(let c=de;c<=ate&&out.length<48;c=addMes(c,1))out.push(c);return out;
+}
+function obrigacoesFaixa(comps){
+  const salvas=S.obrigacoes;const chave=(eid,c,cat,tipo)=>eid+'|'+c+'|'+(cat||tipo);
+  const idx=new Set();salvas.forEach(o=>{idx.add(chave(o.empresaId,o.comp,o.catId,o.tipo));idx.add(chave(o.empresaId,o.comp,null,o.tipo))});
+  const out=salvas.slice();const cset=new Set(comps);
+  S.empresas.forEach(e=>{
+    const ini=inicioControle(e);const itens=itensDaEmpresa(e);if(!itens.length)return;
+    comps.forEach(c=>{
+      if(c<ini)return;if(e.status==='inativo'&&c>=(e.inativoDesde||ini))return;
+      itens.forEach(x=>{
+        if(!devidaNaComp(x.o,c)||(x.desde&&c<x.desde))return;
+        if(idx.has(chave(e.id,c,x.o.id,x.o.nome))||idx.has(chave(e.id,c,null,x.o.nome)))return;
+        const dispensada=x.removidaEm&&c>=x.removidaEm;
+        out.push({id:`v:${e.id}:${c}:${x.o.id}`,virtual:true,empresaId:e.id,comp:c,tipo:x.o.nome,prazo:vencimentoDe(x.o,c),depto:x.o.depto,catId:x.o.id,
+          status:dispensada?'dispensada':'pendente',responsavel:respDe(e,x.o.depto),...(dispensada?{justificativa:'Removida do cadastro da empresa a partir de '+fmtComp(x.removidaEm)}:{})});
+      });
+    });
+  });
+  return out;
+}
+// transforma a obrigação calculada em registro guardado na primeira ação sobre ela
+function obrPorId(id){
+  if(!id)return null;let o=S.obrigacoes.find(x=>x.id===id);if(o)return o;
+  if(!String(id).startsWith('v:'))return null;
+  const [,eid,comp,cat]=String(id).split(':');const e=emp(eid);const c=S.catalogo.find(x=>x.id===cat);if(!e||!c)return null;
+  o={id:uid(),empresaId:eid,comp,tipo:c.nome,prazo:vencimentoDe(c,comp),depto:c.depto,catId:c.id,status:'pendente',responsavel:respDe(e,c.depto),criadaEm:agora()};
+  const rem=(e.obrigRemov2||{})[c.id];if(rem&&comp>=rem){o.status='dispensada';o.justificativa='Removida do cadastro da empresa a partir de '+fmtComp(rem);o.concluidaEm=agora()}
+  S.obrigacoes.push(o);
+  if(UI.obrAberta===id)UI.obrAberta=o.id;if(UI.obrSel&&UI.obrSel.has(id)){UI.obrSel.delete(id);UI.obrSel.add(o.id)}
+  return o;
+}
+
+/* ---------- filtros com botão Pesquisar ---------- */
+function fobrRasc(){const f=fobr();if(!UI.fobrRasc)UI.fobrRasc=JSON.parse(JSON.stringify(f));return UI.fobrRasc}
+function aplicarFobr(){UI.fobr=JSON.parse(JSON.stringify(fobrRasc()));UI.fobr.pag=0;render()}
+const alterouFobr=()=>UI.fobrRasc&&JSON.stringify({...UI.fobrRasc,pag:0,ord:0,dir:0})!==JSON.stringify({...fobr(),pag:0,ord:0,dir:0});
+delete buscaVivas['busca-obr'];
+document.addEventListener('input',ev=>{if(ev.target.id==='busca-obr'){fobrRasc().q=ev.target.value;marcarPendente()}},true);
+document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&ev.target.closest&&ev.target.closest('.obr-filtros')&&ev.target.tagName==='INPUT'){ev.preventDefault();aplicarFobr()}});
+function marcarPendente(){const b=document.getElementById('obr-pesquisar');if(b){const p=alterouFobr();b.classList.toggle('pulsar',!!p);const h=document.getElementById('obr-pend');if(h)h.hidden=!p}}
+ACT['obr-pesquisar']=()=>aplicarFobr();
+ACT['obr-limpar']=()=>{UI.fobr=null;const f=fobr();f.legDe='';f.legAte='';f.sit={pendentes:true,justificadas:true,entregues:true,dispensadas:false};UI.fobrRasc=null;render()};
+const obrRapidoV4=ACT['obr-rapido'];ACT['obr-rapido']=el=>{UI.fobrRasc=null;obrRapidoV4(el)};
+ACT['obr-tag-rm']=el=>{fobrRasc().tags.splice(Number(el.dataset.i),1);render()};
+// os campos de filtro escrevem no rascunho; a lista só muda ao pesquisar
+document.addEventListener('change',ev=>{
+  const el=ev.target;const r=()=>{ev.stopImmediatePropagation()};
+  if(el.dataset.obrSit){r();fobrRasc().sit[el.dataset.obrSit]=el.checked;el.closest('label')?.classList.toggle('on',el.checked);marcarPendente()}
+  else if(el.dataset.fobr){r();fobrRasc()[el.dataset.fobr]=el.value;marcarPendente()}
+  else if(el.dataset.obrTag){r();const R=fobrRasc();if(el.value&&!R.tags.some(t=>t.k===el.dataset.obrTag&&t.v===el.value))R.tags.push({k:el.dataset.obrTag,v:el.value});render()}
+},true);
+(function(){const st=document.createElement('style');st.textContent=`
+#obr-pesquisar{min-width:140px}#obr-pesquisar.pulsar{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 35%,transparent)}
+.obr-docs-form{display:grid;grid-template-columns:2fr 1.2fr 1.2fr auto;gap:10px;align-items:end}@media (max-width:900px){.obr-docs-form{grid-template-columns:1fr}}
+`;document.head.appendChild(st)})();
+
+/* lista: usa obrigações guardadas + calculadas do cadastro */
+function linhasObrV5(f){
+  const q=(f.q||'').toLowerCase().trim();const qd=soDig(q);
+  const tag=k=>f.tags.filter(t=>t.k===k).map(t=>t.v);const tObr=tag('obr'),tResp=tag('resp'),tDep=tag('depto'),tEmp=tag('emp');
+  const base=obrigacoesFaixa(faixaComps(f));
+  const todas=base.map(o=>{const e=emp(o.empresaId);if(!e)return null;return {o,e,tec:prazoTec(o),leg:o.prazo,sit:sitObr(o),guia:S.guias.find(g=>g.empresaId===o.empresaId&&g.comp===o.comp&&g.tipo===o.tipo),resp:o.responsavel||respDe(e,o.depto||'Fiscal')}}).filter(Boolean);
+  const semSit=todas.filter(r=>{const o=r.o,e=r.e;
+    if(q&&!([e.razao,e.fantasia,e.grupo,o.tipo,o.protocolo].join(' ').toLowerCase().includes(q)||(qd.length>=3&&soDig(e.cnpj).includes(qd))))return false;
+    if(f.compDe&&o.comp<f.compDe)return false;if(f.compAte&&o.comp>f.compAte)return false;
+    if(f.tecDe&&(!r.tec||r.tec<f.tecDe))return false;if(f.tecAte&&(!r.tec||r.tec>f.tecAte))return false;
+    if(f.legDe&&(!r.leg||r.leg<f.legDe))return false;if(f.legAte&&(!r.leg||r.leg>f.legAte))return false;
+    const dc=dataDe(o.entregueEm||o.concluidaEm);if(f.entDe&&(!dc||dc<f.entDe))return false;if(f.entAte&&(!dc||dc>f.entAte))return false;
+    if(tObr.length&&!tObr.includes(o.tipo))return false;if(tResp.length&&!tResp.includes(r.resp))return false;
+    if(tDep.length&&!tDep.includes(o.depto||''))return false;if(tEmp.length&&!tEmp.includes(e.id))return false;return true});
+  const cont={pendentes:0,justificadas:0,entregues:0,dispensadas:0};semSit.forEach(r=>cont[GRUPO_SIT(r.o)]++);
+  const rows=semSit.filter(r=>f.sit[GRUPO_SIT(r.o)]);
+  const nomeE=e=>(e.fantasia||e.razao||'').toLowerCase();
+  const K={obr:r=>r.o.tipo.toLowerCase(),emp:r=>nomeE(r.e),tec:r=>r.tec||'9',legal:r=>r.leg||'9',comp:r=>r.o.comp,resp:r=>nomeEquipe(r.resp).toLowerCase()};const k=K[f.ord]||K.legal;
+  rows.sort((a,b)=>{const x=k(a),y=k(b);return (x<y?-1:x>y?1:0)*f.dir||nomeE(a.e).localeCompare(nomeE(b.e))});
+  return {rows,cont};
+}
+linhasObr=function(){return linhasObrV5(fobr()).rows};
+const gestaoObrigV4=gestaoObrig;
+gestaoObrig=function(){
+  const f=fobr();const R=fobrRasc();const {cont}=linhasObrV5(f);
+  // a tela da v4 desenha a partir de fobr(); desenhamos os filtros a partir do rascunho trocando temporariamente
+  const aplicado=UI.fobr;UI.fobr=R;let filtrosHtml;
+  try{const h=gestaoObrigV4();filtrosHtml=h.slice(0,h.indexOf('<div class="filtro-resumo">'))}finally{UI.fobr=aplicado}
+  const corpo=gestaoObrigV4();const resto=corpo.slice(corpo.indexOf('<div class="filtro-resumo">'));
+  let h=filtrosHtml+resto;
+  // contagens por situação conforme os demais filtros aplicados
+  h=h.replace(/(data-obr-sit="(\w+)"[^>]*>\s*[^<]*<span class="small muted">)\d+(<\/span>)/g,(m,a,k,b)=>a+(cont[k]||0)+b);
+  h=h.replace('<div class="filtro-resumo"><span class="small muted">',`<div class="filtro-resumo"><div class="actions"><button class="btn primary" id="obr-pesquisar" data-act="obr-pesquisar">${svg('search')}Pesquisar</button><span id="obr-pend" class="small" style="color:var(--warn)" hidden>Filtros alterados: clique em Pesquisar</span></div><span class="small muted">`);
+  h=h.replace(/(<button class="btn sm" data-act="obr-limpar">Limpar filtros<\/button>)/,'$1');
+  setTimeout(marcarPendente,0);
+  return comprovantesPainel()+h;
+};
+function comprovantesPainel(){
+  const conf=S.guias.filter(g=>g.status==='informada');if(!conf.length)return '';
+  return `<div class="panel nao-imprimir"><h2>Comprovantes de pagamento para conferir</h2><div class="list">${conf.map(g=>`<div class="row"><div class="grow"><b>${esc(emp(g.empresaId)?.fantasia||'')}</b> · ${esc(g.tipo)} ${fmtComp(g.comp)}<div class="small muted">${brl(g.valor)} · informado em ${fmtDH(g.informadaEm)}</div></div>${linkArq(g.comprovante,'Comprovante')}<button class="btn sm primary" data-act="conf-pag" data-id="${g.id}">Confirmar</button><button class="btn sm danger" data-act="recusar-pag" data-id="${g.id}">Recusar</button></div>`).join('')}</div></div>`;
+}
+// sem a aba de apuração
+aGuias=function(){return head('Controle de obrigações','Todas as obrigações dos cadastros, com vencimento legal e prazo técnico, protocolo, anexos, envio ao cliente, comentários e histórico. Filtre pelo mês do prazo legal para ver tudo o que vence nele e clique em Pesquisar.')+gestaoObrig()};
+const IC_SEARCH='<circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/>';if(!IC.search)IC.search=IC_SEARCH;
+
+/* ações da v4 passam a materializar a obrigação calculada */
+for(const k of ['obr-justificar','obr-reabrir','obr-anexo-rm']){const base=ACT[k];ACT[k]=el=>{const o=obrPorId(el.dataset.id);if(o)el.dataset.id=o.id;base(el)}}
+// comentário usa o id do campo; quando a obrigação acaba de virar registro, o campo ainda tem o id antigo
+ACT['obr-comentar']=el=>{const idAntigo=el.dataset.id;const i=document.getElementById('obr-com-'+idAntigo);const t=(i?.value||'').trim();if(!t){toast('Escreva o comentário.',true);return}
+  const o=obrPorId(idAntigo);if(!o)return;i.value='';mut('obrigacoes',()=>{(o.comentarios=o.comentarios||[]).push({texto:t,em:agora(),uid:ME.id,nome:ME.nome||''});logObr(o,{tipo:'comentario',texto:t})},null)};
+const obrLoteV4=ACT['obr-lote'];ACT['obr-lote']=el=>{if(el.dataset.v!=='limpar')[...(UI.obrSel||[])].forEach(id=>obrPorId(id));obrLoteV4(el)};
+document.addEventListener('change',ev=>{const el=ev.target;if(el.hasAttribute&&el.hasAttribute('data-obr-lote-resp')&&el.value)[...(UI.obrSel||[])].forEach(id=>obrPorId(id))},true);
+const cicloV1=ACT['ciclo-obrig'];ACT['ciclo-obrig']=el=>{const o=obrPorId(el.dataset.id);if(o){el.dataset.id=o.id;cicloV1(el)}};
+const onUploadV4=onUpload;onUpload=async function(inp){if(inp.dataset.up==='obr-anexo'){const o=obrPorId(inp.dataset.id);if(o)inp.dataset.id=o.id}if(inp.dataset.up==='doc-interno')return uploadDocInterno(inp);return onUploadV4(inp)};
+// detalhe: valor da guia e publicação em "Guias e impostos" do cliente
+const EH_GUIA=/DAS|FGTS|DCTF|DARF|GPS|INSS|ISS|ICMS|Parcelamento|PGFN|DAE|IRPJ|CSLL|PIS|COFINS|IPTU|Taxa/i;
+const detalheObrV4=detalheObr;
+detalheObr=function(o,r){
+  let h=detalheObrV4(o,r);const ed=podeMod('obrig','editar');const g=r.guia;const ehG=o.publicarGuia!=null?o.publicarGuia:EH_GUIA.test(o.tipo);
+  const bloco=`<div><div class="grid-f" style="grid-template-columns:1fr 1fr;gap:8px"><label class="f"><span>Valor da guia (R$)</span><input name="valorGuia" type="number" step="0.01" min="0" value="${o.valorGuia??(g?g.valor:'')}" ${ed?'':'disabled'} placeholder="0,00"></label>
+    <label class="f"><span>No portal, entra em</span><select name="publicarGuia" ${ed?'':'disabled'}><option value="1" ${ehG?'selected':''}>Guias e impostos do mês</option><option value="0" ${ehG?'':'selected'}>Documentos da empresa</option></select></label></div>
+    ${g?`<p class="small muted" style="margin:6px 0 0">Guia no portal: ${pill(statusGuia(g).t,statusGuia(g).c)} ${g.arquivo?'· PDF anexado':''}</p>`:''}</div>`;
+  // entra depois do bloco "Enviar ao cliente"
+  const i=h.indexOf('<div><div class="grid-f" style="grid-template-columns:1fr 1fr;gap:8px">');
+  return i>0?h.slice(0,i)+bloco+h.slice(i):h;
+};
+const salvarV4=FORM['obr-salvar'];
+FORM['obr-salvar']=async(fd,form)=>{
+  const o=obrPorId(form.dataset.id);if(!o)return;form.dataset.id=o.id;
+  const v=fd.get('valorGuia');const valor=v===''||v==null?null:Math.round(Number(v)*100)/100;const comoGuia=fd.get('publicarGuia')==='1';
+  const envio=String(fd.get('envio')||'nao');const pend=(o.arquivos||[]).filter(a=>!a.enviadoEm);
+  o.valorGuia=valor;o.publicarGuia=comoGuia;
+  const antes=new Set(S.documentos.map(d=>d.id));
+  await salvarV4(fd,form);
+  if(!(comoGuia&&envio!=='nao'&&pend.length))return;
+  // como é guia: sai de "Documentos" e entra em "Guias e impostos" do mês no portal
+  const novos=S.documentos.filter(d=>!antes.has(d.id)&&d.obrigacaoId===o.id);
+  const pdf=pend.find(a=>/pdf/i.test(String(a.tipo||'')+a.nome))||pend[0];const quando=agora();
+  const depto=['Fiscal','Pessoal','Contábil'].includes(o.depto)?o.depto:'Fiscal';
+  mut(['guias','documentos','obrigacoes'],()=>{
+    S.documentos=S.documentos.filter(d=>!novos.includes(d));
+    let g=S.guias.find(x=>x.empresaId===o.empresaId&&x.comp===o.comp&&x.tipo===o.tipo);
+    if(!g){g={id:uid(),empresaId:o.empresaId,tipo:o.tipo,comp:o.comp,valor:valor||0,venc:o.prazo,depto,status:'liberada',arquivo:pdf,liberadaEm:quando,obrigacaoId:o.id,origem:'obrigacao'};S.guias.push(g)}
+    else{g.arquivo=pdf;if(valor!=null)g.valor=valor;g.venc=g.venc||o.prazo;if(g.status==='rascunho'){g.status='liberada';g.liberadaEm=quando}g.obrigacaoId=o.id}
+    const l=[...(o.log||[])].reverse().find(x=>x.tipo==='envio'&&/publicad/.test(x.texto||''));
+    const txt=`${fmtDH(quando)} Guia${valor?' de '+brl(valor):''} publicada em "Guias e impostos" de ${fmtComp(o.comp)} no portal de ${emp(o.empresaId)?.razao||''}`;
+    if(l)l.texto=txt;else logObr(o,{tipo:'envio',texto:txt});
+  },['Guias','Publicou '+o.tipo+' '+fmtComp(o.comp)+' pelo controle de obrigações',emp(o.empresaId)?.razao]);
+};
+
+/* ---------- motor de alertas: obrigações calculadas que estão atrasadas ---------- */
+const motorV3=motor;
+motor=function(eid,publico){
+  const A=motorV3(eid,publico);if(publico!=='a'||!S.catalogo.length)return A;
+  const ca=compAtual();const comps=[addMes(ca,-3),addMes(ca,-2),addMes(ca,-1),ca];const h=hoje();
+  const lista=obrigacoesFaixa(comps).filter(o=>o.virtual&&o.status==='pendente'&&o.prazo<h&&(!eid||o.empresaId===eid));
+  const por={};lista.forEach(o=>{(por[o.empresaId]=por[o.empresaId]||[]).push(o)});
+  Object.entries(por).forEach(([id,l])=>{const e=emp(id);if(!e)return;A.push({nivel:'crit',empresaId:id,empresa:e.fantasia||e.razao,area:'Obrigações',texto:`${l.length} obrigação(ões) vencida(s) sem entrega: ${[...new Set(l.map(o=>o.tipo))].slice(0,3).join(', ')}`,view:'a-guias'})});
+  return A;
+};
+
+/* ---------- cadastro: obrigações vinculadas com "Remover" a partir de uma competência ---------- */
+function proximoPrazo(o,e){const ca=addMes(compAtual(),-1);for(let i=0;i<24;i++){const c=addMes(ca,i);if(c<inicioControle(e))continue;if(devidaNaComp(o,c))return {c,d:vencimentoDe(o,c)}}return null}
+abaObrig=function(e){
+  if(!S.catalogo.length)return `<div class="panel">${vazio('O catálogo de obrigações ainda não foi criado.',podeMod('obrig','editar')?`<button class="btn primary" data-act="catalogo-padrao">Criar catálogo e regimes padrão</button>`:'')}</div>`;
+  const ed=podeMod('obrig','editar');const r=regimeDe(e);const itens=itensDaEmpresa(e);const ativos=itens.filter(x=>!x.removidaEm),rem=itens.filter(x=>x.removidaEm);
+  const fora=S.catalogo.filter(o=>o.ativo!==false&&!ativos.some(x=>x.o.id===o.id));
+  const opComp=sel=>{let s='';for(let i=-1;i<=12;i++){const c=addMes(compAtual(),i);s+=`<option value="${c}" ${c===sel?'selected':''}>${fmtComp(c)}</option>`}return s};
+  return `<div class="panel"><div class="panel-head"><div><h2>Obrigações vinculadas</h2><p class="sub">Regime: <b>${esc(r?r.nome:'sem regime definido')}</b> · controle a partir de <b>${fmtComp(inicioControle(e))}</b>. Tudo o que está aqui aparece no Controle de obrigações em todas as competências, com o vencimento de cada uma.</p></div></div>
+  ${ativos.length?`<div class="table-wrap"><table><thead><tr><th>Obrigação</th><th>Origem</th><th>Vencimento</th><th>Próximo vencimento</th><th></th></tr></thead><tbody>${ativos.sort((a,b)=>a.o.depto.localeCompare(b.o.depto)||a.o.nome.localeCompare(b.o.nome)).map(({o,origem,desde})=>{const p=proximoPrazo(o,e);return `<tr><td><b>${esc(o.nome)}</b><div class="sub">${esc(o.depto)} · ${RECORRENCIAS[o.recorrencia]||''}${desde?' · desde '+fmtComp(desde):''}</div></td><td>${origem==='regime'?pill('Pacote do regime',''):pill('Avulsa','info')}</td><td class="small">${textoVenc(o)}</td><td class="num small">${p?fmtData(p.d)+` <span class="muted">(${fmtComp(p.c)})</span>`:'—'}</td><td class="r">${ed?`<button class="btn sm ghost" data-act="obrig-remover" data-id="${e.id}" data-o="${o.id}">Remover</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted">Nenhuma obrigação vinculada.</p>'}
+  ${ed&&fora.length?`<form class="form-sec" data-form="obrig-avulsa2" data-id="${e.id}"><h3>Adicionar obrigação (inclusive parcelamentos)</h3><div class="grid-f"><label class="f"><span>Obrigação do catálogo</span><select name="o">${fora.sort((a,b)=>a.nome.localeCompare(b.nome)).map(o=>`<option value="${o.id}">${esc(o.nome)} · ${esc(o.depto)}</option>`).join('')}</select></label><label class="f"><span>A partir da competência</span><select name="desde">${opComp(addMes(compAtual(),-1))}</select></label></div><div class="actions" style="margin-top:10px"><button class="btn">${svg('plus')}Adicionar</button></div></form>`:''}
+  ${rem.length?`<div class="form-sec"><h3>Removidas</h3><p class="sub">As competências anteriores continuam guardadas no Controle de obrigações; as próximas aparecem como dispensadas.</p><div class="list">${rem.map(({o,removidaEm})=>`<div class="row"><div class="grow"><b>${esc(o.nome)}</b><div class="small muted">Dispensada a partir de ${fmtComp(removidaEm)}</div></div>${ed?`<button class="btn sm" data-act="obrig-restaurar2" data-id="${e.id}" data-o="${o.id}">Restaurar</button>`:''}</div>`).join('')}</div></div>`:''}</div>`;
+};
+ACT['obrig-remover']=el=>{const e=emp(el.dataset.id);const c=S.catalogo.find(x=>x.id===el.dataset.o);if(!e||!c)return;
+  let ops='';for(let i=-1;i<=12;i++){const x=addMes(compAtual(),i);ops+=`<option value="${x}" ${i===-1?'selected':''}>${fmtComp(x)}${i===-1?' (competência atual de trabalho)':i===0?' (mês corrente)':''}</option>`}
+  openModal(`${mHead('Remover '+c.nome)}<form data-form="obrig-remover" data-id="${e.id}" data-o="${c.id}"><div class="modal-body"><p>${esc(c.nome)} deixa de ser cobrada de ${esc(e.fantasia||e.razao)}. As competências anteriores ficam guardadas no Controle de obrigações e as próximas passam a aparecer como <b>dispensadas</b>.</p>
+   <label class="f"><span>Dispensar a partir da competência</span><select name="desde">${ops}</select></label></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn danger">Remover</button></div></form>`)};
+FORM['obrig-remover']=(fd,form)=>{const e=emp(form.dataset.id);const id=form.dataset.o;const desde=String(fd.get('desde'));const c=S.catalogo.find(x=>x.id===id);closeModal();
+  mut(['empresas','obrigacoes'],()=>{e.obrigRemov2={...(e.obrigRemov2||{}),[id]:desde};
+    S.obrigacoes.filter(o=>o.empresaId===e.id&&(o.catId===id||o.tipo===c.nome)&&o.comp>=desde&&!obrOk(o)).forEach(o=>{o.justificativa='Removida do cadastro da empresa a partir de '+fmtComp(desde);mudarStatus(o,'dispensada',{motivo:o.justificativa})})},
+    ['Obrigações','Removeu '+c.nome+' a partir de '+fmtComp(desde),e.razao]);toast(c.nome+' removida. A partir de '+fmtComp(desde)+' ela aparece como dispensada.')};
+ACT['obrig-restaurar2']=el=>{const e=emp(el.dataset.id);const id=el.dataset.o;mut('empresas',()=>{const m={...(e.obrigRemov2||{})};delete m[id];e.obrigRemov2=m},['Obrigações','Restaurou obrigação',e.razao]);toast('Obrigação restaurada.')};
+FORM['obrig-avulsa2']=(fd,form)=>{const e=emp(form.dataset.id);const id=String(fd.get('o'));const desde=String(fd.get('desde'));
+  mut('empresas',()=>{const r=regimeDe(e);const doReg=r?(r.obrigacoes||[]):[];
+    if((e.obrigRemovidas||[]).includes(id))e.obrigRemovidas=e.obrigRemovidas.filter(x=>x!==id);
+    if(e.obrigRemov2&&e.obrigRemov2[id]){const m={...e.obrigRemov2};delete m[id];e.obrigRemov2=m}
+    if(!doReg.includes(id)){e.obrigExtras=[...new Set([...(e.obrigExtras||[]),id])];e.obrigExtrasDesde={...(e.obrigExtrasDesde||{}),[id]:desde}}
+  },['Obrigações','Incluiu obrigação '+(S.catalogo.find(x=>x.id===id)?.nome||''),e.razao]);toast('Obrigação incluída a partir de '+fmtComp(desde)+'.')};
+
+/* ---------- cadastro: documentos com nome e departamento ---------- */
+const DEPTOS_DOC=['Todos os departamentos','Fiscal','Pessoal','Contábil','Legalização','Financeiro'];
+const abaDocsV3=abaDocs;
+abaDocs=function(e){
+  const h=abaDocsV3(e);const ed=podeMod('docs','editar');const exc=podeMod('docs','excluir');const fd=UI.docDepto||'';
+  const L=S.docsinternos.filter(d=>d.empresaId===e.id&&(!fd||d.depto===fd||d.depto==='Todos os departamentos')).sort((a,b)=>String(b.em).localeCompare(String(a.em)));
+  const painel=`<div class="panel"><div class="panel-head"><div><h2>Documentos para a equipe</h2><p class="sub">Contratos, procurações, termos de parcelamento, senhas em PDF e o que cada departamento precisa consultar. O cliente não vê estes arquivos, a menos que você marque "mostrar no portal".</p></div>
+    <label class="small muted" style="display:flex;gap:6px;align-items:center">Departamento<select data-doc-depto style="width:auto"><option value="">Todos</option>${DEPTOS_DOC.slice(1).map(d=>`<option ${fd===d?'selected':''}>${d}</option>`).join('')}</select></label></div>
+   ${ed?`<form class="obr-docs-form" data-form="doc-interno" data-id="${e.id}"><label class="f"><span>Nome do documento *</span><input name="nome" required maxlength="100" placeholder="Ex.: Termo de parcelamento PGFN"></label>
+     <label class="f"><span>Departamento que vai usar</span><select name="depto">${DEPTOS_DOC.map(d=>`<option>${d}</option>`).join('')}</select></label>
+     <label class="chk" style="align-self:center"><input type="checkbox" name="portal"> Mostrar também no portal do cliente</label>
+     <label class="btn primary">${svg('upload')}Escolher arquivo e salvar<input type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.xml,.txt,.csv" data-up="doc-interno" data-id="${e.id}"></label></form>`:''}
+   ${L.length?`<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Documento</th><th>Departamento</th><th>Anexado</th><th></th></tr></thead><tbody>${L.map(d=>`<tr><td><b>${esc(d.nome)}</b><div class="sub">${esc(d.arquivo?.nome||'')}</div></td><td>${pill(d.depto,d.depto==='Todos os departamentos'?'info':'')}</td><td class="small">${fmtDH(d.em)}<div class="sub">${esc(d.nomeUsuario||'')}</div></td><td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${linkArq(d.arquivo)}${exc?`<button class="btn sm danger" data-act="doc-interno-rm" data-id="${d.id}">Excluir</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:`<p class="small muted" style="margin-top:10px">Nenhum documento${fd?' para '+esc(fd):''}.</p>`}</div>`;
+  // fica logo depois da chave liga/desliga
+  const i=h.indexOf('</div></div></div>')+18;return h.slice(0,i)+painel+h.slice(i);
+};
+document.addEventListener('change',ev=>{if(ev.target.hasAttribute&&ev.target.hasAttribute('data-doc-depto')){UI.docDepto=ev.target.value;render()}});
+FORM['doc-interno']=()=>toast('Escolha o arquivo pelo botão "Escolher arquivo e salvar".',true);
+async function uploadDocInterno(inp){
+  const form=inp.closest('form');const e=emp(inp.dataset.id);const files=[...inp.files];inp.value='';if(!files.length||!e)return;
+  const nome=String(form.nome.value||'').trim()||files[0].name.replace(/\.[^.]+$/,'');const depto=form.depto.value;const portal=form.portal.checked;
+  const antes=UI.empresaId;UI.empresaId=portal?e.id:null;
+  try{const arq=await enviarArquivo(files[0]);
+    if(portal)mut('documentos',()=>S.documentos.push({id:uid(),empresaId:e.id,nome,categoria:'Outros',arquivo:arq,enviadoEm:agora(),depto,origem:'escritorio'}),['Documentos','Anexou '+nome+' (portal)',e.razao]);
+    mut('docsinternos',()=>S.docsinternos.push({id:uid(),empresaId:e.id,nome,depto,arquivo:arq,em:agora(),uid:ME.id,nomeUsuario:ME.nome||'',noPortal:portal}),['Documentos','Anexou '+nome+' para '+depto,e.razao]);
+    form.nome.value='';toast('Documento "'+nome+'" anexado'+(portal?' e publicado no portal':'')+'.');
+  }catch(er){toast(er.message,true)}finally{UI.empresaId=antes}
+}
+ACT['doc-interno-rm']=el=>{const d=S.docsinternos.find(x=>x.id===el.dataset.id);if(!d)return;confirmar('Excluir documento',`Excluir "${esc(d.nome)}"?`,'Excluir',()=>mut('docsinternos',()=>{S.docsinternos=S.docsinternos.filter(x=>x.id!==d.id)},['Documentos','Excluiu '+d.nome,emp(d.empresaId)?.razao]))};
+
+/* migração automática dos regimes quando alguém com acesso abre o painel */
+const conteudoV4=conteudo;conteudo=function(){if(!cfg().regimesV2)setTimeout(migrarRegimesV2,300);return conteudoV4()};
+/* ==== MÓDULOS v5 (fim) ==== */
 
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();
