@@ -180,7 +180,7 @@
     const txt = M.estado === 'online' ? 'Tempo real · conectado' : M.estado === 'reconectando' ? 'Reconectando…' : 'Conectando…';
     return `<span class="conn ${M.estado === 'online' ? 'ok' : ''}" id="mf-selo"><i></i>${txt}</span>
       <span>${esc(ME.nome)}${M.site === 'painel' && (ME.funcao || ME.papel) ? ' · ' + esc(ME.funcao || ({ master: 'Master' }[ME.papel] || 'Equipe')) : ''}</span>
-      <span style="display:flex;gap:10px;flex-wrap:wrap">${M.site === 'painel' && typeof podeMod === 'function' && podeMod('equipe', 'ver') ? '<a href="#a-equipe" style="color:inherit">Equipe e permissões</a>' : ''}<a href="#" data-act="mf-sair" style="color:inherit">Sair</a></span>`;
+      <span style="display:flex;gap:10px;flex-wrap:wrap">${M.site === 'painel' && typeof podeMod === 'function' && podeMod('equipe', 'ver') ? '<a href="#a-equipe" style="color:inherit">Equipe e permissões</a>' : ''}<a href="#${M.site === 'painel' ? 'a-perfil' : 'c-perfil'}" style="color:inherit">Meu perfil</a><a href="#" data-act="mf-sair" style="color:inherit">Sair</a></span>`;
   };
   function selo() {
     const el = document.getElementById('mf-selo'); if (!el) return;

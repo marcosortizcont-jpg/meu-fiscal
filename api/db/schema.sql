@@ -32,6 +32,8 @@ ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS funcao TEXT;
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permissoes JSONB NOT NULL DEFAULT '{}';
 -- departamentos do Atendimento em que a pessoa atua ('*' = todos os setores; vazio/nulo = padrão da função)
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS deptos TEXT[];
+-- telefone de contato da pessoa (mostrado em Meu perfil; só o escritório altera)
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefone TEXT;
 UPDATE usuarios SET funcao = 'Master' WHERE papel = 'master' AND funcao IS NULL;
 
 -- Quais empresas cada usuário-cliente enxerga e com que perfil (vários CNPJs no mesmo login)

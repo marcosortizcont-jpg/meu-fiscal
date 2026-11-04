@@ -17,6 +17,7 @@ import { registrarFinanceiro } from './financeiro.js';
 import { registrarDocumentos } from './documentos.js';
 import { registrarCrmTheo } from './crm-theo.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
+import { registrarPerfil } from './perfil.js';
 import { registrarAtendimento, cfgAtend, filtroConversas, conversaVisivel, limparDeptos, deptosDoUsuario } from './atendimento.js';
 
 const AUD = site => `meufiscal:${site}`;
@@ -457,7 +458,7 @@ export function registrarRotas(r, { db, hub }) {
     const u = await exigir(ctx, { site: 'painel' });
     const verEquipe = u.papel === 'master' || pode(u, 'equipe', 'ver');
     if (!verEquipe && !pode(u, 'carteira', 'ver')) throw new ErroHttp(403, 'Sem acesso.');
-    const usuarios = await db.query(`SELECT u.id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, u.deptos, u.status, u.ultimo_login_em,
+    const usuarios = await db.query(`SELECT u.id, u.nome, u.email, u.telefone, u.ambiente, u.papel, u.funcao, u.permissoes, u.deptos, u.status, u.ultimo_login_em,
         COALESCE((SELECT json_agg(json_build_object('id', ue.empresa_id, 'perfil', ue.perfil)) FROM usuarios_empresas ue WHERE ue.usuario_id = u.id), '[]'::json) AS empresas
       FROM usuarios u WHERE u.escritorio_id = $1 ${verEquipe ? '' : "AND u.ambiente = 'cliente'"} ORDER BY u.ambiente DESC, u.nome`, [u.escritorio_id]);
     const [escr] = await db.query('SELECT funcoes FROM escritorios WHERE id = $1', [u.escritorio_id]);
@@ -509,8 +510,8 @@ export function registrarRotas(r, { db, hub }) {
     const resultado = await db.tx(async q => {
       const [existe] = await q('SELECT id, ambiente FROM usuarios WHERE lower(email) = $1', [email]);
       if (existe) throw new ErroHttp(409, existe.ambiente === ambiente ? 'Este e-mail já tem acesso. Use "Editar" para mudar empresas ou permissões.' : 'Este e-mail já é usado por uma conta do outro ambiente.');
-      const [novo] = await q(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, funcao, permissoes, status, senha_hash, deptos) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::text[]) RETURNING id, nome, email`,
-        [u.escritorio_id, nome, email, ambiente, papel, funcao, JSON.stringify(permissoes), senha ? 'ativo' : 'convidado', hash, deptos]);
+      const [novo] = await q(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, funcao, permissoes, status, senha_hash, deptos, telefone) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::text[],$11) RETURNING id, nome, email`,
+        [u.escritorio_id, nome, email, ambiente, papel, funcao, JSON.stringify(permissoes), senha ? 'ativo' : 'convidado', hash, deptos, String(c.telefone || '').replace(/[^\d+() -]/g, '').slice(0, 30) || null]);
       for (const e of empresas) await q('INSERT INTO usuarios_empresas (usuario_id, empresa_id, perfil) VALUES ($1,$2,$3)', [novo.id, e.id, e.perfil]);
       if (senha) return { usuario: novo, ativo: true, endereco: CONFIG.origens[ambiente === 'equipe' ? 'painel' : 'cliente'][0] + (ambiente === 'equipe' ? '/admin/login' : '/login') };
       return { usuario: novo, ...(await enviarConvite(q, novo, ambiente === 'equipe' ? 'painel' : 'cliente', u.nome)) };
@@ -541,6 +542,14 @@ export function registrarRotas(r, { db, hub }) {
     }
     await db.tx(async q => {
       if (typeof c.nome === 'string' && c.nome.trim().length >= 3) await q('UPDATE usuarios SET nome = $1 WHERE id = $2', [c.nome.trim(), alvo.id]);
+      // e-mail de acesso e telefone: só o escritório altera (o usuário pede em Meu perfil)
+      if (typeof c.email === 'string' && c.email.trim().toLowerCase() !== String(alvo.email).toLowerCase()) {
+        const novo = c.email.trim().toLowerCase(); if (!EMAIL_RE.test(novo)) throw new ErroHttp(400, 'E-mail inválido.');
+        const [outro] = await q('SELECT id FROM usuarios WHERE lower(email) = $1 AND id <> $2', [novo, alvo.id]);
+        if (outro) throw new ErroHttp(409, 'Este e-mail já é usado por outra conta.');
+        await q('UPDATE usuarios SET email = $1 WHERE id = $2', [novo, alvo.id]);
+      }
+      if (typeof c.telefone === 'string') await q('UPDATE usuarios SET telefone = $1 WHERE id = $2', [c.telefone.replace(/[^\d+() -]/g, '').slice(0, 30) || null, alvo.id]);
       if (['ativo', 'bloqueado'].includes(c.status)) {
         await q(`UPDATE usuarios SET status = $1 WHERE id = $2 AND (status <> 'convidado' OR $1 = 'bloqueado')`, [c.status, alvo.id]);
         if (c.status === 'bloqueado') await q('UPDATE sessoes SET revogada_em = now() WHERE usuario_id = $1 AND revogada_em IS NULL', [alvo.id]);
@@ -560,7 +569,7 @@ export function registrarRotas(r, { db, hub }) {
     if (c.status === 'bloqueado') hub.encerrarUsuario(alvo.id);
     await log('usuario_alterado', { usuarioId: alvo.id, ip: ctx.ip, detalhe: `por ${u.email}: ${JSON.stringify(c).slice(0, 300)}` });
     {
-      const partes = []; if (c.nome) partes.push('nome'); if (c.status) partes.push('situação: ' + c.status); if (c.funcao) partes.push('função: ' + c.funcao);
+      const partes = []; if (c.nome) partes.push('nome'); if (typeof c.email === 'string') partes.push('e-mail: ' + c.email.trim().toLowerCase()); if (typeof c.telefone === 'string') partes.push('telefone'); if (c.status) partes.push('situação: ' + c.status); if (c.funcao) partes.push('função: ' + c.funcao);
       if (c.permissoes) partes.push('permissões'); if (Array.isArray(c.deptos)) partes.push('departamentos: ' + (limparDeptos(c.deptos).includes('*') ? 'todos' : limparDeptos(c.deptos).join(', ') || 'nenhum')); if (Array.isArray(c.empresas)) partes.push('empresas liberadas');
       const resumoU = `Alterou ${alvo.ambiente === 'equipe' ? 'o colaborador' : 'o acesso de'} ${alvo.nome || ''}${partes.length ? ' (' + partes.join(', ') + ')' : ''}`;
       const emps = alvo.ambiente === 'cliente' ? (await db.query('SELECT empresa_id FROM usuarios_empresas WHERE usuario_id = $1', [alvo.id])).map(x => x.empresa_id) : [];
@@ -611,6 +620,7 @@ export function registrarRotas(r, { db, hub }) {
   registrarCrmTheo(r, { db, exigir, log, pode, wa });
   registrarRotasAlteracoes(r, { db, exigir, log, pode, alt });
   registrarAtendimento(r, { db });
+  registrarPerfil(r, { db, exigir, log, hub, limparCacheDe });
 
   return { carregarEmpresas };
 }
