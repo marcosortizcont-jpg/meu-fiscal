@@ -2627,7 +2627,7 @@ function aEquipe(){
   const d=apiDado('equipe-admin','/api/admin/usuarios');
   if(d.carregando)return cab+abas+`<div class="panel">${carregandoBox()}</div>`;if(d.erro)return cab+abas+`<div class="panel"><p class="small muted">${esc(d.erro)}</p></div>`;
   const eq=d.dados.usuarios.filter(u=>u.ambiente==='equipe');const ST={ativo:['Ativo','ok'],convidado:['Convite pendente','info'],bloqueado:['Desativado','crit']};
-  return cab+abas+`<div class="panel"><div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>Função</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead><tbody>${eq.map(u=>{const [st,cl]=ST[u.status]||['—',''];const ajust=Object.keys(u.permissoes||{}).length;return `<tr><td><b>${esc(u.nome)}</b>${u.id===ME.id?' <span class="tag">você</span>':''}<div class="sub">${esc(u.email)}</div></td><td>${esc(u.funcao||(u.papel==='master'?'Master':'—'))}${ajust?`<div class="sub">${ajust} permissão(ões) ajustada(s)</div>`:''}</td><td>${pill(st,cl)}</td><td class="small">${u.ultimo_login_em?fmtDH(u.ultimo_login_em):'Nunca'}</td>
+  return cab+abas+`<div class="panel"><div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>Função</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead><tbody>${eq.map(u=>{const [st,cl]=ST[u.status]||['—',''];const ajust=Object.keys(u.permissoes||{}).length;return `<tr><td><b>${esc(u.nome)}</b>${u.id===ME.id?' <span class="tag">você</span>':''}<div class="sub">${esc(u.email)}</div></td><td>${esc(u.funcao||(u.papel==='master'?'Master':'—'))}${ajust?`<div class="sub">${ajust} permissão(ões) ajustada(s)</div>`:''}<div class="sub">Atendimento: ${u.deptosEfetivos===null||u.deptosEfetivos===undefined?'todos os setores':u.deptosEfetivos.length?esc(u.deptosEfetivos.join(', ')):'só o que for transferido'}</div></td><td>${pill(st,cl)}</td><td class="small">${u.ultimo_login_em?fmtDH(u.ultimo_login_em):'Nunca'}</td>
    <td class="r">${ehMaster()?`<div class="actions" style="justify-content:flex-end"><button class="btn sm" data-act="colab-form" data-id="${u.id}">Editar</button><button class="btn sm" data-act="usuario-senha" data-id="${u.id}" data-nome="${esc(u.nome)}">Definir senha</button>${u.status==='convidado'?`<button class="btn sm" data-act="usuario-convite" data-id="${u.id}">Novo link</button>`:''}${u.id!==ME.id?(u.status==='bloqueado'?`<button class="btn sm" data-act="usuario-status" data-id="${u.id}" data-v="ativo">Reativar</button>`:`<button class="btn sm danger" data-act="usuario-status" data-id="${u.id}" data-v="bloqueado">Desativar</button>`):''}</div>`:''}</td></tr>`}).join('')}</tbody></table></div></div>
   <div class="panel"><h2>O que cada função pode fazer por padrão</h2><p class="sub">O master pode ajustar módulo a módulo para cada pessoa em "Editar".</p><div class="table-wrap"><table class="matriz-perm"><thead><tr><th>Módulo</th>${Object.keys(d.dados.funcoes).map(f=>`<th>${esc(f)}</th>`).join('')}</tr></thead><tbody>${d.dados.modulos.map(([m,r])=>`<tr><td>${esc(r)}</td>${Object.values(d.dados.funcoes).map(p=>`<td>${nivelPill(p[m])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
@@ -2641,6 +2641,7 @@ ACT['colab-form']=el=>{
    <label class="f"><span>E-mail corporativo (login) *</span><input name="email" type="email" required value="${esc(u?.email||'')}" ${u?'disabled':''}></label>
    <label class="f"><span>Função</span><select name="funcao" data-change="funcao-perm">${Object.keys(d.funcoes).map(f=>`<option ${f===func?'selected':''}>${esc(f)}</option>`).join('')}</select></label>
    ${u?'':campoSenha8('senha-colab','senha','Senha inicial (vazio = convite por link)',false)}
+   ${camposDeptos(u,func)}
   </div><div class="form-sec"><h3>Permissões por módulo</h3><p class="sub">"Padrão" segue a função escolhida. Ajuste só o que for diferente para esta pessoa.</p>
   <div class="table-wrap"><table class="matriz-perm"><thead><tr><th>Módulo</th><th>Padrão da função</th><th>Para esta pessoa</th></tr></thead><tbody>${d.modulos.map(([m,r])=>`<tr><td>${esc(r)}</td><td data-padrao="${m}">${nivelPill(d.funcoes[func][m])}</td><td><select name="perm_${m}" style="width:auto"><option value="">Padrão</option>${['nenhum','ver','editar','excluir'].map(n=>`<option value="${n}" ${aj[m]===n?'selected':''}>${NIVEL_NOME[n]}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div></div>
   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">${u?'Salvar':'Cadastrar colaborador'}</button></div></form>`,true);
@@ -2648,10 +2649,11 @@ ACT['colab-form']=el=>{
 document.addEventListener('change',ev=>{if(ev.target.dataset.change!=='funcao-perm')return;const d=APIC['equipe-admin']?.dados;if(!d)return;const f=d.funcoes[ev.target.value];document.querySelectorAll('[data-padrao]').forEach(td=>{td.innerHTML=nivelPill(f[td.dataset.padrao])})});
 FORM['colaborador']=async(fd,form)=>{
   const d=APIC['equipe-admin'].dados;const permissoes={};d.modulos.forEach(([m])=>{const v=fd.get('perm_'+m);if(v)permissoes[m]=v});
+  let deptos=fd.getAll('depto').map(String);if(deptos.includes('*'))deptos=['*'];
   const senha=String(fd.get('senha')||'').trim();if(senha&&!SENHA8.test(senha)){toast('A senha inicial precisa ter exatamente 8 letras ou números.',true);return}
   try{
-    if(form.dataset.id){await MF.api('PATCH','/api/admin/usuarios/'+form.dataset.id,{nome:fd.get('nome'),funcao:fd.get('funcao'),permissoes});closeModal();invalidar('equipe-admin');invalidar('equipe');toast('Colaborador atualizado. As novas permissões valem em até 10 segundos.');return}
-    const r=await MF.api('POST','/api/admin/usuarios',{nome:fd.get('nome'),email:fd.get('email'),ambiente:'equipe',funcao:fd.get('funcao'),permissoes,senha:senha||undefined});
+    if(form.dataset.id){await MF.api('PATCH','/api/admin/usuarios/'+form.dataset.id,{nome:fd.get('nome'),funcao:fd.get('funcao'),permissoes,deptos});closeModal();invalidar('equipe-admin');invalidar('equipe');toast('Colaborador atualizado. As novas permissões valem em até 10 segundos.');return}
+    const r=await MF.api('POST','/api/admin/usuarios',{nome:fd.get('nome'),email:fd.get('email'),ambiente:'equipe',funcao:fd.get('funcao'),permissoes,deptos,senha:senha||undefined});
     closeModal();invalidar('equipe-admin');invalidar('equipe');
     const texto=senha?`Seu acesso ao Painel Contábil do Meu Fiscal está pronto.\nEndereço: ${r.endereco}\nLogin: ${fd.get('email')}\nSenha: ${senha}`:`Crie a sua senha do Painel Contábil do Meu Fiscal por este link (vale 72 horas): ${r.link}`;
     openModal(`${mHead('Colaborador cadastrado')}<div class="modal-body"><p>${r.emailEnviado?'O convite foi enviado por e-mail. ':''}Repasse os dados de acesso:</p><textarea id="dl-text" class="mono" readonly style="min-height:110px">${esc(texto)}</textarea></div><div class="modal-foot"><button class="btn" data-act="copy-dl">Copiar</button><button class="btn primary" data-act="close-modal">Concluir</button></div>`);
@@ -5445,15 +5447,16 @@ const classificarDeptoC=t=>{t=String(t||'');for(const [d,re] of REGRAS_DEPTO_C)i
 const deptoConv=c=>DEPTOS_ATEND.includes(c.depto)?c.depto:'Triagem';
 const FUNCAO_DEPTO={'Analista Fiscal':['Fiscal'],'Analista de DP':['Pessoal'],'Analista Contábil':['Contábil'],'Legalização':['Legalização'],'Comercial':['Comercial'],'Financeiro':['Financeiro']};
 const funcaoDe=id=>(id===ME.id&&ME.funcao)||((listaEquipe()||[]).find(p=>p.id===id)||{}).funcao||'';
-const deptosDoUsuario=(id=ME.id)=>{const f=funcaoDe(id);return FUNCAO_DEPTO[f]||null};   // null = vê todos (master e funções sem departamento)
+const deptosDoUsuario=(id=ME.id)=>{if(id===ME.id&&ME.deptos!==undefined)return ME.deptos;const p=(listaEquipe()||[]).find(x=>x.id===id);if(p&&p.deptos!==undefined)return p.deptos;const f=funcaoDe(id);return FUNCAO_DEPTO[f]||null};   // null = vê todos (master e funções sem departamento)
 if(UI.deptoAtend==null)UI.deptoAtend='';
 function filtroDeptoConv(c){const f=UI.deptoAtend;if(!f)return true;if(f==='meus'){const d=deptosDoUsuario();return !d||d.includes(deptoConv(c))||c.atendenteUid===ME.id}return deptoConv(c)===f}
 function tagDepto(c){const d=deptoConv(c);return `<span class="tag-depto" style="color:${COR_DEPTO[d]};background:${COR_DEPTO[d]}1a">${d}</span>`}
 function barraDeptos(){
   const abertas=S.conversas.filter(c=>c.status!=='encerrada');const meus=deptosDoUsuario();
   const n=d=>abertas.filter(c=>deptoConv(c)===d);const esp=l=>l.filter(c=>c.status==='aguardando_humano').length;
-  const op=[['','Todos',abertas],...(meus?[['meus','Meus ('+meus.join(', ')+')',abertas.filter(c=>meus.includes(deptoConv(c))||c.atendenteUid===ME.id)]]:[]),...DEPTOS_ATEND.map(d=>[d,d,n(d)])];
-  return `<div class="deptos-bar" role="group" aria-label="Departamento">${op.filter(([k,,l])=>!k||k==='meus'||l.length||UI.deptoAtend===k).map(([k,r,l])=>`<button aria-pressed="${UI.deptoAtend===k}" data-act="atend-depto" data-v="${k}" ${k&&k!=='meus'?`style="${UI.deptoAtend===k?'':'border-color:'+COR_DEPTO[k]+'66'}"`:''}>${esc(r)} <i class="${esp(l)?'alerta':''}">${esp(l)||l.length}</i></button>`).join('')}</div>`;
+  const op=[['','Todos',abertas],...(meus&&meus.length?[['meus','Meus ('+meus.join(', ')+')',abertas.filter(c=>meus.includes(deptoConv(c))||c.atendenteUid===ME.id)]]:[]),...DEPTOS_ATEND.map(d=>[d,d,n(d)])];
+  const aviso=MODO==='api'&&atendCfg().porSetor&&meus?`<p class="small muted" style="margin:0 6px 6px">Você recebe as conversas de ${meus.length?meus.join(', '):'nenhum setor'} e as que forem transferidas para você.</p>`:'';
+  return aviso+`<div class="deptos-bar" role="group" aria-label="Departamento">${op.filter(([k,,l])=>!k||k==='meus'||l.length||UI.deptoAtend===k).map(([k,r,l])=>`<button aria-pressed="${UI.deptoAtend===k}" data-act="atend-depto" data-v="${k}" ${k&&k!=='meus'?`style="${UI.deptoAtend===k?'':'border-color:'+COR_DEPTO[k]+'66'}"`:''}>${esc(r)} <i class="${esp(l)?'alerta':''}">${esp(l)||l.length}</i></button>`).join('')}</div>`;
 }
 ACT['atend-depto']=el=>{UI.deptoAtend=el.dataset.v;UI.convSel=null;render()};
 // cabeçalho da conversa: departamento, transferir e link para o lead
@@ -5507,7 +5510,7 @@ render=function(){const r=renderV13.apply(this,arguments);
 // portal: quando o Théo passa para a equipe, a conversa já vai para o departamento do assunto
 const perguntarIAV13=perguntarIA;
 perguntarIA=async function(texto){const r=await perguntarIAV13(texto);const e=empAtual();const c=e&&conversaAtiva(e.id,false);
-  if(c&&c.status==='aguardando_humano'&&(!c.depto||c.depto==='Triagem')){const d=classificarDeptoC(c.mensagens.filter(m=>m.de==='cliente').slice(-6).map(m=>m.texto).join(' '));if(d!=='Triagem')mut('conversas',()=>{c.depto=d},null)}return r};
+  if(c&&c.status==='aguardando_humano'&&(!c.depto||c.depto==='Triagem')&&!(MODO==='api'&&atendCfg().triagemTheo)){const d=classificarDeptoC(c.mensagens.filter(m=>m.de==='cliente').slice(-6).map(m=>m.texto).join(' '));if(d!=='Triagem')mut('conversas',()=>{c.depto=d},null)}return r};
 
 
 /* ---------- CRM: Théo comercial ---------- */
@@ -5570,6 +5573,59 @@ function atualizarTextoTheo(){
 }
 setTimeout(function tentar(){if(S.config&&S.config[0]&&MODO!=='local'){atualizarTextoTheo()}else setTimeout(tentar,1500)},2500);
 /* ==== MÓDULOS v14 (fim) ==== */
+
+/* ==== v15: atendimento por setor, triagem pelo Théo, devolução por inatividade e etiquetas ==== */
+const ATEND_PADRAO={porSetor:true,triagemTheo:true,inatividadeMin:30,devolverPara:'setor'};
+function atendCfg(){return {...ATEND_PADRAO,...((S.config&&S.config[0]&&S.config[0].atendimento)||{})}}
+(function(){const st=document.createElement('style');st.textContent=`
+.tag-atend{font-size:10.5px;border-radius:99px;padding:1px 7px;font-weight:600;background:#0f172a0f;color:#334155;white-space:nowrap}
+.conv-item>span:nth-child(2){flex-wrap:wrap;row-gap:3px}
+.deptos-chk{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:4px}.deptos-chk label{display:flex;gap:6px;align-items:center;font-size:13.5px;font-weight:500}
+`;document.head.appendChild(st)})();
+// cadastro do colaborador: em quais departamentos do Atendimento a pessoa atua
+function camposDeptos(u,func){
+  const raw=Array.isArray(u?.deptos)?u.deptos:null;const todos=raw?raw.includes('*'):(func==='Master'||!FUNCAO_DEPTO[func]);
+  const marc=raw?raw:(FUNCAO_DEPTO[func]||[]);
+  return `<div class="f full"><span>Departamentos no Atendimento</span><div class="deptos-chk">
+    <label><input type="checkbox" name="depto" value="*" ${todos?'checked':''}> <b>Todos os setores</b></label>
+    ${DEPTOS_ATEND.map(d=>`<label><input type="checkbox" name="depto" value="${d}" ${!todos&&marc.includes(d)?'checked':''}> <span class="tag-depto" style="color:${COR_DEPTO[d]};background:${COR_DEPTO[d]}1a">${d}</span></label>`).join('')}</div>
+    <span class="small muted" style="font-weight:400">A pessoa recebe só as conversas dos setores marcados, mais as que forem transferidas para ela. "Triagem" é a recepção: conversas que o Théo não conseguiu encaminhar.</span></div>`;
+}
+document.addEventListener('change',ev=>{const el=ev.target;if(el.name!=='depto'||!el.closest('form[data-form=colaborador]'))return;const f=el.closest('form');
+  if(el.value==='*'&&el.checked)f.querySelectorAll('input[name=depto]:not([value="*"])').forEach(x=>x.checked=false);
+  else if(el.value!=='*'&&el.checked){const t=f.querySelector('input[name=depto][value="*"]');if(t)t.checked=false}});
+// ao trocar a função de alguém novo, os departamentos acompanham o padrão da função
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset.change!=='funcao-perm')return;const f=el.closest('form[data-form=colaborador]');if(!f||f.dataset.id)return;
+  const ds=FUNCAO_DEPTO[el.value];f.querySelectorAll('input[name=depto]').forEach(x=>{x.checked=ds?ds.includes(x.value):x.value==='*'})});
+
+// etiquetas automáticas: departamentos por onde a conversa passou e atendentes que responderam
+function etiquetasConv(c){
+  const atual=deptoConv(c);const deps=[atual];const add=d=>{if(d&&d!=='Triagem'&&DEPTOS_ATEND.includes(d)&&!deps.includes(d))deps.push(d)};
+  (c.transferencias||[]).forEach(t=>{add(t.de&&t.de.depto);add(t.para&&t.para.depto)});if(c.triagem)add(c.triagem.depto);
+  const ats=[];const addA=(id,nome)=>{if(!id||ats.some(a=>a.id===id))return;ats.push({id,nome:nomeEquipe(id)||nome||(UI.nomes&&UI.nomes[id])||''})};
+  (c.mensagens||[]).forEach(m=>{if(m.de==='humano'&&m.uid)addA(m.uid,m.nome)});if(c.status==='humano')addA(c.atendenteUid,'');
+  return {deps,ats,atual};
+}
+tagDepto=function(c){const {deps,ats,atual}=etiquetasConv(c);
+  return deps.map(d=>`<span class="tag-depto" style="color:${COR_DEPTO[d]};background:${COR_DEPTO[d]}${d===atual?'26':'12'}" title="${d===atual?'Departamento atual':'Passou por este departamento'}">${d}</span>`).join('')
+   +ats.map(a=>`<span class="tag-atend" title="Atendente${c.status==='humano'&&c.atendenteUid===a.id?' (com a conversa agora)':''}">${c.status==='humano'&&c.atendenteUid===a.id?'● ':''}${esc(primeiroNome(a.nome)||'Atendente')}</span>`).join('')};
+
+// regras do atendimento (master ou quem edita Configurações)
+const aChatV15=aChat;
+aChat=function(){let h=aChatV15();if((UI.tab.atend||'caixa')!=='caixa'||!(ehMaster()||podeMod('config','editar')))return h;
+  return h.replace(/(<div class="page-head"><div><h1>Atendimento<\/h1>(?:<p>[\s\S]*?<\/p>)?<\/div>)(<\/div>)/,`$1<div class="actions"><button class="btn sm" data-act="atend-regras">${svg('gear')}Regras do atendimento</button></div>$2`)};
+ACT['atend-regras']=()=>{const a=atendCfg();
+  openModal(`${mHead('Regras do atendimento')}<form data-form="atend-regras"><div class="modal-body"><div class="grid-f">
+   <label class="chk full"><input type="checkbox" name="triagemTheo" ${a.triagemTheo?'checked':''}> <span><b>Triagem pelo Théo.</b> Quando a conversa vai para a equipe sem setor definido, o Théo lê as mensagens do cliente e encaminha para o departamento certo. Se não der para saber o assunto, ela fica na Triagem.</span></label>
+   <label class="chk full"><input type="checkbox" name="porSetor" ${a.porSetor?'checked':''}> <span><b>Cada atendente vê só o próprio setor.</b> Recebe as conversas dos departamentos marcados no cadastro (Equipe e permissões › Editar), mais as que estão com ele ou foram transferidas para ele. O master e quem tem "Todos os setores" veem tudo.</span></label>
+   <label class="f"><span>Devolver para a fila após (minutos sem resposta do atendente)</span><input type="number" name="inatividadeMin" min="0" max="480" value="${esc(a.inatividadeMin)}"></label>
+   <label class="f"><span>Devolver para</span><select name="devolverPara"><option value="setor" ${a.devolverPara!=='triagem'?'selected':''}>Fila do mesmo setor</option><option value="triagem" ${a.devolverPara==='triagem'?'selected':''}>Triagem (recepção)</option></select></label>
+   <p class="small muted full" style="margin:0">O tempo conta a partir da mensagem do cliente que ficou sem resposta (ou de quando o atendente assumiu, se for depois). 0 desliga. A conversa volta com todo o histórico e uma nota interna, que o cliente não vê.</p>
+   <p class="small muted full" style="margin:0">Cada atendimento ganha etiquetas automáticas com os departamentos por onde passou e o nome de quem atendeu.</p>
+  </div></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar regras</button></div></form>`,true)};
+FORM['atend-regras']=fd=>{const atendimento={triagemTheo:!!fd.get('triagemTheo'),porSetor:!!fd.get('porSetor'),inatividadeMin:Math.max(0,Math.min(480,Math.round(Number(fd.get('inatividadeMin'))||0))),devolverPara:fd.get('devolverPara')==='triagem'?'triagem':'setor'};
+  mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].atendimento=atendimento},['Atendimento','Alterou as regras do atendimento',`triagem pelo Théo ${atendimento.triagemTheo?'ligada':'desligada'}; por setor ${atendimento.porSetor?'sim':'não'}; inatividade ${atendimento.inatividadeMin} min`]);
+  closeModal();toast('Regras salvas. A equipe passa a ver a nova divisão ao recarregar o painel.')};
 
 
 

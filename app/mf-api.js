@@ -201,6 +201,7 @@
     M.eu = eu;
     ME.id = eu.usuario.id; ME.nome = eu.usuario.nome; ME.canEdit = M.site === 'painel';
     ME.papel = eu.usuario.papel; ME.funcao = eu.usuario.funcao; ME.perm = eu.usuario.permissoes || null;
+    ME.deptos = M.site === 'painel' ? (eu.usuario.deptos === undefined ? null : eu.usuario.deptos) : undefined;
     M.urlCliente = eu.urls?.cliente || ''; M.urlPainel = eu.urls?.painel || '';
     if (M.site === 'painel' && typeof aplicarPermissoes === 'function') aplicarPermissoes();
     Object.assign(CAP, { db: null, sample: eu.recursos.ia ? sample : null, assets, downloads, user: M.site === 'painel' ? usuarios : null });

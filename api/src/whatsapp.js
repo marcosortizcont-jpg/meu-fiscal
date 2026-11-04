@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { CONFIG } from './config.js';
 import { ErroHttp } from './http.js';
 import { perguntarIA, iaDisponivel } from './externos.js';
-import { classificarDepto } from './apoio.js';
+import { triar, deptoConv, cfgAtend, conversaVisivel } from './atendimento.js';
 import { cfgTheo, OPTOUT } from './crm-theo.js';
 import fs from 'node:fs';
 import { urlEnvio, gravarDisco, caminhoDisco, urlDownload } from './arquivos.js';
@@ -308,10 +308,18 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
   }
   async function passarParaEquipe(esc, c, aviso) {
     c.status = 'aguardando_humano';
-    if (!c.depto || c.depto === 'Triagem') c.depto = c.modo === 'comercial' ? 'Comercial' : classificarDepto(c.mensagens.filter(x => x.de === 'cliente').slice(-6).map(x => x.texto).join(' '));
+    await deptoDaFila(esc, c);
     if (aviso) { await enviarTexto(c.waJid, aviso).catch(nada); c.mensagens.push({ de: 'ia', texto: aviso, em: new Date().toISOString(), canal: 'whatsapp' }); }
     c.mensagens.push({ de: 'sistema', texto: 'A conversa foi passada para a equipe do escritório.', em: new Date().toISOString() });
     await salvarConversa(esc, c);
+  }
+  // ao ir para a equipe: o Théo escolhe o setor (Atendimento › Regras do atendimento)
+  async function deptoDaFila(esc, c, cfg) {
+    if (c.modo === 'comercial') { c.depto = 'Comercial'; return; }
+    if (deptoConv(c) === 'Triagem') await triar(c, cfg || await configEscritorio(esc));
+  }
+  async function exigirVisivel(u, c) {
+    if (!conversaVisivel(u, c, cfgAtend(await configEscritorio(u.escritorio_id)))) throw new ErroHttp(403, 'Esta conversa é de outro setor. Peça para transferirem para você.');
   }
   let fluxoDas = null;   // Théo emite o DAS do MEI pela integração com a Receita (integra.js)
   async function responderIA(esc, c, chave, texto, imagemIA) {
@@ -355,7 +363,7 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
       const corpo = limpar(resp) || 'Recebi sua mensagem. A equipe do escritório vai responder em breve.';
       await enviarTexto(c.waJid, corpo);
       c.mensagens.push({ de: 'ia', texto: corpo, em: new Date().toISOString(), confianca: conf, canal: 'whatsapp' });
-      if (conf === 'baixa') { c.status = 'aguardando_humano'; if (!c.depto || c.depto === 'Triagem') c.depto = classificarDepto(c.mensagens.filter(x => x.de === 'cliente').slice(-6).map(x => x.texto).join(' ')); c.mensagens.push({ de: 'sistema', texto: 'A IA chamou a equipe (' + c.depto + ') para continuar este atendimento.', em: new Date().toISOString() }); }
+      if (conf === 'baixa') { c.status = 'aguardando_humano'; await deptoDaFila(esc, c, cfg); c.mensagens.push({ de: 'sistema', texto: 'A IA chamou a equipe (' + c.depto + ') para continuar este atendimento.', em: new Date().toISOString() }); }
       await salvarConversa(esc, c);
     } catch (e) {
       console.error('[whatsapp] IA', e.message);
@@ -461,6 +469,7 @@ DADOS DO LEAD (JSON): ${JSON.stringify(dadosLead)}`;
     const [l] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND id = $2`, [esc, String(ctx.corpo.conversaId || '')]);
     if (!l || l.dados.canal !== 'whatsapp') throw new ErroHttp(404, 'Conversa do WhatsApp não encontrada.');
     const c = l.dados;
+    await exigirVisivel(u, c);
     // resposta a uma mensagem (citação, como no WhatsApp)
     const resp = ctx.corpo.resposta && typeof ctx.corpo.resposta === 'object' ? ctx.corpo.resposta : null;
     const orig = resp ? c.mensagens.find(m => m.em === resp.em && m.de === resp.de) : null;
@@ -477,7 +486,7 @@ DADOS DO LEAD (JSON): ${JSON.stringify(dadosLead)}`;
       const r = await W.sock.sendMessage(c.waJid, msg, !texto && quoted ? { quoted } : undefined);
       if (r?.key?.id) { enviadas.set(r.key.id, r.message); waIds.push(r.key.id); }
     }
-    if (c.status !== 'humano') { c.status = 'humano'; c.atendenteUid = u.id; c.mensagens.push({ de: 'sistema', texto: `${u.nome} assumiu a conversa.`, em: new Date().toISOString() }); }
+    if (c.status !== 'humano' || !c.atendenteUid) { c.status = 'humano'; c.atendenteUid = u.id; c.assumidaEm = new Date().toISOString(); delete c.transferidaPara; c.mensagens.push({ de: 'sistema', texto: `${u.nome} assumiu a conversa.`, em: new Date().toISOString() }); }
     c.mensagens.push({ de: 'humano', texto, em: new Date().toISOString(), uid: u.id, nome: u.nome, canal: 'whatsapp', waIds, ...(resp ? { resposta: { em: String(resp.em || ''), de: String(resp.de || ''), nome: String(resp.nome || '').slice(0, 40), texto: String(resp.texto || '').slice(0, 140) } } : {}), ...(anexos.length ? { arquivos: anexos.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, tamanho: a.tamanho, url: `/api/arquivos/${a.id}` })) } : {}) });
     c.naoLidas = 0;
     await salvarConversa(esc, c);
@@ -489,7 +498,7 @@ DADOS DO LEAD (JSON): ${JSON.stringify(dadosLead)}`;
     if (!pode(u, 'chat', 'editar')) throw new ErroHttp(403, 'Seu acesso ao Atendimento é só de consulta.');
     const [l] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND id = $2`, [u.escritorio_id, String(ctx.corpo.conversaId || '')]);
     if (!l) throw new ErroHttp(404, 'Conversa não encontrada.');
-    const c = l.dados; const m = c.mensagens.find(x => x.em === ctx.corpo.em && x.uid === u.id && x.de === 'humano');
+    const c = l.dados; await exigirVisivel(u, c); const m = c.mensagens.find(x => x.em === ctx.corpo.em && x.uid === u.id && x.de === 'humano');
     if (!m) throw new ErroHttp(404, 'Mensagem não encontrada ou não foi enviada por você.');
     if (Date.now() - new Date(m.em).getTime() > 60 * 60 * 1000) throw new ErroHttp(400, 'Só dá para apagar para todos mensagens enviadas na última hora.');
     if (c.canal === 'whatsapp' && W.sock && W.status === 'conectado') {
@@ -557,9 +566,9 @@ DADOS DO LEAD (JSON): ${JSON.stringify(dadosLead)}`;
     const texto = String(b.texto || '').trim().slice(0, 4000);
     let c = await conversaAberta(esc, jid); const agora = new Date().toISOString();
     if (!c) c = { id: 'wa-' + crypto.randomUUID(), empresaId: b.empresaId ? String(b.empresaId) : null, canal: 'whatsapp', waJid: jid, waFone: jid.split('@')[0],
-      contatoNome: String(b.nome || '').slice(0, 80), contatoId: b.contatoId ? String(b.contatoId) : null, status: 'humano', atendenteUid: u.id, criadoEm: agora,
+      contatoNome: String(b.nome || '').slice(0, 80), contatoId: b.contatoId ? String(b.contatoId) : null, status: 'humano', atendenteUid: u.id, assumidaEm: agora, criadoEm: agora,
       mensagens: [{ de: 'sistema', texto: `${String(u.nome || '').split(' ')[0]} iniciou o atendimento pelo WhatsApp.`, em: agora }] };
-    else if (c.status !== 'humano') { c.status = 'humano'; c.atendenteUid = u.id; c.mensagens.push({ de: 'sistema', texto: `${String(u.nome || '').split(' ')[0]} assumiu a conversa.`, em: agora }); }
+    else if (c.status !== 'humano') { c.status = 'humano'; c.atendenteUid = u.id; c.assumidaEm = agora; c.mensagens.push({ de: 'sistema', texto: `${String(u.nome || '').split(' ')[0]} assumiu a conversa.`, em: agora }); }
     if (texto) { const rt = await enviarTexto(jid, texto); c.mensagens.push({ de: 'humano', texto, em: new Date().toISOString(), uid: u.id, nome: u.nome, canal: 'whatsapp', waIds: rt?.key?.id ? [rt.key.id] : [] }); }
     await salvarConversa(esc, c);
     await log('whatsapp_atendimento_iniciado', { usuarioId: u.id, ip: ctx.ip, detalhe: '+' + jid.split('@')[0] });

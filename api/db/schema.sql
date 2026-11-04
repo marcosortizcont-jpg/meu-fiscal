@@ -30,6 +30,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS usuarios_email_unico ON usuarios (lower(email)
 -- Função na equipe (Master, Analista Fiscal, Analista de DP, Analista Contábil, Legalização) e ajustes de permissão por módulo
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS funcao TEXT;
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permissoes JSONB NOT NULL DEFAULT '{}';
+-- departamentos do Atendimento em que a pessoa atua ('*' = todos os setores; vazio/nulo = padrão da função)
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS deptos TEXT[];
 UPDATE usuarios SET funcao = 'Master' WHERE papel = 'master' AND funcao IS NULL;
 
 -- Quais empresas cada usuário-cliente enxerga e com que perfil (vários CNPJs no mesmo login)

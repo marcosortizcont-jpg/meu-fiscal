@@ -17,6 +17,7 @@ import { registrarFinanceiro } from './financeiro.js';
 import { registrarDocumentos } from './documentos.js';
 import { registrarCrmTheo } from './crm-theo.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
+import { registrarAtendimento, cfgAtend, filtroConversas, conversaVisivel, limparDeptos, deptosDoUsuario } from './atendimento.js';
 
 const AUD = site => `meufiscal:${site}`;
 export const ROTA_SENHA = { cliente: '/definir-senha', painel: '/admin/definir-senha' };
@@ -42,7 +43,7 @@ export function registrarRotas(r, { db, hub }) {
   async function usuarioDaSessao(site, sid) {
     const chave = sha256(sid);
     const c = cache.get(chave); if (c && c.ate > Date.now()) return c.u;
-    const [u] = await db.query(`SELECT u.id, u.escritorio_id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, s.id AS sessao_id, e.funcoes AS funcoes_escritorio
+    const [u] = await db.query(`SELECT u.id, u.escritorio_id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, u.deptos, s.id AS sessao_id, e.funcoes AS funcoes_escritorio
       FROM sessoes s JOIN usuarios u ON u.id = s.usuario_id JOIN escritorios e ON e.id = u.escritorio_id
       WHERE s.id = $1 AND s.site = $2 AND s.revogada_em IS NULL AND s.expira_em > now() AND u.status = 'ativo' AND u.ambiente = $3`,
       [chave, site, AMBIENTE_DO_SITE[site]]);
@@ -140,7 +141,7 @@ export function registrarRotas(r, { db, hub }) {
     const u = await exigir(ctx);
     const [esc] = await db.query('SELECT id, nome FROM escritorios WHERE id = $1', [u.escritorio_id]);
     return {
-      usuario: { id: u.id, nome: u.nome, email: u.email, ambiente: u.ambiente, papel: u.papel, funcao: u.funcao, permissoes: u.perm },
+      usuario: { id: u.id, nome: u.nome, email: u.email, ambiente: u.ambiente, papel: u.papel, funcao: u.funcao, permissoes: u.perm, deptos: u.ambiente === 'equipe' ? deptosDoUsuario(u) : undefined },
       modulos: u.ambiente === 'equipe' ? MODULOS : undefined, funcoes: u.ambiente === 'equipe' ? Object.keys(FUNCOES) : undefined,
       site: u.site, escritorio: esc, empresas: u.empresas, urls: { cliente: CONFIG.origens.cliente[0], painel: CONFIG.origens.painel[0] },
       recursos: { ia: !!(CONFIG.ia.groq || CONFIG.ia.gemini || CONFIG.ia.chave), arquivos: CONFIG.arquivos.driver },
@@ -216,7 +217,9 @@ export function registrarRotas(r, { db, hub }) {
   r.get('/api/dados', async ctx => {
     const u = await exigir(ctx);
     const [filtro, extra] = filtroLeitura(u, 2);
-    const linhas = await db.query(`SELECT colecao, dados FROM registros WHERE escritorio_id = $1 AND colecao <> 'auditoria'${filtro} ORDER BY atualizado_em`, [u.escritorio_id, ...extra]);
+    // conversas: cada atendente recebe só as do(s) seu(s) setor(es) (Atendimento › Regras do atendimento)
+    const [filtroConv, extraConv] = u.ambiente === 'equipe' ? filtroConversas(u, cfgAtend(await configDe(u.escritorio_id)), 2 + extra.length) : ['', []];
+    const linhas = await db.query(`SELECT colecao, dados FROM registros WHERE escritorio_id = $1 AND colecao <> 'auditoria'${filtro}${filtroConv} ORDER BY atualizado_em`, [u.escritorio_id, ...extra, ...extraConv]);
     const acessos = await mapaAcessos(u.escritorio_id);
     const colecoes = Object.fromEntries(COLECOES.map(c => [c, []]));
     for (const l of linhas) if (colecoes[l.colecao]) colecoes[l.colecao].push(prepararLeitura(u, l.colecao, l.dados, acessos));
@@ -227,15 +230,17 @@ export function registrarRotas(r, { db, hub }) {
     return { colecoes, em: new Date().toISOString() };
   });
 
+  async function configDe(esc) { const [c] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'config' LIMIT 1`, [esc]); return c?.dados || {}; }
   r.post('/api/dados/buscar', async ctx => {
     const u = await exigir(ctx);
+    const confAt = u.ambiente === 'equipe' && (ctx.corpo.itens || []).some?.(i => i && i.c === 'conversas') ? cfgAtend(await configDe(u.escritorio_id)) : null;
     const itens = Array.isArray(ctx.corpo.itens) ? ctx.corpo.itens.slice(0, 200) : [];
     const acessos = itens.some(i => i.c === 'empresas') ? await mapaAcessos(u.escritorio_id) : null;
     const out = [];
     for (const { c, id } of itens) {
       if (!COLECOES.includes(c)) continue;
       const [l] = await db.query('SELECT empresa_id, dados FROM registros WHERE escritorio_id = $1 AND colecao = $2 AND id = $3', [u.escritorio_id, c, String(id)]);
-      out.push({ c, id, dados: l && podeLer(u, c, l.empresa_id) && (u.ambiente === 'equipe' || visivelAoCliente(c, l.dados)) ? prepararLeitura(u, c, l.dados, acessos) : null });
+      out.push({ c, id, dados: l && podeLer(u, c, l.empresa_id) && (u.ambiente === 'equipe' || visivelAoCliente(c, l.dados)) && !(c === 'conversas' && confAt && !conversaVisivel(u, l.dados, confAt)) ? prepararLeitura(u, c, l.dados, acessos) : null });
     }
     return { itens: out };
   });
@@ -273,6 +278,12 @@ export function registrarRotas(r, { db, hub }) {
           const faltam = atual.dados.mensagens.filter(m => !vistas.has(chave(m)));
           if (faltam.length) op.dados.mensagens = [...op.dados.mensagens, ...faltam].sort((a, b) => String(a.em).localeCompare(String(b.em))).slice(-200);
           for (const k of ['canal', 'waJid', 'waFone']) if (atual.dados[k] !== undefined) op.dados[k] = atual.dados[k];
+        }
+        // momento em que alguém assumiu a conversa: base da devolução por inatividade (o servidor carimba)
+        if (op.op === 'salvar' && op.c === 'conversas') {
+          const a = atual?.dados || {};
+          if (op.dados.status === 'humano' && (a.status !== 'humano' || a.atendenteUid !== op.dados.atendenteUid)) op.dados.assumidaEm = new Date().toISOString();
+          else if (a.assumidaEm && op.dados.status === 'humano') op.dados.assumidaEm = a.assumidaEm;
         }
         if (op.op === 'apagar') {
           const res = await q('DELETE FROM registros WHERE escritorio_id = $1 AND colecao = $2 AND id = $3', [u.escritorio_id, op.c, op.id]);
@@ -438,20 +449,20 @@ export function registrarRotas(r, { db, hub }) {
   // lista curta da equipe para escolher responsáveis (qualquer pessoa da equipe)
   r.get('/api/equipe', async ctx => {
     const u = await exigir(ctx, { site: 'painel' });
-    const l = await db.query(`SELECT id, nome, funcao, papel, status FROM usuarios WHERE escritorio_id = $1 AND ambiente = 'equipe' AND status <> 'bloqueado' ORDER BY nome`, [u.escritorio_id]);
-    return { equipe: l.map(x => ({ id: x.id, nome: x.nome, funcao: x.funcao || (x.papel === 'master' ? 'Master' : ''), status: x.status })) };
+    const l = await db.query(`SELECT id, nome, funcao, papel, status, deptos FROM usuarios WHERE escritorio_id = $1 AND ambiente = 'equipe' AND status <> 'bloqueado' ORDER BY nome`, [u.escritorio_id]);
+    return { equipe: l.map(x => ({ id: x.id, nome: x.nome, funcao: x.funcao || (x.papel === 'master' ? 'Master' : ''), status: x.status, deptos: deptosDoUsuario(x) })) };
   });
 
   r.get('/api/admin/usuarios', async ctx => {
     const u = await exigir(ctx, { site: 'painel' });
     const verEquipe = u.papel === 'master' || pode(u, 'equipe', 'ver');
     if (!verEquipe && !pode(u, 'carteira', 'ver')) throw new ErroHttp(403, 'Sem acesso.');
-    const usuarios = await db.query(`SELECT u.id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, u.status, u.ultimo_login_em,
+    const usuarios = await db.query(`SELECT u.id, u.nome, u.email, u.ambiente, u.papel, u.funcao, u.permissoes, u.deptos, u.status, u.ultimo_login_em,
         COALESCE((SELECT json_agg(json_build_object('id', ue.empresa_id, 'perfil', ue.perfil)) FROM usuarios_empresas ue WHERE ue.usuario_id = u.id), '[]'::json) AS empresas
       FROM usuarios u WHERE u.escritorio_id = $1 ${verEquipe ? '' : "AND u.ambiente = 'cliente'"} ORDER BY u.ambiente DESC, u.nome`, [u.escritorio_id]);
     const [escr] = await db.query('SELECT funcoes FROM escritorios WHERE id = $1', [u.escritorio_id]);
     const funcoesEsc = funcoesDoEscritorio(escr?.funcoes);
-    usuarios.forEach(x => { if (x.ambiente === 'equipe') x.efetivas = permissoesEfetivas(x, funcoesEsc); });
+    usuarios.forEach(x => { if (x.ambiente === 'equipe') { x.efetivas = permissoesEfetivas(x, funcoesEsc); x.deptosEfetivos = deptosDoUsuario(x); } });
     const empresas = await db.query(`SELECT id, dados->>'razao' AS razao, dados->>'fantasia' AS fantasia, dados->>'cnpj' AS cnpj FROM registros
       WHERE escritorio_id = $1 AND colecao = 'empresas' ORDER BY dados->>'razao'`, [u.escritorio_id]);
     return { eu: { id: u.id, papel: u.papel, podeEquipe: u.papel === 'master', podeClientes: podeCliente(u) }, usuarios, empresas, modulos: MODULOS, funcoes: funcoesEsc, funcoesCodigo: FUNCOES, niveis: NIVEIS };
@@ -491,14 +502,15 @@ export function registrarRotas(r, { db, hub }) {
     const funcao = ambiente === 'equipe' ? (funcaoValida(c.funcao) || 'Analista Fiscal') : null;
     const papel = ambiente === 'equipe' ? (funcao === 'Master' ? 'master' : 'analista') : null;
     const permissoes = ambiente === 'equipe' ? limparPermissoes(c.permissoes) : {};
+    const deptos = ambiente === 'equipe' ? limparDeptos(c.deptos) : null;
     const empresas = ambiente === 'cliente' ? validarEmpresas(c.empresas) : [];
     if (ambiente === 'cliente' && !empresas.length) throw new ErroHttp(400, 'Escolha ao menos uma empresa.');
     const hash = senha ? await hashSenha(senha) : null;
     const resultado = await db.tx(async q => {
       const [existe] = await q('SELECT id, ambiente FROM usuarios WHERE lower(email) = $1', [email]);
       if (existe) throw new ErroHttp(409, existe.ambiente === ambiente ? 'Este e-mail já tem acesso. Use "Editar" para mudar empresas ou permissões.' : 'Este e-mail já é usado por uma conta do outro ambiente.');
-      const [novo] = await q(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, funcao, permissoes, status, senha_hash) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9) RETURNING id, nome, email`,
-        [u.escritorio_id, nome, email, ambiente, papel, funcao, JSON.stringify(permissoes), senha ? 'ativo' : 'convidado', hash]);
+      const [novo] = await q(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, funcao, permissoes, status, senha_hash, deptos) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::text[]) RETURNING id, nome, email`,
+        [u.escritorio_id, nome, email, ambiente, papel, funcao, JSON.stringify(permissoes), senha ? 'ativo' : 'convidado', hash, deptos]);
       for (const e of empresas) await q('INSERT INTO usuarios_empresas (usuario_id, empresa_id, perfil) VALUES ($1,$2,$3)', [novo.id, e.id, e.perfil]);
       if (senha) return { usuario: novo, ativo: true, endereco: CONFIG.origens[ambiente === 'equipe' ? 'painel' : 'cliente'][0] + (ambiente === 'equipe' ? '/admin/login' : '/login') };
       return { usuario: novo, ...(await enviarConvite(q, novo, ambiente === 'equipe' ? 'painel' : 'cliente', u.nome)) };
@@ -537,6 +549,7 @@ export function registrarRotas(r, { db, hub }) {
         const f = funcaoValida(c.funcao);
         if (f) await q('UPDATE usuarios SET funcao = $1, papel = $2 WHERE id = $3', [f, f === 'Master' ? 'master' : 'analista', alvo.id]);
         if (c.permissoes) await q('UPDATE usuarios SET permissoes = $1::jsonb WHERE id = $2', [JSON.stringify(limparPermissoes(c.permissoes)), alvo.id]);
+        if (Array.isArray(c.deptos)) await q('UPDATE usuarios SET deptos = $1::text[] WHERE id = $2', [limparDeptos(c.deptos), alvo.id]);
       }
       if (alvo.ambiente === 'cliente' && Array.isArray(c.empresas)) {
         await q('DELETE FROM usuarios_empresas WHERE usuario_id = $1', [alvo.id]);
@@ -548,7 +561,7 @@ export function registrarRotas(r, { db, hub }) {
     await log('usuario_alterado', { usuarioId: alvo.id, ip: ctx.ip, detalhe: `por ${u.email}: ${JSON.stringify(c).slice(0, 300)}` });
     {
       const partes = []; if (c.nome) partes.push('nome'); if (c.status) partes.push('situação: ' + c.status); if (c.funcao) partes.push('função: ' + c.funcao);
-      if (c.permissoes) partes.push('permissões'); if (Array.isArray(c.empresas)) partes.push('empresas liberadas');
+      if (c.permissoes) partes.push('permissões'); if (Array.isArray(c.deptos)) partes.push('departamentos: ' + (limparDeptos(c.deptos).includes('*') ? 'todos' : limparDeptos(c.deptos).join(', ') || 'nenhum')); if (Array.isArray(c.empresas)) partes.push('empresas liberadas');
       const resumoU = `Alterou ${alvo.ambiente === 'equipe' ? 'o colaborador' : 'o acesso de'} ${alvo.nome || ''}${partes.length ? ' (' + partes.join(', ') + ')' : ''}`;
       const emps = alvo.ambiente === 'cliente' ? (await db.query('SELECT empresa_id FROM usuarios_empresas WHERE usuario_id = $1', [alvo.id])).map(x => x.empresa_id) : [];
       if (emps.length) for (const e of emps) await alt.registrar(db.query, u, ctx.ip, { colecao: 'acesso_portal', id: alvo.id, empresaId: e, acao: 'alterou', resumo: resumoU, mudancas: [] });
@@ -597,6 +610,7 @@ export function registrarRotas(r, { db, hub }) {
   registrarDocumentos(r, { db, exigir, log, pode, wa });
   registrarCrmTheo(r, { db, exigir, log, pode, wa });
   registrarRotasAlteracoes(r, { db, exigir, log, pode, alt });
+  registrarAtendimento(r, { db });
 
   return { carregarEmpresas };
 }
