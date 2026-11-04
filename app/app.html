@@ -3017,7 +3017,7 @@ ACT['wa-conectar']=async()=>{
 };
 aChat=function(){
   const busca=(UI.convBusca||'').toLowerCase().trim();
-  const todas=S.conversas.filter(c=>c.status!=='encerrada');
+  const todas=S.conversas.filter(c=>c.status!=='encerrada'&&filtroDeptoConv(c));
   const F={todas:()=>true,aguardando:c=>c.status==='aguardando_humano',comigo:c=>c.status==='humano'&&c.atendenteUid===ME.id,ia:c=>c.status==='ia',whatsapp:c=>c.canal==='whatsapp'};
   const ult=c=>c.mensagens.at(-1)?.em||c.criadoEm||'';
   const cs=todas.filter(F[UI.convFiltro]||F.todas).filter(c=>!busca||(nomeConv(c)+' '+(c.waFone||'')+' '+(c.mensagens.at(-1)?.texto||'')).toLowerCase().includes(busca))
@@ -3027,7 +3027,7 @@ aChat=function(){
   const cont=k=>todas.filter(F[k]).length;
   const ed=podeMod('chat','editar');
   const filtros=`<div class="filtros" role="group" aria-label="Filtro" style="margin:4px 4px 8px">${[['todas','Todas'],['aguardando','Aguardando'],['comigo','Comigo'],['ia','Copiloto'],['whatsapp','WhatsApp']].map(([k,r])=>`<button aria-pressed="${UI.convFiltro===k}" data-act="conv-filtro" data-v="${k}">${r} ${cont(k)}</button>`).join('')}</div>`;
-  const lista=cs.map(c=>`<button class="conv-item" data-act="conv" data-id="${c.id}" aria-current="${sel&&sel.id===c.id}"><span style="display:flex;justify-content:space-between;gap:6px;align-items:center"><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nomeConv(c))}</b>${c.naoLidas&&!(sel&&sel.id===c.id)?`<span class="nao-lidas">${c.naoLidas}</span>`:pill(...ST[c.status])}</span><span style="display:flex;gap:6px;align-items:center">${canalTag(c)}<span class="small muted">${ult(c)?fmtDH(ult(c)).slice(0,16):''}</span></span><span class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.mensagens.at(-1)?.texto||'')}</span></button>`).join('')||'<p class="muted small" style="padding:10px">Nenhuma conversa aqui.</p>';
+  const lista=cs.map(c=>`<button class="conv-item" data-act="conv" data-id="${c.id}" aria-current="${sel&&sel.id===c.id}"><span style="display:flex;justify-content:space-between;gap:6px;align-items:center"><b style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(nomeConv(c))}</b>${c.naoLidas&&!(sel&&sel.id===c.id)?`<span class="nao-lidas">${c.naoLidas}</span>`:pill(...ST[c.status])}</span><span style="display:flex;gap:6px;align-items:center">${canalTag(c)}${tagDepto(c)}<span class="small muted">${ult(c)?fmtDH(ult(c)).slice(0,16):''}</span></span><span class="small muted" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(c.mensagens.at(-1)?.texto||'')}</span></button>`).join('')||'<p class="muted small" style="padding:10px">Nenhuma conversa aqui.</p>';
   let painel='';
   if(sel){
     const e=emp(sel.empresaId);const wa=sel.canal==='whatsapp';
@@ -3039,7 +3039,7 @@ aChat=function(){
   }
   return `${head('Atendimento','Caixa de entrada única: conversas do portal e do WhatsApp do escritório. O copiloto responde primeiro e passa para a equipe quando precisa; ao assumir, a IA para de responder até você devolver.')}
   ${cartaoWhatsApp()}
-  <div class="inbox"><div class="panel" style="padding:8px"><input type="search" id="busca-conv" data-live="1" value="${esc(UI.convBusca)}" placeholder="Buscar conversa" style="margin-bottom:6px">${filtros}${lista}</div><div>${painel||'<div class="panel"><p class="muted small">Selecione uma conversa.</p></div>'}</div></div>`;
+  <div class="inbox"><div class="panel" style="padding:8px"><input type="search" id="busca-conv" data-live="1" value="${esc(UI.convBusca)}" placeholder="Buscar conversa" style="margin-bottom:6px">${barraDeptos()}${filtros}${lista}</div><div>${painel||'<div class="panel"><p class="muted small">Selecione uma conversa.</p></div>'}</div></div>`;
 };
 ACT['conv-filtro']=el=>{UI.convFiltro=el.dataset.v;render()};
 ACT['conv-lead']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.id);if(!c)return;const id='lead-'+uid();
@@ -5423,6 +5423,137 @@ const motorV12=motor;motor=function(eid,publico){const A=motorV12(eid,publico).f
     if(anal.length&&publico!=='c')A.push({nivel:'info',empresaId:e.id,empresa:nome,area:'Envio mensal',texto:`${anal.length} documento${anal.length>1?'s':''} de ${fmtComp(ant)} para analisar`,view:'a-receb'})});
   return A};
 /* ==== MÓDULOS v13 (fim) ==== */
+/* ==== MÓDULOS v14: Atendimento por departamentos, transferências e Théo comercial no CRM ==== */
+(function(){const st=document.createElement('style');st.textContent=`
+.deptos-bar{display:flex;gap:4px;flex-wrap:wrap;margin:0 4px 6px}
+.deptos-bar button{border:1px solid var(--line);background:var(--surface);border-radius:99px;padding:3px 10px;font-size:12px;cursor:pointer;color:var(--ink);display:flex;gap:5px;align-items:center}
+.deptos-bar button[aria-pressed=true]{background:var(--navy);color:#fff;border-color:var(--navy)}
+.deptos-bar button i{font-style:normal;font-weight:700;font-size:11px;opacity:.8}.deptos-bar button i.alerta{color:var(--crit);opacity:1}
+.deptos-bar button[aria-pressed=true] i.alerta{color:#fecaca}
+.tag-depto{font-size:10.5px;border-radius:99px;padding:1px 7px;font-weight:600;background:var(--surface-2);color:var(--muted)}
+.qualif{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;font-size:13px;margin:6px 0 0}.qualif dt{color:var(--muted)}.qualif dd{margin:0}
+`;document.head.appendChild(st)})();
+const DEPTOS_ATEND=['Triagem','Fiscal','Pessoal','Contábil','Legalização','Financeiro','Comercial'];
+const COR_DEPTO={Triagem:'#64748b',Fiscal:'#2563eb',Pessoal:'#7c3aed',Contábil:'#0891b2',Legalização:'#d97706',Financeiro:'#059669',Comercial:'#db2777'};
+const REGRAS_DEPTO_C=[['Pessoal',/\b(funcion[aá]ri|folha|sal[aá]rio|f[eé]rias|rescis|admiss|demiss|demitir|fgts|esocial|ponto|holerite|contracheque|d[eé]cimo|vale.?transporte|atestado|afastamento)/i],['Financeiro',/\b(mensalidade|honor[aá]rio|fatura|boleto do escrit|meu plano|reajuste)/i],
+  ['Legalização',/\b(abrir (a |uma )?empresa|abertura|altera[cç][aã]o contratual|contrato social|baixa da empresa|encerrar (a )?empresa|alvar[aá]|junta comercial|mudan[cç]a de endere[cç]o|s[oó]cio|inscri[cç][aã]o (estadual|municipal)|cnae)/i],
+  ['Contábil',/\b(balan[cç]o|balancete|dre|lucro|distribui[cç][aã]o|pr[oó].?labore|concilia[cç]|imposto de renda|irpf)/i],['Fiscal',/\b(nota|nfs-?e|nf-?e|das\b|imposto|guia|simples|mei\b|icms|iss\b|tribut|parcelamento|certid|cnd|darf|dctf|pgdas)/i]];
+const classificarDeptoC=t=>{t=String(t||'');for(const [d,re] of REGRAS_DEPTO_C)if(re.test(t))return d;return 'Triagem'};
+const deptoConv=c=>DEPTOS_ATEND.includes(c.depto)?c.depto:'Triagem';
+const FUNCAO_DEPTO={'Analista Fiscal':['Fiscal'],'Analista de DP':['Pessoal'],'Analista Contábil':['Contábil'],'Legalização':['Legalização'],'Comercial':['Comercial'],'Financeiro':['Financeiro']};
+const funcaoDe=id=>(id===ME.id&&ME.funcao)||((listaEquipe()||[]).find(p=>p.id===id)||{}).funcao||'';
+const deptosDoUsuario=(id=ME.id)=>{const f=funcaoDe(id);return FUNCAO_DEPTO[f]||null};   // null = vê todos (master e funções sem departamento)
+if(UI.deptoAtend==null)UI.deptoAtend='';
+function filtroDeptoConv(c){const f=UI.deptoAtend;if(!f)return true;if(f==='meus'){const d=deptosDoUsuario();return !d||d.includes(deptoConv(c))||c.atendenteUid===ME.id}return deptoConv(c)===f}
+function tagDepto(c){const d=deptoConv(c);return `<span class="tag-depto" style="color:${COR_DEPTO[d]};background:${COR_DEPTO[d]}1a">${d}</span>`}
+function barraDeptos(){
+  const abertas=S.conversas.filter(c=>c.status!=='encerrada');const meus=deptosDoUsuario();
+  const n=d=>abertas.filter(c=>deptoConv(c)===d);const esp=l=>l.filter(c=>c.status==='aguardando_humano').length;
+  const op=[['','Todos',abertas],...(meus?[['meus','Meus ('+meus.join(', ')+')',abertas.filter(c=>meus.includes(deptoConv(c))||c.atendenteUid===ME.id)]]:[]),...DEPTOS_ATEND.map(d=>[d,d,n(d)])];
+  return `<div class="deptos-bar" role="group" aria-label="Departamento">${op.filter(([k,,l])=>!k||k==='meus'||l.length||UI.deptoAtend===k).map(([k,r,l])=>`<button aria-pressed="${UI.deptoAtend===k}" data-act="atend-depto" data-v="${k}" ${k&&k!=='meus'?`style="${UI.deptoAtend===k?'':'border-color:'+COR_DEPTO[k]+'66'}"`:''}>${esc(r)} <i class="${esp(l)?'alerta':''}">${esp(l)||l.length}</i></button>`).join('')}</div>`;
+}
+ACT['atend-depto']=el=>{UI.deptoAtend=el.dataset.v;UI.convSel=null;render()};
+// cabeçalho da conversa: departamento, transferir e link para o lead
+const aChatV13=aChat;
+aChat=function(){
+  listaEquipe();let h=aChatV13();const m=h.match(/<form class="composer" data-form="msg-humano" data-id="([^"]+)">/)||h.match(/data-act="encerrar-conv" data-id="([^"]+)"/);
+  const c=m&&S.conversas.find(x=>x.id===m[1]);if(!c||!podeMod('chat','editar'))return h;
+  const extra=`<button class="btn sm" data-act="transferir" data-id="${c.id}">Transferir</button>${c.leadId?`<button class="btn sm ghost" data-act="crm-abrir" data-id="${c.leadId}">Lead no CRM</button>`:''}`;
+  h=h.replace(/(data-act="encerrar-conv" data-id="[^"]+">Encerrar<\/button>)/,extra+'$1');
+  h=h.replace(/(<div class="panel-head" style="margin-bottom:10px;flex-wrap:wrap;gap:8px"><div><h2>[^<]*<\/h2>)(<span class="small muted">)/,`$1 ${tagDepto(c)}${c.modo==='comercial'?' <span class="tag-depto" style="background:#db27771a;color:#db2777">Théo comercial</span>':''}<br>$2`);
+  return h;
+};
+const crmAbrirV13=ACT['crm-abrir'];
+ACT['crm-abrir']=(el,ev)=>{if(UI.view==='a-chat'){const l=S.leads.find(x=>x.id===el.dataset.id);if(l){abrirLead(l);return}toast('Lead não encontrado (pode ter sido excluído).',true);return}return crmAbrirV13(el,ev)};
+
+/* ---------- transferir atendimento ---------- */
+ACT['transferir']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.id);if(!c)return;if(listaEquipe()==null){toast('Carregando a equipe…');setTimeout(()=>ACT['transferir'](el),900);return}const eq=(listaEquipe()||[]).filter(p=>p.id);
+  const opU=d=>eq.filter(p=>p.id!==ME.id||true).map(p=>{const ds=deptosDoUsuario(p.id);return `<option value="${p.id}" data-deptos="${esc((ds||DEPTOS_ATEND).join(','))}">${esc(p.nome)}${ds?' · '+ds.join(', '):''}${p.id===ME.id?' (você)':''}</option>`}).join('');
+  openModal(`${mHead('Transferir atendimento · '+esc(nomeConv(c)))}<form data-form="transferir" data-id="${c.id}"><div class="modal-body"><div class="grid-f">
+   <label class="f"><span>Para o departamento</span><select name="depto" data-transf-depto>${DEPTOS_ATEND.map(d=>`<option ${deptoConv(c)===d?'selected':''}>${d}</option>`).join('')}</select></label>
+   <label class="f"><span>Para a pessoa (opcional)</span><select name="uid" data-transf-uid><option value="">Fila do departamento (quem estiver livre assume)</option>${opU()}</select></label>
+   <label class="f full"><span>Nota interna para quem recebe (o cliente não vê)</span><textarea name="nota" rows="3" maxlength="600" placeholder="Ex.: cliente quer rescindir um funcionário em dezembro; já enviou a CTPS."></textarea></label>
+   <label class="chk full"><input type="checkbox" name="avisar" checked> Avisar o cliente que o atendimento foi encaminhado para o setor</label></div>
+   <p class="small muted" style="margin:6px 0 0">Situação atual: ${tagDepto(c)} · ${c.status==='humano'?'com '+esc(nomeEquipe(c.atendenteUid)||'alguém da equipe'):c.status==='ia'?'Théo atendendo':'aguardando na fila'}</p></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Transferir</button></div></form>`,true);
+  // ao escolher uma pessoa, o departamento acompanha o dela
+  setTimeout(()=>{const f=document.querySelector('form[data-form=transferir]');if(!f)return;f.querySelector('[data-transf-uid]').addEventListener('change',ev=>{const o=ev.target.selectedOptions[0];const ds=(o&&o.dataset.deptos||'').split(',').filter(Boolean);const d=f.querySelector('[data-transf-depto]');if(ds.length===1)d.value=ds[0]})},30)};
+FORM['transferir']=async(fd,form)=>{const c=S.conversas.find(x=>x.id===form.dataset.id);if(!c)return;
+  const depto=String(fd.get('depto'));const uidP=String(fd.get('uid')||'');const nota=String(fd.get('nota')||'').trim();const avisar=!!fd.get('avisar');
+  const de={depto:deptoConv(c),uid:c.atendenteUid||null,status:c.status};if(de.depto===depto&&(de.uid||'')===uidP&&c.status!=='ia'){toast('Escolha outro departamento ou outra pessoa.',true);return}
+  const nomeP=uidP?(nomeEquipe(uidP)||'colega'):'';const quem=primeiroNome(ME.nome)||'Equipe';const txtCli=`Seu atendimento foi encaminhado para o setor ${depto==='Triagem'?'de atendimento':depto}${nomeP?' ('+primeiroNome(nomeP)+')':''}. Já vamos te responder por aqui.`;
+  mut('conversas',()=>{c.depto=depto;if(uidP){c.status='humano';c.atendenteUid=uidP;c.transferidaPara=uidP;c.transferidaEm=agora()}else{c.status='aguardando_humano';c.atendenteUid=null;delete c.transferidaPara}
+    (c.transferencias=c.transferencias||[]).push({em:agora(),de,para:{depto,uid:uidP||null},por:ME.id,nota});
+    c.mensagens.push({de:'sistema',interna:true,em:agora(),texto:`${quem} transferiu para ${depto}${nomeP?' · '+nomeP:' (fila)'}${nota?' — nota: '+nota:''}`,textoCliente:avisar?txtCli:''})},
+    ['Atendimento',`Transferiu atendimento para ${depto}${nomeP?' / '+nomeP:''}`,emp(c.empresaId)?.razao||nomeConv(c)]);
+  closeModal();
+  if(avisar&&c.canal==='whatsapp'&&MODO==='api'){try{await MF.api('POST','/api/whatsapp/enviar',{conversaId:c.id,texto:txtCli})}catch(er){toast('Transferido, mas o aviso no WhatsApp falhou: '+er.message,true);return}}
+  if(uidP!==ME.id&&UI.convSel===c.id&&!filtroDeptoConv(c))UI.convSel=null;
+  toast(`Transferido para ${depto}${nomeP?' · '+nomeP:''}.`);
+};
+// notas internas: no portal, o cliente vê só o aviso (ou nada)
+const bolhasV13=bolhas;
+bolhas=function(c,lado){if(lado==='cliente'&&c&&(c.mensagens||[]).some(m=>m.interna))c={...c,mensagens:c.mensagens.map(m=>m.interna?{...m,texto:m.textoCliente||'',oculta:!m.textoCliente}:m)};
+  let h=bolhasV13(c,lado);if(lado==='cliente')h=h.replace(/<div class="msg sys">\s*<\/div>/g,'');return h};
+// aviso para quem recebeu uma transferência
+UI.transfVistas=UI.transfVistas||new Set();
+const renderV13=render;
+render=function(){const r=renderV13.apply(this,arguments);
+  if(UI.modo==='painel'){S.conversas.filter(c=>c.transferidaPara===ME.id&&c.status==='humano'&&!UI.transfVistas.has(c.id+c.transferidaEm)).forEach(c=>{UI.transfVistas.add(c.id+c.transferidaEm);if(Date.now()-new Date(c.transferidaEm).getTime()<10*60000){const t=[...(c.transferencias||[])].pop();setTimeout(()=>toast(`${nomeEquipe(t?.por)||'Um colega'} transferiu ${nomeConv(c)} para você${t?.nota?': '+t.nota:''}.`),50)}})}
+  return r};
+// portal: quando o Théo passa para a equipe, a conversa já vai para o departamento do assunto
+const perguntarIAV13=perguntarIA;
+perguntarIA=async function(texto){const r=await perguntarIAV13(texto);const e=empAtual();const c=e&&conversaAtiva(e.id,false);
+  if(c&&c.status==='aguardando_humano'&&(!c.depto||c.depto==='Triagem')){const d=classificarDeptoC(c.mensagens.filter(m=>m.de==='cliente').slice(-6).map(m=>m.texto).join(' '));if(d!=='Triagem')mut('conversas',()=>{c.depto=d},null)}return r};
+
+
+/* ---------- CRM: Théo comercial ---------- */
+const THEO_INFO_PADRAO=`Planos mensais (contabilidade online, atendimento por WhatsApp, telefone, e-mail e chat, painel para a empresa):
+PRESTAÇÃO DE SERVIÇOS: Basic R$ 259/mês (abertura de CNPJ grátis, contabilidade completa, certificado digital A1); Unique R$ 450/mês (gerente de conta dedicado, atendimento das 8h às 21h, folha de sócios e funcionários até 5 pessoas, importação de notas de qualquer município); Unique Plus R$ 700/mês (tudo do Unique + até 100 agendamentos de contas ou emissões de nota por mês, importação de até 800 notas e de extrato de até 3 contas).
+COMÉRCIO: Basic Comércio R$ 359/mês; Unique Comércio R$ 550/mês (inclui declaração de IRPF); Unique Plus Comércio R$ 900/mês.
+Adicional: endereço comercial para abrir o CNPJ, a partir de R$ 60/mês.
+Troca de contador: o escritório pede os documentos ao contador anterior. Abertura: CNPJ, inscrições e enquadramento no regime certo.`;
+const theoCfg=()=>({ativo:false,atrasoMin:2,inicio:8,fim:18,sabado:false,mensagem:'',info:THEO_INFO_PADRAO,...(cfg().crmTheo||{})});
+const aCrmV13=aCrm;
+aCrm=function(){let h=aCrmV13();const t=theoCfg();
+  h=h.replace(/(<button class="btn primary" data-act="crm-novo">)/,`<button class="btn" data-act="crm-theo-cfg">🤖 Théo ${t.ativo?'ligado':'desligado'}</button>$1`);
+  S.leads.forEach(l=>{if(!l.theo&&!l.optOut&&!l.qualificacao)return;const tx=l.optOut?'🚫 não quer mensagens':l.theo?.status==='agendado'?'🤖 Théo envia '+fmtDH(l.theo.enviarEm).slice(11):l.theo?.status==='enviado'?(l.qualificacao?'🤖 qualificado pelo Théo':'🤖 Théo em contato'):l.theo?.status==='falhou'?'⚠ Théo não enviou':'';
+    if(tx)h=h.replace(new RegExp(`(data-lead="${l.id}"[\\s\\S]*?<div class="chips">)`),`$1<span style="background:#db27771a;color:#db2777">${esc(tx)}</span>`)});
+  return h};
+ACT['crm-theo-cfg']=()=>{const t=theoCfg();const ed=podeMod('comercial','editar')&&(ehMaster()||podeMod('config','editar')||podeMod('comercial','excluir'));const dis=ed?'':'disabled';
+  openModal(`${mHead('Théo no comercial')}<form data-form="crm-theo" class="modal-body"><div class="grid-f">
+   <p class="small full" style="margin:0">Quando alguém pede contato pelo site, o Théo manda a primeira mensagem no WhatsApp do escritório em poucos minutos, conversa para entender a empresa (atividade, regime, faturamento, funcionários, cidade) e passa para o Comercial quando a pessoa pede proposta ou fica pronta para fechar. Tudo vai para a linha do tempo do lead.</p>
+   <label class="chk full"><input type="checkbox" name="ativo" ${t.ativo?'checked':''} ${dis}> <b>Ligar o Théo para os leads do site</b></label>
+   <label class="f"><span>Esperar antes da 1ª mensagem (min)</span><input type="number" name="atrasoMin" min="0" max="30" value="${esc(t.atrasoMin)}" ${dis}></label>
+   <label class="f"><span>Horário comercial</span><span style="display:flex;gap:6px;align-items:center"><input type="number" name="inicio" min="0" max="23" value="${esc(t.inicio)}" style="width:70px" ${dis}>h às <input type="number" name="fim" min="1" max="24" value="${esc(t.fim)}" style="width:70px" ${dis}>h</span></label>
+   <label class="chk"><input type="checkbox" name="sabado" ${t.sabado?'checked':''} ${dis}> Enviar também aos sábados</label>
+   <p class="small muted full" style="margin:0">Fora do horário, a mensagem sai no início do próximo horário comercial. Responder rápido faz diferença: as pesquisas de "speed to lead" mostram que o contato nos primeiros 5 minutos aumenta muito a chance de conversar com o interessado.</p>
+   <label class="f full"><span>Primeira mensagem (use {nome}, {escritorio}, {plano}, {empresa}, {pergunta})</span><textarea name="mensagem" rows="5" maxlength="1000" ${dis} placeholder="Olá, {nome}! Aqui é o Théo, assistente virtual do {escritorio}. 😊 Recebi seu pedido{plano} pelo nosso site e já vou te ajudar. {pergunta} …">${esc(t.mensagem||'')}</textarea></label>
+   <p class="small muted full" style="margin:0">{pergunta} muda conforme o formulário: quem já tem contador recebe "o que te fez pensar em trocar de contador?"; quem não tem, "a empresa já está aberta ou você quer abrir o CNPJ agora?". A mensagem sempre termina com a opção de responder SAIR.</p>
+   <label class="f full"><span>O que o Théo pode falar sobre o escritório (planos, preços, diferenciais)</span><textarea name="info" rows="8" maxlength="4000" ${dis}>${esc(t.info||THEO_INFO_PADRAO)}</textarea></label>
+   <div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">Prévia</span><div class="linha-dig" id="theo-previa" style="white-space:pre-wrap;font-family:inherit">…</div></div></div>
+   ${ed?`<div class="actions" style="margin-top:12px"><button class="btn primary">Salvar</button><button type="button" class="btn" data-act="close-modal">Fechar</button></div>`:''}</form>`,true);
+  previaTheo()};
+async function previaTheo(){const el=document.getElementById('theo-previa');if(!el)return;const f=document.querySelector('form[data-form=crm-theo]');const conf={mensagem:f.mensagem.value.trim()||undefined,atrasoMin:Number(f.atrasoMin.value),inicio:Number(f.inicio.value),fim:Number(f.fim.value),sabado:f.sabado.checked};
+  if(MODO!=='api'){el.textContent='(prévia na versão publicada)';return}
+  try{const r=await MF.api('POST','/api/crm/theo/previa',{conf});el.textContent=r.texto+'\n\n→ Um lead que chegasse agora receberia em '+fmtDH(r.quando)+'.'}catch(er){el.textContent=er.message}}
+document.addEventListener('input',ev=>{if(ev.target.closest&&ev.target.closest('form[data-form=crm-theo]')){clearTimeout(UI.tPrevia);UI.tPrevia=setTimeout(previaTheo,500)}});
+FORM['crm-theo']=(fd)=>{const n=(k,d,a,b)=>Math.min(b,Math.max(a,Number(fd.get(k)??d)));const inicio=n('inicio',8,0,23),fim=n('fim',18,1,24);if(fim<=inicio){toast('O fim do horário precisa ser depois do início.',true);return}
+  const crmTheo={ativo:!!fd.get('ativo'),atrasoMin:n('atrasoMin',2,0,30),inicio,fim,sabado:!!fd.get('sabado'),mensagem:String(fd.get('mensagem')||'').trim(),info:String(fd.get('info')||'').trim()};
+  if(crmTheo.ativo&&MODO==='api'&&APIC.wa?.dados?.status!=='conectado')toast('Atenção: o WhatsApp do escritório não está conectado. O Théo envia assim que conectar.',true);
+  mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].crmTheo=crmTheo},['Comercial','Théo comercial '+(crmTheo.ativo?'ligado':'desligado'),'']);closeModal();toast('Théo comercial salvo.')};
+// detalhe do lead: qualificação feita pelo Théo e botão para ele iniciar a conversa
+const abrirLeadV13=abrirLead;
+abrirLead=function(l){abrirLeadV13(l);if(!l||!UI.modal)return;const q=l.qualificacao||{};const rot={atividade:'Atividade',regime:'Regime',faturamento_mensal:'Faturamento/mês',funcionarios:'Funcionários',cidade:'Cidade',prioridade:'Prioridade'};
+  const qs=Object.entries(rot).filter(([k])=>q[k]);const st=l.theo;
+  const bloco=`<div class="panel" style="padding:10px 12px;margin:0 0 12px;background:#db27770d;border-color:#db277733"><b>🤖 Théo</b> <span class="small muted">${l.optOut?'o contato pediu para não receber mensagens':st?.status==='agendado'?'primeira mensagem agendada para '+fmtDH(st.enviarEm):st?.status==='enviado'?'conversando desde '+fmtDH(st.enviadoEm):st?.status==='falhou'?'não conseguiu enviar: '+esc(st.erro||''):'ainda não falou com este lead'}</span>
+   ${q.resumo?`<p class="small" style="margin:6px 0 0"><b>Resumo:</b> ${esc(q.resumo)}</p>`:''}${qs.length?`<dl class="qualif">${qs.map(([k,r])=>`<dt>${r}</dt><dd>${esc(q[k])}</dd>`).join('')}</dl>`:''}
+   <div class="actions" style="margin-top:8px">${st?.conversaId?`<button class="btn sm" data-act="lead-conversa" data-id="${esc(st.conversaId)}">Ver conversa</button>`:''}${!l.optOut&&l.whatsapp&&podeMod('comercial','editar')&&st?.status!=='enviado'?`<button class="btn sm primary" data-act="lead-theo" data-id="${l.id}">Théo: enviar primeira mensagem agora</button>`:''}</div></div>`;
+  UI.modal.html=UI.modal.html.replace('<h3 style="margin:14px 0 8px">Linha do tempo</h3>',bloco+'<h3 style="margin:14px 0 8px">Linha do tempo</h3>');renderModal()};
+ACT['lead-theo']=async el=>{el.disabled=true;el.textContent='Enviando…';try{const r=await MF.api('POST','/api/crm/theo/iniciar',{leadId:el.dataset.id});toast('O Théo iniciou a conversa no WhatsApp.');setTimeout(()=>{const l=S.leads.find(x=>x.id===el.dataset.id);if(l&&UI.modal)abrirLead(l)},1200)}catch(er){toast(er.message,true);el.disabled=false;el.textContent='Théo: enviar primeira mensagem agora'}};
+ACT['lead-conversa']=el=>{closeModal();UI.view='a-chat';UI.tab.atend='caixa';UI.deptoAtend='';UI.convSel=el.dataset.id;if(location.hash!=='#a-chat')location.hash='a-chat';else render()};
+/* ==== MÓDULOS v14 (fim) ==== */
+
 
 
 

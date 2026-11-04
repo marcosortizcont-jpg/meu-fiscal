@@ -60,3 +60,15 @@ export function criarApoio(db) {
   }
   return { guardarArquivo, conteudoArquivo, gravar, registro, empresa, configEscritorio, emailsDaEmpresa };
 }
+
+// Departamento provável de um atendimento, pelo assunto (o atendente pode transferir depois)
+export const DEPTOS_ATEND = ['Triagem', 'Fiscal', 'Pessoal', 'Contábil', 'Legalização', 'Financeiro', 'Comercial'];
+const REGRAS_DEPTO = [
+  ['Pessoal', /\b(funcion[aá]ri|folha|sal[aá]rio|f[eé]rias|rescis|admiss|demiss|demitir|contratar funcion|fgts|esocial|e-social|ponto|holerite|contracheque|d[eé]cimo|13[ºo°]?|vale.?transporte|atestado|afastamento|inss do funcion)/i],
+  ['Financeiro', /\b(mensalidade|honor[aá]rio|fatura|boleto do escrit|pagar o escrit|meu plano|cobran[cç]a do escrit|reajuste)/i],
+  ['Legalização', /\b(abrir (a |uma )?empresa|abertura|altera[cç][aã]o contratual|contrato social|baixa da empresa|fechar (a )?empresa|encerrar (a )?empresa|alvar[aá]|junta comercial|mudan[cç]a de endere[cç]o|novo s[oó]cio|incluir s[oó]cio|inscri[cç][aã]o (estadual|municipal)|cnae)/i],
+  ['Contábil', /\b(balan[cç]o|balancete|dre|demonstra[cç]|lucro|distribui[cç][aã]o|pr[oó].?labore|concilia[cç]|extrato banc|imposto de renda|irpf|declara[cç][aã]o de renda)/i],
+  ['Fiscal', /\b(nota fiscal|nota|nfs-?e|nf-?e|das\b|imposto|guia|simples nacional|mei\b|icms|iss\b|tribut|parcelamento|certid[aã]o|cnd|darf|dctf|pgdas|sped)/i],
+  ['Comercial', /\b(contratar (o |a )?(servi|escrit|plano|contabilidade)|or[cç]amento|proposta|quanto custa|pre[cç]o do plano|planos?\b.*(valor|pre[cç]o))/i],
+];
+export function classificarDepto(texto) { const t = String(texto || ''); for (const [d, re] of REGRAS_DEPTO) if (re.test(t)) return d; return 'Triagem'; }

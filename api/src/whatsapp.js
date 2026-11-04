@@ -8,6 +8,8 @@ import crypto from 'node:crypto';
 import { CONFIG } from './config.js';
 import { ErroHttp } from './http.js';
 import { perguntarIA, iaDisponivel } from './externos.js';
+import { classificarDepto } from './apoio.js';
+import { cfgTheo, OPTOUT } from './crm-theo.js';
 import fs from 'node:fs';
 import { urlEnvio, gravarDisco, caminhoDisco, urlDownload } from './arquivos.js';
 
@@ -160,6 +162,24 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     return null;
   }
   // contato salvo em Atendimento › Contatos (tem prioridade sobre o telefone do cadastro da empresa)
+  async function leadPorFone(esc, fone) {
+    const k = chaveFone(fone); if (!k) return null;
+    const ls = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'leads' AND coalesce(dados->>'etapa', dados->>'status', '') NOT IN ('ganho','perdido','convertido','descartado') ORDER BY atualizado_em DESC LIMIT 500`, [esc]);
+    return ls.map(x => x.dados).find(l => chaveFone(l.whatsapp) === k) || null;
+  }
+  async function gravarLead(esc, l) { await db.query(`UPDATE registros SET dados = $3::jsonb, versao = versao + 1, atualizado_em = now() WHERE escritorio_id = $1 AND colecao = 'leads' AND id = $2`, [esc, l.id, JSON.stringify(l)]); }
+  async function lerLead(esc, id) { const [x] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'leads' AND id = $2`, [esc, String(id)]); return x?.dados || null; }
+  async function iniciarConversaLead({ esc, fone, nome, texto, leadId }) {
+    if (!W.sock || W.status !== 'conectado') throw new ErroHttp(503, 'O WhatsApp do escritório está desconectado.');
+    const jid = await resolverJid(fone); const agora = new Date().toISOString();
+    let c = await conversaAberta(esc, jid);
+    if (!c) c = { id: 'wa-' + crypto.randomUUID(), empresaId: null, canal: 'whatsapp', waJid: jid, waFone: jid.split('@')[0], contatoNome: String(nome || '').slice(0, 80), status: 'ia', criadoEm: agora,
+      mensagens: [{ de: 'sistema', texto: 'O Théo iniciou a conversa com um lead do site (CRM comercial).', em: agora }] };
+    Object.assign(c, { leadId, modo: 'comercial', depto: 'Comercial' }); if (c.status !== 'humano') c.status = 'ia';
+    const rt = await enviarTexto(jid, texto);
+    c.mensagens.push({ de: 'ia', texto, em: new Date().toISOString(), canal: 'whatsapp', confianca: 'alta', waIds: rt?.key?.id ? [rt.key.id] : [] });
+    await salvarConversa(esc, c); return c.id;
+  }
   async function contatoPorFone(esc, fone) {
     const alvo = chaveFone(fone); if (!alvo) return null;
     const cs = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'contatos'`, [esc]);
@@ -235,6 +255,10 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
       c = { id: 'wa-' + crypto.randomUUID(), empresaId: (ct && (ct.empresas || [])[0]) || await empresaPorFone(esc, fone), canal: 'whatsapp', waJid: jid, waFone: fone,
         contatoNome: ct?.nome || m.pushName || '', contatoId: ct?.id || null, atendenteUid: ct?.atendente || null,
         status: iaDisponivel() && cfg.whatsappIA !== false ? 'ia' : 'aguardando_humano', atendenteId: null, criadoEm: agora, mensagens: [] };
+      if (!c.empresaId && !ct) {
+        const ld = await leadPorFone(esc, fone);
+        if (ld) { c.leadId = ld.id; c.modo = 'comercial'; c.depto = 'Comercial'; c.contatoNome = ld.nome || c.contatoNome; if (!(iaDisponivel() && cfgTheo(cfg).ativo && !ld.optOut)) c.status = 'aguardando_humano'; }
+      }
     }
     if (m.pushName && !c.contatoNome) c.contatoNome = m.pushName;
 
@@ -284,6 +308,7 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
   }
   async function passarParaEquipe(esc, c, aviso) {
     c.status = 'aguardando_humano';
+    if (!c.depto || c.depto === 'Triagem') c.depto = c.modo === 'comercial' ? 'Comercial' : classificarDepto(c.mensagens.filter(x => x.de === 'cliente').slice(-6).map(x => x.texto).join(' '));
     if (aviso) { await enviarTexto(c.waJid, aviso).catch(nada); c.mensagens.push({ de: 'ia', texto: aviso, em: new Date().toISOString(), canal: 'whatsapp' }); }
     c.mensagens.push({ de: 'sistema', texto: 'A conversa foi passada para a equipe do escritório.', em: new Date().toISOString() });
     await salvarConversa(esc, c);
@@ -292,6 +317,7 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
   async function responderIA(esc, c, chave, texto, imagemIA) {
     const cfg = await configEscritorio(esc);
     if (PEDE_HUMANO.test(texto || '')) return passarParaEquipe(esc, c, 'Certo! Vou chamar alguém da equipe do escritório para continuar com você. Aguarde um instante, por favor.');
+    if (c.modo === 'comercial' && c.leadId) return responderComercial(esc, c, chave, texto, cfg);
     if (fluxoDas && c.empresaId && texto) {
       let fx = null; try { fx = await fluxoDas({ esc, empresaId: c.empresaId, chave: 'wa:' + c.id, texto }); } catch (e) { console.error('[whatsapp] DAS', e.message); }
       if (fx) {
@@ -329,12 +355,72 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
       const corpo = limpar(resp) || 'Recebi sua mensagem. A equipe do escritório vai responder em breve.';
       await enviarTexto(c.waJid, corpo);
       c.mensagens.push({ de: 'ia', texto: corpo, em: new Date().toISOString(), confianca: conf, canal: 'whatsapp' });
-      if (conf === 'baixa') { c.status = 'aguardando_humano'; c.mensagens.push({ de: 'sistema', texto: 'A IA chamou a equipe para continuar este atendimento.', em: new Date().toISOString() }); }
+      if (conf === 'baixa') { c.status = 'aguardando_humano'; if (!c.depto || c.depto === 'Triagem') c.depto = classificarDepto(c.mensagens.filter(x => x.de === 'cliente').slice(-6).map(x => x.texto).join(' ')); c.mensagens.push({ de: 'sistema', texto: 'A IA chamou a equipe (' + c.depto + ') para continuar este atendimento.', em: new Date().toISOString() }); }
       await salvarConversa(esc, c);
     } catch (e) {
       console.error('[whatsapp] IA', e.message);
       c.status = 'aguardando_humano';
       c.mensagens.push({ de: 'sistema', texto: 'O copiloto não respondeu (' + e.message + '). Conversa na fila para um atendente.', em: new Date().toISOString() });
+      await salvarConversa(esc, c);
+    }
+  }
+
+  /* ---------- Théo comercial: conversa com lead do CRM ---------- */
+  async function responderComercial(esc, c, chave, texto, cfg) {
+    const agora = () => new Date().toISOString();
+    const l = await lerLead(esc, c.leadId); const conf = cfgTheo(cfg);
+    if (!l) { c.modo = null; await salvarConversa(esc, c); return; }
+    const registrar = async (txt, extra = {}) => { const x = await lerLead(esc, c.leadId) || l; x.atividades = [...(x.atividades || []), { em: agora(), tipo: 'whatsapp', nome: 'Théo', texto: txt }].slice(-300); Object.assign(x, extra); await gravarLead(esc, x); return x; };
+    if (OPTOUT.test(texto || '')) {
+      const t = 'Tudo bem! Não vou mais te enviar mensagens. Se precisar da gente, é só chamar por aqui. 😊';
+      await enviarTexto(c.waJid, t).catch(nada); c.mensagens.push({ de: 'ia', texto: t, em: agora(), canal: 'whatsapp' }); c.status = 'encerrada'; c.encerradaEm = agora();
+      c.mensagens.push({ de: 'sistema', texto: 'O lead pediu para não receber mais mensagens (SAIR).', em: agora() }); await salvarConversa(esc, c);
+      await registrar('Pediu para não receber mais mensagens (respondeu SAIR).', { optOut: true }); return;
+    }
+    // primeira resposta: o lead avança para "Primeiro contato"
+    if ((l.etapa || 'novo') === 'novo') await registrar('Respondeu ao Théo pelo WhatsApp: "' + String(texto).slice(0, 140) + '"', { etapa: 'contato', status: 'contato', etapaDesde: agora() });
+    if (!iaDisponivel() || !conf.ativo) return passarParaEquipe(esc, c, 'Obrigado! Um especialista do escritório vai continuar com você por aqui em instantes.');
+    const dadosLead = { nome: l.nome, empresa: l.empresa, cnpj: l.cnpj ? 'informado' : 'não informado', funcionarios: l.funcionarios, ja_tem_contador: l.temContador, plano_escolhido: l.planoNome, valor_plano: l.valor, cidade: l.cidade, mensagem_do_site: l.mensagem };
+    const regras = `Você é o Théo, assistente virtual do escritório de contabilidade "${cfg.escritorio || 'Meu Fiscal'}", falando pelo WhatsApp com um interessado que pediu contato pelo site.
+Objetivo: entender a empresa e encaminhar para um especialista fechar a contratação. Você não fecha contrato nem dá desconto.
+Regras:
+- Português do Brasil, até 3 frases curtas por mensagem, tom cordial e direto, sem markdown, no máximo 1 emoji.
+- Faça UMA pergunta por mensagem. Qualifique nesta ordem, pulando o que já se sabe: tipo de atividade (serviço, comércio ou indústria); se a empresa já existe (e o regime: MEI, Simples Nacional ou outro) ou se vai abrir; faturamento médio mensal aproximado; número de funcionários; cidade; o que é mais importante para ele (preço, atendimento, troca rápida de contador…).
+- Use só as INFORMAÇÕES DO ESCRITÓRIO para falar de planos, preços e serviços. Se não souber, diga que o especialista confirma.
+- Nunca prometa redução de impostos nem valores de imposto.
+- Quando o interessado pedir proposta, contrato, desconto, negociação, ligação, reunião, falar com uma pessoa, ou quando você já tiver as respostas principais, diga que vai passar para um especialista que continua por aqui, e use CONFIANCA: baixa.
+- Depois do texto, escreva uma linha "DADOS: " com um JSON só com o que o cliente informou nesta conversa: {"atividade":"","regime":"","faturamento_mensal":"","funcionarios":"","cidade":"","prioridade":"","resumo":""} (deixe vazio o que não souber; "resumo" com até 20 palavras sobre o caso).
+- A última linha deve ser exatamente "CONFIANCA: alta", "CONFIANCA: media" ou "CONFIANCA: baixa".
+INFORMAÇÕES DO ESCRITÓRIO: ${conf.info || 'Planos mensais de contabilidade online para MEI e Simples Nacional; o especialista apresenta valores.'}
+DADOS DO LEAD (JSON): ${JSON.stringify(dadosLead)}`;
+    const hist = c.mensagens.filter(x => x.de !== 'sistema').slice(-14).map(x => ({ role: x.de === 'cliente' ? 'user' : 'assistant', content: x.texto }));
+    while (hist.length && hist[0].role !== 'user') hist.shift();
+    try {
+      await W.sock?.readMessages?.([chave]).catch?.(nada);
+      const resp = await perguntarIA({ mensagens: [{ role: 'user', content: regras }, ...hist] });
+      const conf2 = ((resp.match(/CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)/i) || [])[1] || 'media').toLowerCase().replace('é', 'e');
+      let dados = null; const md = resp.match(/DADOS:\s*(\{[\s\S]*?\})\s*(?:\n|$)/i); if (md) { try { dados = JSON.parse(md[1]); } catch { } }
+      const corpo = limpar(resp.replace(/^\s*DADOS:.*$/gim, '')) || 'Obrigado! Um especialista vai continuar com você por aqui.';
+      await enviarTexto(c.waJid, corpo);
+      c.mensagens.push({ de: 'ia', texto: corpo, em: agora(), confianca: conf2, canal: 'whatsapp' });
+      if (dados) {
+        const x = await lerLead(esc, c.leadId) || l; const q = { ...(x.qualificacao || {}) };
+        for (const [k, v] of Object.entries(dados)) if (v && String(v).trim() && k !== 'resumo') q[k] = String(v).slice(0, 120);
+        if (dados.resumo) q.resumo = String(dados.resumo).slice(0, 200);
+        if (!x.cidade && dados.cidade) x.cidade = String(dados.cidade).slice(0, 80);
+        x.qualificacao = q; await gravarLead(esc, x);
+      }
+      if (conf2 === 'baixa') {
+        c.status = 'aguardando_humano'; c.depto = 'Comercial';
+        c.mensagens.push({ de: 'sistema', texto: 'O Théo qualificou o lead e chamou o Comercial para continuar.', em: agora() });
+        const x = await lerLead(esc, c.leadId) || l;
+        await registrar('Théo encaminhou para o Comercial' + (x.qualificacao?.resumo ? ': ' + x.qualificacao.resumo : '.'), { proximaAcao: { data: agora().slice(0, 10), texto: 'Responder no WhatsApp (Théo encaminhou)' }, ...(['novo', 'contato'].includes(x.etapa || 'novo') ? { etapa: 'contato', status: 'contato' } : {}) });
+      }
+      await salvarConversa(esc, c);
+    } catch (e) {
+      console.error('[whatsapp] Théo comercial', e.message);
+      c.status = 'aguardando_humano'; c.depto = 'Comercial';
+      c.mensagens.push({ de: 'sistema', texto: 'O Théo não respondeu (' + e.message + '). Conversa na fila do Comercial.', em: agora() });
       await salvarConversa(esc, c);
     }
   }
@@ -479,5 +565,5 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
     await log('whatsapp_atendimento_iniciado', { usuarioId: u.id, ip: ctx.ip, detalhe: '+' + jid.split('@')[0] });
     return { ok: true, conversaId: c.id };
   });
-  return { status: () => W.status, enviarArquivos, definirFluxoDas: fn => { fluxoDas = fn; } };
+  return { status: () => W.status, enviarArquivos, iniciarConversaLead, definirFluxoDas: fn => { fluxoDas = fn; } };
 }

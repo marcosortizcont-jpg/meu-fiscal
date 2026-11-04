@@ -15,6 +15,7 @@ import { registrarEnvios } from './envios.js';
 import { registrarIntegra } from './integra.js';
 import { registrarFinanceiro } from './financeiro.js';
 import { registrarDocumentos } from './documentos.js';
+import { registrarCrmTheo } from './crm-theo.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
 
 const AUD = site => `meufiscal:${site}`;
@@ -594,6 +595,7 @@ export function registrarRotas(r, { db, hub }) {
   registrarIntegra(r, { db, exigir, log, pode, wa });
   registrarFinanceiro(r, { db, exigir, log, pode, wa });
   registrarDocumentos(r, { db, exigir, log, pode, wa });
+  registrarCrmTheo(r, { db, exigir, log, pode, wa });
   registrarRotasAlteracoes(r, { db, exigir, log, pode, alt });
 
   return { carregarEmpresas };
