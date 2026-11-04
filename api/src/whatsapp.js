@@ -288,9 +288,27 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     c.mensagens.push({ de: 'sistema', texto: 'A conversa foi passada para a equipe do escritório.', em: new Date().toISOString() });
     await salvarConversa(esc, c);
   }
+  let fluxoDas = null;   // Théo emite o DAS do MEI pela integração com a Receita (integra.js)
   async function responderIA(esc, c, chave, texto, imagemIA) {
     const cfg = await configEscritorio(esc);
     if (PEDE_HUMANO.test(texto || '')) return passarParaEquipe(esc, c, 'Certo! Vou chamar alguém da equipe do escritório para continuar com você. Aguarde um instante, por favor.');
+    if (fluxoDas && c.empresaId && texto) {
+      let fx = null; try { fx = await fluxoDas({ esc, empresaId: c.empresaId, chave: 'wa:' + c.id, texto }); } catch (e) { console.error('[whatsapp] DAS', e.message); }
+      if (fx) {
+        const agora = () => new Date().toISOString();
+        await W.sock?.readMessages?.([chave]).catch?.(nada);
+        const rt = await enviarTexto(c.waJid, fx.texto).catch(nada);
+        const m = { de: 'ia', texto: fx.texto, em: agora(), confianca: 'alta', canal: 'whatsapp', waIds: rt?.key?.id ? [rt.key.id] : [] };
+        if (fx.anexo) {
+          const rd = await W.sock.sendMessage(c.waJid, { document: fx.anexo.conteudo, mimetype: 'application/pdf', fileName: fx.anexo.nome }).catch(nada);
+          if (rd?.key?.id) { enviadas.set(rd.key.id, rd.message); m.waIds.push(rd.key.id); }
+          m.arquivos = [{ id: fx.anexo.id, nome: fx.anexo.nome, tipo: 'application/pdf', tamanho: fx.anexo.tamanho, url: fx.anexo.url }];
+        }
+        c.mensagens.push(m);
+        if (fx.passarEquipe) { c.status = 'aguardando_humano'; c.mensagens.push({ de: 'sistema', texto: 'O Théo não conseguiu emitir o DAS (' + (fx.erro || 'erro') + '). A equipe foi chamada.', em: agora() }); }
+        await salvarConversa(esc, c); return;
+      }
+    }
     const dados = await contexto(esc, c.empresaId);
     const regras = `Você é o Théo, assistente virtual do escritório "${cfg.escritorio || 'de contabilidade'}", e responde pelo WhatsApp. Apresente-se como Théo na primeira resposta da conversa.
 Regras:
@@ -460,5 +478,5 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
     await log('whatsapp_atendimento_iniciado', { usuarioId: u.id, ip: ctx.ip, detalhe: '+' + jid.split('@')[0] });
     return { ok: true, conversaId: c.id };
   });
-  return { status: () => W.status, enviarArquivos };
+  return { status: () => W.status, enviarArquivos, definirFluxoDas: fn => { fluxoDas = fn; } };
 }

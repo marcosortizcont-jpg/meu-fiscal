@@ -198,3 +198,33 @@ CREATE TABLE IF NOT EXISTS alteracoes (
 );
 CREATE INDEX IF NOT EXISTS alteracoes_empresa ON alteracoes (escritorio_id, empresa_id, em DESC);
 CREATE INDEX IF NOT EXISTS alteracoes_usuario ON alteracoes (escritorio_id, usuario_id, em DESC);
+
+-- Integra Contador (SERPRO): credenciais do escritório para emitir o DAS do MEI pela API oficial da Receita
+CREATE TABLE IF NOT EXISTS integra_config (
+  escritorio_id            UUID PRIMARY KEY REFERENCES escritorios(id) ON DELETE CASCADE,
+  ambiente                 TEXT NOT NULL DEFAULT 'producao',
+  cnpj                     TEXT,
+  consumer_key             TEXT,
+  consumer_secret_cifrado  BYTEA,
+  pfx_cifrado              BYTEA,
+  senha_cifrada            BYTEA,
+  cert_titular             TEXT,
+  cert_validade            TEXT,
+  auto                     JSONB NOT NULL DEFAULT '{}'::jsonb,
+  atualizado_por           UUID,
+  atualizado_em            TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+-- Cada emissão e entrega do DAS-MEI (painel, Théo e envio mensal), para conferência e custos
+CREATE TABLE IF NOT EXISTS integra_execucoes (
+  id            BIGSERIAL PRIMARY KEY,
+  escritorio_id UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  em            TIMESTAMPTZ NOT NULL DEFAULT now(),
+  origem        TEXT NOT NULL,
+  empresa_id    TEXT,
+  comp          TEXT,
+  ok            BOOLEAN NOT NULL,
+  valor         NUMERIC,
+  mensagem      TEXT,
+  lote          TEXT
+);
+CREATE INDEX IF NOT EXISTS integra_exec_esc ON integra_execucoes (escritorio_id, em DESC);

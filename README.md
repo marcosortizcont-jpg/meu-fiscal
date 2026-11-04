@@ -79,6 +79,19 @@ Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site
 A camada gratuita da Groq tem limite de pedidos por minuto e por dia (quando estoura, a conversa vai para a equipe) e não usa as conversas para treinar modelos. Fotos são analisadas por um modelo com visão; se ele não estiver disponível, a equipe confere a imagem.
 Alternativa: `GEMINI_API_KEY` (Google AI Studio, gratuito sem ativar faturamento). Se o Google pedir para ativar faturamento ou comprar créditos, não é necessário para a camada gratuita, e prefira a Groq.
 
+#### DAS do MEI direto da Receita (Integra Contador)
+O PGMEI tem captcha e não pode ser automatizado pelo navegador. O caminho oficial é a API **Integra Contador** (SERPRO/Receita), que emite o DAS do MEI em PDF (serviço PGMEI › Gerar DAS).
+1. Na **Loja Serpro**, contrate o Integra Contador com o CNPJ do escritório (cobrança por consulta/emissão).
+2. Na Área do Cliente Serpro, copie **Consumer Key** e **Consumer Secret**.
+3. Painel → **Configurações › Integração com a Receita**: CNPJ do escritório, Key, Secret e o **e-CNPJ A1 do escritório** (.pfx + senha, guardados cifrados) → **Testar conexão**.
+4. Cada MEI dá **procuração eletrônica** ao CNPJ do escritório no e-CAC. Sem ela, a emissão daquela empresa falha e aparece no histórico.
+
+Com isso:
+- **Théo** (portal e WhatsApp): o cliente pede a guia, o Théo pergunta a competência e a data de pagamento (guia vencida sai atualizada, com data até o fim do mês), confirma e envia o PDF. A guia também entra em "Guias e impostos" e a obrigação DAS-MEI fica entregue. Se a Receita recusar, a conversa vai para a equipe.
+- **Controle de obrigações**: na obrigação DAS-MEI, botão "Emitir no PGMEI", com data de pagamento e envio por WhatsApp/e-mail.
+- **Envio automático mensal**: dia e horário escolhidos (1 a 19), para todos os MEI marcados, pelo portal + WhatsApp e/ou e-mail. Sai a competência anterior; guias pagas ou já enviadas são puladas; guia já emitida e ainda válida é reaproveitada (sem nova cobrança). Se o Render estiver dormindo no horário, o envio acontece quando ele acordar, até o dia 19.
+- Tudo fica no **Histórico de emissões e envios** da mesma tela.
+
 #### WhatsApp por QR code
 1. No Render: **Settings → Build Command** = `npm install --omit=dev --no-audit --no-fund` e **Health Check Path** = `/api/vivo`. Depois, **Manual Deploy → Deploy latest commit**.
 2. No Painel: **Atendimento → Conectar WhatsApp** e leia o QR code no celular do escritório (WhatsApp › Dispositivos conectados › Conectar dispositivo).

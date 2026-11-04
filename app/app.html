@@ -4769,6 +4769,119 @@ ACT['lanc-notas']=el=>{const e=empAtual();const antes=new Set(S.lancamentos.map(
     if(!p&&t.nome){p={id:'pc-'+uid(),empresaId:e.id,nome:t.nome,fantasia:'',doc:d&&docOk(d)?d:'',semDoc:false,tipos:['cliente'],catRec:'servicos',ativo:true,criadoEm:agora(),obs:'Criado a partir da NFS-e'};S.parceiros.push(p)}
     if(p)l.parceiroId=p.id}),null)};
 /* ==== MÓDULOS v10 (fim) ==== */
+/* ==== MÓDULOS v11: DAS do MEI pela integração oficial com a Receita (Integra Contador / PGMEI) ==== */
+const ehMeiE=e=>!!e&&(e.regimeId==='reg2-mei'||e.regime==='MEI');
+const PEDE_GUIA_C=/\b(das|guia|guias|boleto|boletos|2\s*[ªao°]?\s*via|segunda via|imposto do mei)\b/i;
+const integra=()=>MODO==='api'&&UI.modo==='painel'?apiDado('integra','/api/integra'):{};
+const ORIG_EXEC={mensal:'Envio mensal',entrega:'Entrega',theo:'Théo',painel:'Painel'};
+
+/* ---------- Configurações › Integração com a Receita ---------- */
+const aConfigV10=aConfig;
+aConfig=function(){
+  const h=aConfigV10();if(MODO!=='api')return h;
+  const d=integra();if(d.carregando)return h+`<div class="panel"><h2>Integração com a Receita (DAS do MEI)</h2><p class="small muted">Carregando…</p></div>`;
+  if(d.erro)return h+`<div class="panel"><h2>Integração com a Receita (DAS do MEI)</h2>${vazio(d.erro)}</div>`;
+  const x=d.dados||{};const ed=x.podeEditar;const a=x.auto||{};const dis=ed?'':'disabled';
+  const meis=S.empresas.filter(e=>ehMeiE(e)&&e.status!=='inativo').sort((p,q)=>(p.fantasia||p.razao).localeCompare(q.fantasia||q.razao));const exc=new Set(a.excluidas||[]);
+  const canais=a.canais||['portal','whatsapp'];const ult=a.ultimoLote;const compAnt=addMes(compAtual(),-1);
+  const passo=`<details class="small" style="margin-top:12px"><summary style="cursor:pointer;font-weight:600">Como contratar e liberar (passo a passo)</summary><ol style="margin:8px 0 0 18px;display:grid;gap:6px">
+    <li>Na <b>Loja Serpro</b> (loja.serpro.gov.br), contrate o produto <b>Integra Contador</b> com o CNPJ do escritório. A cobrança é por consulta/emissão, sem mensalidade fixa.</li>
+    <li>Na Área do Cliente Serpro, copie a <b>Consumer Key</b> e a <b>Consumer Secret</b> do contrato.</li>
+    <li>Tenha o <b>certificado e-CNPJ A1</b> do escritório (arquivo .pfx e senha). É ele que assina a conexão com a Receita.</li>
+    <li>Cada MEI precisa dar uma <b>procuração eletrônica</b> ao CNPJ do escritório no e-CAC (Senhas e procurações › Cadastro de procuração), com os serviços do Simples Nacional/MEI. Sem ela a Receita recusa a emissão daquela empresa.</li>
+    <li>Preencha os campos abaixo, salve e clique em <b>Testar conexão</b>.</li></ol></details>`;
+  const cred=`<form data-form="integra" class="grid-f" style="margin-top:12px">
+    <label class="f"><span>Ambiente</span><select name="ambiente" ${dis}><option value="producao" ${x.ambiente!=='demonstracao'?'selected':''}>Produção (dados reais)</option><option value="demonstracao" ${x.ambiente==='demonstracao'?'selected':''}>Demonstração (dados fictícios da SERPRO)</option></select></label>
+    <label class="f"><span>CNPJ do escritório (contratante)</span><input name="cnpj" inputmode="numeric" maxlength="18" value="${esc(x.cnpj?fmtCNPJ(x.cnpj):'')}" ${dis}></label>
+    <label class="f"><span>Consumer Key</span><input name="consumerKey" autocomplete="off" placeholder="${esc(x.consumerKey||'')}" ${dis}></label>
+    <label class="f"><span>Consumer Secret</span><input name="consumerSecret" type="password" autocomplete="new-password" placeholder="${x.temSegredo?'guardada no cofre (preencha só para trocar)':''}" ${dis}></label>
+    <label class="f"><span>Certificado e-CNPJ do escritório (.pfx)</span><input type="file" name="cert" accept=".pfx,.p12" ${dis}></label>
+    <label class="f"><span>Senha do certificado</span><input name="senha" type="password" autocomplete="new-password" ${dis}></label>
+    ${x.cert?`<p class="small muted full" style="margin:0">Certificado guardado: <b>${esc(x.cert.titular||'')}</b>, válido até ${fmtData(x.cert.validade)}.</p>`:''}
+    ${ed?`<div class="actions full"><button class="btn primary">Salvar integração</button><button type="button" class="btn" data-act="integra-testar">Testar conexão</button></div>`:''}</form>`;
+  const auto=`<form data-form="integra-auto" class="grid-f" style="margin-top:8px">
+    <label class="chk full"><input type="checkbox" name="ativo" ${a.ativo?'checked':''} ${dis}> <b>Enviar o DAS automaticamente para todos os MEI, todo mês</b></label>
+    <label class="f"><span>Dia do envio (1 a 19)</span><input name="dia" type="number" min="1" max="19" value="${esc(a.dia||5)}" ${dis}></label>
+    <label class="f"><span>A partir das</span><select name="hora" ${dis}>${[7,8,9,10,11,12,13,14,15,16,17,18].map(hh=>`<option value="${hh}" ${(a.hora??8)==hh?'selected':''}>${hh}h</option>`).join('')}</select></label>
+    <div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">Para onde vai</span><div class="tipos-chk"><label><input type="checkbox" checked disabled> Portal (Guias e impostos)</label><label><input type="checkbox" name="canais" value="whatsapp" ${canais.includes('whatsapp')?'checked':''} ${dis}> WhatsApp dos contatos</label><label><input type="checkbox" name="canais" value="email" ${canais.includes('email')?'checked':''} ${dis}> E-mail</label></div></div>
+    <label class="f full"><span>Mensagem (use {nome}, {empresa}, {competencia}, {valor}, {vencimento})</span><textarea name="mensagem" rows="2" maxlength="600" ${dis}>${esc(a.mensagem||'')}</textarea></label>
+    <div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">Empresas MEI que recebem (${meis.filter(e=>!exc.has(e.id)).length} de ${meis.length})</span><div class="ct-empresas">${meis.map(e=>`<label class="chk"><input type="checkbox" name="incluir" value="${e.id}" ${exc.has(e.id)?'':'checked'} ${dis}> ${esc(e.fantasia||e.razao)} <span class="small muted">${fmtCNPJ(e.cnpj)}</span></label>`).join('')||'<span class="small muted">Nenhuma empresa no regime MEI.</span>'}</div></div>
+    <p class="small muted full" style="margin:0">No dia marcado sai a guia da competência anterior (ex.: no dia ${a.dia||5} de ${fmtComp(compAtual())} vai a de ${fmtComp(compAnt)}, que vence dia 20). Se o servidor estiver dormindo no horário, o envio acontece assim que ele acordar, até o dia 19. Guias já pagas ou já enviadas no mês são puladas.</p>
+    ${ed?`<div class="actions full"><button class="btn primary">Salvar envio automático</button><button type="button" class="btn" data-act="integra-executar" ${x.configurado&&!x.rodando?'':'disabled'}>${x.rodando?'Enviando…':'Enviar agora'}</button></div>`:''}</form>`;
+  const fx=UI.fexec||'';const ex=(x.execucoes||[]).filter(r=>!fx||(fx==='falhas'?!r.ok:r.origem===fx));
+  const hist=`<div class="filtro-resumo" style="margin-top:16px"><h3 style="margin:0">Histórico de emissões e envios</h3><div class="filtros" role="group">${[['','Tudo'],['falhas','Só falhas'],['mensal','Mensal'],['theo','Théo'],['painel','Painel']].map(([k,r])=>`<button aria-pressed="${fx===k}" data-act="integra-fexec" data-v="${k}">${r}</button>`).join('')}</div></div>
+    ${ex.length?`<div class="table-wrap"><table><thead><tr><th>Quando</th><th>Empresa</th><th>Comp.</th><th>Origem</th><th>Resultado</th></tr></thead><tbody>${ex.slice(0,80).map(r=>`<tr><td class="small">${fmtDH(r.em)}</td><td class="small">${esc(r.razao||'—')}</td><td class="small">${r.comp?fmtComp(r.comp):'—'}</td><td class="small">${ORIG_EXEC[r.origem]||esc(r.origem)}</td><td class="small">${r.ok?pill('ok','ok'):pill('falhou','crit')} ${r.valor?brl(Number(r.valor))+' · ':''}${esc(r.mensagem||'')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small muted">Nada por aqui ainda.</p>'}`;
+  return h+`<div class="panel" id="integra"><div class="panel-head"><h2>Integração com a Receita (DAS do MEI)</h2>${x.configurado?pill(x.falso?'Simulação local':x.ambiente==='demonstracao'?'Demonstração':'Configurada','ok'):pill('Não configurada','warn')}</div>
+    <p class="small muted">Emite o DAS do MEI direto na Receita pela API oficial <b>Integra Contador</b> (SERPRO), sem entrar no PGMEI. Com ela, o Théo envia a guia quando o cliente pede, o Controle de obrigações ganha o botão "Emitir no PGMEI" e todos os MEI podem receber a guia num dia fixo do mês.</p>${passo}${cred}
+    <h3 style="margin:20px 0 0">Envio automático mensal</h3>${ult?`<p class="small" style="margin:6px 0 0">Último envio: ${fmtComp(ult.comp)} · ${fmtDH(ult.inicio)} · <b>${ult.ok}</b> enviada(s), <b style="color:${ult.falhas?'var(--crit)':'inherit'}">${ult.falhas}</b> falha(s), ${ult.puladas} pulada(s)${ult.fim?'':' · em andamento'}</p>`:''}${auto}${hist}</div>`;
+};
+ACT['integra-fexec']=el=>{UI.fexec=el.dataset.v;render()};
+FORM['integra']=async(fd,form)=>{
+  const f=fd.get('cert');let certificado=null;
+  if(f&&f.size){if(!/\.(pfx|p12)$/i.test(f.name)){toast('Envie o arquivo .pfx ou .p12 do e-CNPJ.',true);return}if(!fd.get('senha')){toast('Informe a senha do certificado.',true);return}
+    certificado=await new Promise(ok=>{const r=new FileReader();r.onload=()=>ok(String(r.result).split(',')[1]);r.readAsDataURL(f)})}
+  const amb=String(fd.get('ambiente'));const cnpj=soDig(fd.get('cnpj'));
+  if(amb==='producao'&&cnpj&&!cnpjValido(cnpj)){toast('CNPJ do escritório inválido.',true);return}
+  try{await MF.api('PUT','/api/integra',{ambiente:amb,cnpj,consumerKey:String(fd.get('consumerKey')||'').trim(),consumerSecret:String(fd.get('consumerSecret')||'').trim(),certificado,senha:certificado?String(fd.get('senha')):undefined});
+    toast('Integração salva.');invalidar('integra')}catch(er){toast(er.message,true)}
+};
+ACT['integra-testar']=async el=>{el.disabled=true;el.textContent='Testando…';try{const r=await MF.api('POST','/api/integra/testar',{});toast(r.texto,!r.ok)}catch(er){toast(er.message,true)}el.disabled=false;el.textContent='Testar conexão'};
+FORM['integra-auto']=async(fd,form)=>{
+  const meis=S.empresas.filter(e=>ehMeiE(e)&&e.status!=='inativo').map(e=>e.id);const inc=new Set(fd.getAll('incluir'));
+  const dia=Number(fd.get('dia'));if(!(dia>=1&&dia<=19)){toast('O dia do envio precisa ser de 1 a 19 (o DAS vence dia 20).',true);return}
+  try{await MF.api('PUT','/api/integra/auto',{ativo:!!fd.get('ativo'),dia,hora:Number(fd.get('hora')),canais:['portal',...fd.getAll('canais')],mensagem:String(fd.get('mensagem')||'').trim(),excluidas:meis.filter(id=>!inc.has(id))});
+    toast(fd.get('ativo')?`Envio automático ligado: todo dia ${dia}, a partir das ${fd.get('hora')}h.`:'Envio automático desligado.');invalidar('integra')}catch(er){toast(er.message,true)}
+};
+ACT['integra-executar']=()=>{const comps=[0,-1,-2].map(n=>addMes(compAtual(),n-1));const n=S.empresas.filter(e=>ehMeiE(e)&&e.status!=='inativo'&&!((integra().dados?.auto?.excluidas)||[]).includes(e.id)).length;
+  openModal(`${mHead('Enviar o DAS-MEI agora')}<form data-form="integra-exec"><div class="modal-body"><label class="f"><span>Competência</span><select name="comp">${comps.map(c=>`<option value="${c}">${fmtComp(c)}</option>`).join('')}</select></label>
+   <p class="small muted">Gera e envia a guia para ${n} empresa(s) MEI marcadas. Cada emissão nova é cobrada pela SERPRO; guias já emitidas e ainda válidas são reaproveitadas sem custo. O andamento aparece no histórico abaixo.</p></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Gerar e enviar</button></div></form>`)};
+FORM['integra-exec']=async fd=>{try{const r=await MF.api('POST','/api/integra/executar',{comp:fd.get('comp')});closeModal();toast(`Envio iniciado para ${r.resumo.total} empresa(s). Acompanhe no histórico.`);invalidar('integra');
+  const t=setInterval(()=>{invalidar('integra');const d=APIC.integra?.dados;if(d&&!d.rodando)clearInterval(t)},4000);setTimeout(()=>clearInterval(t),10*60000)}catch(er){toast(er.message,true)}};
+
+/* ---------- Controle de obrigações: emitir o DAS-MEI daquela empresa ---------- */
+const detalheObrV9=detalheObr;
+detalheObr=function(o,r){
+  const h=detalheObrV9(o,r);const e=r.e;
+  if(MODO!=='api'||!(o.tipo==='DAS-MEI'||o.catId==='das-mei')||!ehMeiE(e)||!podeMod('guias','editar'))return h;
+  const d=integra();if(!d.dados)return h;
+  if(!d.dados.configurado)return `<div class="banner info" style="margin-bottom:10px"><span class="small">Emita este DAS direto da Receita: configure a integração em <a href="#a-config">Configurações › Integração com a Receita</a>.</span></div>`+h;
+  const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===o.comp&&x.tipo==='DAS-MEI');const venc=o.prazo;const vencida=venc<hoje();
+  return `<div class="panel" style="margin-bottom:10px;padding:12px;background:var(--surface-2)" data-pgmei="${o.id}"><div class="panel-head" style="margin:0 0 8px"><b>Emitir no PGMEI (Receita)</b>${g?.origem==='pgmei'?pill('Emitido '+fmtDH(g.emitidaEm)+' · '+brl(g.valor),'ok'):''}</div>
+   <div class="grid-f"><label class="f"><span>Data de pagamento ${vencida?'(vencida: sai com multa e juros)':'(vazio = até o vencimento)'}</span><input type="date" id="pgmei-data" min="${hoje()}" value="${vencida?hoje():''}"></label>
+   <div class="f"><span class="small" style="font-weight:600;color:var(--muted)">Enviar também</span><div class="tipos-chk"><label><input type="checkbox" id="pgmei-wa" checked> WhatsApp</label><label><input type="checkbox" id="pgmei-em"> E-mail</label></div></div></div>
+   <div class="actions" style="margin-top:8px"><button type="button" class="btn sm primary" data-act="pgmei-emitir" data-eid="${e.id}" data-comp="${o.comp}">${g?.origem==='pgmei'?'Emitir de novo':'Emitir e publicar no portal'}</button><span class="small muted">A guia vai para "Guias e impostos" do portal e a obrigação fica entregue.</span></div></div>`+h;
+};
+ACT['pgmei-emitir']=async el=>{
+  const data=($('#pgmei-data')||{}).value||null;const canais=[($('#pgmei-wa')||{}).checked?'whatsapp':null,($('#pgmei-em')||{}).checked?'email':null].filter(Boolean);
+  el.disabled=true;const txt=el.textContent;el.textContent='Emitindo na Receita…';
+  try{const r=await MF.api('POST','/api/integra/das-mei',{empresaId:el.dataset.eid,comp:el.dataset.comp,dataPagamento:data,canais,forcar:/de novo/.test(txt)});
+    const ent=Object.entries(r.entrega||{}).map(([k,v])=>(k==='email'?'E-mail ':'WhatsApp ')+v).join(' · ');
+    toast(`DAS ${fmtComp(r.guia.comp)}: ${brl(r.guia.valor)}, pagamento até ${fmtData(r.guia.venc)}${r.reaproveitada?' (guia válida reaproveitada)':''}. Publicado no portal.${ent?' '+ent:''}`);invalidar('integra')}
+  catch(er){toast(er.message,true)}el.disabled=false;el.textContent=txt;
+};
+
+/* ---------- Théo no portal: pedido da guia do MEI ---------- */
+const perguntarIAV10=perguntarIA;
+perguntarIA=async function(texto){
+  const e=empAtual();
+  if(MODO!=='api'||!e||!ehMeiE(e)||!texto||UI.iaAnexos.length||UI.iaDraft!=null)return perguntarIAV10(texto);
+  const c0=conversaAtiva(e.id,false);if(c0&&c0.status!=='ia')return perguntarIAV10(texto);
+  if(!UI.dasConversa&&!PEDE_GUIA_C.test(texto))return perguntarIAV10(texto);
+  let c;mut('conversas',()=>{c=conversaAtiva(e.id,true);c.mensagens.push({de:'cliente',texto,em:agora(),uid:ME.id,nome:ME.nome||''})},null);
+  UI.iaDraft='';render();
+  let r;try{r=await MF.api('POST','/api/theo/das',{empresaId:e.id,conversaId:c.id,texto})}catch(er){r={tratado:false,erroApi:er.message}}
+  UI.iaDraft=null;
+  if(!r.tratado){UI.dasConversa=false;
+    // não era pedido de guia: segue com o Théo normal (sem repetir a mensagem do cliente)
+    const ult=c.mensagens.at(-1);if(ult&&ult.de==='cliente'&&ult.texto===texto){c.mensagens.pop()}
+    return perguntarIAV10(texto)}
+  UI.dasConversa=!!r.continua;
+  mut('conversas',()=>{c.mensagens.push({de:'ia',texto:r.texto,em:agora(),confianca:'alta',...(r.arquivo?{arquivos:[r.arquivo]}:{})});
+    if(r.passarEquipe){c.status='aguardando_humano';c.mensagens.push({de:'sistema',texto:'O Théo não conseguiu emitir o DAS e chamou a equipe.',em:agora()})}},r.arquivo?['Atendimento','Théo enviou o DAS-MEI',e.razao]:null);
+};
+/* ==== MÓDULOS v11 (fim) ==== */
+
 
 
 
