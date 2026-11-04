@@ -65,6 +65,10 @@ Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site
 
 - **Atendimento:** a IA se chama **Théo**. Na conversa (portal e painel) dá para enviar e receber arquivos, fotos, áudios (gravados no microfone ou anexados) e emojis; imagens, áudios e vídeos aparecem na própria conversa. As mensagens mostram o primeiro nome do cliente e do atendente. Áudios do cliente vão direto para a equipe (o Théo ainda não ouve áudio). A aba **Histórico de atendimentos** filtra por cliente, canal, atendente, situação, período e competência, com exportação.
 
+- **Contatos (Atendimento › Contatos):** cada contato tem WhatsApp, e-mail, cargo, as empresas pelas quais responde (a primeira é a principal), o atendente responsável e se recebe guias pelo WhatsApp e/ou e-mail. Botões para iniciar o atendimento pelo WhatsApp do escritório, pelo portal ou por e-mail; "Importar dos cadastros" traz os contatos e telefones já cadastrados nas empresas. Conversas de WhatsApp de números salvos já chegam com a empresa e o atendente certos.
+- **Guias pelo WhatsApp:** no Controle de obrigações, ao escolher "Portal + WhatsApp", a guia vai para todos os contatos vinculados à empresa que recebem pelo WhatsApp (o detalhe da obrigação mostra para quem vai). Sem contato, usa o telefone do cadastro. O envio fica registrado na conversa daquele contato.
+- **CRM comercial (departamento Comercial):** funil em kanban (Novos leads, Primeiro contato, Proposta enviada, Negociação, Ganhos, Perdidos) com arrastar e soltar, indicadores (em aberto, ganhos no mês, conversão, ações atrasadas), filtros, lista e exportação CSV. Ao abrir um lead: dados da empresa, plano e valor, responsável, próxima ação com data, linha do tempo de movimentações (ligação, WhatsApp, e-mail, reunião, proposta), WhatsApp direto e "Cadastrar como cliente" (o cadastro abre preenchido e o lead vira ganho). Perdido sempre pede o motivo. A função **Comercial** em Equipe e permissões dá acesso ao CRM.
+
 #### Copiloto com IA gratuita (Groq)
 1. Entre em **console.groq.com** e crie a conta (Google ou e-mail). **Não pede cartão de crédito.**
 2. Menu **API Keys** → **Create API Key** → dê um nome (ex.: Meu Fiscal) → copie a chave (começa com `gsk_`).
@@ -181,7 +185,7 @@ O build tem uma trava: se o proxy do `vercel.json` apontar para uma API diferent
 - **Preços, planos, números e depoimentos**: edite `app/landing.config.json` no GitHub (lápis ✏️ → *Commit changes*). A Vercel publica sozinha em ~1 minuto.
 - **Depoimentos** só aparecem quando a lista `depoimentos` tiver itens. Use apenas depoimentos reais, com autorização do cliente.
 - **Botão do topo**: mostra "Mudar de contabilidade". Se a abertura de empresa for sem custo de honorário, troque `aberturaGratis` para `true` e ele vira "Abrir empresa grátis".
-- **Quem preenche o formulário** vira um *interessado* no Painel → Carteira de clientes (e um alerta na Central de alertas), em tempo real. Dali você chama no WhatsApp e, com um clique em *Cadastrar empresa*, o cadastro já abre com e-mail e telefone preenchidos.
+- **Botão "Contratar"** (topo e planos) abre uma janela em duas etapas: nome completo, WhatsApp e e-mail; depois empresa, CNPJ, funcionários e se já tem contador, com o plano escolhido e o preço. O pedido cai na hora em **Painel → CRM comercial › Novos leads** (e na Central de alertas).
 - Textos de termos e privacidade: `app/legal.html` (revise com seu advogado).
 - Se mudar classes de layout em `app/landing.html`, recompile o CSS com o Tailwind CLI: `tailwindcss -c sites/landing/tailwind.config.js -i sites/landing/landing.src.css -o app/landing.css --minify`. Só editar o JSON não exige isso.
 
