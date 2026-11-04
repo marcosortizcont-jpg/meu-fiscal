@@ -5555,6 +5555,17 @@ ACT['lead-conversa']=el=>{closeModal();UI.view='a-chat';UI.tab.atend='caixa';UI.
 const encerrarConvV13=ACT['encerrar-conv'];
 ACT['encerrar-conv']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.id);if(!c)return;
   confirmar('Encerrar atendimento',`Tem certeza que deseja encerrar o atendimento de <b>${esc(nomeConv(c))}</b>? A conversa sai da caixa de entrada e fica no Histórico de atendimentos. Se o cliente mandar nova mensagem, abre um novo atendimento.`,'Sim, encerrar',()=>encerrarConvV13(el))};
+// texto salvo do Théo comercial: atualiza os planos (sem endereço comercial; Unique Plus com folha até 10 colaboradores)
+function atualizarTextoTheo(){
+  const c=S.config[0];const t=c&&c.crmTheo;if(!t||!t.info||UI.modo!=='painel'||!(ehMaster()||podeMod('config','editar')))return;
+  let x=t.info;
+  x=x.replace(/\s*\+?\s*at[eé] 100 (agendamentos de contas ou emiss[oõ]es de nota|opera[cç][oõ]es)[^,;.)]*/gi,' + folha de sócios e funcionários até 10 colaboradores')
+     .replace(/tudo do Unique \+ folha de sócios e funcionários até 10 colaboradores,?\s*\+?\s*/i,'tudo do Unique + folha de sócios e funcionários até 10 colaboradores, ')
+     .replace(/Unique Plus Comércio R\$ ?900\/mês\.(?!\s*\()/i,'Unique Plus Comércio R$ 900/mês (folha de sócios e funcionários até 10 colaboradores).')
+     .replace(/^.*endere[cç]o comercial.*(\n|$)/gim,'').replace(/[,;]?\s*[^,;.\n]*endere[cç]o comercial[^,;.\n]*/gi,'');
+  if(x!==t.info)mut('config',()=>{c.crmTheo={...t,info:x.trim()}},['Comercial','Atualizou o texto dos planos do Théo','']);
+}
+setTimeout(function tentar(){if(S.config&&S.config[0]&&MODO!=='local'){atualizarTextoTheo()}else setTimeout(tentar,1500)},2500);
 /* ==== MÓDULOS v14 (fim) ==== */
 
 
