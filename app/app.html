@@ -5509,9 +5509,8 @@ perguntarIA=async function(texto){const r=await perguntarIAV13(texto);const e=em
 
 /* ---------- CRM: Théo comercial ---------- */
 const THEO_INFO_PADRAO=`Planos mensais (contabilidade online, atendimento por WhatsApp, telefone, e-mail e chat, painel para a empresa):
-PRESTAÇÃO DE SERVIÇOS: Basic R$ 259/mês (abertura de CNPJ grátis, contabilidade completa, certificado digital A1); Unique R$ 450/mês (gerente de conta dedicado, atendimento das 8h às 21h, folha de sócios e funcionários até 5 pessoas, importação de notas de qualquer município); Unique Plus R$ 700/mês (tudo do Unique + até 100 agendamentos de contas ou emissões de nota por mês, importação de até 800 notas e de extrato de até 3 contas).
-COMÉRCIO: Basic Comércio R$ 359/mês; Unique Comércio R$ 550/mês (inclui declaração de IRPF); Unique Plus Comércio R$ 900/mês.
-Adicional: endereço comercial para abrir o CNPJ, a partir de R$ 60/mês.
+PRESTAÇÃO DE SERVIÇOS: Basic R$ 259/mês (abertura de CNPJ grátis, contabilidade completa, certificado digital A1); Unique R$ 450/mês (gerente de conta dedicado, atendimento das 8h às 21h, folha de sócios e funcionários até 5 pessoas, importação de notas de qualquer município); Unique Plus R$ 700/mês (tudo do Unique + folha de sócios e funcionários até 10 colaboradores, importação de até 800 notas e de extrato de até 3 contas).
+COMÉRCIO: Basic Comércio R$ 359/mês; Unique Comércio R$ 550/mês (inclui declaração de IRPF); Unique Plus Comércio R$ 900/mês (folha de sócios e funcionários até 10 colaboradores).
 Troca de contador: o escritório pede os documentos ao contador anterior. Abertura: CNPJ, inscrições e enquadramento no regime certo.`;
 const theoCfg=()=>({ativo:false,atrasoMin:2,inicio:8,fim:18,sabado:false,mensagem:'',info:THEO_INFO_PADRAO,...(cfg().crmTheo||{})});
 const aCrmV13=aCrm;

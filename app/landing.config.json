@@ -56,11 +56,7 @@
         },
         "Atendimento por WhatsApp, telefone, e-mail e chat",
         "Painel contábil completo para a sua empresa"
-      ],
-      "adicional": {
-        "nome": "Endereço comercial para abrir seu CNPJ",
-        "preco": 70
-      }
+      ]
     },
     {
       "id": "unique",
@@ -76,11 +72,7 @@
         "Horário estendido: atendimento das 8h às 21h com o gerente de conta",
         "Gestão da folha de sócios e funcionários no Painel de RH: até 5 pessoas",
         "Importação de notas fiscais de qualquer município"
-      ],
-      "adicional": {
-        "nome": "Endereço comercial para abrir seu CNPJ",
-        "preco": 60
-      }
+      ]
     },
     {
       "id": "unique-plus",
@@ -91,14 +83,10 @@
       "destaque": false,
       "titulo": "Tudo do Unique, mais:",
       "itens": [
-        "Agendamento de contas ou emissão de notas fiscais: até 100 operações por mês",
+        "Gestão da folha de sócios e funcionários no Painel de RH: até 10 colaboradores",
         "Importação de até 800 notas fiscais",
         "Importação de extrato bancário: até 3 contas"
-      ],
-      "adicional": {
-        "nome": "Endereço comercial para abrir seu CNPJ",
-        "preco": 60
-      }
+      ]
     },
     {
       "id": "basic-comercio",
@@ -143,7 +131,7 @@
       "destaque": false,
       "titulo": "Tudo do Unique, mais:",
       "itens": [
-        "Agendamento de contas ou emissão de notas fiscais: até 100 operações por mês",
+        "Gestão da folha de sócios e funcionários no Painel de RH: até 10 colaboradores",
         "Importação de extrato bancário: até 3 contas"
       ]
     }
