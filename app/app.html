@@ -5627,6 +5627,64 @@ FORM['atend-regras']=fd=>{const atendimento={triagemTheo:!!fd.get('triagemTheo')
   mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].atendimento=atendimento},['Atendimento','Alterou as regras do atendimento',`triagem pelo Théo ${atendimento.triagemTheo?'ligada':'desligada'}; por setor ${atendimento.porSetor?'sim':'não'}; inatividade ${atendimento.inatividadeMin} min`]);
   closeModal();toast('Regras salvas. A equipe passa a ver a nova divisão ao recarregar o painel.')};
 
+/* ==== v16: obrigação mensal "Receita bruta da competência" — fonte do faturamento declarado (BI, Théo, RBT12) ==== */
+const RB_ID='receita-bruta';
+const ehReceitaBruta=o=>!!o&&(o.catId===RB_ID);
+// o valor entregue na obrigação é o faturamento declarado; sem ele, vale o que estiver gravado em "faturamento"
+let RB_IDX=null;
+function idxReceitaBruta(){if(RB_IDX)return RB_IDX;RB_IDX=new Map();
+  (S.obrigacoes||[]).forEach(o=>{if(ehReceitaBruta(o)&&o.status==='entregue'&&o.receita!=null&&o.receita!=='')RB_IDX.set(o.empresaId+'|'+o.comp,Number(o.receita)||0)});
+  setTimeout(()=>{RB_IDX=null},0);return RB_IDX}
+const receitaMesV16=receitaMes;
+receitaMes=function(eid,comp){const v=idxReceitaBruta().get(eid+'|'+comp);return v!==undefined?v:receitaMesV16(eid,comp)};
+receitaAno=function(eid,ano){let t=0;for(let m=1;m<=12;m++)t+=receitaMes(eid,ano+'-'+String(m).padStart(2,'0'))||0;return t};
+
+// catálogo: mesma regra de vencimento e prazo técnico da PGDAS-D do escritório
+function itemReceitaBruta(){const p=(S.catalogo||[]).find(x=>x.id==='pgdas');
+  return {id:RB_ID,nome:'Receita bruta da competência',depto:'Fiscal',recorrencia:'mensal',venc:p?JSON.parse(JSON.stringify(p.venc)):{tipo:'dia',dia:20,ajuste:'prorroga',mesesApos:1},
+    condicao:'',diasTecnico:p&&p.diasTecnico!=null?p.diasTecnico:3,ativo:true,obs:'Informe a receita bruta do mês (a mesma declarada no PGDAS-D). Ela alimenta o faturamento do cliente no portal, o BI, o RBT12 e o Théo.',criadoEm:agora()}}
+const catalogoPadraoV16=catalogoPadrao;catalogoPadrao=function(){const l=catalogoPadraoV16();if(!l.some(x=>x.id===RB_ID))l.push(itemReceitaBruta());return l};
+const regimesPadraoV16=regimesPadrao;regimesPadrao=function(){return regimesPadraoV16().map(r=>({...r,obrigacoes:[...new Set([RB_ID,...(r.obrigacoes||[])])]}))};
+// troca única: cria a obrigação e coloca no pacote de todos os regimes (todos os clientes), a partir do mês anterior
+function migrarReceitaBruta(){
+  if(UI.migrandoRB||cfg().receitaBrutaV1||!cfg().regimesV2||UI.modo!=='painel'||!podeMod('obrig','editar')||!S.catalogo.length)return;
+  UI.migrandoRB=true;const desde=addMes(compAtual(),-1);
+  mut(['catalogo','regimes','empresas','config'],()=>{
+    if(!S.catalogo.some(x=>x.id===RB_ID))S.catalogo.push(itemReceitaBruta());
+    S.regimes.forEach(r=>{r.obrigacoes=r.obrigacoes||[];if(!r.obrigacoes.includes(RB_ID))r.obrigacoes.unshift(RB_ID)});
+    S.empresas.forEach(e=>{const d=e.obrigExtrasDesde||(e.obrigExtrasDesde={});if(!d[RB_ID])d[RB_ID]=desde});
+    const c=S.config[0]||(S.config[0]={id:'cfg'});c.receitaBrutaV1=true;
+  },['Obrigações','Criou a obrigação mensal "Receita bruta da competência" para todos os clientes','a partir de '+fmtComp(desde)]);
+  toast('Nova obrigação mensal para todos os clientes: Receita bruta da competência.');
+}
+setTimeout(function tentarRB(){if(S.config&&S.config[0]&&MODO!=='carregando'&&S.catalogo&&S.catalogo.length&&cfg().regimesV2)migrarReceitaBruta();else if(!cfg().receitaBrutaV1)setTimeout(tentarRB,2000)},3000);
+
+// detalhe da obrigação: campo da receita no lugar do bloco de guia
+const detalheObrV16=detalheObr;
+detalheObr=function(o,r){let h=detalheObrV16(o,r);if(!ehReceitaBruta(o))return h;
+  const ed=podeMod('obrig','editar');const atual=o.receita!=null&&o.receita!==''?o.receita:receitaMesV16(o.empresaId,o.comp);
+  const bloco=`<div class="rb-bloco"><label class="f"><span>Receita bruta de ${fmtComp(o.comp)} (R$) *</span><input name="receitaBruta" type="number" step="0.01" min="0" inputmode="decimal" value="${atual!=null?esc(atual):''}" ${ed?'':'disabled'} placeholder="0,00 (sem movimento = 0)"></label>
+    <p class="small muted" style="margin:4px 0 0">Use o mesmo valor declarado no PGDAS-D. Ao salvar, a obrigação fica entregue e o valor passa a ser o faturamento do mês no portal do cliente, no BI, no RBT12 e nas respostas do Théo.${o.status==='entregue'&&o.receita!=null?' Entregue com '+brl(o.receita)+'.':''}</p></div>`;
+  const re=/<div><div class="grid-f" style="grid-template-columns:1fr 1fr;gap:8px"><label class="f"><span>Valor da guia \(R\$\)<\/span>[\s\S]*?<\/select><\/label><\/div>(?:<p class="small muted" style="margin:6px 0 0">[\s\S]*?<\/p>)?<\/div>/;
+  return re.test(h)?h.replace(re,bloco):h.replace(/(<form[^>]*data-form="obr-salvar"[^>]*>)/,'$1'+bloco)};
+const salvarV16=FORM['obr-salvar'];
+FORM['obr-salvar']=async(fd,form)=>{
+  const o=obrPorId(form.dataset.id);if(o)form.dataset.id=o.id;if(!o||!ehReceitaBruta(o))return salvarV16(fd,form);
+  let bruto=String(fd.get('receitaBruta')??'').trim();if(bruto.includes(','))bruto=bruto.replace(/\./g,'').replace(',','.');
+  if(bruto===''||isNaN(Number(bruto))||Number(bruto)<0){toast('Informe a receita bruta da competência (sem movimento = 0).',true);form.querySelector('[name=receitaBruta]')?.focus();return}
+  const v=Math.round(Number(bruto)*100)/100;const mudou=Number(o.receita)!==v||o.receita==null;
+  mut('obrigacoes',()=>{if(mudou)logObr(o,{tipo:'receita',texto:'Receita bruta informada: '+brl(v)});o.receita=v},null);
+  await salvarV16(fd,form);
+  if(receitaMesV16(o.empresaId,o.comp)!==v)setReceita(o.empresaId,o.comp,v,'obrigacao');
+};
+// entregar em lote ou pelo atalho de status exige a receita: abre o detalhe
+const obrLoteV16=ACT['obr-lote'];
+ACT['obr-lote']=el=>{if(el.dataset.v==='entregue'){const sem=[...(UI.obrSel||[])].map(id=>obrPorId(id)).filter(o=>ehReceitaBruta(o)&&o.receita==null);
+  if(sem.length){sem.forEach(o=>UI.obrSel.delete(o.id));toast(sem.length+' "Receita bruta" ficaram de fora: abra cada uma e informe o valor.',true);if(!UI.obrSel.size){render();return}}}
+  return obrLoteV16(el)};
+const cicloV16=ACT['ciclo-obrig'];
+ACT['ciclo-obrig']=el=>{const o=obrPorId(el.dataset.id);if(o)el.dataset.id=o.id;if(o&&ehReceitaBruta(o)&&o.status!=='entregue'&&o.receita==null){UI.obrAberta=o.id;UI.view='a-guias';if(location.hash!=='#a-guias')location.hash='a-guias';render();toast('Informe a receita bruta para entregar esta obrigação.');return}return cicloV16(el)};
+
 
 
 
