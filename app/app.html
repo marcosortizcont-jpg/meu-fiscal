@@ -39,7 +39,10 @@ button,input,select,textarea{font:inherit;color:inherit}
 .app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100%}
 .side{background:var(--side);color:var(--side-ink);display:flex;flex-direction:column;gap:22px;padding-block:22px;padding-inline:14px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:10px;padding:0 6px}
-.brand-mark{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#059669,#0284C7);color:var(--accent-ink);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:15px}
+.brand-mark{width:34px;height:34px;border-radius:9px;background:#0F172A;display:grid;place-items:center;flex-shrink:0}
+.brand-mark svg{width:100%;height:100%;display:block}
+.side .brand-mark{background:#1E293B;box-shadow:inset 0 0 0 1px #334155}
+.brand b{letter-spacing:-.035em}.wm-meu{font-weight:500;opacity:.72}
 .brand b{font-family:var(--f-display);font-weight:700;letter-spacing:-.02em;font-size:1.15rem;display:block;line-height:1.1}
 .brand span{font-size:.72rem;color:var(--side-muted)}
 .mode-switch{display:grid;grid-template-columns:1fr 1fr;background:rgba(148,163,184,.10);border-radius:8px;padding:3px;gap:3px}
@@ -368,7 +371,7 @@ html.sem-rolagem,html.sem-rolagem body{overflow:hidden}
 @media (prefers-reduced-motion:no-preference){.btn,.nav a,.kcard{transition:background-color .12s,border-color .12s}}
 </style>
 
-<div id="root"><div class="loading"><div><b style="font-family:var(--f-display);font-size:1.3rem">Meu Fiscal</b><p class="muted">Conectando ao banco de dados da plataforma…</p></div></div></div>
+<div id="root"><div class="loading"><div><b style="font-family:var(--f-display);font-size:1.3rem;letter-spacing:-.035em"><span class="wm-meu">meu</span>fiscal</b><p class="muted">Conectando ao banco de dados da plataforma…</p></div></div></div>
 <div class="toasts" id="toasts" aria-live="polite"></div>
 
 <script>
@@ -945,7 +948,7 @@ function pos(){
 }
 function telaVazia(){
   return `<div class="loading"><div style="display:flex;flex-direction:column;gap:14px;align-items:center;max-width:460px">
-  <div class="brand-mark" style="width:48px;height:48px;font-size:20px">MF</div>
+  <div class="brand-mark" style="width:48px;height:48px;font-size:20px"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></div>
   <h1>Meu Fiscal está pronto para começar</h1>
   <p class="muted">O banco de dados da plataforma está vazio. Carregue a carteira de exemplo para conhecer o sistema ou comece cadastrando o seu escritório e o primeiro cliente.</p>
   ${ME.canEdit?`<div class="actions" style="justify-content:center">${MODO==='api'?'':'<button class="btn primary" data-act="seed">Carregar carteira de exemplo</button>'}<button class="btn" data-act="start-blank">Começar do zero</button></div>`:'<p class="small muted">Peça ao contador responsável para configurar a plataforma.</p>'}
@@ -957,7 +960,7 @@ function sidebar(){
   const navC=NAV_C.filter(n=>n[2].includes(perfilAtual())).map(n=>`<a href="#${n[0]}" ${UI.view===n[0]?'aria-current="page"':''} class="${bloqueado(n[0])?'locked':''}">${svg(NAV_ICON[n[0]])}<span class="lbl">${n[1]}</span>${cont(n[0])}</a>`).join('');
   const navA=NAV_A.map(n=>`<a href="#${n[0]}" ${UI.view===n[0]?'aria-current="page"':''}>${svg(NAV_ICON[n[0]])}<span class="lbl">${n[1]}</span>${cont(n[0])}</a>`).join('');
   return `<aside class="side">
-    <div class="brand"><div class="brand-mark">MF</div><div><b>Meu Fiscal</b><span>${esc(cfg().escritorio||'Contabilidade online')}</span></div></div>
+    <div class="brand"><div class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></div><div><b><span class="wm-meu">meu</span>fiscal</b><span>${esc(cfg().escritorio||'Contabilidade online')}</span></div></div>
     ${ME.canEdit?`<div class="mode-switch" role="group" aria-label="Área"><button data-act="modo" data-v="cliente" aria-pressed="${UI.modo==='cliente'}">Portal do cliente</button><button data-act="modo" data-v="painel" aria-pressed="${UI.modo==='painel'}">Painel contábil</button></div>`:''}
     <nav class="nav">${UI.modo==='cliente'?`<div class="nav-label">Área do cliente</div>${navC}`:`<div class="nav-label">Operação contábil</div>${navA}`}</nav>
     <div class="side-foot">${MODO==='api'?MF.rodape():`<span class="conn ${MODO==='db'?'ok':''}"><i></i>${MODO==='db'?'Banco de dados compartilhado':'Modo local · só neste navegador'}</span>`}${SOMENTE_LEITURA?'<span>Acesso somente leitura</span>':''}<span>${esc(cfg().crc||'')}</span></div>
@@ -2190,7 +2193,7 @@ function iniciarLocal(){
 const comTempo=(pr,ms,padrao)=>Promise.race([Promise.resolve(pr).catch(()=>padrao),new Promise(ok=>setTimeout(()=>ok(padrao),ms))]);
 function telaCarregando(msg,opcoes){
   const r=$('#root'); if(!r||MODO!=='carregando')return;
-  r.innerHTML=`<div class="loading"><div style="display:flex;flex-direction:column;gap:12px;align-items:center;max-width:440px"><div class="brand-mark" style="width:44px;height:44px;font-size:18px">MF</div><b style="font-family:var(--f-display);font-size:1.3rem">Meu Fiscal</b><p class="muted">${esc(msg)}</p>${opcoes?(window.MF&&window.MF.site?`<div class="actions" style="justify-content:center"><button class="btn primary" data-act="recarregar">Tentar de novo</button></div>`:`<div class="actions" style="justify-content:center"><button class="btn primary" data-act="recarregar">Tentar de novo</button><button class="btn" data-act="abrir-local">Abrir sem o banco compartilhado</button></div><p class="small muted">Sem o banco compartilhado, o app abre com dados de exemplo só neste navegador.</p>`):''}</div></div>`;
+  r.innerHTML=`<div class="loading"><div style="display:flex;flex-direction:column;gap:12px;align-items:center;max-width:440px"><div class="brand-mark" style="width:44px;height:44px;font-size:18px"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></div><b style="font-family:var(--f-display);font-size:1.3rem;letter-spacing:-.035em"><span class="wm-meu">meu</span>fiscal</b><p class="muted">${esc(msg)}</p>${opcoes?(window.MF&&window.MF.site?`<div class="actions" style="justify-content:center"><button class="btn primary" data-act="recarregar">Tentar de novo</button></div>`:`<div class="actions" style="justify-content:center"><button class="btn primary" data-act="recarregar">Tentar de novo</button><button class="btn" data-act="abrir-local">Abrir sem o banco compartilhado</button></div><p class="small muted">Sem o banco compartilhado, o app abre com dados de exemplo só neste navegador.</p>`):''}</div></div>`;
 }
 ACT['recarregar']=()=>location.reload();
 ACT['abrir-local']=()=>{if(MODO==='carregando'&&!(window.MF&&window.MF.site))iniciarLocal()};
@@ -2739,7 +2742,7 @@ sidebar=function(){
   const troca=ME.canEdit&&!SITE_PAINEL?`<div class="mode-switch" role="group" aria-label="Área"><button data-act="modo" data-v="cliente" aria-pressed="${UI.modo==='cliente'}">Portal do cliente</button><button data-act="modo" data-v="painel" aria-pressed="${UI.modo==='painel'}">Painel contábil</button></div>`:'';
   const voltar=SITE_PAINEL&&UI.modo==='cliente'?`<button class="btn sm" style="margin:0 12px 8px" data-act="modo" data-v="painel">${svg('back')}Voltar ao Painel contábil</button>`:'';
   return `<aside class="side">
-    <div class="brand"><div class="brand-mark">MF</div><div><b>Meu Fiscal</b><span>${esc(cfg().escritorio||'Contabilidade online')}</span></div></div>
+    <div class="brand"><div class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></div><div><b><span class="wm-meu">meu</span>fiscal</b><span>${esc(cfg().escritorio||'Contabilidade online')}</span></div></div>
     ${troca}${voltar}
     <nav class="nav">${UI.modo==='cliente'?`<div class="nav-label">${SITE_PAINEL?'Visualizando como o cliente':'Área do cliente'}</div>${navC}`:`<div class="nav-label">Operação contábil</div>${navA}`}</nav>
     <div class="side-foot">${MODO==='api'?MF.rodape():`<span class="conn ${MODO==='db'?'ok':''}"><i></i>${MODO==='db'?'Banco de dados compartilhado':'Modo local · só neste navegador'}</span>`}${SOMENTE_LEITURA?'<span>Acesso somente leitura</span>':''}<span>${esc(cfg().crc||'')}</span></div>

@@ -6,6 +6,7 @@
 <title>Entrar · Meu Fiscal</title>
 <!--MF_CONFIG-->
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
@@ -14,8 +15,8 @@
 body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased}
 .wrap{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);min-height:100vh}
 .lado{background:var(--navy);color:#E2E8F0;padding:48px;display:flex;flex-direction:column;justify-content:space-between;gap:32px}
-.marca{display:flex;align-items:center;gap:12px;font-weight:700;font-size:18px;color:#fff}
-.marca i{width:40px;height:40px;border-radius:10px;background:linear-gradient(135deg,#059669,#0d9488);display:grid;place-items:center;font-style:normal;font-size:15px}
+.marca{display:flex;align-items:center;gap:12px;font-weight:700;font-size:18px;color:#fff;letter-spacing:-.035em}
+.marca i{width:40px;height:40px;border-radius:10px;background:#1E293B;box-shadow:inset 0 0 0 1px #334155;display:grid;place-items:center;font-style:normal;flex-shrink:0}.marca i svg{width:100%;height:100%;display:block}.wm-meu{font-weight:500;opacity:.72}
 .lado h1{font-size:30px;line-height:1.2;color:#fff;letter-spacing:-.02em;max-width:18ch}
 .lado ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:12px;color:#CBD5E1;font-size:14.5px}
 .lado li{display:flex;gap:10px}.lado li::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);margin-top:8px;flex:none}
@@ -55,7 +56,7 @@ body.painel .rodape,body.painel p.sub{color:#94A3B8}
 <body>
 <div class="wrap">
   <aside class="lado">
-    <div class="marca"><i>MF</i>Meu Fiscal</div>
+    <div class="marca"><i><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></i><span><span class="wm-meu">meu</span>fiscal</span></div>
     <div style="display:flex;flex-direction:column;gap:20px">
       <h1>Sua contabilidade, organizada e no prazo.</h1>
       <ul><li>Guias de impostos liberadas pelo escritório assim que ficam prontas</li><li>Envio de notas fiscais de saída, documentos e pedidos em um só lugar</li><li>Funcionários, folha e admissões acompanhados mês a mês</li></ul>
@@ -80,7 +81,7 @@ body.painel .rodape,body.painel p.sub{color:#94A3B8}
     return {status:r.status,ok:r.ok,j};
   }
   const aviso=(t,m)=>m?`<div class="aviso ${t}">${m}</div>`:'';
-  const topo=(t,s)=>`<div class="selo-painel"><span class="marca" style="font-size:15px;color:#fff;text-transform:none;letter-spacing:0"><i style="width:30px;height:30px;font-size:12px">MF</i>Meu Fiscal</span><span>· Painel Contábil</span></div><div><h2>${t}</h2>${s?`<p class="sub">${s}</p>`:''}</div>`;
+  const topo=(t,s)=>`<div class="selo-painel"><span class="marca" style="font-size:15px;color:#fff;text-transform:none;letter-spacing:0"><i style="width:30px;height:30px;font-size:12px"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></i><span><span class="wm-meu">meu</span>fiscal</span></span><span>· Painel Contábil</span></div><div><h2>${t}</h2>${s?`<p class="sub">${s}</p>`:''}</div>`;
   const campoSenha=(id,rot,ac)=>`<label>${rot}<span class="campo"><input type="password" id="${id}" maxlength="8" autocomplete="${ac}" required><button type="button" class="olho" data-olho="${id}" aria-label="Mostrar senha">${olhoSvg}</button></span><span class="dica"><span>8 letras ou números</span><span id="${id}-n">0/8</span></span></label>`;
   let estado={msg:null};
 

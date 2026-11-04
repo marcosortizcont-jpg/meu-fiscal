@@ -119,6 +119,9 @@ fs.writeFileSync(path.join(DIST, 'app.html'), `<!doctype html>
 <meta name="theme-color" content="#0F172A">
 ${site === 'painel' ? '<meta name="robots" content="noindex,nofollow">\n' : ''}<title>${titulo}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="alternate icon" href="/favicon.ico" sizes="any">
+<link rel="apple-touch-icon" href="/apple-touch-icon-180.png">
+<link rel="manifest" href="/manifest.webmanifest">
 ${cfg}
 <script src="/mf-api.js"></script>
 </head>
@@ -130,7 +133,11 @@ ${app}
 for (const p of ['login.html', ...(site === 'painel' ? ['acessos.html'] : [])])
   fs.writeFileSync(path.join(DIST, p), fs.readFileSync(path.join(APP, p), 'utf8').replace('<!--MF_CONFIG-->', cfg));
 fs.copyFileSync(path.join(APP, 'mf-api.js'), path.join(DIST, 'mf-api.js'));
-fs.writeFileSync(path.join(DIST, 'favicon.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#059669"/><text x="32" y="41" font-family="Arial,sans-serif" font-size="26" font-weight="700" text-anchor="middle" fill="#fff">MF</text></svg>`);
+// marca: favicon, ícones de celular e logos (app/marca)
+for (const f of ['favicon.svg', 'favicon.ico', 'apple-touch-icon-180.png', 'icon-192.png', 'icon-512.png', 'logo-horizontal.svg', 'logo-horizontal-negativa.svg'])
+  fs.copyFileSync(path.join(APP, 'marca', f), path.join(DIST, f));
+fs.writeFileSync(path.join(DIST, 'manifest.webmanifest'), JSON.stringify({ name: titulo, short_name: 'Meu Fiscal', start_url: site === 'cliente' ? '/dashboard' : '/admin/dashboard', display: 'standalone', background_color: '#F8FAFC', theme_color: '#0F172A', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }, null, 2));
+const MF_OG = '<g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7" transform="translate(32 32) scale(0.72) translate(-32 -31)"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g>';
 if (site === 'cliente') {
   // página comercial em "/" + termos/privacidade, montadas a partir de app/landing.config.json
   const SITE_URL = String(env.SITE_URL || 'https://meufiscal-cliente.vercel.app').replace(/\/$/, '');
@@ -140,7 +147,7 @@ if (site === 'cliente') {
   const data = new Date().toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
   fs.writeFileSync(path.join(DIST, 'legal.html'), montarLanding(fs.readFileSync(path.join(APP, 'legal.html'), 'utf8'), { ...lc, DATA: data }, { siteUrl: SITE_URL, painelUrl: PAINEL_URL }));
   fs.copyFileSync(path.join(APP, 'landing.css'), path.join(DIST, 'landing.css'));
-  fs.writeFileSync(path.join(DIST, 'og.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#0F172A"/><rect x="80" y="80" width="96" height="96" rx="22" fill="#059669"/><text x="80" y="330" font-family="Arial,sans-serif" font-size="78" font-weight="700" fill="#fff">Meu Fiscal</text><text x="80" y="420" font-family="Arial,sans-serif" font-size="40" fill="#94A3B8">Contabilidade online para MEI e Simples Nacional</text><text x="80" y="520" font-family="Arial,sans-serif" font-size="32" fill="#34D399">Impostos calculados · NFS-e · IA 24h · Contador responsável</text></svg>`);
+  fs.writeFileSync(path.join(DIST, 'og.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#0F172A"/><g transform="translate(80 80) scale(1.5)"><rect x="1" y="1" width="62" height="62" rx="15" fill="#1E293B" stroke="#334155" stroke-width="2"/>${MF_OG}</g><text x="80" y="330" font-family="Arial,sans-serif" font-size="78" font-weight="700" fill="#fff">Meu Fiscal</text><text x="80" y="420" font-family="Arial,sans-serif" font-size="40" fill="#94A3B8">Contabilidade online para MEI e Simples Nacional</text><text x="80" y="520" font-family="Arial,sans-serif" font-size="32" fill="#34D399">Impostos calculados · NFS-e · IA 24h · Contador responsável</text></svg>`);
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${SITE_URL}/</loc></url><url><loc>${SITE_URL}/termos</loc></url><url><loc>${SITE_URL}/privacidade</loc></url></urlset>\n`);
 }
 fs.writeFileSync(path.join(DIST, 'robots.txt'), site === 'painel' ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nDisallow: /dashboard\nDisallow: /login\nDisallow: /api/\nSitemap: ${String(env.SITE_URL || 'https://meufiscal-cliente.vercel.app').replace(/\/$/, '')}/sitemap.xml\n`);

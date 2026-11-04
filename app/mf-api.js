@@ -214,7 +214,7 @@
     ACT['mf-sair'] = async () => { try { await api('POST', '/api/sair', {}); } catch { } location.replace(LOGIN); };
     ACT['recarregar'] = () => location.reload();
     if (M.site === 'cliente' && !v.length) {
-      document.getElementById('root').innerHTML = `<div class="loading"><div style="display:flex;flex-direction:column;gap:12px;align-items:center;max-width:440px;text-align:center"><div class="brand-mark" style="width:44px;height:44px;font-size:18px">MF</div><h1>Nenhuma empresa liberada</h1><p class="muted">Seu acesso está ativo, mas o escritório ainda não liberou nenhuma empresa para você. Fale com a equipe e tente de novo.</p><button class="btn" data-act="mf-sair">Sair</button></div></div>`;
+      document.getElementById('root').innerHTML = `<div class="loading"><div style="display:flex;flex-direction:column;gap:12px;align-items:center;max-width:440px;text-align:center"><div class="brand-mark" style="width:44px;height:44px;font-size:18px"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></div><h1>Nenhuma empresa liberada</h1><p class="muted">Seu acesso está ativo, mas o escritório ainda não liberou nenhuma empresa para você. Fale com a equipe e tente de novo.</p><button class="btn" data-act="mf-sair">Sair</button></div></div>`;
       conectarTempoReal(); return;
     }
     render();

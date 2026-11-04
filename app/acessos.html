@@ -6,6 +6,7 @@
 <title>Acessos e equipe · Meu Fiscal</title>
 <!--MF_CONFIG-->
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/apple-touch-icon-180.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{--navy:#0F172A;--ink:#0F172A;--muted:#64748B;--line:#E2E8F0;--line-2:#F1F5F9;--bg:#F8FAFC;--surface:#fff;--accent:#059669;--accent-h:#047857;--crit:#DC2626;--warn:#B45309;--info:#2563EB}
@@ -13,7 +14,7 @@
 body{font-family:Inter,system-ui,sans-serif;background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;font-size:14px}
 header{background:var(--navy);color:#fff;padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 header a{color:#CBD5E1;text-decoration:none;font-weight:600;font-size:13px}header a:hover{color:#fff}
-.marca{display:flex;align-items:center;gap:10px;font-weight:700}.marca i{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,#059669,#0d9488);display:grid;place-items:center;font-style:normal;font-size:12px}
+.marca{display:flex;align-items:center;gap:10px;font-weight:700}.marca i{width:30px;height:30px;border-radius:8px;background:#1E293B;box-shadow:inset 0 0 0 1px #334155;display:grid;place-items:center;font-style:normal;flex-shrink:0}.marca i svg{width:100%;height:100%;display:block}.wm-meu{font-weight:500;opacity:.72}
 main{max-width:1080px;margin:0 auto;padding:24px 16px 48px;display:flex;flex-direction:column;gap:18px}
 h1{font-size:24px;letter-spacing:-.01em}.sub{color:var(--muted);margin-top:4px;line-height:1.5}
 .topo{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
@@ -46,7 +47,7 @@ input[type=text],input[type=email],select{font:inherit;padding:9px 10px;border:1
 </style>
 </head>
 <body>
-<header><span class="marca"><i>MF</i>Meu Fiscal · Painel Contábil</span><a href="/admin/dashboard">← Voltar ao painel</a></header>
+<header><span class="marca"><i><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></i><span style="letter-spacing:-.035em"><span class="wm-meu">meu</span>fiscal</span> · Painel Contábil</span><a href="/admin/dashboard">← Voltar ao painel</a></header>
 <main>
   <div class="topo"><div><h1>Acessos e equipe</h1><p class="sub">Libere o Portal do Cliente para os empresários e cadastre os colaboradores do escritório. Cada pessoa recebe um link por e-mail para criar a senha.</p></div><div id="botoes"></div></div>
   <div class="tabs" role="tablist"><button role="tab" data-aba="clientes" aria-selected="true">Clientes</button><button role="tab" data-aba="equipe" aria-selected="false">Equipe do escritório</button></div>
