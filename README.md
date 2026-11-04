@@ -79,6 +79,10 @@ Menu **Financeiro** (antigo Honorários), com quatro abas:
 
 **Banco (boleto + PIX com baixa automática)**: crie a conta no **Asaas**, gere a chave em Integrações › Chaves de API e cole em Financeiro › Régua e automação › Banco. Depois, em Integrações › Webhooks do Asaas, cadastre o webhook de cobranças com a URL e o token mostrados no painel: pagamento recebido dá baixa sozinho. Sem banco, anexe o PDF do boleto em cada fatura e o cliente paga pela chave PIX do escritório. No portal, o cliente vê "Pagar online", linha digitável e PIX copia e cola.
 
+- **Envio e recebimento de documentos**:
+  - No cadastro do cliente, aba **Envio de documentos**: documentos recorrentes (formatos, instruções, todo mês / trimestral / anual / meses escolhidos, prazo, departamento, obrigatório, vários arquivos, "não tive movimento"), modelos prontos e **solicitações avulsas** para competências específicas (com aviso ao cliente por WhatsApp e e-mail). Grade dos últimos 6 meses.
+  - No portal, **Envio mensal** mostra o que é pedido no mês, prazo, motivo de negativa e pedido de complemento (o cliente envia só o que falta; o que já mandou fica guardado).
+  - No painel, **Recebimento de documentos**: fila por documento ou por cliente, filtros (competência, situação, departamento, responsável), indicadores, análise com Aprovar, Pedir complemento, Negar, Dispensar no mês e Reabrir, histórico, baixar arquivos, anexar pela equipe e cobrar quem não enviou. O fechamento do mês considera os documentos aprovados ou dispensados.
 #### Copiloto com IA gratuita (Groq)
 1. Entre em **console.groq.com** e crie a conta (Google ou e-mail). **Não pede cartão de crédito.**
 2. Menu **API Keys** → **Create API Key** → dê um nome (ex.: Meu Fiscal) → copie a chave (começa com `gsk_`).

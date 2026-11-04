@@ -2454,7 +2454,7 @@ function abaDados(e){
   <div class="form-sec"><div class="panel-head"><h3>Outros contatos</h3>${ed?`<button type="button" class="btn sm" data-act="rep-add" data-v="contato">${svg('plus')}Adicionar contato</button>`:''}</div><div class="rep-lista" id="rep-contato">${(x.contatos||[]).map(contato).join('')}</div><template id="tpl-contato">${contato({})}</template></div>
   <div class="form-sec"><h3>Plano contábil</h3><div class="grid-f">${c('pNome','Nome do plano',x.plano?.nome)}${c('pValor','Mensalidade (R$)',x.plano?.valor||0,'type="number" step="0.01" min="0"')}${c('pInc','Funcionários inclusos',x.plano?.funcInclusos||0,'type="number" min="0"')}${c('pAdd','Adicional por funcionário (R$)',x.plano?.adicionalFunc||0,'type="number" step="0.01" min="0"')}
    <label class="f"><span>Situação</span><select name="status"><option value="ativo" ${x.status!=='inativo'?'selected':''}>Ativa</option><option value="inativo" ${x.status==='inativo'?'selected':''}>Inativa</option></select></label></div></div>
-  <div class="form-sec"><h3>Documentos mensais exigidos</h3><p class="sub">Um por linha: Nome do documento | extensões. Ex.: Extrato bancário (OFX) | ofx</p><textarea name="checklist" style="min-height:96px" class="mono">${esc((x.checklist||[]).map(k=>k.nome+' | '+k.formatos.join(',')).join('\n'))}</textarea></div>
+  ${e?`<div class="form-sec"><h3>Documentos mensais</h3><p class="sub">${(x.checklist||[]).filter(k=>k.ativo!==false).length} documento(s) pedidos todo mês. Configure prazos, formatos, meses e pedidos avulsos na aba <b>Envio de documentos</b>.</p></div>`:`<div class="form-sec"><h3>Documentos mensais exigidos</h3><p class="sub">Um por linha: Nome do documento | extensões. Depois de salvar, ajuste tudo na aba Envio de documentos.</p><textarea name="checklist" style="min-height:96px" class="mono">${esc((x.checklist||[]).map(k=>k.nome+' | '+k.formatos.join(',')).join('\n'))}</textarea></div>`}
   ${ed?`<div class="form-acoes"><button type="button" class="btn" data-act="cart-voltar">Cancelar</button><button class="btn primary">${e?'Salvar alterações':'Cadastrar empresa'}</button></div>`:''}
   </form>${e?secaoAcesso(e):''}`;
 }
@@ -2476,7 +2476,7 @@ FORM['empresa360']=async(fd,form)=>{
   const contatos=cn.map((n,i)=>({nome:n.trim(),cargo:cc[i].trim(),telefone:soDig(ct[i]),email:ce[i].trim()})).filter(x=>x.nome||x.telefone||x.email);
   const dados={razao:g('razao'),fantasia:g('fantasia'),grupo:g('grupo'),cnpj,ie:g('ie'),im:g('im'),abertura:g('abertura'),cnae:g('cnae'),atividade:g('atividade'),meiAtividade:g('meiAtividade'),prolabore:Number(g('prolabore')||0),fatorR:!!fd.get('fatorR'),reinf:!!fd.get('reinf'),
     endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},municipio:g('municipio'),uf:g('uf').toUpperCase(),ibge:soDig(g('ibge')),telefone:soDig(g('telefone')),email:g('email'),socios,contatos,status:g('status')||'ativo',
-    plano:{...(prev?.plano||{metodo:'pix'}),nome:g('pNome'),valor:Number(g('pValor')||0),funcInclusos:Number(g('pInc')||0),adicionalFunc:Number(g('pAdd')||0)},checklist:ck};
+    plano:{...(prev?.plano||{metodo:'pix'}),nome:g('pNome'),valor:Number(g('pValor')||0),funcInclusos:Number(g('pInc')||0),adicionalFunc:Number(g('pAdd')||0)},checklist:fd.has('checklist')?ck.map(c=>({...((prev?.checklist||[]).find(o=>o.id===c.id)||{}),...c})):(prev?.checklist||[])};
   if(fd.has('regimeId')){const r=S.regimes.find(x=>x.id===fd.get('regimeId'));dados.regimeId=r.id;dados.regime=r.base;if(r.base==='SN')dados.anexo=fd.get('anexo')||r.anexo||prev?.anexo||'III'}if(fd.get('inicioControle'))dados.inicioControle=String(fd.get('inicioControle'));
   else{dados.regime=g('regime')||'SN';dados.anexo=g('anexo')||'III'}
   if(dados.regime!=='SN')dados.fatorR=false;
@@ -5147,6 +5147,283 @@ finFaturas=function(e){let h=finFaturasV1(e);
   return h;
 };
 /* ==== MÓDULOS v12 (fim) ==== */
+/* ==== MÓDULOS v13: Envio de documentos (configuração por cliente, solicitações avulsas) e Recebimento de documentos no painel ==== */
+(function(){const st=document.createElement('style');st.textContent=`
+.fmt-chk{display:flex;gap:6px;flex-wrap:wrap}.fmt-chk label{border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:12.5px;cursor:pointer;display:flex;gap:5px;align-items:center}
+.fmt-chk label:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);font-weight:600}
+.mes-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px}@media(min-width:700px){.mes-grid{grid-template-columns:repeat(12,1fr)}}
+.mes-grid label{border:1px solid var(--line);border-radius:8px;padding:6px 0;text-align:center;font-size:12px;cursor:pointer}
+.mes-grid label:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent);font-weight:700}.mes-grid input{display:none}
+.st-dot{display:inline-grid;place-items:center;width:26px;height:26px;border-radius:8px;font-size:13px;font-weight:700}
+.st-dot.ok{background:color-mix(in srgb,var(--ok) 16%,transparent);color:var(--ok)}.st-dot.info{background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent)}
+.st-dot.warn{background:color-mix(in srgb,var(--warn) 18%,transparent);color:var(--warn)}.st-dot.crit{background:color-mix(in srgb,var(--crit) 14%,transparent);color:var(--crit)}.st-dot.mut{background:var(--surface-2);color:var(--muted)}
+.doc-card.pendencia{border-color:var(--warn)}.doc-msg{margin-top:6px;font-size:13px;border-left:3px solid var(--warn);padding:4px 10px;background:color-mix(in srgb,var(--warn) 8%,transparent);border-radius:4px}
+.doc-msg.crit{border-color:var(--crit);background:color-mix(in srgb,var(--crit) 7%,transparent)}
+.rec-arq{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+`;document.head.appendChild(st)})();
+const FORMATOS_DOC=[['pdf','PDF'],['ofx','OFX'],['xml','XML'],['csv','CSV'],['txt','TXT'],['jpg','JPG'],['png','PNG']];
+const RECORR={mensal:'Todo mês',trimestral:'Trimestral (mar, jun, set, dez)',anual:'Uma vez por ano',meses:'Só nos meses escolhidos'};
+const MESES_C=['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
+const ST_DOC={pendente:['Aguardando envio','warn','•'],enviado:['Em análise','info','⏳'],aprovado:['Aprovado','ok','✓'],recusado:['Negado','crit','✕'],pendencia:['Complemento solicitado','warn','!'],dispensado:['Dispensado','mut','–']};
+const MODELOS_DOC=[
+  {nome:'Extrato bancário (OFX)',formatos:['ofx'],descricao:'Exporte o extrato do mês inteiro de cada conta no internet banking, no formato OFX (Money/Quicken).',multiplo:true,semMovimento:true},
+  {nome:'Extrato bancário (PDF)',formatos:['pdf'],descricao:'Extrato do mês inteiro de cada conta.',multiplo:true,semMovimento:true},
+  {nome:'XML das notas de saída (vendas)',formatos:['xml'],xmlTipo:'saida',descricao:'XML de todas as NF-e/NFS-e emitidas pela empresa no mês.',multiplo:true,semMovimento:true},
+  {nome:'XML das notas de entrada (compras)',formatos:['xml'],xmlTipo:'entrada',descricao:'XML das notas recebidas de fornecedores no mês.',multiplo:true,semMovimento:true},
+  {nome:'Notas de serviços tomados',formatos:['pdf','xml'],xmlTipo:'qualquer',descricao:'Notas de serviços contratados de terceiros (com ISS ou INSS retido, se houver).',multiplo:true,semMovimento:true},
+  {nome:'Comprovantes de despesas',formatos:['pdf','jpg','png'],descricao:'Boletos pagos, recibos e notas de despesas do mês.',multiplo:true,semMovimento:true},
+  {nome:'Relatório de vendas no cartão',formatos:['pdf','csv'],descricao:'Relatório da maquininha (Stone, Cielo, PagSeguro…) com as vendas do mês.',multiplo:true,semMovimento:true},
+  {nome:'Folha de ponto e eventos da folha',formatos:['pdf','jpg','png','csv'],depto:'Pessoal',descricao:'Ponto, faltas, horas extras, comissões e afastamentos do mês.',multiplo:true,semMovimento:true,prazoDia:25,mesmoMes:true},
+  {nome:'Inventário de estoque',formatos:['pdf','csv'],depto:'Contábil',recorrencia:'anual',mesAnual:12,descricao:'Estoque em 31/12 com quantidade e custo de cada item.'},
+];
+const prazoPadrao=()=>Number(cfg().prazoDocs||5);
+function itemDevido(it,comp){if(it.ativo===false)return false;if(it.desde&&comp<it.desde)return false;if(it.ate&&comp>it.ate)return false;const m=+comp.slice(5,7);const r=it.recorrencia||'mensal';
+  return r==='mensal'?true:r==='trimestral'?m%3===0:r==='anual'?m===Number(it.mesAnual||12):r==='meses'?(it.meses||[]).includes(m):true}
+function itensDoMes(e,comp){return [...(e.checklist||[]).filter(it=>itemDevido(it,comp)),...(e.docAvulsos||[]).filter(a=>a.comp===comp).map(a=>({...a,avulso:true}))]}
+const prazoDoItem=(it,comp)=>it.avulso&&it.prazo?it.prazo:it.mesmoMes?`${comp}-${pad(Math.min(Number(it.prazoDia||25),ultimoDiaMes(+comp.slice(0,4),+comp.slice(5,7))))}`:`${addMes(comp,1)}-${pad(Math.min(Number(it.prazoDia||prazoPadrao()),28))}`;
+const regDoc=(e,comp,it)=>S.checklist.find(z=>z.empresaId===e.id&&z.comp===comp&&z.itemId===it.id);
+const estadoDoc=(e,comp,it)=>{const x=regDoc(e,comp,it);return {x,k:x?(x.status||'enviado'):'pendente'}};
+const docConcluido=k=>k==='aprovado'||k==='dispensado';
+const xmlTipoDe=it=>it.xmlTipo||(it.formatos||[]).includes('xml')?(it.xmlTipo||(/entrada|compra|tomad/i.test(it.nome)?'qualquer':'saida')):null;
+function histDoc(x,acao,texto){(x.historico=x.historico||[]).push({em:agora(),uid:ME.id,nome:ME.nome||'',lado:UI.modo==='painel'?'escritorio':'cliente',acao,texto:texto||''});if(x.historico.length>60)x.historico.splice(0,x.historico.length-60)}
+async function validarXmlEntrada(f,cnpj){const t=await f.slice(0,2*1024*1024).text();const dest=(t.match(/<dest>[\s\S]*?<CNPJ>(\d{14})<\/CNPJ>/)||[])[1];if(dest&&cnpj&&dest!==soDig(cnpj))return {ok:false,msg:f.name+': esta nota não é destinada à sua empresa (destinatário '+fmtCNPJ(dest)+').'};return {ok:true}}
+
+/* ====================== Portal: Envio mensal ====================== */
+vEnvio=function(e){
+  const comp=UI.tab.envioComp||addMes(compAtual(),-1);const itens=itensDoMes(e,comp);const fech=S.fechamentos.find(f=>f.empresaId===e.id&&f.comp===comp);
+  const est=itens.map(it=>({it,...estadoDoc(e,comp,it)}));
+  const nOk=est.filter(x=>docConcluido(x.k)).length,nAn=est.filter(x=>x.k==='enviado').length,nAc=est.filter(x=>['recusado','pendencia'].includes(x.k)).length,tot=itens.length;const falta=tot-nOk-nAn;
+  const mes=fmtCompL(comp);const mesCap=mes.charAt(0).toUpperCase()+mes.slice(1);
+  const cards=est.map(({it,x,k})=>{const [rot,cls]=ST_DOC[k];const prazo=prazoDoItem(it,comp);const atras=k==='pendente'&&prazo<hoje();
+    const pode=!fech&&['pendente','recusado','enviado','pendencia'].includes(k);const accept=(it.formatos||['pdf']).map(f=>'.'+f+(f==='jpg'?',.jpeg':'')).join(',');
+    const mult=it.multiplo||(it.formatos||[]).includes('xml');
+    const btn=pode?`<label class="btn ${['pendente','recusado','pendencia'].includes(k)?'primary':''}">${svg(k==='pendente'?'upload':k==='pendencia'?'plus':'refresh')}${k==='pendente'?'Enviar arquivo'+(mult?'s':''):k==='pendencia'?'Enviar complemento':'Reenviar'}<input type="file" hidden data-up="checklist" data-item="${it.id}" data-comp="${comp}" accept="${accept}" ${mult?'multiple':''}></label>`:'';
+    const sm=pode&&k==='pendente'&&it.semMovimento!==false?`<button class="btn ghost" data-act="env-sem-mov" data-item="${it.id}" data-comp="${comp}">Não tive movimento</button>`:'';
+    const arqs=x?.arquivos?.length?x.arquivos:x?.arquivo?[x.arquivo]:[];
+    const ver=arqs.length===1&&arqs[0].url?`<a class="btn" href="${esc(arqs[0].url)}" target="_blank" rel="noopener">${svg('eye')}Ver</a>`:'';
+    const msg=k==='pendencia'&&x.pendencia?`<div class="doc-msg"><b>O escritório pediu um complemento:</b> ${esc(x.pendencia)}</div>`:k==='recusado'&&x.motivo?`<div class="doc-msg crit"><b>Negado:</b> ${esc(x.motivo)} Envie de novo.</div>`:'';
+    return `<article class="doc-card ${k==='recusado'?'recusado':k==='pendencia'?'pendencia':''}"><div class="doc-main"><div class="doc-ico ${cls}">${svg(iconeDoc(it))}</div><div style="min-width:0"><div class="doc-title">${esc(it.nome)}${it.avulso?' <span class="tag">pedido avulso</span>':''}</div>
+      <div class="doc-sub">${esc(it.descricao||'')}${it.descricao?' · ':''}Formatos: ${(it.formatos||['pdf']).map(f=>'.'+f.toUpperCase()).join(', ')}${mult?' · pode enviar vários':''}</div><div class="doc-sub">Prazo: <b style="color:${atras?'var(--crit)':'inherit'}">${fmtData(prazo)}${atras?' (atrasado)':''}</b></div>${msg}</div></div>
+      <div class="doc-file">${x&&x.semMovimento?'<span class="fn">Sem movimento no mês</span>':arqs.length?`<span class="fn">${arqs.length>1?arqs.length+' arquivos · '+fmtBytes(arqs.reduce((a,f)=>a+(f.tamanho||0),0)):esc(arqs[0].nome||'Arquivo')+(arqs[0].tamanho?' · '+fmtBytes(arqs[0].tamanho):'')}</span>`:''}${x?.enviadoEm?`<span>Enviado em ${fmtDH(x.enviadoEm)}</span>`:''}</div>
+      <div class="doc-side">${pill(rot,cls==='mut'?'':cls)}${ver}${btn}${sm}</div></article>`}).join('');
+  return `${head('Envio mensal de documentos','Lista definida pelo escritório para a sua empresa. Cada arquivo é conferido na hora (formato e conteúdo) e depois analisado pela equipe.',compSelect('envio-comp',comp,12))}
+  <section class="hero" aria-label="Progresso do mês"><div class="hero-top"><div><span class="eyebrow">Mês de referência</span><div class="hero-mes">${esc(mesCap)}</div>
+   <div class="hero-sub">${fech?'Competência encerrada pelo escritório em '+fmtData(fech.em.slice(0,10)):nAc?`${nAc} documento(s) precisam de atenção (negado ou complemento pedido).`:falta>0?`${falta>1?'Faltam':'Falta'} ${falta} documento${falta>1?'s':''} para o escritório fechar o mês.`:tot?'Tudo enviado. A equipe confere e aprova cada documento.':''}</div></div>
+   ${tot?`<span class="badge-lg ${nOk<tot?'parcial':''}">${svg(nOk===tot?'checksq':'upload')}<span><b>${nOk+nAn} de ${tot}</b> enviados · ${nOk} aprovado(s)</span></span>`:''}</div>
+   ${tot?`<div class="progress"><i class="p-ok" style="width:${nOk/tot*100}%"></i><i class="p-an" style="width:${nAn/tot*100}%"></i></div>`:''}</section>
+  ${tot?`<div class="doc-list">${cards}</div>`:vazio('O escritório não pediu documentos para este mês.')}`;
+};
+ACT['env-sem-mov']=el=>{const e=empAtual();const it=itensDoMes(e,el.dataset.comp).find(i=>i.id===el.dataset.item);if(!it)return;
+  confirmar('Sem movimento',`Confirmar que não houve movimento para "${esc(it.nome)}" em ${fmtComp(el.dataset.comp)}? O escritório confere.`,'Confirmar',()=>mut('checklist',()=>{let x=regDoc(e,el.dataset.comp,it);if(!x){x={id:uid(),empresaId:e.id,comp:el.dataset.comp,itemId:it.id};S.checklist.push(x)}
+    Object.assign(x,{status:'enviado',semMovimento:true,arquivo:null,arquivos:[],validacao:'Cliente informou que não houve movimento',motivo:'',pendencia:'',enviadoEm:agora(),uid:ME.id});histDoc(x,'sem_movimento','Informou que não houve movimento')},['Envio mensal','Sem movimento: '+it.nome+' '+fmtComp(el.dataset.comp),e.razao]))};
+// upload do cliente (e da equipe, pelo painel): valida, guarda, e com pendência anexa o complemento aos arquivos anteriores
+const onUploadV12=onUpload;
+onUpload=async function(inp){
+  if(inp.dataset.up!=='checklist'&&inp.dataset.up!=='rec-anexar')return onUploadV12(inp);
+  const files=[...inp.files];inp.value='';if(!files.length)return;
+  const e=inp.dataset.up==='rec-anexar'?emp(inp.dataset.eid):empAtual();const comp=inp.dataset.comp;const it=e&&itensDoMes(e,comp).find(i=>i.id===inp.dataset.item);if(!it){toast('Documento não encontrado neste mês.',true);return}
+  const fmts=(it.formatos||['pdf']).flatMap(f=>f==='jpg'?['jpg','jpeg']:[f]);const mult=it.multiplo||fmts.includes('xml');const lista=mult?files:[files[0]];const xt=xmlTipoDe(it);
+  const ok=[],ruins=[];let resumo='';
+  for(const f of lista){const v=await validarArquivo(f,fmts);if(!v.ok){ruins.push(f.name+': '+v.msg);continue}
+    if(extDe(f.name)==='xml'&&xt==='saida'){const s2=await validarXmlSaida(f,e.cnpj);if(!s2.ok){ruins.push(s2.msg);continue}}
+    if(extDe(f.name)==='xml'&&xt==='entrada'){const s3=await validarXmlEntrada(f,e.cnpj);if(!s3.ok){ruins.push(s3.msg);continue}}
+    ok.push(f);resumo=v.msg}
+  if(!ok.length){toast(ruins[0]||'Nenhum arquivo aceito.',true);return}
+  toast('Enviando '+ok.length+' arquivo(s)…');const arqs=[];
+  const antesE=UI.empresaId;UI.empresaId=e.id;try{for(const f of ok)arqs.push(await enviarArquivo(f))}catch(er){UI.empresaId=antesE;toast(er.message,true);return}UI.empresaId=antesE;
+  const equipe=inp.dataset.up==='rec-anexar';
+  mut('checklist',()=>{let x=regDoc(e,comp,it);if(!x){x={id:uid(),empresaId:e.id,comp,itemId:it.id};S.checklist.push(x)}
+    const comple=x.status==='pendencia';const prev=comple?(x.arquivos||(x.arquivo?[x.arquivo]:[])):[];const todos=[...prev,...arqs.map(a=>({...a,enviadoEm:agora(),...(comple?{complemento:true}:{})}))];
+    Object.assign(x,{status:equipe?'aprovado':'enviado',semMovimento:false,arquivo:todos[0],arquivos:todos,validacao:fmts.includes('xml')&&arqs.length>1?arqs.length+' XML conferidos':resumo,motivo:'',enviadoEm:agora(),uid:ME.id,...(equipe?{aprovadoEm:agora(),aprovadoPor:ME.id}:{})});
+    if(comple)x.pendenciaRespondidaEm=agora();
+    histDoc(x,equipe?'anexado_equipe':comple?'complemento':'enviado',(equipe?'A equipe anexou ':comple?'Complemento: ':'Enviou ')+arqs.map(a=>a.nome).join(', '))},
+    [equipe?'Recebimento de documentos':'Envio mensal',(equipe?'Anexou pela equipe ':'Enviou ')+it.nome+' '+fmtComp(comp)+' ('+arqs.length+')',e.razao]);
+  if(ruins.length)openModal(`${mHead(arqs.length+' enviado(s), '+ruins.length+' recusado(s)')}<div class="modal-body"><ul class="small" style="margin:0;padding-left:18px">${ruins.map(r=>`<li>${esc(r)}</li>`).join('')}</ul></div><div class="modal-foot"><button class="btn primary" data-act="close-modal">Entendi</button></div>`);
+  else{toast(equipe?'Arquivo anexado e aprovado.':'Enviado para análise do escritório.');if(equipe&&UI.recAberto)abrirRec(UI.recAberto)}
+};
+// fechamento do mês: considera os documentos do mês (recorrentes + avulsos) e aceita dispensados
+const travasV12=travasFechamento;
+travasFechamento=function(e,comp){const T=travasV12({...e,checklist:[]},comp);
+  itensDoMes(e,comp).filter(it=>it.obrigatorio!==false).forEach(it=>{const {k}=estadoDoc(e,comp,it);if(!docConcluido(k))T.unshift(`${it.nome}: ${k==='pendente'?'não enviado pelo cliente':k==='enviado'?'aguardando sua análise':k==='pendencia'?'complemento pedido ao cliente':'negado, aguardando reenvio'}`)});return T};
+
+/* ====================== Cadastro do cliente: aba Envio de documentos ====================== */
+const detalheEmpresaV12=detalheEmpresa;
+detalheEmpresa=function(){
+  const e=UI.cart?.id?emp(UI.cart.id):null;if(!e)return detalheEmpresaV12();
+  const quer=UI.cart.aba==='envio';if(quer)UI.cart.aba='resp';
+  let h=detalheEmpresaV12();if(quer)UI.cart.aba='envio';
+  const aba=`<button role="tab" aria-selected="${quer}" data-act="cart-aba" data-v="envio">Envio de documentos${modAtivo(e,'docs')?'':' · desativado'}</button>`;
+  h=h.replace(/(<button role="tab" aria-selected="(?:true|false)"[^>]*data-v="resp">)/,aba+'$1');
+  if(quer){h=h.replace(/(<button role="tab" aria-selected=)"true"([^>]*data-v="resp">)/,'$1"false"$2');h=h.replace(abaResp(e),abaEnvio(e))}
+  return h;
+};
+function abaEnvio(e){
+  const ed=podeMod('docs','editar');const its=e.checklist||[];const comps=[];for(let i=5;i>=0;i--)comps.push(addMes(compAtual(),-i-1));
+  const av=(e.docAvulsos||[]).slice().sort((a,b)=>b.comp.localeCompare(a.comp));
+  const recTxt=it=>it.recorrencia==='anual'?'Anual ('+MESES_C[Number(it.mesAnual||12)-1]+')':it.recorrencia==='meses'?'Meses: '+(it.meses||[]).map(m=>MESES_C[m-1]).join(', '):RECORR[it.recorrencia||'mensal'];
+  const topo=chaveModulo(e,'docs','Envio de documentos pelo portal','Quando ativo, o cliente vê "Envio mensal" no portal com a lista abaixo e recebe os lembretes. A equipe analisa tudo em Recebimento de documentos.');
+  return topo+`<div class="panel"><div class="panel-head"><h2>Documentos recorrentes</h2>${ed?`<div class="actions"><button class="btn sm" data-act="docitem-modelos" data-id="${e.id}">Modelos prontos</button><button class="btn sm primary" data-act="docitem-form" data-id="${e.id}">${svg('plus')}Novo documento</button></div>`:''}</div>
+   ${its.length?`<div class="table-wrap"><table><thead><tr><th>Documento</th><th>Formatos</th><th>Quando</th><th>Prazo</th><th>Depto.</th><th></th></tr></thead><tbody>${its.map(it=>`<tr style="${it.ativo===false?'opacity:.55':''}"><td><b>${esc(it.nome)}</b>${it.descricao?`<div class="sub">${esc(it.descricao)}</div>`:''}${it.obrigatorio===false?' <span class="tag">opcional</span>':''}${it.ativo===false?' <span class="tag">pausado</span>':''}</td>
+     <td class="small">${(it.formatos||[]).map(f=>f.toUpperCase()).join(', ')}${it.multiplo?' · vários':''}</td><td class="small">${recTxt(it)}${it.desde?'<div class="sub">desde '+fmtComp(it.desde)+'</div>':''}</td><td class="small">${it.mesmoMes?'dia '+(it.prazoDia||25)+' do próprio mês':'dia '+(it.prazoDia||prazoPadrao())+' do mês seguinte'}</td><td class="small">${esc(it.depto||'Fiscal')}</td>
+     <td class="r">${ed?`<button class="btn sm ghost" data-act="docitem-form" data-id="${e.id}" data-item="${it.id}">Editar</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhum documento recorrente. Use "Modelos prontos" para começar rápido.')}</div>
+  <div class="panel"><div class="panel-head"><h2>Solicitações avulsas</h2>${ed?`<button class="btn sm primary" data-act="docav-form" data-id="${e.id}">${svg('plus')}Nova solicitação avulsa</button>`:''}</div>
+   <p class="small muted" style="margin-top:0">Pedidos pontuais para meses específicos (ex.: contrato de aluguel, extrato de aplicação, documentos para uma alteração). Aparecem no Envio mensal do cliente só nas competências escolhidas.</p>
+   ${av.length?`<div class="table-wrap"><table><thead><tr><th>Documento</th><th>Competência</th><th>Prazo</th><th>Situação</th><th></th></tr></thead><tbody>${av.map(a=>{const {k}=estadoDoc(e,a.comp,a);const [r,c]=ST_DOC[k];return `<tr><td><b>${esc(a.nome)}</b>${a.descricao?`<div class="sub">${esc(a.descricao)}</div>`:''}</td><td class="small">${fmtComp(a.comp)}</td><td class="small">${fmtData(a.prazo)}</td><td>${pill(r,c==='mut'?'':c)}</td><td class="r">${ed&&k==='pendente'?`<button class="btn sm ghost" data-act="docav-rm" data-id="${e.id}" data-av="${a.id}">Remover</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted">Nenhuma solicitação avulsa.</p>'}</div>
+  <div class="panel"><h2>Últimos 6 meses</h2>${its.length||av.length?`<div class="table-wrap"><table><thead><tr><th>Documento</th>${comps.map(c=>`<th style="text-align:center">${fmtComp(c)}</th>`).join('')}</tr></thead><tbody>${[...new Map([...its,...(e.docAvulsos||[])].map(i=>[i.id,i])).values()].map(it=>`<tr><td class="small"><b>${esc(it.nome)}</b></td>${comps.map(c=>{const dev=itensDoMes(e,c).some(i=>i.id===it.id);if(!dev)return '<td style="text-align:center" class="muted">·</td>';const {k}=estadoDoc(e,c,it);const [r,cl,ic]=ST_DOC[k];return `<td style="text-align:center"><span class="st-dot ${cl}" title="${r}">${ic}</span></td>`}).join('')}</tr>`).join('')}</tbody></table></div><p class="small muted">✓ aprovado · ⏳ em análise · ! complemento pedido · ✕ negado · • aguardando envio · – dispensado</p>`:'<p class="small muted">Sem histórico.</p>'}</div>`;
+}
+function camposDoc(x,ehAvulso){
+  return `<label class="f full"><span>Nome do documento *</span><input name="nome" required maxlength="100" value="${esc(x.nome||'')}" placeholder="Ex.: Extrato bancário (OFX)"></label>
+   <label class="f full"><span>Instruções para o cliente</span><input name="descricao" maxlength="300" value="${esc(x.descricao||'')}" placeholder="Ex.: extrato do mês inteiro de cada conta"></label>
+   <div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">Formatos aceitos *</span><div class="fmt-chk">${FORMATOS_DOC.map(([k,r])=>`<label><input type="checkbox" name="formatos" value="${k}" ${(x.formatos||['pdf']).includes(k)?'checked':''}> ${r}</label>`).join('')}</div></div>
+   <label class="f"><span>XML aceito</span><select name="xmlTipo"><option value="saida" ${x.xmlTipo==='saida'||(!x.xmlTipo&&!ehAvulso&&/sa[ií]da|emitid|venda/i.test(x.nome||''))?'selected':''}>Notas de saída (emitidas pela empresa)</option><option value="entrada" ${x.xmlTipo==='entrada'?'selected':''}>Notas de entrada (destinadas à empresa)</option><option value="qualquer" ${x.xmlTipo==='qualquer'||(!x.xmlTipo&&(ehAvulso||!/sa[ií]da|emitid|venda/i.test(x.nome||'')))?'selected':''}>Qualquer nota fiscal</option></select></label>
+   <label class="f"><span>Departamento que usa</span><select name="depto">${['Fiscal','Pessoal','Contábil','Legalização','Financeiro'].map(d=>`<option ${(x.depto||'Fiscal')===d?'selected':''}>${d}</option>`).join('')}</select></label>
+   <label class="chk"><input type="checkbox" name="multiplo" ${x.multiplo?'checked':''}> Pode enviar vários arquivos</label>
+   <label class="chk"><input type="checkbox" name="obrigatorio" ${x.obrigatorio!==false?'checked':''}> Obrigatório para fechar o mês</label>`;
+}
+ACT['docitem-form']=el=>{const e=emp(el.dataset.id);const x=el.dataset.item?(e.checklist||[]).find(i=>i.id===el.dataset.item):(UI.docModelo||{});UI.docModelo=null;
+  openModal(`${mHead(el.dataset.item?'Editar documento recorrente':'Novo documento recorrente')}<form data-form="docitem" data-id="${e.id}" data-item="${el.dataset.item||''}"><div class="modal-body"><div class="grid-f">${camposDoc(x)}
+   <label class="f"><span>Quando pedir</span><select name="recorrencia" data-rec>${Object.entries(RECORR).map(([k,r])=>`<option value="${k}" ${(x.recorrencia||'mensal')===k?'selected':''}>${r}</option>`).join('')}</select></label>
+   <label class="f" data-rec-anual ${x.recorrencia==='anual'?'':'hidden'}><span>Mês (anual)</span><select name="mesAnual">${MESES_C.map((m,i)=>`<option value="${i+1}" ${Number(x.mesAnual||12)===i+1?'selected':''}>${m}</option>`).join('')}</select></label>
+   <div class="f full" data-rec-meses ${x.recorrencia==='meses'?'':'hidden'}><span class="small" style="font-weight:600;color:var(--muted)">Meses de competência</span><div class="mes-grid">${MESES_C.map((m,i)=>`<label><input type="checkbox" name="meses" value="${i+1}" ${(x.meses||[]).includes(i+1)?'checked':''}>${m}</label>`).join('')}</div></div>
+   <label class="f"><span>Prazo (dia)</span><input type="number" name="prazoDia" min="1" max="28" value="${esc(x.prazoDia||prazoPadrao())}"></label>
+   <label class="f"><span>Prazo conta a partir</span><select name="mesmoMes"><option value="0" ${x.mesmoMes?'':'selected'}>do mês seguinte à competência</option><option value="1" ${x.mesmoMes?'selected':''}>do próprio mês (ex.: folha)</option></select></label>
+   <label class="f"><span>Pedir a partir da competência</span><input type="month" name="desde" value="${esc(x.desde||'')}"></label>
+   <label class="chk"><input type="checkbox" name="semMovimento" ${x.semMovimento!==false?'checked':''}> Cliente pode informar "não tive movimento"</label>
+   ${el.dataset.item?`<label class="chk"><input type="checkbox" name="ativo" ${x.ativo!==false?'checked':''}> Ativo</label>`:''}</div></div>
+  <div class="modal-foot">${el.dataset.item?`<button type="button" class="btn danger" data-act="docitem-rm" data-id="${e.id}" data-item="${el.dataset.item}">Remover</button>`:''}<span class="grow"></span><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar</button></div></form>`,true)};
+document.addEventListener('change',ev=>{const s=ev.target;if(!s.matches||!s.matches('[data-rec]'))return;const f=s.form;f.querySelector('[data-rec-anual]').hidden=s.value!=='anual';f.querySelector('[data-rec-meses]').hidden=s.value!=='meses'});
+function lerCamposDoc(fd){const nome=String(fd.get('nome')||'').trim();const formatos=fd.getAll('formatos');if(nome.length<3){toast('Informe o nome do documento.',true);return null}if(!formatos.length){toast('Marque pelo menos um formato.',true);return null}
+  return {nome,descricao:String(fd.get('descricao')||'').trim(),formatos,xmlTipo:formatos.includes('xml')?String(fd.get('xmlTipo')||'qualquer'):undefined,depto:String(fd.get('depto')||'Fiscal'),multiplo:!!fd.get('multiplo'),obrigatorio:!!fd.get('obrigatorio')}}
+FORM['docitem']=(fd,form)=>{const e=emp(form.dataset.id);const base=lerCamposDoc(fd);if(!base)return;const rec=String(fd.get('recorrencia'));const meses=fd.getAll('meses').map(Number);
+  if(rec==='meses'&&!meses.length){toast('Escolha os meses.',true);return}
+  const dados={...base,recorrencia:rec,mesAnual:rec==='anual'?Number(fd.get('mesAnual')):undefined,meses:rec==='meses'?meses:undefined,prazoDia:Math.min(28,Math.max(1,Number(fd.get('prazoDia')||prazoPadrao()))),mesmoMes:fd.get('mesmoMes')==='1',desde:String(fd.get('desde')||'')||undefined,semMovimento:!!fd.get('semMovimento'),ativo:form.dataset.item?!!fd.get('ativo'):true};
+  const id=form.dataset.item;if(!id&&(e.checklist||[]).some(i=>normTxt(i.nome)===normTxt(dados.nome))){toast('Já existe um documento com esse nome.',true);return}
+  mut('empresas',()=>{e.checklist=[...(e.checklist||[])];if(id){const i=e.checklist.findIndex(x=>x.id===id);e.checklist[i]={...e.checklist[i],...dados}}else e.checklist.push({id:'ck-'+uid().slice(0,8),...dados})},['Envio de documentos',(id?'Editou':'Incluiu')+' documento recorrente '+dados.nome,e.razao]);closeModal();toast('Documento salvo.')};
+ACT['docitem-rm']=el=>{const e=emp(el.dataset.id);const it=(e.checklist||[]).find(i=>i.id===el.dataset.item);if(!it)return;closeModal();
+  const usado=S.checklist.some(x=>x.empresaId===e.id&&x.itemId===it.id);
+  confirmar('Remover documento',usado?`"${esc(it.nome)}" já tem envios. Ele será pausado (os envios antigos continuam no histórico).`:`Remover "${esc(it.nome)}" da lista do cliente?`,usado?'Pausar':'Remover',()=>mut('empresas',()=>{e.checklist=usado?(e.checklist||[]).map(i=>i.id===it.id?{...i,ativo:false}:i):(e.checklist||[]).filter(i=>i.id!==it.id)},['Envio de documentos',(usado?'Pausou':'Removeu')+' documento '+it.nome,e.razao]))};
+ACT['docitem-modelos']=el=>{const e=emp(el.dataset.id);const tem=new Set((e.checklist||[]).map(i=>normTxt(i.nome)));
+  openModal(`${mHead('Modelos de documentos')}<form data-form="docmodelos" data-id="${e.id}"><div class="modal-body"><p class="small muted" style="margin-top:0">Marque os que esta empresa deve enviar. Depois você ajusta prazo e meses em cada um.</p><div class="list">${MODELOS_DOC.map((m,i)=>`<label class="row chk" style="cursor:pointer"><input type="checkbox" name="m" value="${i}" ${tem.has(normTxt(m.nome))?'disabled':''}><div class="grow"><b>${esc(m.nome)}</b>${tem.has(normTxt(m.nome))?' <span class="tag">já incluído</span>':''}<div class="sub">${esc(m.descricao)} · ${m.formatos.map(f=>f.toUpperCase()).join(', ')}${m.recorrencia==='anual'?' · anual':''}</div></div></label>`).join('')}</div></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Incluir selecionados</button></div></form>`,true)};
+FORM['docmodelos']=(fd,form)=>{const e=emp(form.dataset.id);const sel=fd.getAll('m').map(Number);if(!sel.length){toast('Marque pelo menos um.',true);return}
+  mut('empresas',()=>{e.checklist=[...(e.checklist||[]),...sel.map(i=>({id:'ck-'+uid().slice(0,8),recorrencia:'mensal',prazoDia:prazoPadrao(),depto:'Fiscal',obrigatorio:true,...MODELOS_DOC[i],ativo:true}))]},['Envio de documentos','Incluiu '+sel.length+' documento(s) de modelo',e.razao]);closeModal();toast(sel.length+' documento(s) incluído(s).')};
+ACT['docav-form']=el=>{const e=emp(el.dataset.id);const comps=[];for(let i=-3;i<=6;i++)comps.push(addMes(compAtual(),i));
+  openModal(`${mHead('Solicitação avulsa · '+(e.fantasia||e.razao))}<form data-form="docav" data-id="${e.id}"><div class="modal-body"><div class="grid-f">${camposDoc({formatos:['pdf'],multiplo:true},true)}
+   <div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">Competência(s) em que o cliente deve enviar *</span><div class="mes-grid" style="grid-template-columns:repeat(5,1fr)">${comps.map(c=>`<label><input type="checkbox" name="comps" value="${c}" ${c===compAtual()?'checked':''}>${fmtComp(c)}</label>`).join('')}</div></div>
+   <label class="f"><span>Prazo de envio *</span><input type="date" name="prazo" min="${hoje()}" value="${addDias(hoje(),7)}" required></label>
+   <label class="chk" style="align-self:end"><input type="checkbox" name="avisar" checked> Avisar o cliente agora (WhatsApp e e-mail)</label></div></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Solicitar</button></div></form>`,true)};
+FORM['docav']=async(fd,form)=>{const e=emp(form.dataset.id);const base=lerCamposDoc(fd);if(!base)return;const comps=fd.getAll('comps');const prazo=String(fd.get('prazo')||'');
+  if(!comps.length){toast('Escolha pelo menos uma competência.',true);return}if(!prazo){toast('Informe o prazo.',true);return}
+  const novos=comps.map(c=>({id:'av-'+uid().slice(0,8),...base,comp:c,prazo,criadoEm:agora(),criadoPor:ME.id,semMovimento:false}));
+  mut('empresas',()=>{e.docAvulsos=[...(e.docAvulsos||[]),...novos]},['Envio de documentos','Solicitação avulsa: '+base.nome+' ('+comps.map(fmtComp).join(', ')+')',e.razao]);closeModal();
+  if(fd.get('avisar')&&MODO==='api'){try{const r=await MF.api('POST','/api/documentos/cobrar',{empresaId:e.id,comp:comps[0],itens:[base.nome],avulso:true,prazo});toast('Solicitação criada. '+r.resumo)}catch(er){toast('Solicitação criada, mas o aviso falhou: '+er.message,true)}}else toast('Solicitação criada.')};
+ACT['docav-rm']=el=>{const e=emp(el.dataset.id);const a=(e.docAvulsos||[]).find(x=>x.id===el.dataset.av);if(!a)return;confirmar('Remover solicitação',`Remover "${esc(a.nome)}" de ${fmtComp(a.comp)}?`,'Remover',()=>mut('empresas',()=>{e.docAvulsos=(e.docAvulsos||[]).filter(x=>x.id!==a.id)},['Envio de documentos','Removeu solicitação avulsa '+a.nome,e.razao]))};
+
+/* ====================== Painel: Recebimento de documentos ====================== */
+if(!NAV_A.some(n=>n[0]==='a-receb')){const i=NAV_A.findIndex(n=>n[0]==='a-guias');NAV_A.splice(i+1,0,['a-receb','Recebimento de documentos'])}
+MOD_DA_VIEW['a-receb']='docs';NAV_ICON['a-receb']='inbox';
+const conteudoV12=conteudo;conteudo=function(){if(UI.modo==='painel'&&UI.view==='a-receb')return aReceb();return conteudoV12()};
+UI.frec=UI.frec||{comp:'',sit:'',depto:'',resp:'',q:'',vis:'fila'};UI.recSel=UI.recSel||new Set();
+function linhasReceb(comp){const out=[];S.empresas.filter(e=>e.status!=='inativo'&&modAtivo(e,'docs')).forEach(e=>itensDoMes(e,comp).forEach(it=>{const {x,k}=estadoDoc(e,comp,it);const prazo=prazoDoItem(it,comp);
+  out.push({e,it,x,k,prazo,atras:k==='pendente'&&prazo<hoje(),resp:respDe(e,it.depto||'Fiscal')})}));return out}
+function aReceb(){
+  if(!podeMod('docs','ver'))return vazio('Seu acesso não inclui Documentos.');listaEquipe();
+  const f=UI.frec;if(!f.comp)f.comp=addMes(compAtual(),-1);const ed=podeMod('docs','editar');const eq=listaEquipe()||[];
+  const todas=linhasReceb(f.comp);const q=(f.q||'').toLowerCase();
+  const L=todas.filter(r=>(!f.sit||(f.sit==='atrasado'?r.atras:f.sit==='faltando'?r.k==='pendente':r.k===f.sit))&&(!f.depto||(r.it.depto||'Fiscal')===f.depto)&&(!f.resp||r.resp===f.resp)&&(!q||((r.e.fantasia||'')+' '+r.e.razao+' '+r.it.nome).toLowerCase().includes(q)));
+  const cnt=k=>todas.filter(r=>r.k===k).length;const nAtr=todas.filter(r=>r.atras).length;const pctOk=todas.length?todas.filter(r=>docConcluido(r.k)).length/todas.length:0;
+  const kpis=`<div class="kpis"><div class="kpi"><span class="eyebrow">Para analisar</span><b style="color:${cnt('enviado')?'var(--accent)':'inherit'}">${cnt('enviado')}</b><small>enviados pelo cliente</small></div>
+   <div class="kpi"><span class="eyebrow">Com o cliente</span><b>${cnt('pendencia')+cnt('recusado')}</b><small>${cnt('pendencia')} complemento(s) · ${cnt('recusado')} negado(s)</small></div>
+   <div class="kpi"><span class="eyebrow">Não enviados</span><b style="color:${nAtr?'var(--crit)':'inherit'}">${cnt('pendente')}</b><small>${nAtr} fora do prazo</small></div>
+   <div class="kpi"><span class="eyebrow">Concluído em ${fmtComp(f.comp)}</span><b>${pct(pctOk)}</b><small>${cnt('aprovado')} aprovado(s) · ${cnt('dispensado')} dispensado(s)</small></div></div>`;
+  const comps=[];for(let i=-1;i<12;i++)comps.push(addMes(compAtual(),-i));
+  const filtros=`<div class="panel"><div class="barra-filtros">
+    <label class="f"><span>Competência</span><select data-frec="comp">${comps.map(c=>`<option value="${c}" ${f.comp===c?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>
+    <label class="f"><span>Situação</span><select data-frec="sit"><option value="">Todas</option>${[['enviado','Para analisar'],['pendencia','Complemento pedido'],['recusado','Negados'],['faltando','Não enviados'],['atrasado','Fora do prazo'],['aprovado','Aprovados'],['dispensado','Dispensados']].map(([k,r])=>`<option value="${k}" ${f.sit===k?'selected':''}>${r}</option>`).join('')}</select></label>
+    ${selF('depto','Departamento',['Fiscal','Pessoal','Contábil','Legalização','Financeiro'].map(d=>[d,d]),f.depto,'frec')}${selF('resp','Responsável',eq.map(p=>[p.id,p.nome]),f.resp,'frec')}
+    <label class="f busca"><span>Pesquisar</span><input type="search" id="busca-rec" data-live="1" value="${esc(f.q)}" placeholder="Cliente ou documento"></label></div>
+   <div class="filtro-resumo"><div class="filtros" role="group"><button aria-pressed="${f.vis!=='cliente'}" data-act="rec-vis" data-v="fila">Por documento</button><button aria-pressed="${f.vis==='cliente'}" data-act="rec-vis" data-v="cliente">Por cliente</button></div>
+    ${ed?`<div class="actions">${[...UI.recSel].length?`<button class="btn sm primary" data-act="rec-aprovar-lote">Aprovar ${UI.recSel.size} selecionado(s)</button>`:''}<button class="btn sm" data-act="rec-cobrar-todos">Cobrar quem não enviou</button></div>`:''}</div></div>`;
+  let corpo;
+  if(f.vis==='cliente'){
+    const por=new Map();L.forEach(r=>{const a=por.get(r.e.id)||{e:r.e,l:[]};a.l.push(r);por.set(r.e.id,a)});
+    corpo=`<div class="panel">${por.size?`<div class="table-wrap"><table><thead><tr><th>Cliente</th><th>Progresso</th><th>Para analisar</th><th>Com o cliente</th><th>Faltando</th><th></th></tr></thead><tbody>${[...por.values()].sort((a,b)=>b.l.filter(r=>r.k==='enviado').length-a.l.filter(r=>r.k==='enviado').length).map(({e,l})=>{const ok=l.filter(r=>docConcluido(r.k)).length;const falt=l.filter(r=>r.k==='pendente');return `<tr><td><b>${esc(e.fantasia||e.razao)}</b></td>
+      <td style="min-width:160px"><div class="progress" style="height:8px"><i class="p-ok" style="width:${ok/l.length*100}%"></i><i class="p-an" style="width:${l.filter(r=>r.k==='enviado').length/l.length*100}%"></i></div><div class="sub">${ok} de ${l.length} concluídos</div></td>
+      <td>${l.filter(r=>r.k==='enviado').length||'—'}</td><td>${l.filter(r=>['pendencia','recusado'].includes(r.k)).length||'—'}</td><td>${falt.length?`<span style="color:${falt.some(r=>r.atras)?'var(--crit)':'inherit'}">${falt.length}</span>`:'—'}</td>
+      <td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${ed&&falt.length?`<button class="btn sm" data-act="rec-cobrar" data-eid="${e.id}">Cobrar</button>`:''}<button class="btn sm ghost" data-act="rec-filtrar-cli" data-v="${esc(e.fantasia||e.razao)}">Ver documentos</button></div></td></tr>`}).join('')}</tbody></table></div>`:vazio('Nada com esses filtros.')}</div>`;
+  } else {
+    const ord={enviado:0,pendencia:1,recusado:2,pendente:3,aprovado:4,dispensado:5};
+    const Lo=L.slice().sort((a,b)=>ord[a.k]-ord[b.k]||String(a.x?.enviadoEm||a.prazo).localeCompare(String(b.x?.enviadoEm||b.prazo)));
+    corpo=`<div class="panel">${Lo.length?`<div class="table-wrap"><table><thead><tr>${ed?'<th></th>':''}<th>Cliente</th><th>Documento</th><th>Situação</th><th>Arquivos</th><th>Prazo</th><th>Responsável</th><th></th></tr></thead><tbody>${Lo.map(r=>{const [rot,cl]=ST_DOC[r.k];const n=r.x?.arquivos?.length||(r.x?.arquivo?1:0);const chave=r.e.id+'|'+r.it.id;return `<tr>
+      ${ed?`<td>${r.k==='enviado'?`<input type="checkbox" class="fin-sel" data-act="rec-sel" data-v="${chave}" ${UI.recSel.has(chave)?'checked':''}>`:''}</td>`:''}
+      <td><b>${esc(r.e.fantasia||r.e.razao)}</b></td><td>${esc(r.it.nome)}${r.it.avulso?' <span class="tag">avulso</span>':''}<div class="sub">${esc(r.it.depto||'Fiscal')}</div></td>
+      <td>${pill(rot,cl==='mut'?'':cl)}${r.x?.semMovimento?'<div class="sub">sem movimento</div>':''}</td><td class="small">${n?n+' arquivo(s)'+(r.x?.enviadoEm?'<div class="sub">'+fmtDH(r.x.enviadoEm)+'</div>':''):r.x?.semMovimento?'—':'—'}</td>
+      <td class="small" style="color:${r.atras?'var(--crit)':'inherit'}">${fmtData(r.prazo)}${r.atras?'<div class="sub" style="color:var(--crit)">atrasado</div>':''}</td><td class="small">${esc(nomeEquipe(r.resp)||'—')}</td>
+      <td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${ed&&r.k==='enviado'?`<button class="btn sm primary" data-act="rec-acao" data-v="aprovar" data-k="${chave}">Aprovar</button>`:''}<button class="btn sm ${r.k==='enviado'?'':'ghost'}" data-act="rec-abrir" data-k="${chave}">${r.k==='enviado'?'Analisar':'Abrir'}</button></div></td></tr>`}).join('')}</tbody></table></div>`
+      :vazio(todas.length?'Nenhum documento com esses filtros.':'Nenhum cliente com documentos pedidos nesta competência. Configure em Carteira › cadastro › Envio de documentos.')}</div>`;
+  }
+  return head('Recebimento de documentos','Tudo o que os clientes enviam para a apuração do mês: analise, aprove, peça complemento ou negue, e cobre quem ainda não enviou.')+kpis+filtros+corpo;
+}
+Object.assign(buscaVivas,{'busca-rec':v=>{UI.frec.q=v}});
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.frec){UI.frec[el.dataset.frec]=el.value;UI.recSel.clear();render()}});
+ACT['rec-vis']=el=>{UI.frec.vis=el.dataset.v;render()};
+ACT['rec-filtrar-cli']=el=>{UI.frec.q=el.dataset.v;UI.frec.vis='fila';render()};
+ACT['rec-sel']=el=>{el.checked?UI.recSel.add(el.dataset.v):UI.recSel.delete(el.dataset.v);render()};
+const recDe=chave=>{const [eid,iid]=chave.split('|');const e=emp(eid);const comp=UI.frec.comp||addMes(compAtual(),-1);const it=e&&itensDoMes(e,comp).find(i=>i.id===iid);return e&&it?{e,it,comp,...estadoDoc(e,comp,it)}:null};
+ACT['rec-abrir']=el=>abrirRec(el.dataset.k);
+function abrirRec(chave){
+  const r=recDe(chave);if(!r)return;UI.recAberto=chave;const {e,it,comp,x,k}=r;const ed=podeMod('docs','editar');const [rot,cl]=ST_DOC[k];const arqs=x?.arquivos?.length?x.arquivos:x?.arquivo?[x.arquivo]:[];
+  openModal(`${mHead(esc(it.nome)+' · '+esc(e.fantasia||e.razao)+' · '+fmtComp(comp))}<div class="modal-body"><div class="crm-det"><div>
+   <p class="small" style="margin-top:0">${pill(rot,cl==='mut'?'':cl)} · prazo ${fmtData(prazoDoItem(it,comp))} · ${esc(it.depto||'Fiscal')}${it.avulso?' · pedido avulso':''}</p>
+   ${it.descricao?`<p class="small muted">${esc(it.descricao)}</p>`:''}${x?.validacao?`<p class="small">Conferência automática: <b>${esc(x.validacao)}</b></p>`:''}
+   ${x?.semMovimento?'<div class="banner info"><span class="small">O cliente informou que <b>não houve movimento</b> neste mês.</span></div>':''}
+   ${k==='pendencia'&&x.pendencia?`<div class="doc-msg"><b>Complemento pedido:</b> ${esc(x.pendencia)}</div>`:''}${k==='recusado'&&x.motivo?`<div class="doc-msg crit"><b>Negado:</b> ${esc(x.motivo)}</div>`:''}
+   <h3 style="margin:14px 0 8px">Arquivos</h3>${arqs.length?`<div style="display:grid;gap:6px">${arqs.map(a=>`<div class="rec-arq"><span class="small" style="overflow:hidden;text-overflow:ellipsis"><b>${esc(a.nome||'arquivo')}</b>${a.complemento?' <span class="tag">complemento</span>':''}<span class="sub" style="display:block">${a.tamanho?fmtBytes(a.tamanho):''}${a.enviadoEm?' · '+fmtDH(a.enviadoEm):''}</span></span>${a.url?`<span class="actions" style="flex-wrap:nowrap"><a class="btn sm" href="${esc(a.url)}" target="_blank" rel="noopener">Abrir</a><a class="btn sm ghost" href="${esc(a.url)}" download="${esc(a.nome||'arquivo')}">Baixar</a></span>`:''}</div>`).join('')}</div>${arqs.length>1?`<button class="btn sm" data-act="rec-baixar-todos" data-k="${chave}" style="margin-top:8px">${svg('download')}Baixar todos (${arqs.length})</button>`:''}`:'<p class="small muted">Nenhum arquivo.</p>'}
+   ${ed?`<label class="btn sm" style="margin-top:10px">${svg('upload')}Anexar pela equipe (recebido por outro meio)<input type="file" hidden multiple data-up="rec-anexar" data-eid="${e.id}" data-item="${it.id}" data-comp="${comp}" accept="${(it.formatos||['pdf']).map(f=>'.'+f).join(',')}"></label>`:''}</div>
+   <div>${ed?`<h3 style="margin:0 0 8px">Análise</h3><div class="actions" style="flex-wrap:wrap">
+     ${['enviado','pendencia','recusado'].includes(k)&&(arqs.length||x?.semMovimento)?`<button class="btn primary" data-act="rec-acao" data-v="aprovar" data-k="${chave}">${svg('checksq')}Aprovar</button>`:''}
+     ${k==='enviado'?`<button class="btn" data-act="rec-acao" data-v="pendencia" data-k="${chave}">Pedir complemento</button><button class="btn danger" data-act="rec-acao" data-v="negar" data-k="${chave}">Negar</button>`:''}
+     ${['pendente','recusado','pendencia'].includes(k)?`<button class="btn" data-act="rec-cobrar" data-eid="${e.id}" data-item="${esc(it.nome)}">Cobrar o cliente</button>`:''}
+     ${!['dispensado','aprovado'].includes(k)?`<button class="btn ghost" data-act="rec-acao" data-v="dispensar" data-k="${chave}">Dispensar neste mês</button>`:''}
+     ${['aprovado','dispensado','recusado'].includes(k)?`<button class="btn ghost" data-act="rec-acao" data-v="reabrir" data-k="${chave}">Reabrir</button>`:''}</div>`:''}
+    <h3 style="margin:16px 0 8px">Histórico</h3><div class="tl">${[...(x?.historico||[])].reverse().map(h=>`<div class="it ${h.lado==='escritorio'?'':'sistema'}"><small>${fmtDH(h.em)} · ${esc(primeiroNome(h.nome)||'')} ${h.lado==='cliente'?'(cliente)':''}</small><div>${esc(h.texto||h.acao)}</div></div>`).join('')||(x?.enviadoEm?`<div class="it sistema"><small>${fmtDH(x.enviadoEm)}</small><div>Enviado pelo cliente</div></div>`:'<p class="small muted">Nada ainda.</p>')}</div></div></div></div>
+  <div class="modal-foot"><span class="grow"></span><button class="btn" data-act="close-modal">Fechar</button></div>`,true);
+}
+ACT['rec-baixar-todos']=el=>{const r=recDe(el.dataset.k);const arqs=r?.x?.arquivos||[];arqs.forEach((a,i)=>setTimeout(()=>{const l=document.createElement('a');l.href=a.url;l.download=a.nome||'arquivo';document.body.appendChild(l);l.click();l.remove()},i*400))};
+function acaoRec(chave,v,texto){const r=recDe(chave);if(!r)return;const {e,it,comp}=r;
+  const R={aprovar:['aprovado','Aprovou'],pendencia:['pendencia','Pediu complemento'],negar:['recusado','Negou'],dispensar:['dispensado','Dispensou'],reabrir:['enviado','Reabriu']}[v];
+  mut('checklist',()=>{let x=regDoc(e,comp,it);if(!x){x={id:uid(),empresaId:e.id,comp,itemId:it.id,arquivos:[]};S.checklist.push(x)}x.status=R[0];
+    if(v==='aprovar'){x.aprovadoEm=agora();x.aprovadoPor=ME.id}if(v==='negar'){x.motivo=texto;x.recusadoEm=agora()}if(v==='pendencia'){x.pendencia=texto;x.pendenciaEm=agora()}if(v==='dispensar'){x.dispensaMotivo=texto||''}
+    if(v==='reabrir'&&!(x.arquivos||[]).length&&!x.arquivo&&!x.semMovimento){S.checklist=S.checklist.filter(z=>z!==x);return}
+    histDoc(x,v,R[1]+(texto?': '+texto:''))},['Recebimento de documentos',R[1]+' '+it.nome+' '+fmtComp(comp)+(texto?' · '+texto:''),e.razao]);
+  if(UI.modal&&UI.recAberto===chave)abrirRec(chave);}
+ACT['rec-acao']=el=>{const v=el.dataset.v,k=el.dataset.k;
+  if(v==='negar')return pedirMotivo('Negar documento','Diga ao cliente o que está errado (ex.: extrato incompleto, mês errado). Ele recebe o aviso e envia de novo.',m=>{acaoRec(k,'negar',m);avisarCliente(k,'negado',m)});
+  if(v==='pendencia')return pedirMotivo('Pedir complemento','O que falta? (ex.: falta o extrato da conta poupança). O que já foi enviado fica guardado; o cliente só manda o que falta.',m=>{acaoRec(k,'pendencia',m);avisarCliente(k,'pendencia',m)});
+  if(v==='dispensar')return pedirMotivo('Dispensar neste mês','Motivo (ex.: conta encerrada, sem operação no mês):',m=>acaoRec(k,'dispensar',m));
+  acaoRec(k,v)};
+async function avisarCliente(chave,tipo,texto){if(MODO!=='api')return;const r=recDe(chave);if(!r)return;
+  try{await MF.api('POST','/api/documentos/cobrar',{empresaId:r.e.id,comp:r.comp,itens:[r.it.nome],tipo,texto})}catch(er){toast('O cliente vê no portal, mas o aviso por WhatsApp/e-mail falhou: '+er.message,true)}}
+ACT['rec-aprovar-lote']=()=>{const ks=[...UI.recSel];if(!ks.length)return;confirmar('Aprovar documentos',`Aprovar ${ks.length} documento(s) selecionado(s)?`,'Aprovar',()=>{ks.forEach(k=>acaoRec(k,'aprovar'));UI.recSel.clear();toast(ks.length+' documento(s) aprovado(s).')})};
+ACT['rec-cobrar']=async el=>{const e=emp(el.dataset.eid);if(!e)return;const comp=UI.frec.comp||addMes(compAtual(),-1);
+  const itens=el.dataset.item?[el.dataset.item]:itensDoMes(e,comp).filter(it=>['pendente','recusado','pendencia'].includes(estadoDoc(e,comp,it).k)).map(it=>it.nome);
+  if(!itens.length){toast('Nada pendente para cobrar.',true);return}if(MODO!=='api'){toast('A cobrança funciona na versão publicada.',true);return}
+  el.disabled=true;try{const r=await MF.api('POST','/api/documentos/cobrar',{empresaId:e.id,comp,itens});audit('Recebimento de documentos','Cobrou documentos de '+fmtComp(comp)+': '+itens.join(', '),e.razao);toast(r.resumo)}catch(er){toast(er.message,true)}el.disabled=false};
+ACT['rec-cobrar-todos']=()=>{const comp=UI.frec.comp||addMes(compAtual(),-1);const por={};linhasReceb(comp).filter(r=>['pendente','recusado','pendencia'].includes(r.k)).forEach(r=>{(por[r.e.id]=por[r.e.id]||[]).push(r.it.nome)});
+  const ids=Object.keys(por);if(!ids.length){toast('Todos enviaram. 🎉');return}
+  confirmar('Cobrar documentos',`Enviar WhatsApp e e-mail para ${ids.length} cliente(s) com documentos pendentes de ${fmtComp(comp)}?`,'Cobrar',async()=>{let ok=0;const f=[];for(const id of ids){try{await MF.api('POST','/api/documentos/cobrar',{empresaId:id,comp,itens:por[id]});ok++}catch(er){f.push((emp(id)?.fantasia||'')+': '+er.message)}}
+    audit('Recebimento de documentos','Cobrou '+ok+' cliente(s) por documentos de '+fmtComp(comp),'');toast(ok+' cliente(s) cobrado(s).'+(f.length?' Falhas: '+f.slice(0,2).join(' · '):''),!!f.length)})};
+// alertas: documentos do mês pela regra nova
+const motorV12=motor;motor=function(eid,publico){const A=motorV12(eid,publico).filter(a=>a.area!=='Envio mensal').map(a=>a.view==='a-docs'?{...a,view:'a-receb'}:a);const ant=addMes(compAtual(),-1);
+  S.empresas.filter(e=>(!eid||e.id===eid)&&e.status!=='inativo'&&modAtivo(e,'docs')).forEach(e=>{const L=itensDoMes(e,ant).map(it=>({it,...estadoDoc(e,ant,it)}));const nome=e.fantasia||e.razao;
+    const falta=L.filter(r=>r.k==='pendente'),acao=L.filter(r=>['pendencia','recusado'].includes(r.k)),anal=L.filter(r=>r.k==='enviado');const atr=falta.filter(r=>prazoDoItem(r.it,ant)<hoje());
+    if(falta.length)A.push({nivel:atr.length?(publico==='c'?'crit':'warn'):(publico==='c'?'warn':'info'),empresaId:e.id,empresa:nome,area:'Envio mensal',texto:`${falta.length} documento${falta.length>1?'s':''} de ${fmtComp(ant)} pendente${falta.length>1?'s':''} de envio${atr.length?' ('+atr.length+' fora do prazo)':''}`,view:publico==='c'?'c-envio':'a-receb'});
+    if(acao.length)A.push({nivel:'warn',empresaId:e.id,empresa:nome,area:'Envio mensal',texto:publico==='c'?`${acao.length} documento${acao.length>1?'s':''} de ${fmtComp(ant)} precisa${acao.length>1?'m':''} de correção ou complemento`:`${acao.length} documento(s) de ${fmtComp(ant)} aguardando o cliente corrigir`,view:publico==='c'?'c-envio':'a-receb'});
+    if(anal.length&&publico!=='c')A.push({nivel:'info',empresaId:e.id,empresa:nome,area:'Envio mensal',texto:`${anal.length} documento${anal.length>1?'s':''} de ${fmtComp(ant)} para analisar`,view:'a-receb'})});
+  return A};
+/* ==== MÓDULOS v13 (fim) ==== */
+
 
 
 

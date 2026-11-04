@@ -14,6 +14,7 @@ import { registrarWhatsApp } from './whatsapp.js';
 import { registrarEnvios } from './envios.js';
 import { registrarIntegra } from './integra.js';
 import { registrarFinanceiro } from './financeiro.js';
+import { registrarDocumentos } from './documentos.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
 
 const AUD = site => `meufiscal:${site}`;
@@ -592,6 +593,7 @@ export function registrarRotas(r, { db, hub }) {
   registrarEnvios(r, { db, exigir, log, pode, wa });
   registrarIntegra(r, { db, exigir, log, pode, wa });
   registrarFinanceiro(r, { db, exigir, log, pode, wa });
+  registrarDocumentos(r, { db, exigir, log, pode, wa });
   registrarRotasAlteracoes(r, { db, exigir, log, pode, alt });
 
   return { carregarEmpresas };
