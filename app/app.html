@@ -5552,6 +5552,10 @@ abrirLead=function(l){abrirLeadV13(l);if(!l||!UI.modal)return;const q=l.qualific
   UI.modal.html=UI.modal.html.replace('<h3 style="margin:14px 0 8px">Linha do tempo</h3>',bloco+'<h3 style="margin:14px 0 8px">Linha do tempo</h3>');renderModal()};
 ACT['lead-theo']=async el=>{el.disabled=true;el.textContent='Enviando…';try{const r=await MF.api('POST','/api/crm/theo/iniciar',{leadId:el.dataset.id});toast('O Théo iniciou a conversa no WhatsApp.');setTimeout(()=>{const l=S.leads.find(x=>x.id===el.dataset.id);if(l&&UI.modal)abrirLead(l)},1200)}catch(er){toast(er.message,true);el.disabled=false;el.textContent='Théo: enviar primeira mensagem agora'}};
 ACT['lead-conversa']=el=>{closeModal();UI.view='a-chat';UI.tab.atend='caixa';UI.deptoAtend='';UI.convSel=el.dataset.id;if(location.hash!=='#a-chat')location.hash='a-chat';else render()};
+// encerrar só depois de confirmar
+const encerrarConvV13=ACT['encerrar-conv'];
+ACT['encerrar-conv']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.id);if(!c)return;
+  confirmar('Encerrar atendimento',`Tem certeza que deseja encerrar o atendimento de <b>${esc(nomeConv(c))}</b>? A conversa sai da caixa de entrada e fica no Histórico de atendimentos. Se o cliente mandar nova mensagem, abre um novo atendimento.`,'Sim, encerrar',()=>encerrarConvV13(el))};
 /* ==== MÓDULOS v14 (fim) ==== */
 
 
