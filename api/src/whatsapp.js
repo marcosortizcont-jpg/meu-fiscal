@@ -443,6 +443,7 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
       try {
         const jid = await resolverJid(d.fone); if (vistos.has(jid)) continue; vistos.add(jid);
         const waIds = [];
+        if (!anexos.length && legenda) { const r0 = await W.sock.sendMessage(jid, { text: legenda }); if (r0?.key?.id) { enviadas.set(r0.key.id, r0.message); waIds.push(r0.key.id); } }
         for (let i = 0; i < anexos.length; i++) {
           const a = anexos[i]; const cap = i === 0 ? legenda || '' : '';
           const r = await W.sock.sendMessage(jid, /^image\//.test(a.tipo) ? { image: a.conteudo, caption: cap } : { document: a.conteudo, mimetype: a.tipo, fileName: a.nome, caption: cap });
@@ -450,8 +451,8 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
         }
         let c = await conversaAberta(esc, jid); const nova = !c; const agora = new Date().toISOString();
         if (!c) c = { id: 'wa-' + crypto.randomUUID(), empresaId: String(empresaId), canal: 'whatsapp', waJid: jid, waFone: jid.split('@')[0], contatoNome: d.nome || '', contatoId: d.contatoId, status: 'encerrada', encerradaEm: agora, criadoEm: agora, mensagens: [] };
-        c.mensagens.push({ de: 'humano', texto: legenda || '', em: agora, uid: u?.id || null, nome: u?.nome || 'Equipe', canal: 'whatsapp', waIds, arquivos: anexos.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, tamanho: a.conteudo.length, url: `/api/arquivos/${a.id}` })) });
-        if (nova) c.mensagens.push({ de: 'sistema', texto: 'Envio automático do Controle de obrigações.', em: agora });
+        c.mensagens.push({ de: 'humano', texto: legenda || '', em: agora, uid: u?.id || null, nome: u?.nome || 'Equipe', canal: 'whatsapp', waIds, ...(anexos.length ? { arquivos: anexos.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, tamanho: a.conteudo.length, url: `/api/arquivos/${a.id}` })) } : {}) });
+        if (nova) c.mensagens.push({ de: 'sistema', texto: u?.nome && /autom|cobran/i.test(u.nome) ? u.nome + '.' : 'Envio automático do Controle de obrigações.', em: agora });
         await salvarConversa(esc, c);
         enviados.push((d.nome ? d.nome + ' ' : '') + '+' + jid.split('@')[0]);
       } catch (e) { falhas.push((d.nome || d.fone) + ': ' + e.message); }

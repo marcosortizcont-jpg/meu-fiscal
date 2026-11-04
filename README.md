@@ -70,6 +70,15 @@ Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site
 - **CRM comercial (departamento Comercial):** funil em kanban (Novos leads, Primeiro contato, Proposta enviada, Negociação, Ganhos, Perdidos) com arrastar e soltar, indicadores (em aberto, ganhos no mês, conversão, ações atrasadas), filtros, lista e exportação CSV. Ao abrir um lead: dados da empresa, plano e valor, responsável, próxima ação com data, linha do tempo de movimentações (ligação, WhatsApp, e-mail, reunião, proposta), WhatsApp direto e "Cadastrar como cliente" (o cadastro abre preenchido e o lead vira ganho). Perdido sempre pede o motivo. A função **Comercial** em Equipe e permissões dá acesso ao CRM.
 
 - **Clientes, fornecedores e prestadores (Gestão do negócio › Clientes e fornecedores):** o cliente cadastra cada um com CPF/CNPJ (validado, sem repetir), apelido, contato e categoria padrão de receita/despesa. Sem CPF/CNPJ só com a opção "Cadastrar sem CPF/CNPJ" marcada. Ao lançar, o campo sugere os cadastros a partir do primeiro nome (ou do CPF/CNPJ) digitado; nome novo abre o cadastro rápido ali mesmo, e o lançamento só salva com o cadastro feito. Receitas, despesas e o B.I. (principais clientes, fornecedores, % das receitas) agrupam pelo cadastro. "Trazer dos lançamentos e notas" cria os cadastros a partir do que já foi lançado e dos tomadores da NFS-e.
+### Financeiro (honorários)
+Menu **Financeiro** (antigo Honorários), com quatro abas:
+- **Visão geral**: faturado e recebido no mês, a vencer, em atraso, inadimplência dos últimos 3 meses, gráfico de 12 meses, atraso por faixa e maiores devedores.
+- **Cobranças**: mensalidades por competência e situação; gerar mensalidades (plano + funcionários excedentes + serviços avulsos concluídos), emitir boletos, enviar/cobrar por WhatsApp e e-mail (individual ou em lote), baixa manual, editar vencimento/desconto/itens, cancelar e histórico de envios de cada fatura.
+- **Inadimplência**: clientes em atraso com total, faturas, maior atraso e última cobrança; botão Cobrar (ou Cobrar todos) e controle de bloqueio: bloquear agora, liberar por alguns dias, isentar ou voltar à regra automática.
+- **Régua e automação**: geração automática no dia escolhido, vencimento padrão (ou o dia do plano do cliente), multa e juros, envio do boleto ao gerar, lembrete antes do vencimento, aviso no dia, etapas de cobrança após o vencimento (dias, canais e mensagem de cada uma) e bloqueio do portal por dias de atraso. Roda uma vez por dia no horário escolhido; cada etapa sai uma única vez por fatura.
+
+**Banco (boleto + PIX com baixa automática)**: crie a conta no **Asaas**, gere a chave em Integrações › Chaves de API e cole em Financeiro › Régua e automação › Banco. Depois, em Integrações › Webhooks do Asaas, cadastre o webhook de cobranças com a URL e o token mostrados no painel: pagamento recebido dá baixa sozinho. Sem banco, anexe o PDF do boleto em cada fatura e o cliente paga pela chave PIX do escritório. No portal, o cliente vê "Pagar online", linha digitável e PIX copia e cola.
+
 #### Copiloto com IA gratuita (Groq)
 1. Entre em **console.groq.com** e crie a conta (Google ou e-mail). **Não pede cartão de crédito.**
 2. Menu **API Keys** → **Create API Key** → dê um nome (ex.: Meu Fiscal) → copie a chave (começa com `gsk_`).
@@ -79,8 +88,8 @@ Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site
 A camada gratuita da Groq tem limite de pedidos por minuto e por dia (quando estoura, a conversa vai para a equipe) e não usa as conversas para treinar modelos. Fotos são analisadas por um modelo com visão; se ele não estiver disponível, a equipe confere a imagem.
 Alternativa: `GEMINI_API_KEY` (Google AI Studio, gratuito sem ativar faturamento). Se o Google pedir para ativar faturamento ou comprar créditos, não é necessário para a camada gratuita, e prefira a Groq.
 
-#### DAS do MEI direto da Receita (Integra Contador)
-O PGMEI tem captcha e não pode ser automatizado pelo navegador. O caminho oficial é a API **Integra Contador** (SERPRO/Receita), que emite o DAS do MEI em PDF (serviço PGMEI › Gerar DAS).
+#### Guias federais direto da Receita (Integra Contador)
+Os portais da Receita têm captcha e não podem ser automatizados pelo navegador. O caminho oficial é a API **Integra Contador** (SERPRO/Receita), que emite em PDF: **DAS do MEI** (PGMEI), **DAS do Simples Nacional** (PGDAS-D, depois da declaração transmitida), **DARF da DCTFWeb** (depois da DCTFWeb transmitida) e **parcelas dos parcelamentos do Simples e do MEI** (PARCSN, PARCSN-ESP, PERTSN, RELPSN, PARCMEI, PARCMEI-ESP, PERTMEI, RELPMEI). Parcelamentos comuns da Receita e da PGFN (Regularize) não estão na API: continuam com o PDF anexado na obrigação.
 1. Na **Loja Serpro**, contrate o Integra Contador com o CNPJ do escritório (cobrança por consulta/emissão).
 2. Na Área do Cliente Serpro, copie **Consumer Key** e **Consumer Secret**.
 3. Painel → **Configurações › Integração com a Receita**: CNPJ do escritório, Key, Secret e o **e-CNPJ A1 do escritório** (.pfx + senha, guardados cifrados) → **Testar conexão**.
@@ -88,8 +97,8 @@ O PGMEI tem captcha e não pode ser automatizado pelo navegador. O caminho ofici
 
 Com isso:
 - **Théo** (portal e WhatsApp): o cliente pede a guia, o Théo pergunta a competência e a data de pagamento (guia vencida sai atualizada, com data até o fim do mês), confirma e envia o PDF. A guia também entra em "Guias e impostos" e a obrigação DAS-MEI fica entregue. Se a Receita recusar, a conversa vai para a equipe.
-- **Controle de obrigações**: na obrigação DAS-MEI, botão "Emitir no PGMEI", com data de pagamento e envio por WhatsApp/e-mail.
-- **Envio automático mensal**: dia e horário escolhidos (1 a 19), para todos os MEI marcados, pelo portal + WhatsApp e/ou e-mail. Sai a competência anterior; guias pagas ou já enviadas são puladas; guia já emitida e ainda válida é reaproveitada (sem nova cobrança). Se o Render estiver dormindo no horário, o envio acontece quando ele acordar, até o dia 19.
+- **Controle de obrigações**: nas obrigações DAS-MEI, PGDAS-D, DCTFWeb e Parcelamento do Simples, bloco "Emitir na Receita" (data de pagamento, programa do parcelamento e envio por WhatsApp/e-mail). Ali também se marca quem entra no envio automático (DAS e DCTFWeb por empresa; programas de parcelamento de cada empresa).
+- **Envio automático mensal**, uma rotina por tipo (DAS-MEI, DAS do Simples, DCTFWeb e parcelas), cada uma com seu dia e horário, para as empresas marcadas, pelo portal + WhatsApp e/ou e-mail. Sai a competência anterior; guias pagas ou já enviadas são puladas; guia já emitida e ainda válida é reaproveitada (sem nova cobrança). Se o Render estiver dormindo no horário, o envio acontece quando ele acordar, até o dia 19.
 - Tudo fica no **Histórico de emissões e envios** da mesma tela.
 
 #### WhatsApp por QR code

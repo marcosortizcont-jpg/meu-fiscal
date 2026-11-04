@@ -696,7 +696,7 @@ function motor(eid,publico){
       else if(n<0)add('warn',e,'Certidões',`CND ${x.esfera} vencida em ${fmtData(x.validade)}`,publico==='c'?'c-docs':'a-fiscal');
       else if(n<=10&&publico!=='c')add('info',e,'Certidões',`CND ${x.esfera} vence em ${n} dia${n!==1?'s':''}`,'a-fiscal');});
     S.faturas.filter(f=>f.empresaId===e.id&&f.status!=='paga').forEach(f=>{const n=diasAtrasoFatura(f);
-      if(n>30)add('crit',e,'Financeiro',`Mensalidade de ${fmtComp(f.comp)} com ${n} dias de atraso · acesso parcialmente bloqueado`,publico==='c'?'c-fin':'a-hon');
+      if(empresaBloqueada(e)&&n>0)add('crit',e,'Financeiro',`Mensalidade de ${fmtComp(f.comp)} com ${n} dias de atraso · acesso parcialmente bloqueado`,publico==='c'?'c-fin':'a-hon');
       else if(n>0)add('warn',e,'Financeiro',`Mensalidade de ${fmtComp(f.comp)} vencida há ${n} dia${n>1?'s':''}`,publico==='c'?'c-fin':'a-hon');});
     const ano=compAtual().slice(0,4);
     if(e.regime==='MEI'){const lim=limiteMEIAno(e,ano),r=receitaAno(e.id,ano);
@@ -4771,7 +4771,7 @@ ACT['lanc-notas']=el=>{const e=empAtual();const antes=new Set(S.lancamentos.map(
 /* ==== MÓDULOS v10 (fim) ==== */
 /* ==== MÓDULOS v11: DAS do MEI pela integração oficial com a Receita (Integra Contador / PGMEI) ==== */
 const ehMeiE=e=>!!e&&(e.regimeId==='reg2-mei'||e.regime==='MEI');
-const PEDE_GUIA_C=/\b(das|guia|guias|boleto|boletos|2\s*[ªao°]?\s*via|segunda via|imposto do mei)\b/i;
+const PEDE_GUIA_C=/\b(das|guia|guias|boleto|boletos|2\s*[ªao°]?\s*via|segunda via|imposto do mei|darf|parcela|parcelamento)\b/i;
 const integra=()=>MODO==='api'&&UI.modo==='painel'?apiDado('integra','/api/integra'):{};
 const ORIG_EXEC={mensal:'Envio mensal',entrega:'Entrega',theo:'Théo',painel:'Painel'};
 
@@ -4779,8 +4779,8 @@ const ORIG_EXEC={mensal:'Envio mensal',entrega:'Entrega',theo:'Théo',painel:'Pa
 const aConfigV10=aConfig;
 aConfig=function(){
   const h=aConfigV10();if(MODO!=='api')return h;
-  const d=integra();if(d.carregando)return h+`<div class="panel"><h2>Integração com a Receita (DAS do MEI)</h2><p class="small muted">Carregando…</p></div>`;
-  if(d.erro)return h+`<div class="panel"><h2>Integração com a Receita (DAS do MEI)</h2>${vazio(d.erro)}</div>`;
+  const d=integra();if(d.carregando)return h+`<div class="panel"><h2>Integração com a Receita (guias federais)</h2><p class="small muted">Carregando…</p></div>`;
+  if(d.erro)return h+`<div class="panel"><h2>Integração com a Receita (guias federais)</h2>${vazio(d.erro)}</div>`;
   const x=d.dados||{};const ed=x.podeEditar;const a=x.auto||{};const dis=ed?'':'disabled';
   const meis=S.empresas.filter(e=>ehMeiE(e)&&e.status!=='inativo').sort((p,q)=>(p.fantasia||p.razao).localeCompare(q.fantasia||q.razao));const exc=new Set(a.excluidas||[]);
   const canais=a.canais||['portal','whatsapp'];const ult=a.ultimoLote;const compAnt=addMes(compAtual(),-1);
@@ -4799,21 +4799,24 @@ aConfig=function(){
     <label class="f"><span>Senha do certificado</span><input name="senha" type="password" autocomplete="new-password" ${dis}></label>
     ${x.cert?`<p class="small muted full" style="margin:0">Certificado guardado: <b>${esc(x.cert.titular||'')}</b>, válido até ${fmtData(x.cert.validade)}.</p>`:''}
     ${ed?`<div class="actions full"><button class="btn primary">Salvar integração</button><button type="button" class="btn" data-act="integra-testar">Testar conexão</button></div>`:''}</form>`;
+  const R=a.rotinas||{};const lotes=a.lotes||{};const rodando=x.rodando||[];
+  const ROT=[['mei','DAS do MEI','todos os MEI marcados abaixo · sai a competência anterior',19],['das','DAS do Simples Nacional','empresas do Simples (desmarque na obrigação PGDAS-D) · só depois do PGDAS-D transmitido',19],['dctfweb','DARF da DCTFWeb','empresas marcadas na obrigação DCTFWeb · depois da DCTFWeb transmitida',19],['parc','Parcelas de parcelamentos','empresas com programa marcado na obrigação de parcelamento · parcela do mês',25]];
+  const lin=([k,n,d,mx])=>{const r=R[k]||{};const l=lotes[k];return `<tr><td><label class="chk"><input type="checkbox" name="r-${k}-ativo" ${r.ativo?'checked':''} ${dis}> <b>${n}</b></label><div class="sub">${d}</div>${l?`<div class="sub">Último: ${fmtComp(l.comp)} · ${fmtDH(l.inicio)} · ${l.ok} ok, <b style="color:${l.falhas?'var(--crit)':'inherit'}">${l.falhas} falha(s)</b>, ${l.puladas} pulada(s)${l.fim?'':' · em andamento'}</div>`:''}</td>
+    <td><input type="number" name="r-${k}-dia" min="1" max="${mx}" value="${esc(r.dia||({mei:5,das:15,dctfweb:15,parc:10})[k])}" style="width:72px" ${dis}></td><td><select name="r-${k}-hora" ${dis}>${[7,8,9,10,11,12,13,14,15,16,17,18].map(hh=>`<option value="${hh}" ${(r.hora??8)==hh?'selected':''}>${hh}h</option>`).join('')}</select></td>
+    <td>${ed?`<button type="button" class="btn sm" data-act="integra-executar" data-rotina="${k}" ${x.configurado&&!rodando.includes(k)?'':'disabled'}>${rodando.includes(k)?'Enviando…':'Enviar agora'}</button>`:''}</td></tr>`};
   const auto=`<form data-form="integra-auto" class="grid-f" style="margin-top:8px">
-    <label class="chk full"><input type="checkbox" name="ativo" ${a.ativo?'checked':''} ${dis}> <b>Enviar o DAS automaticamente para todos os MEI, todo mês</b></label>
-    <label class="f"><span>Dia do envio (1 a 19)</span><input name="dia" type="number" min="1" max="19" value="${esc(a.dia||5)}" ${dis}></label>
-    <label class="f"><span>A partir das</span><select name="hora" ${dis}>${[7,8,9,10,11,12,13,14,15,16,17,18].map(hh=>`<option value="${hh}" ${(a.hora??8)==hh?'selected':''}>${hh}h</option>`).join('')}</select></label>
+    <div class="table-wrap full"><table><thead><tr><th>Rotina mensal</th><th>Dia</th><th>A partir das</th><th></th></tr></thead><tbody>${ROT.map(lin).join('')}</tbody></table></div>
     <div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">Para onde vai</span><div class="tipos-chk"><label><input type="checkbox" checked disabled> Portal (Guias e impostos)</label><label><input type="checkbox" name="canais" value="whatsapp" ${canais.includes('whatsapp')?'checked':''} ${dis}> WhatsApp dos contatos</label><label><input type="checkbox" name="canais" value="email" ${canais.includes('email')?'checked':''} ${dis}> E-mail</label></div></div>
-    <label class="f full"><span>Mensagem (use {nome}, {empresa}, {competencia}, {valor}, {vencimento})</span><textarea name="mensagem" rows="2" maxlength="600" ${dis}>${esc(a.mensagem||'')}</textarea></label>
+    <label class="f full"><span>Mensagem (use {nome}, {empresa}, {guia}, {competencia}, {valor}, {vencimento})</span><textarea name="mensagem" rows="2" maxlength="600" ${dis}>${esc(a.mensagem||'')}</textarea></label>
     <div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">Empresas MEI que recebem (${meis.filter(e=>!exc.has(e.id)).length} de ${meis.length})</span><div class="ct-empresas">${meis.map(e=>`<label class="chk"><input type="checkbox" name="incluir" value="${e.id}" ${exc.has(e.id)?'':'checked'} ${dis}> ${esc(e.fantasia||e.razao)} <span class="small muted">${fmtCNPJ(e.cnpj)}</span></label>`).join('')||'<span class="small muted">Nenhuma empresa no regime MEI.</span>'}</div></div>
-    <p class="small muted full" style="margin:0">No dia marcado sai a guia da competência anterior (ex.: no dia ${a.dia||5} de ${fmtComp(compAtual())} vai a de ${fmtComp(compAnt)}, que vence dia 20). Se o servidor estiver dormindo no horário, o envio acontece assim que ele acordar, até o dia 19. Guias já pagas ou já enviadas no mês são puladas.</p>
-    ${ed?`<div class="actions full"><button class="btn primary">Salvar envio automático</button><button type="button" class="btn" data-act="integra-executar" ${x.configurado&&!x.rodando?'':'disabled'}>${x.rodando?'Enviando…':'Enviar agora'}</button></div>`:''}</form>`;
+    <p class="small muted full" style="margin:0">Se o servidor estiver dormindo no horário, a rotina roda assim que ele acordar (até o dia 19, ou 25 nas parcelas). Guias pagas ou já enviadas no mês são puladas; guia já emitida e ainda válida é reaproveitada, sem nova cobrança da SERPRO.</p>
+    ${ed?`<div class="actions full"><button class="btn primary">Salvar rotinas</button></div>`:''}</form>`;
   const fx=UI.fexec||'';const ex=(x.execucoes||[]).filter(r=>!fx||(fx==='falhas'?!r.ok:r.origem===fx));
   const hist=`<div class="filtro-resumo" style="margin-top:16px"><h3 style="margin:0">Histórico de emissões e envios</h3><div class="filtros" role="group">${[['','Tudo'],['falhas','Só falhas'],['mensal','Mensal'],['theo','Théo'],['painel','Painel']].map(([k,r])=>`<button aria-pressed="${fx===k}" data-act="integra-fexec" data-v="${k}">${r}</button>`).join('')}</div></div>
     ${ex.length?`<div class="table-wrap"><table><thead><tr><th>Quando</th><th>Empresa</th><th>Comp.</th><th>Origem</th><th>Resultado</th></tr></thead><tbody>${ex.slice(0,80).map(r=>`<tr><td class="small">${fmtDH(r.em)}</td><td class="small">${esc(r.razao||'—')}</td><td class="small">${r.comp?fmtComp(r.comp):'—'}</td><td class="small">${ORIG_EXEC[r.origem]||esc(r.origem)}</td><td class="small">${r.ok?pill('ok','ok'):pill('falhou','crit')} ${r.valor?brl(Number(r.valor))+' · ':''}${esc(r.mensagem||'')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small muted">Nada por aqui ainda.</p>'}`;
-  return h+`<div class="panel" id="integra"><div class="panel-head"><h2>Integração com a Receita (DAS do MEI)</h2>${x.configurado?pill(x.falso?'Simulação local':x.ambiente==='demonstracao'?'Demonstração':'Configurada','ok'):pill('Não configurada','warn')}</div>
-    <p class="small muted">Emite o DAS do MEI direto na Receita pela API oficial <b>Integra Contador</b> (SERPRO), sem entrar no PGMEI. Com ela, o Théo envia a guia quando o cliente pede, o Controle de obrigações ganha o botão "Emitir no PGMEI" e todos os MEI podem receber a guia num dia fixo do mês.</p>${passo}${cred}
-    <h3 style="margin:20px 0 0">Envio automático mensal</h3>${ult?`<p class="small" style="margin:6px 0 0">Último envio: ${fmtComp(ult.comp)} · ${fmtDH(ult.inicio)} · <b>${ult.ok}</b> enviada(s), <b style="color:${ult.falhas?'var(--crit)':'inherit'}">${ult.falhas}</b> falha(s), ${ult.puladas} pulada(s)${ult.fim?'':' · em andamento'}</p>`:''}${auto}${hist}</div>`;
+  return h+`<div class="panel" id="integra"><div class="panel-head"><h2>Integração com a Receita (guias federais)</h2>${x.configurado?pill(x.falso?'Simulação local':x.ambiente==='demonstracao'?'Demonstração':'Configurada','ok'):pill('Não configurada','warn')}</div>
+    <p class="small muted">Emite guias direto na Receita pela API oficial <b>Integra Contador</b> (SERPRO), sem entrar nos portais: DAS do MEI, DAS do Simples Nacional, DARF da DCTFWeb e parcelas dos parcelamentos do Simples Nacional e do MEI (PARCSN, PERTSN, RELPSN, PARCMEI…). O Théo envia a guia quando o cliente pede, o Controle de obrigações ganha o botão "Emitir na Receita" e cada tipo pode sair sozinho num dia do mês. Parcelamentos comuns da Receita e da PGFN não estão na API: continuam com a guia anexada à mão.</p>${passo}${cred}
+    <h3 style="margin:20px 0 0">Envio automático mensal</h3>${auto}${hist}</div>`;
 };
 ACT['integra-fexec']=el=>{UI.fexec=el.dataset.v;render()};
 FORM['integra']=async(fd,form)=>{
@@ -4827,37 +4830,55 @@ FORM['integra']=async(fd,form)=>{
 };
 ACT['integra-testar']=async el=>{el.disabled=true;el.textContent='Testando…';try{const r=await MF.api('POST','/api/integra/testar',{});toast(r.texto,!r.ok)}catch(er){toast(er.message,true)}el.disabled=false;el.textContent='Testar conexão'};
 FORM['integra-auto']=async(fd,form)=>{
-  const meis=S.empresas.filter(e=>ehMeiE(e)&&e.status!=='inativo').map(e=>e.id);const inc=new Set(fd.getAll('incluir'));
-  const dia=Number(fd.get('dia'));if(!(dia>=1&&dia<=19)){toast('O dia do envio precisa ser de 1 a 19 (o DAS vence dia 20).',true);return}
-  try{await MF.api('PUT','/api/integra/auto',{ativo:!!fd.get('ativo'),dia,hora:Number(fd.get('hora')),canais:['portal',...fd.getAll('canais')],mensagem:String(fd.get('mensagem')||'').trim(),excluidas:meis.filter(id=>!inc.has(id))});
-    toast(fd.get('ativo')?`Envio automático ligado: todo dia ${dia}, a partir das ${fd.get('hora')}h.`:'Envio automático desligado.');invalidar('integra')}catch(er){toast(er.message,true)}
+  const meis=S.empresas.filter(e=>ehMeiE(e)&&e.status!=='inativo').map(e=>e.id);const inc=new Set(fd.getAll('incluir'));const rotinas={};
+  for(const k of ['mei','das','dctfweb','parc']){const dia=Number(fd.get('r-'+k+'-dia'));const mx=k==='parc'?25:19;if(!(dia>=1&&dia<=mx)){toast('O dia de cada rotina vai de 1 a '+mx+'.',true);return}rotinas[k]={ativo:!!fd.get('r-'+k+'-ativo'),dia,hora:Number(fd.get('r-'+k+'-hora'))}}
+  try{await MF.api('PUT','/api/integra/auto',{rotinas,canais:['portal',...fd.getAll('canais')],mensagem:String(fd.get('mensagem')||'').trim(),excluidas:meis.filter(id=>!inc.has(id))});
+    const on=Object.entries(rotinas).filter(([,r])=>r.ativo).length;toast(on?on+' rotina(s) automática(s) ligada(s).':'Rotinas automáticas desligadas.');invalidar('integra')}catch(er){toast(er.message,true)}
 };
-ACT['integra-executar']=()=>{const comps=[0,-1,-2].map(n=>addMes(compAtual(),n-1));const n=S.empresas.filter(e=>ehMeiE(e)&&e.status!=='inativo'&&!((integra().dados?.auto?.excluidas)||[]).includes(e.id)).length;
-  openModal(`${mHead('Enviar o DAS-MEI agora')}<form data-form="integra-exec"><div class="modal-body"><label class="f"><span>Competência</span><select name="comp">${comps.map(c=>`<option value="${c}">${fmtComp(c)}</option>`).join('')}</select></label>
-   <p class="small muted">Gera e envia a guia para ${n} empresa(s) MEI marcadas. Cada emissão nova é cobrada pela SERPRO; guias já emitidas e ainda válidas são reaproveitadas sem custo. O andamento aparece no histórico abaixo.</p></div>
+const NOME_ROT={mei:'DAS do MEI',das:'DAS do Simples Nacional',dctfweb:'DARF da DCTFWeb',parc:'parcelas dos parcelamentos'};
+ACT['integra-executar']=el=>{const rot=el.dataset.rotina||'mei';const desl=rot==='parc'?0:-1;const comps=[0,-1,-2].map(n=>addMes(compAtual(),n+desl));
+  openModal(`${mHead('Enviar agora: '+NOME_ROT[rot])}<form data-form="integra-exec" data-rotina="${rot}"><div class="modal-body"><label class="f"><span>Competência${rot==='parc'?' (mês da parcela)':''}</span><select name="comp">${comps.map(c=>`<option value="${c}">${fmtComp(c)}</option>`).join('')}</select></label>
+   <p class="small muted">Gera e envia para todas as empresas desta rotina. Cada emissão nova é cobrada pela SERPRO; guias já emitidas e ainda válidas são reaproveitadas sem custo. O andamento aparece no histórico.</p></div>
    <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Gerar e enviar</button></div></form>`)};
-FORM['integra-exec']=async fd=>{try{const r=await MF.api('POST','/api/integra/executar',{comp:fd.get('comp')});closeModal();toast(`Envio iniciado para ${r.resumo.total} empresa(s). Acompanhe no histórico.`);invalidar('integra');
-  const t=setInterval(()=>{invalidar('integra');const d=APIC.integra?.dados;if(d&&!d.rodando)clearInterval(t)},4000);setTimeout(()=>clearInterval(t),10*60000)}catch(er){toast(er.message,true)}};
+FORM['integra-exec']=async(fd,form)=>{try{const r=await MF.api('POST','/api/integra/executar',{rotina:form.dataset.rotina,comp:fd.get('comp')});closeModal();toast(`Envio iniciado para ${r.resumo.total} empresa(s). Acompanhe no histórico.`);invalidar('integra');
+  const t=setInterval(()=>{invalidar('integra');const d=APIC.integra?.dados;if(d&&!(d.rodando||[]).length)clearInterval(t)},4000);setTimeout(()=>clearInterval(t),10*60000)}catch(er){toast(er.message,true)}};
 
-/* ---------- Controle de obrigações: emitir o DAS-MEI daquela empresa ---------- */
+/* ---------- Controle de obrigações: emitir a guia na Receita ---------- */
+const SERV_DA_CAT={'das-mei':'mei','pgdas':'das','dctfweb':'dctfweb','parc-simples':'parc'};
+const servDaObr=o=>SERV_DA_CAT[o.catId]||({'DAS-MEI':'mei','PGDAS-D':'das','DCTFWeb':'dctfweb','Parcelamento do Simples Nacional':'parc'})[o.tipo]||null;
+const ehSimplesE=e=>!!e&&(String(e.regimeId||'').startsWith('reg2-sn')||e.regime==='SN');
+const progsDe=e=>{const P=integra().dados?.programas||{};return Object.entries(P).filter(([k])=>ehMeiE(e)?/MEI/.test(k):!/MEI/.test(k))};
 const detalheObrV9=detalheObr;
 detalheObr=function(o,r){
-  const h=detalheObrV9(o,r);const e=r.e;
-  if(MODO!=='api'||!(o.tipo==='DAS-MEI'||o.catId==='das-mei')||!ehMeiE(e)||!podeMod('guias','editar'))return h;
+  const h=detalheObrV9(o,r);const e=r.e;if(MODO!=='api'||!podeMod('guias','editar'))return h;
+  if(['parc-federal','parc-pgfn'].includes(o.catId))return `<div class="banner info" style="margin-bottom:10px"><span class="small">${o.catId==='parc-pgfn'?'Parcelamentos da PGFN são emitidos no Regularize':'Parcelamentos comuns da Receita (fora do Simples) não estão no Integra Contador'}: emita no portal e anexe o PDF abaixo.</span></div>`+h;
+  const sv=servDaObr(o);if(!sv)return h;
+  if(sv==='mei'&&!ehMeiE(e))return h;if(sv==='das'&&!ehSimplesE(e))return h;
   const d=integra();if(!d.dados)return h;
-  if(!d.dados.configurado)return `<div class="banner info" style="margin-bottom:10px"><span class="small">Emita este DAS direto da Receita: configure a integração em <a href="#a-config">Configurações › Integração com a Receita</a>.</span></div>`+h;
-  const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===o.comp&&x.tipo==='DAS-MEI');const venc=o.prazo;const vencida=venc<hoje();
-  return `<div class="panel" style="margin-bottom:10px;padding:12px;background:var(--surface-2)" data-pgmei="${o.id}"><div class="panel-head" style="margin:0 0 8px"><b>Emitir no PGMEI (Receita)</b>${g?.origem==='pgmei'?pill('Emitido '+fmtDH(g.emitidaEm)+' · '+brl(g.valor),'ok'):''}</div>
-   <div class="grid-f"><label class="f"><span>Data de pagamento ${vencida?'(vencida: sai com multa e juros)':'(vazio = até o vencimento)'}</span><input type="date" id="pgmei-data" min="${hoje()}" value="${vencida?hoje():''}"></label>
-   <div class="f"><span class="small" style="font-weight:600;color:var(--muted)">Enviar também</span><div class="tipos-chk"><label><input type="checkbox" id="pgmei-wa" checked> WhatsApp</label><label><input type="checkbox" id="pgmei-em"> E-mail</label></div></div></div>
-   <div class="actions" style="margin-top:8px"><button type="button" class="btn sm primary" data-act="pgmei-emitir" data-eid="${e.id}" data-comp="${o.comp}">${g?.origem==='pgmei'?'Emitir de novo':'Emitir e publicar no portal'}</button><span class="small muted">A guia vai para "Guias e impostos" do portal e a obrigação fica entregue.</span></div></div>`+h;
+  if(!d.dados.configurado)return `<div class="banner info" style="margin-bottom:10px"><span class="small">Emita esta guia direto da Receita: configure a integração em <a href="#a-config">Configurações › Integração com a Receita</a>.</span></div>`+h;
+  const tipoG={mei:'DAS-MEI',das:'DAS',dctfweb:'DCTFWeb',parc:'Parcelamento'}[sv];const ig=e.integra||{};const progs=progsDe(e);
+  const g=S.guias.filter(x=>x.empresaId===e.id&&x.comp===o.comp&&x.tipo===tipoG&&['pgmei','receita'].includes(x.origem)).sort((a,b)=>String(b.emitidaEm).localeCompare(String(a.emitidaEm)))[0];
+  const venc=o.prazo;const vencida=venc<hoje();const consolida=sv==='mei'||sv==='das';
+  const auto=sv==='mei'?'':sv==='das'?`<label class="chk"><input type="checkbox" data-act="pgmei-auto" data-eid="${e.id}" data-k="das" ${ig.das!==false?'checked':''}> Incluir esta empresa no envio automático do DAS</label>`
+    :sv==='dctfweb'?`<label class="chk"><input type="checkbox" data-act="pgmei-auto" data-eid="${e.id}" data-k="dctfweb" ${ig.dctfweb?'checked':''}> Incluir esta empresa no envio automático do DARF da DCTFWeb</label>`
+    :`<div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">Programas desta empresa (entram no envio automático das parcelas)</span><div class="tipos-chk">${progs.map(([k,n])=>`<label title="${esc(n)}"><input type="checkbox" data-act="pgmei-prog" data-eid="${e.id}" value="${k}" ${(ig.parcelamentos||[]).includes(k)?'checked':''}> ${k}</label>`).join('')}</div></div>`;
+  return `<div class="panel" style="margin-bottom:10px;padding:12px;background:var(--surface-2)" data-pgmei="${o.id}"><div class="panel-head" style="margin:0 0 8px"><b>Emitir na Receita (Integra Contador)</b>${g?pill('Emitida '+fmtDH(g.emitidaEm)+' · '+brl(g.valor)+(g.programa?' · '+g.programa:''),'ok'):''}</div>
+   <div class="grid-f">${sv==='parc'?`<label class="f"><span>Programa</span><select id="pgmei-prog">${progs.map(([k,n])=>`<option value="${k}" ${(ig.parcelamentos||[])[0]===k?'selected':''}>${esc(n)}</option>`).join('')}</select></label>`:''}
+   ${consolida?`<label class="f"><span>Data de pagamento ${vencida?'(vencida: sai com multa e juros)':'(vazio = até o vencimento)'}</span><input type="date" id="pgmei-data" min="${hoje()}" value="${vencida?hoje():''}"></label>`:''}
+   <div class="f"><span class="small" style="font-weight:600;color:var(--muted)">Enviar também</span><div class="tipos-chk"><label><input type="checkbox" id="pgmei-wa" checked> WhatsApp</label><label><input type="checkbox" id="pgmei-em"> E-mail</label></div></div>${auto}</div>
+   ${sv==='das'?'<p class="small muted" style="margin:6px 0 0">O DAS só sai depois do PGDAS-D do mês transmitido. A obrigação continua aberta até você marcar a declaração como entregue.</p>':sv==='dctfweb'?'<p class="small muted" style="margin:6px 0 0">O DARF só sai depois da DCTFWeb do mês transmitida.</p>':''}
+   <div class="actions" style="margin-top:8px"><button type="button" class="btn sm primary" data-act="pgmei-emitir" data-eid="${e.id}" data-comp="${o.comp}" data-sv="${sv}">${g?'Emitir de novo':'Emitir e publicar no portal'}</button><span class="small muted">A guia vai para "Guias e impostos" do portal.</span></div></div>`+h;
 };
+ACT['pgmei-auto']=el=>{const e=emp(el.dataset.eid);if(!e)return;mut('empresas',()=>{e.integra={...(e.integra||{}),[el.dataset.k]:el.checked}},['Guias','Envio automático pela Receita ('+el.dataset.k+') '+(el.checked?'ligado':'desligado'),e.razao])};
+ACT['pgmei-prog']=el=>{const e=emp(el.dataset.eid);if(!e)return;const s=new Set((e.integra||{}).parcelamentos||[]);el.checked?s.add(el.value):s.delete(el.value);mut('empresas',()=>{e.integra={...(e.integra||{}),parcelamentos:[...s]}},['Guias','Programas de parcelamento: '+([...s].join(', ')||'nenhum'),e.razao])};
 ACT['pgmei-emitir']=async el=>{
-  const data=($('#pgmei-data')||{}).value||null;const canais=[($('#pgmei-wa')||{}).checked?'whatsapp':null,($('#pgmei-em')||{}).checked?'email':null].filter(Boolean);
+  const sv=el.dataset.sv||'mei';const data=($('#pgmei-data')||{}).value||null;const programa=sv==='parc'?($('#pgmei-prog')||{}).value:null;
+  if(sv==='parc'&&!programa){toast('Escolha o programa de parcelamento.',true);return}
+  const canais=[($('#pgmei-wa')||{}).checked?'whatsapp':null,($('#pgmei-em')||{}).checked?'email':null].filter(Boolean);
   el.disabled=true;const txt=el.textContent;el.textContent='Emitindo na Receita…';
-  try{const r=await MF.api('POST','/api/integra/das-mei',{empresaId:el.dataset.eid,comp:el.dataset.comp,dataPagamento:data,canais,forcar:/de novo/.test(txt)});
+  try{const r=await MF.api('POST','/api/integra/guia',{servico:sv,programa,empresaId:el.dataset.eid,comp:el.dataset.comp,dataPagamento:data,canais,forcar:/de novo/.test(txt)});
     const ent=Object.entries(r.entrega||{}).map(([k,v])=>(k==='email'?'E-mail ':'WhatsApp ')+v).join(' · ');
-    toast(`DAS ${fmtComp(r.guia.comp)}: ${brl(r.guia.valor)}, pagamento até ${fmtData(r.guia.venc)}${r.reaproveitada?' (guia válida reaproveitada)':''}. Publicado no portal.${ent?' '+ent:''}`);invalidar('integra')}
+    toast(`${r.guia.programa||r.guia.tipo} ${fmtComp(r.guia.comp)}: ${brl(r.guia.valor)}, pagamento até ${fmtData(r.guia.venc)}${r.reaproveitada?' (guia válida reaproveitada)':''}. Publicado no portal.${ent?' '+ent:''}`);invalidar('integra')}
   catch(er){toast(er.message,true)}el.disabled=false;el.textContent=txt;
 };
 
@@ -4865,7 +4886,7 @@ ACT['pgmei-emitir']=async el=>{
 const perguntarIAV10=perguntarIA;
 perguntarIA=async function(texto){
   const e=empAtual();
-  if(MODO!=='api'||!e||!ehMeiE(e)||!texto||UI.iaAnexos.length||UI.iaDraft!=null)return perguntarIAV10(texto);
+  if(MODO!=='api'||!e||!(ehMeiE(e)||String(e.regimeId||'').startsWith('reg2-sn')||e.regime==='SN'||(e.integra&&(e.integra.dctfweb||(e.integra.parcelamentos||[]).length)))||!texto||UI.iaAnexos.length||UI.iaDraft!=null)return perguntarIAV10(texto);
   const c0=conversaAtiva(e.id,false);if(c0&&c0.status!=='ia')return perguntarIAV10(texto);
   if(!UI.dasConversa&&!PEDE_GUIA_C.test(texto))return perguntarIAV10(texto);
   let c;mut('conversas',()=>{c=conversaAtiva(e.id,true);c.mensagens.push({de:'cliente',texto,em:agora(),uid:ME.id,nome:ME.nome||''})},null);
@@ -4881,6 +4902,252 @@ perguntarIA=async function(texto){
     if(r.passarEquipe){c.status='aguardando_humano';c.mensagens.push({de:'sistema',texto:'O Théo não conseguiu emitir o DAS e chamou a equipe.',em:agora()})}},r.arquivo?['Atendimento','Théo enviou o DAS-MEI',e.razao]:null);
 };
 /* ==== MÓDULOS v11 (fim) ==== */
+/* ==== MÓDULOS v12: Financeiro (honorários, inadimplência, bloqueio, boletos e régua de cobrança) ==== */
+(function(){const st=document.createElement('style');st.textContent=`
+.aging{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.aging div{border:1px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--surface)}
+.aging b{display:block;font-size:18px}.aging small{color:var(--muted)}
+.serie{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;align-items:end;height:150px;padding-top:8px}
+.serie .c{display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;justify-content:flex-end}
+.serie .b{display:flex;gap:2px;align-items:flex-end;height:120px;width:100%;justify-content:center}
+.serie .b i{display:block;width:40%;border-radius:4px 4px 0 0;min-height:2px}
+.serie small{font-size:10.5px;color:var(--muted)}
+.fin-sel{width:16px;height:16px}
+.linha-dig{font-family:var(--mono,ui-monospace,monospace);font-size:12.5px;word-break:break-all;background:var(--surface-2);padding:8px;border-radius:8px}
+`;document.head.appendChild(st)})();
+{const n=NAV_A.find(x=>x[0]==='a-hon');if(n)n[1]='Financeiro';}
+const FINPAD={gerarAuto:false,diaGeracao:1,vencDia:10,boletoAuto:true,hora:9,multa:2,juros:1,envioAoGerar:{ativo:true,canais:['portal','whatsapp','email']},lembreteAntes:{ativo:true,dias:3,canais:['whatsapp']},noVencimento:{ativo:true,canais:['whatsapp']},
+  regua:[{dias:1,ativo:true,canais:['whatsapp','email'],mensagem:''},{dias:7,ativo:true,canais:['whatsapp','email'],mensagem:''},{dias:15,ativo:true,canais:['whatsapp','email'],mensagem:''},{dias:30,ativo:true,canais:['whatsapp','email'],mensagem:''}],bloqueio:{ativo:true,dias:30},mensagens:{}};
+const finCfg=()=>{const c=cfg().financeiro||{};const f={...FINPAD,...c};['envioAoGerar','lembreteAntes','noVencimento','bloqueio'].forEach(k=>{f[k]={...FINPAD[k],...(c[k]||{})}});f.regua=Array.isArray(c.regua)&&c.regua.length?c.regua:FINPAD.regua;return f};
+const MSGS_FIN={envio:'Olá, {nome}! A mensalidade de {competencia} da {empresa} já está disponível: {valor}, com vencimento em {vencimento}. {pagamento}',
+  antes:'Olá, {nome}! Lembrete: a mensalidade de {competencia} da {empresa} ({valor}) vence em {vencimento}. {pagamento}',
+  venc:'Olá, {nome}! Hoje vence a mensalidade de {competencia} da {empresa}: {valor}. {pagamento}',
+  atraso:'Olá, {nome}! Não identificamos o pagamento da mensalidade de {competencia} da {empresa} ({valor}), vencida em {vencimento} ({dias} dia(s) de atraso). {pagamento} Se já pagou, por favor desconsidere ou informe no Portal em Plano e faturas.',
+  atraso30:'Olá, {nome}! A mensalidade de {competencia} da {empresa} ({valor}) está em atraso há {dias} dias. Para evitar a restrição de acesso ao Portal, regularize pelo link: {pagamento} Se precisar negociar, é só responder esta mensagem.'};
+const finApi=()=>MODO==='api'?apiDado('financeiro','/api/financeiro'):{};
+const fatAtiva=f=>!['paga','cancelada'].includes(f.status);
+const atrasoDe=f=>fatAtiva(f)&&f.status!=='informada'?Math.max(0,-diasAte(f.venc)):0;
+
+/* ---------- bloqueio por inadimplência (portal e painel usam a mesma regra) ---------- */
+empresaBloqueada=function(e){
+  if(!e)return false;if(e.isentoBloqueio)return false;
+  if(e.desbloqueioAte&&e.desbloqueioAte>=hoje())return false;
+  if(e.bloqueioManual)return true;
+  const b=finCfg().bloqueio;if(!b.ativo)return false;
+  return S.faturas.some(f=>f.empresaId===e.id&&atrasoDe(f)>Number(b.dias||30));
+};
+const situacaoBloqueio=e=>e.isentoBloqueio?['Isento de bloqueio','info']:e.desbloqueioAte&&e.desbloqueioAte>=hoje()?['Liberado até '+fmtData(e.desbloqueioAte),'info']:e.bloqueioManual?['Bloqueado (manual)','crit']:empresaBloqueada(e)?['Bloqueado (atraso)','crit']:['Liberado','ok'];
+
+/* ---------- módulo ---------- */
+UI.ffin=UI.ffin||{comp:'',sit:'',q:''};UI.finSel=UI.finSel||new Set();
+aHon=function(){
+  if(!podeMod('hon','ver'))return vazio('Seu acesso não inclui o Financeiro.');
+  const t=UI.tab.fin2||'visao';const ed=podeMod('hon','editar');
+  const abas=`<div class="tabs" role="tablist">${[['visao','Visão geral'],['cobrancas','Cobranças'],['inad','Inadimplência'],['auto','Régua e automação']].map(([k,r])=>`<button role="tab" aria-selected="${t===k}" data-act="tab" data-k="fin2" data-v="${k}">${r}${k==='inad'?` (${new Set(S.faturas.filter(f=>atrasoDe(f)>0).map(f=>f.empresaId)).size})`:''}</button>`).join('')}</div>`;
+  const comp=compDe('hon');
+  const acoes=ed?`<button class="btn primary" data-act="fin-gerar">${svg('plus')}Gerar mensalidades</button>`:'';
+  const cab=head('Financeiro','Honorários dos clientes: mensalidades, boletos e PIX, recebimentos, inadimplência, bloqueio do portal e cobrança automática por WhatsApp, e-mail e portal.',acoes);
+  return cab+abas+(t==='cobrancas'?finCobrancas():t==='inad'?finInad():t==='auto'?finAuto():finVisao());
+};
+function finVisao(){
+  const ca=compAtual();const F=S.faturas.filter(f=>f.status!=='cancelada');
+  const doMes=F.filter(f=>f.comp===ca);const fat=doMes.reduce((a,f)=>a+Number(f.valor||0),0);
+  const recMes=F.filter(f=>f.status==='paga'&&String(f.pagaEm||'').startsWith(ca)).reduce((a,f)=>a+Number(f.valorPago||f.valor||0),0);
+  const abertas=F.filter(f=>fatAtiva(f));const aVencer=abertas.filter(f=>atrasoDe(f)===0).reduce((a,f)=>a+Number(f.valor),0);
+  const venc=abertas.filter(f=>atrasoDe(f)>0);const totAtr=venc.reduce((a,f)=>a+Number(f.valor),0);
+  const ult3=F.filter(f=>f.comp>=addMes(ca,-3)&&f.comp<ca);const taxa=ult3.length?ult3.filter(f=>atrasoDe(f)>0).reduce((a,f)=>a+Number(f.valor),0)/ult3.reduce((a,f)=>a+Number(f.valor),0):null;
+  const bloq=S.empresas.filter(e=>e.status!=='inativo'&&empresaBloqueada(e)).length;const info=F.filter(f=>f.status==='informada').length;
+  const fx=[[1,15],[16,30],[31,60],[61,9999]].map(([a,b])=>{const l=venc.filter(f=>{const d=atrasoDe(f);return d>=a&&d<=b});return {r:b>9000?'Mais de 60 dias':`${a} a ${b} dias`,v:l.reduce((x,f)=>x+Number(f.valor),0),n:l.length}});
+  const serie=[];for(let i=11;i>=0;i--){const c=addMes(ca,-i);serie.push({c,f:F.filter(f=>f.comp===c).reduce((a,f)=>a+Number(f.valor),0),r:F.filter(f=>f.status==='paga'&&String(f.pagaEm||'').startsWith(c)).reduce((a,f)=>a+Number(f.valorPago||f.valor),0)})}
+  const mx=Math.max(1,...serie.map(s=>Math.max(s.f,s.r)));
+  const dev={};venc.forEach(f=>{dev[f.empresaId]=(dev[f.empresaId]||0)+Number(f.valor)});const top=Object.entries(dev).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  return `<div class="kpis">
+   <div class="kpi"><span class="eyebrow">Faturado em ${fmtComp(ca)}</span><b>${brl(fat)}</b><small>${doMes.length} mensalidade(s)</small></div>
+   <div class="kpi"><span class="eyebrow">Recebido em ${fmtComp(ca)}</span><b style="color:var(--ok)">${brl(recMes)}</b><small>${info?info+' pagamento(s) informado(s) para conferir':'pela data do pagamento'}</small></div>
+   <div class="kpi"><span class="eyebrow">A vencer</span><b>${brl(aVencer)}</b><small>${abertas.length-venc.length} em aberto no prazo</small></div>
+   <div class="kpi"><span class="eyebrow">Em atraso</span><b style="color:${totAtr?'var(--crit)':'inherit'}">${brl(totAtr)}</b><small>${venc.length} fatura(s) · ${Object.keys(dev).length} cliente(s)</small></div>
+   <div class="kpi"><span class="eyebrow">Inadimplência (3 meses)</span><b>${taxa==null?'—':pct(taxa)}</b><small>${bloq} cliente(s) com portal bloqueado</small></div></div>
+  <div class="cols"><div class="panel"><h2>Faturado × recebido (12 meses)</h2><div class="serie">${serie.map(s=>`<div class="c" title="${fmtComp(s.c)}: faturado ${brl(s.f)}, recebido ${brl(s.r)}"><div class="b"><i style="height:${s.f/mx*100}%;background:var(--navy)"></i><i style="height:${s.r/mx*100}%;background:var(--ok)"></i></div><small>${fmtComp(s.c).slice(0,3)}</small></div>`).join('')}</div><p class="small muted"><span style="color:var(--navy)">■</span> faturado · <span style="color:var(--ok)">■</span> recebido</p></div>
+   <div class="panel"><h2>Atraso por faixa</h2><div class="aging">${fx.map(x=>`<div><small>${x.r}</small><b style="color:${x.v?'var(--crit)':'inherit'}">${brl(x.v)}</b><small>${x.n} fatura(s)</small></div>`).join('')}</div>
+    <h3 style="margin:16px 0 8px">Maiores devedores</h3>${top.length?`<div class="list">${top.map(([id,v])=>`<div class="row"><div class="grow"><b>${esc(emp(id)?.fantasia||emp(id)?.razao||'')}</b><div class="sub">${pill(...situacaoBloqueio(emp(id)||{}))}</div></div><b class="num" style="color:var(--crit)">${brl(v)}</b><button class="btn sm" data-act="fin-cobrar-emp" data-id="${id}">Cobrar</button></div>`).join('')}</div>`:'<p class="small muted">Ninguém em atraso. 🎉</p>'}</div></div>`;
+}
+function linhaSit(f){const d=atrasoDe(f);return f.status==='paga'?pill('Paga'+(f.pagaEm?' '+fmtData(f.pagaEm).slice(0,5):''),'ok')+(f.baixaAutomatica?' <span class="tag">banco</span>':''):f.status==='cancelada'?pill('Cancelada',''):f.status==='informada'?pill('Pagamento informado','info'):d>0?pill(d+' dia(s) em atraso','crit'):pill('Em aberto','warn')}
+function finCobrancas(){
+  const f=UI.ffin;const comps=[...new Set(S.faturas.map(x=>x.comp).concat([compAtual()]))].sort().reverse();if(!f.comp)f.comp=compAtual();
+  const q=(f.q||'').toLowerCase();const ed=podeMod('hon','editar');const banco=finApi().dados?.conectado;
+  const L=S.faturas.filter(x=>(f.comp==='todas'||x.comp===f.comp)&&(!f.sit||(f.sit==='abertas'?fatAtiva(x)&&atrasoDe(x)===0&&x.status!=='informada':f.sit==='vencidas'?atrasoDe(x)>0:f.sit==='semboleto'?fatAtiva(x)&&!x.boleto:x.status===f.sit))
+    &&(!q||(emp(x.empresaId)?.razao+' '+(emp(x.empresaId)?.fantasia||'')).toLowerCase().includes(q))).sort((a,b)=>String(a.venc).localeCompare(String(b.venc)));
+  const sel=[...UI.finSel].filter(id=>L.some(x=>x.id===id));const tot=L.reduce((a,x)=>a+Number(x.valor||0),0);
+  const semBol=L.filter(x=>fatAtiva(x)&&!x.boleto).length;
+  return `<div class="panel"><div class="barra-filtros">
+    <label class="f"><span>Competência</span><select data-ffin="comp"><option value="todas" ${f.comp==='todas'?'selected':''}>Todas</option>${comps.map(c=>`<option value="${c}" ${f.comp===c?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>
+    <label class="f"><span>Situação</span><select data-ffin="sit"><option value="">Todas</option>${[['abertas','Em aberto no prazo'],['vencidas','Em atraso'],['informada','Pagamento informado'],['paga','Pagas'],['semboleto','Sem boleto'],['cancelada','Canceladas']].map(([k,r])=>`<option value="${k}" ${f.sit===k?'selected':''}>${r}</option>`).join('')}</select></label>
+    <label class="f busca"><span>Cliente</span><input type="search" id="busca-fin" data-live="1" value="${esc(f.q)}" placeholder="Nome da empresa"></label></div>
+   <div class="filtro-resumo"><span class="small muted">${L.length} fatura(s) · ${brl(tot)}${sel.length?` · <b>${sel.length} selecionada(s)</b>`:''}</span>${ed?`<div class="actions">${banco&&semBol?`<button class="btn sm" data-act="fin-boleto-lote">Emitir ${sel.length?'boletos das selecionadas':semBol+' boleto(s) que faltam'}</button>`:''}<button class="btn sm" data-act="fin-enviar-lote">${svg('upload')}Enviar ${sel.length?'selecionadas':'todas em aberto'}</button><button class="btn sm" data-act="fin-csv">${svg('download')}Exportar</button></div>`:''}</div></div>
+  <div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr>${ed?`<th><input type="checkbox" class="fin-sel" data-act="fin-sel-todas" ${sel.length&&sel.length===L.filter(fatAtiva).length?'checked':''}></th>`:''}<th>Cliente</th><th>Comp.</th><th>Vencimento</th><th class="r">Valor</th><th>Boleto</th><th>Situação</th><th>Última cobrança</th><th></th></tr></thead><tbody>${L.map(x=>{const e=emp(x.empresaId);const u=(x.cobrancas||[]).at(-1);return `<tr>
+    ${ed?`<td>${fatAtiva(x)?`<input type="checkbox" class="fin-sel" data-act="fin-sel" data-id="${x.id}" ${UI.finSel.has(x.id)?'checked':''}>`:''}</td>`:''}
+    <td><b>${esc(e?.fantasia||e?.razao||'(excluída)')}</b>${e&&empresaBloqueada(e)?' '+pill('portal bloqueado','crit'):''}</td><td class="small">${fmtComp(x.comp)}</td><td class="num small">${fmtData(x.venc)}</td><td class="r num">${brl(x.valor)}</td>
+    <td class="small">${x.boleto?(x.boleto.provedor==='asaas'?'<span class="tag">Asaas</span> ':'')+(x.boleto.url?`<a href="${esc(x.boleto.url)}" target="_blank" rel="noopener">abrir</a>`:esc(x.boleto.nome||'')):'—'}</td>
+    <td>${linhaSit(x)}</td><td class="small">${u?fmtDH(u.em)+'<div class="sub">'+esc(u.etapa==='manual'?'manual · '+u.por:u.etapa==='envio'?'envio do boleto':u.etapa==='antes'?'lembrete antes':u.etapa==='venc'?'no vencimento':u.etapa.replace('atraso-','')+' dia(s) após')+'</div>':'—'}</td>
+    <td class="r"><div class="actions" style="flex-wrap:nowrap;justify-content:flex-end">${ed&&fatAtiva(x)?`<button class="btn sm" data-act="fin-cobrar" data-id="${x.id}">${atrasoDe(x)>0?'Cobrar':'Enviar'}</button><button class="btn sm ${x.status==='informada'?'primary':''}" data-act="fin-baixa" data-id="${x.id}">${x.status==='informada'?'Conferir e baixar':'Baixa'}</button>`:''}<button class="btn sm ghost" data-act="fin-ver" data-id="${x.id}">Detalhes</button></div></td></tr>`}).join('')}</tbody></table></div>`
+   :vazio(`Nenhuma fatura ${f.comp&&f.comp!=='todas'?'em '+fmtComp(f.comp):''} com esses filtros.`,ed?`<button class="btn primary" data-act="fin-gerar">Gerar mensalidades</button>`:'')}</div>`;
+}
+Object.assign(buscaVivas,{'busca-fin':v=>{UI.ffin.q=v}});
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.ffin){UI.ffin[el.dataset.ffin]=el.value;UI.finSel.clear();render()}});
+ACT['fin-sel']=el=>{el.checked?UI.finSel.add(el.dataset.id):UI.finSel.delete(el.dataset.id);render()};
+ACT['fin-sel-todas']=el=>{document.querySelectorAll('[data-act=fin-sel]').forEach(c=>{el.checked?UI.finSel.add(c.dataset.id):UI.finSel.delete(c.dataset.id)});render()};
+function finInad(){
+  const ed=podeMod('hon','editar');const por={};S.faturas.filter(f=>atrasoDe(f)>0).forEach(f=>{(por[f.empresaId]=por[f.empresaId]||[]).push(f)});
+  const L=Object.entries(por).map(([id,fs])=>({e:emp(id),fs,tot:fs.reduce((a,f)=>a+Number(f.valor),0),max:Math.max(...fs.map(atrasoDe)),ult:fs.flatMap(f=>f.cobrancas||[]).sort((a,b)=>String(b.em).localeCompare(String(a.em)))[0]})).filter(x=>x.e).sort((a,b)=>b.max-a.max);
+  const manuais=S.empresas.filter(e=>e.bloqueioManual&&!por[e.id]);const b=finCfg().bloqueio;
+  return `<div class="panel"><div class="filtro-resumo"><span class="small muted">${L.length} cliente(s) em atraso · ${brl(L.reduce((a,x)=>a+x.tot,0))} · bloqueio automático ${b.ativo?'com mais de '+b.dias+' dias de atraso':'desligado'} (ajuste em Régua e automação)</span>${ed&&L.length?`<div class="actions"><button class="btn sm primary" data-act="fin-cobrar-todos">Cobrar todos (${L.length})</button></div>`:''}</div></div>
+  <div class="panel">${L.length||manuais.length?`<div class="table-wrap"><table><thead><tr><th>Cliente</th><th class="r">Em atraso</th><th>Faturas</th><th>Maior atraso</th><th>Última cobrança</th><th>Portal</th><th></th></tr></thead><tbody>${L.map(x=>{const [st,cl]=situacaoBloqueio(x.e);return `<tr>
+    <td><b>${esc(x.e.fantasia||x.e.razao)}</b><div class="sub">${esc(fmtFone(x.e.telefone||'')||'')} ${esc(x.e.email||'')}</div></td><td class="r num" style="color:var(--crit);font-weight:700">${brl(x.tot)}</td>
+    <td class="small">${x.fs.map(f=>fmtComp(f.comp)+' · '+brl(f.valor)).join('<br>')}</td><td>${pill(x.max+' dias',x.max>30?'crit':'warn')}</td>
+    <td class="small">${x.ult?fmtDH(x.ult.em)+'<div class="sub">'+esc((x.ult.canais||[]).join(', '))+'</div>':'nunca'}</td><td>${pill(st,cl)}</td>
+    <td class="r"><div class="actions" style="flex-wrap:nowrap;justify-content:flex-end">${ed?`<button class="btn sm primary" data-act="fin-cobrar-emp" data-id="${x.e.id}">Cobrar</button><button class="btn sm" data-act="fin-bloq" data-id="${x.e.id}">Bloqueio…</button>`:''}</div></td></tr>`}).join('')}
+    ${manuais.map(e=>`<tr><td><b>${esc(e.fantasia||e.razao)}</b></td><td class="r">—</td><td class="small muted">sem faturas em atraso</td><td>—</td><td>—</td><td>${pill('Bloqueado (manual)','crit')}</td><td class="r">${ed?`<button class="btn sm" data-act="fin-bloq" data-id="${e.id}">Bloqueio…</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhum cliente em atraso. 🎉')}</div>`;
+}
+function finAuto(){
+  const c=finCfg();const ed=podeMod('hon','editar');const dis=ed?'':'disabled';const api=finApi();const b=api.dados||{};
+  const ch=(nome,lista,op=['portal','whatsapp','email'])=>`<div class="tipos-chk">${op.map(k=>`<label><input type="checkbox" name="${nome}" value="${k}" ${lista.includes(k)?'checked':''} ${dis}> ${{portal:'Portal',whatsapp:'WhatsApp',email:'E-mail'}[k]}</label>`).join('')}</div>`;
+  const msg=(k,rot)=>`<label class="f full"><span>${rot}</span><textarea name="msg-${k}" rows="2" maxlength="1000" placeholder="${esc(MSGS_FIN[k])}" ${dis}>${esc(c.mensagens?.[k]||'')}</textarea></label>`;
+  const ult=b.ultima;
+  return `<form class="panel" data-form="fin-cfg"><h2>Mensalidades</h2><div class="grid-f">
+    <label class="chk full"><input type="checkbox" name="gerarAuto" ${c.gerarAuto?'checked':''} ${dis}> <b>Gerar as mensalidades do mês automaticamente</b></label>
+    <label class="f"><span>Dia de geração</span><input type="number" name="diaGeracao" min="1" max="28" value="${esc(c.diaGeracao)}" ${dis}></label>
+    <label class="f"><span>Vencimento padrão (dia)</span><input type="number" name="vencDia" min="1" max="31" value="${esc(c.vencDia)}" ${dis}></label>
+    <label class="f"><span>Horário dos envios automáticos</span><select name="hora" ${dis}>${[7,8,9,10,11,12,13,14,15,16,17,18].map(h=>`<option value="${h}" ${c.hora==h?'selected':''}>${h}h</option>`).join('')}</select></label>
+    <label class="f"><span>Multa após o vencimento (%)</span><input type="number" name="multa" step="0.01" min="0" max="2" value="${esc(c.multa)}" ${dis}></label>
+    <label class="f"><span>Juros ao mês (%)</span><input type="number" name="juros" step="0.01" min="0" max="1" value="${esc(c.juros)}" ${dis}></label>
+    <label class="chk full"><input type="checkbox" name="boletoAuto" ${c.boletoAuto?'checked':''} ${dis}> Emitir o boleto/PIX no banco integrado ao gerar a mensalidade</label>
+    <label class="chk full"><input type="checkbox" name="envioAtivo" ${c.envioAoGerar.ativo?'checked':''} ${dis}> Enviar o boleto ao cliente ao gerar</label>${ch('envioCanais',c.envioAoGerar.canais)}
+    ${msg('envio','Mensagem do envio')}</div>
+   <h2 style="margin-top:20px">Lembretes e régua de cobrança</h2><div class="grid-f">
+    <label class="chk full"><input type="checkbox" name="antesAtivo" ${c.lembreteAntes.ativo?'checked':''} ${dis}> Lembrete antes do vencimento</label><label class="f"><span>Quantos dias antes</span><input type="number" name="antesDias" min="1" max="10" value="${esc(c.lembreteAntes.dias)}" ${dis}></label>${ch('antesCanais',c.lembreteAntes.canais,['whatsapp','email'])}
+    <label class="chk full"><input type="checkbox" name="vencAtivo" ${c.noVencimento.ativo?'checked':''} ${dis}> Aviso no dia do vencimento</label>${ch('vencCanais',c.noVencimento.canais,['whatsapp','email'])}
+    ${msg('antes','Mensagem do lembrete')}${msg('venc','Mensagem do dia do vencimento')}
+    <div class="table-wrap full"><table><thead><tr><th>Cobrança após o vencimento</th><th>Canais</th><th>Mensagem (vazio = padrão)</th></tr></thead><tbody>${c.regua.map((r,i)=>`<tr><td><label class="chk"><input type="checkbox" name="r${i}-ativo" ${r.ativo?'checked':''} ${dis}> <input type="number" name="r${i}-dias" min="1" max="120" value="${esc(r.dias)}" style="width:64px" ${dis}> dia(s) após</label></td><td>${ch('r'+i+'-canais',r.canais||[],['whatsapp','email'])}</td><td><textarea name="r${i}-msg" rows="2" maxlength="1000" placeholder="${esc(Number(r.dias)>=30?MSGS_FIN.atraso30:MSGS_FIN.atraso)}" ${dis}>${esc(r.mensagem||'')}</textarea></td></tr>`).join('')}</tbody></table></div>
+    <p class="small muted full" style="margin:0">Variáveis: {nome}, {empresa}, {competencia}, {valor}, {vencimento}, {dias}, {pagamento} (link do boleto/PIX ou chave PIX), {link}, {linha}, {pix}. Cada etapa sai uma única vez por fatura; se o servidor estiver dormindo, só a etapa mais recente é enviada, para não repetir mensagens. Faturas com pagamento informado pelo cliente não recebem cobrança.</p></div>
+   <h2 style="margin-top:20px">Bloqueio por inadimplência</h2><div class="grid-f">
+    <label class="chk full"><input type="checkbox" name="bloqAtivo" ${c.bloqueio.ativo?'checked':''} ${dis}> Bloquear recursos do portal com atraso acima de <input type="number" name="bloqDias" min="1" max="180" value="${esc(c.bloqueio.dias)}" style="width:64px" ${dis}> dias</label>
+    <p class="small muted full" style="margin:0">Bloqueado, o cliente continua vendo guias, notas, documentos e o Plano e faturas (para pagar), mas perde Gestão do negócio, emissão de notas, Envio mensal e Solicitações. O desbloqueio é automático quando a fatura é paga. Em Inadimplência você bloqueia na hora, libera por alguns dias ou isenta um cliente.</p></div>
+   ${ed?`<div class="actions" style="margin-top:14px"><button class="btn primary">Salvar régua e automação</button><button type="button" class="btn" data-act="fin-regua-agora" ${b.rodando?'disabled':''}>${b.rodando?'Rodando…':'Rodar a régua agora'}</button></div>`:''}
+   ${ult?`<p class="small muted" style="margin-top:8px">Última execução: ${fmtDH(ult.em)} · ${ult.geradas} gerada(s), ${ult.boletos} boleto(s), ${ult.enviados} envio(s), ${ult.falhas} falha(s)${ult.manual?' · manual':''}</p>`:''}</form>
+  ${MODO==='api'?finBancoPanel(b):''}`;
+}
+function finBancoPanel(b){
+  const ed=b.podeConfigurar;const dis=ed?'':'disabled';
+  return `<div class="panel"><div class="panel-head"><h2>Banco para boletos e PIX</h2>${b.conectado?pill(b.falso?'Simulação local':'Asaas conectado','ok'):pill('Manual','warn')}</div>
+   <p class="small muted">Com o banco conectado, cada mensalidade ganha boleto com PIX (o cliente escolhe como pagar), a linha digitável e o PIX copia e cola vão nas mensagens e o pagamento dá baixa sozinho. Sem banco, anexe o boleto em PDF em cada fatura e o cliente paga pela chave PIX do escritório.</p>
+   <details class="small" style="margin:8px 0"><summary style="cursor:pointer;font-weight:600">Como conectar o Asaas</summary><ol style="margin:8px 0 0 18px;display:grid;gap:6px">
+    <li>Crie a conta do escritório em asaas.com (taxa por boleto/PIX pago, sem mensalidade).</li><li>No Asaas: <b>Integrações › Chaves de API</b> › gerar chave. Cole abaixo e salve.</li>
+    <li>No Asaas: <b>Integrações › Webhooks</b> › novo webhook de <b>Cobranças</b>, com a URL e o token de autenticação mostrados aqui. Marque os eventos de pagamento recebido/confirmado.</li><li>Clique em <b>Testar conexão</b>.</li></ol></details>
+   <form data-form="fin-banco" class="grid-f"><label class="f"><span>Banco</span><select name="provedor" ${dis}><option value="manual" ${b.provedor!=='asaas'?'selected':''}>Manual (boleto anexado + PIX do escritório)</option><option value="asaas" ${b.provedor==='asaas'?'selected':''}>Asaas</option></select></label>
+    <label class="f"><span>Ambiente</span><select name="ambiente" ${dis}><option value="producao" ${b.ambiente!=='sandbox'?'selected':''}>Produção</option><option value="sandbox" ${b.ambiente==='sandbox'?'selected':''}>Sandbox (teste)</option></select></label>
+    <label class="f full"><span>Chave da API do Asaas</span><input name="apiKey" type="password" autocomplete="new-password" placeholder="${b.temChave?'guardada no cofre (preencha só para trocar)':'$aact_…'}" ${dis}></label>
+    ${b.webhookToken?`<div class="f full"><span>Webhook (cole no Asaas)</span><div class="linha-dig">URL: ${esc(b.webhookUrl)}<br>Token de autenticação: ${esc(b.webhookToken)}</div></div>`:''}
+    ${ed?`<div class="actions full"><button class="btn primary">Salvar banco</button><button type="button" class="btn" data-act="fin-banco-testar">Testar conexão</button></div>`:''}</form></div>`;
+}
+
+/* ---------- ações ---------- */
+ACT['fin-gerar']=()=>{const comps=[1,0,-1].map(n=>addMes(compAtual(),n));const banco=finApi().dados?.conectado;const c=finCfg();
+  const sem=S.empresas.filter(e=>e.status!=='inativo'&&e.plano&&Number(e.plano.valor)>0);
+  openModal(`${mHead('Gerar mensalidades')}<form data-form="fin-gerar"><div class="modal-body"><label class="f"><span>Competência</span><select name="comp">${comps.map(x=>`<option value="${x}" ${x===compAtual()?'selected':''}>${fmtComp(x)}</option>`).join('')}</select></label>
+   <p class="small muted">${sem.length} cliente(s) com plano. Quem já tem a mensalidade da competência é pulado. Vencimento: dia ${c.vencDia} (ou o dia do plano de cada cliente).</p>
+   ${banco?`<label class="chk"><input type="checkbox" name="boleto" ${c.boletoAuto?'checked':''}> Emitir boleto/PIX no banco</label>`:''}<label class="chk"><input type="checkbox" name="enviar"> Enviar já para os clientes (${c.envioAoGerar.canais.join(', ')})</label></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Gerar</button></div></form>`)};
+FORM['fin-gerar']=async fd=>{const comp=String(fd.get('comp'));
+  if(MODO!=='api'){closeModal();UI.comps.hon=comp;ACT['gerar-faturas']();return}
+  try{const r=await MF.api('POST','/api/financeiro/gerar',{comp,boleto:!!fd.get('boleto'),enviar:!!fd.get('enviar')});closeModal();UI.ffin.comp=comp;UI.tab.fin2='cobrancas';
+    toast(r.geradas?`${r.geradas} mensalidade(s) gerada(s)${r.boletos?', '+r.boletos+' boleto(s)':''}${r.enviados?', '+r.enviados+' enviada(s)':''}.${r.falhas.length?' Atenção: '+r.falhas.join(' · '):''}`:'As mensalidades desta competência já existem.',!!r.falhas.length);render()}catch(er){toast(er.message,true)}};
+ACT['fin-boleto-lote']=async el=>{const sel=[...UI.finSel];const L=S.faturas.filter(x=>fatAtiva(x)&&!x.boleto&&(sel.length?sel.includes(x.id):(UI.ffin.comp==='todas'||x.comp===UI.ffin.comp)));
+  if(!L.length){toast('Nenhuma fatura sem boleto.',true);return}el.disabled=true;el.textContent='Emitindo…';
+  try{const r=await MF.api('POST','/api/financeiro/boleto',{faturas:L.map(x=>x.id)});toast(r.emitidos+' boleto(s) emitido(s).'+(r.falhas.length?' Falhas: '+r.falhas.join(' · '):''),!!r.falhas.length)}catch(er){toast(er.message,true)}render()};
+function modalEnvio(ids,titulo){
+  const fs=ids.map(id=>S.faturas.find(x=>x.id===id)).filter(Boolean);if(!fs.length){toast('Nada para enviar.',true);return}
+  const um=fs.length===1?fs[0]:null;const at=um?atrasoDe(um):0;const e=um&&emp(um.empresaId);
+  const pad=um?(at>=30?MSGS_FIN.atraso30:at>0?MSGS_FIN.atraso:MSGS_FIN.envio):'';
+  openModal(`${mHead(titulo||(um?(at>0?'Cobrar ':'Enviar fatura · ')+(e?.fantasia||e?.razao||''):'Enviar '+fs.length+' fatura(s)'))}<form data-form="fin-enviar" data-ids="${fs.map(x=>x.id).join(',')}"><div class="modal-body">
+   ${um?`<p class="small">${fmtComp(um.comp)} · ${brl(um.valor)} · vencimento ${fmtData(um.venc)}${at?` · <b style="color:var(--crit)">${at} dia(s) de atraso</b>`:''}</p>`:`<p class="small muted">${fs.length} fatura(s) · ${brl(fs.reduce((a,x)=>a+Number(x.valor),0))}. A mensagem de cada uma usa o modelo da etapa (em dia ou em atraso).</p>`}
+   <div class="tipos-chk"><label><input type="checkbox" name="canais" value="whatsapp" checked> WhatsApp</label><label><input type="checkbox" name="canais" value="email" checked> E-mail</label><label><input type="checkbox" checked disabled> Portal (Plano e faturas)</label></div>
+   ${um?`<label class="f" style="margin-top:10px"><span>Mensagem</span><textarea name="mensagem" rows="5" maxlength="1500">${esc(finCfg().mensagens?.[at>=30?'atraso30':at>0?'atraso':'envio']||pad)}</textarea></label><p class="small muted">{pagamento} vira o link do boleto/PIX (ou a chave PIX); o boleto em PDF segue anexado quando houver.</p>`:''}
+  </div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Enviar</button></div></form>`,true);
+}
+ACT['fin-cobrar']=el=>modalEnvio([el.dataset.id]);
+ACT['fin-cobrar-emp']=el=>modalEnvio(S.faturas.filter(f=>f.empresaId===el.dataset.id&&atrasoDe(f)>0).map(f=>f.id),'Cobrar '+(emp(el.dataset.id)?.fantasia||''));
+ACT['fin-cobrar-todos']=()=>modalEnvio(S.faturas.filter(f=>atrasoDe(f)>0).map(f=>f.id),'Cobrar todos os clientes em atraso');
+ACT['fin-enviar-lote']=()=>{const sel=[...UI.finSel];modalEnvio(sel.length?sel:S.faturas.filter(x=>fatAtiva(x)&&x.status!=='informada'&&(UI.ffin.comp==='todas'||x.comp===UI.ffin.comp)).map(x=>x.id))};
+FORM['fin-enviar']=async(fd,form)=>{const ids=form.dataset.ids.split(',');const canais=fd.getAll('canais');if(!canais.length){toast('Escolha WhatsApp e/ou e-mail.',true);return}
+  if(MODO!=='api'){toast('O envio funciona na versão publicada.',true);return}
+  try{const r=await MF.api('POST','/api/financeiro/enviar',{faturas:ids,canais,mensagem:fd.get('mensagem')||''});closeModal();UI.finSel.clear();
+    const res=Object.values(r.resultados||{});const falhaCanal=res.flatMap(x=>Object.entries(x).filter(([,v])=>/^não|^sem/.test(v)).map(([k,v])=>(k==='email'?'E-mail ':'WhatsApp ')+v));
+    toast(`${r.enviados} cobrança(s) enviada(s).${[...new Set([...falhaCanal,...r.falhas])].length?' Atenção: '+[...new Set([...falhaCanal,...r.falhas])].slice(0,3).join(' · '):''}`,!!(falhaCanal.length||r.falhas.length))}catch(er){toast(er.message,true)}};
+ACT['fin-baixa']=el=>{const f=S.faturas.find(x=>x.id===el.dataset.id);if(!f)return;
+  openModal(`${mHead('Baixa · '+(emp(f.empresaId)?.fantasia||'')+' · '+fmtComp(f.comp))}<form data-form="fin-baixa" data-id="${f.id}"><div class="modal-body"><div class="grid-f">
+   <label class="f"><span>Data do pagamento</span><input type="date" name="data" value="${esc(f.informadaEm?String(f.informadaEm).slice(0,10):hoje())}" max="${hoje()}" required></label>
+   <label class="f"><span>Valor recebido (R$)</span><input type="number" name="valor" step="0.01" min="0.01" value="${esc(f.valor)}" required></label>
+   <label class="f"><span>Forma</span><select name="forma">${['PIX','Boleto','Transferência','Dinheiro','Cartão','Outra'].map(x=>`<option>${x}</option>`).join('')}</select></label></div>
+   ${f.comprovante?`<p class="small">Comprovante enviado pelo cliente: ${linkArq(f.comprovante,'abrir')}</p>`:''}${f.boleto?.provedor==='asaas'?'<p class="small muted">O boleto também é baixado no Asaas, para o cliente não pagar duas vezes.</p>':''}</div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Confirmar baixa</button></div></form>`)};
+FORM['fin-baixa']=async(fd,form)=>{const f=S.faturas.find(x=>x.id===form.dataset.id);if(!f)return;const data=String(fd.get('data')),valor=Number(fd.get('valor')),forma=String(fd.get('forma'));
+  if(MODO!=='api'){mut('faturas',()=>{Object.assign(f,{status:'paga',pagaEm:data,valorPago:valor,formaPagamento:forma})},['Honorários','Baixa '+fmtComp(f.comp)+' '+brl(valor),emp(f.empresaId)?.razao]);closeModal();return}
+  try{await MF.api('POST','/api/financeiro/baixa',{faturaId:f.id,data,valor,forma});closeModal();toast('Baixa registrada.')}catch(er){toast(er.message,true)}};
+ACT['fin-ver']=el=>{const f=S.faturas.find(x=>x.id===el.dataset.id);if(!f)return;const e=emp(f.empresaId);const ed=podeMod('hon','editar');const b=f.boleto;const banco=finApi().dados?.conectado;
+  openModal(`${mHead('Fatura · '+(e?.fantasia||e?.razao||'')+' · '+fmtComp(f.comp))}<div class="modal-body"><div class="crm-det"><div>
+   <table class="det"><tbody>${(f.itens||[]).map(i=>`<tr><td>${esc(i.desc)}${i.detalhe?`<div class="sub">${esc(i.detalhe)}</div>`:''}</td><td class="r num">${brl(i.valor)}</td></tr>`).join('')}${f.desconto?`<tr><td>Desconto</td><td class="r num">− ${brl(f.desconto)}</td></tr>`:''}<tr class="total"><td>Total</td><td class="r num">${brl(f.valor)}</td></tr></tbody></table>
+   <p class="small">Vencimento ${fmtData(f.venc)} · ${linhaSit(f)}${f.valorPago?' · recebido '+brl(f.valorPago)+(f.formaPagamento?' ('+esc(f.formaPagamento)+')':''):''}</p>
+   ${ed&&fatAtiva(f)?`<form data-form="fin-editar" data-id="${f.id}" class="grid-f" style="margin-top:8px"><label class="f"><span>Vencimento</span><input type="date" name="venc" value="${esc(f.venc)}"></label><label class="f"><span>Desconto (R$)</span><input type="number" step="0.01" min="0" name="desconto" value="${esc(f.desconto||'')}"></label><label class="f full"><span>Item adicional (opcional)</span><input name="itemDesc" placeholder="Ex.: Alteração contratual"></label><label class="f"><span>Valor do item (R$)</span><input type="number" step="0.01" min="0" name="itemValor"></label><div class="actions full"><button class="btn sm primary">Salvar alterações</button></div>${b?.provedor==='asaas'?'<p class="small muted full" style="margin:0">Alterar valor ou vencimento cancela o boleto atual; emita um novo depois.</p>':''}</form>`:''}</div>
+   <div>${b?`<h3 style="margin:0 0 8px">Boleto</h3>${b.url?`<a class="btn sm" href="${esc(b.url)}" target="_blank" rel="noopener">${svg('filetext')}Abrir PDF</a> `:''}${b.linkPagamento?`<a class="btn sm" href="${esc(b.linkPagamento)}" target="_blank" rel="noopener">Página de pagamento</a>`:''}
+     ${b.linhaDigitavel?`<p class="small" style="margin:10px 0 4px">Linha digitável</p><div class="linha-dig">${esc(b.linhaDigitavel)}</div><button class="btn sm ghost" data-act="copiar" data-t="${esc(b.linhaDigitavel)}">Copiar</button>`:''}
+     ${b.pixCopiaCola?`<p class="small" style="margin:10px 0 4px">PIX copia e cola</p><div class="linha-dig">${esc(b.pixCopiaCola)}</div><button class="btn sm ghost" data-act="copiar" data-t="${esc(b.pixCopiaCola)}">Copiar</button>`:''}`
+     :ed&&fatAtiva(f)?`<h3 style="margin:0 0 8px">Boleto</h3>${banco?`<button class="btn sm primary" data-act="fin-boleto" data-id="${f.id}">Emitir boleto/PIX no banco</button> `:''}<label class="btn sm">Anexar PDF<input type="file" hidden accept=".pdf" data-up="fatura-boleto" data-id="${f.id}"></label>`:''}
+    <h3 style="margin:16px 0 8px">Histórico de envios e cobranças</h3><div class="tl">${[...(f.cobrancas||[])].reverse().map(x=>`<div class="it"><small>${fmtDH(x.em)} · ${esc(x.por||'')}</small><div>${esc(x.etapa==='manual'?'Cobrança manual':x.etapa==='envio'?'Envio do boleto':x.etapa==='antes'?'Lembrete antes do vencimento':x.etapa==='venc'?'Aviso no vencimento':'Cobrança '+x.etapa.replace('atraso-','')+' dia(s) após')}<div class="sub">${Object.entries(x.resultado||{}).map(([k,v])=>esc((k==='email'?'E-mail: ':k==='portal'?'Portal: ':'WhatsApp: ')+v)).join('<br>')}</div></div></div>`).join('')||'<p class="small muted">Nada enviado ainda.</p>'}</div></div></div></div>
+   <div class="modal-foot">${ed&&fatAtiva(f)&&podeMod('hon','excluir')?`<button class="btn danger" data-act="fin-cancelar" data-id="${f.id}">Cancelar fatura</button>`:''}<span class="grow"></span>${ed&&fatAtiva(f)?`<button class="btn" data-act="fin-cobrar" data-id="${f.id}">${atrasoDe(f)?'Cobrar':'Enviar'}</button>`:''}<button class="btn" data-act="close-modal">Fechar</button></div>`,true)};
+ACT['fin-boleto']=async el=>{el.disabled=true;el.textContent='Emitindo…';try{await MF.api('POST','/api/financeiro/boleto',{faturaId:el.dataset.id});toast('Boleto emitido.');setTimeout(()=>{ACT['fin-ver']({dataset:{id:el.dataset.id}})},700)}catch(er){toast(er.message,true);el.disabled=false;el.textContent='Emitir boleto/PIX no banco'}};
+FORM['fin-editar']=async(fd,form)=>{const f=S.faturas.find(x=>x.id===form.dataset.id);if(!f)return;const venc=String(fd.get('venc')||f.venc);const desc=Math.max(0,Number(fd.get('desconto')||0));const iv=Number(fd.get('itemValor')||0),id=String(fd.get('itemDesc')||'').trim();
+  if(iv>0&&!id){toast('Descreva o item adicional.',true);return}
+  const itens=[...(f.itens||[])];if(iv>0)itens.push({desc:id,valor:Math.round(iv*100)/100,tipo:'avulso'});const valor=Math.round((itens.reduce((a,i)=>a+Number(i.valor),0)-desc)*100)/100;
+  if(valor<=0){toast('O total precisa ser maior que zero.',true);return}
+  const mudou=valor!==f.valor||venc!==f.venc;
+  if(mudou&&f.boleto?.provedor==='asaas'&&MODO==='api'){try{await MF.api('POST','/api/financeiro/cancelar',{faturaId:f.id,motivo:'reemissão'})}catch{}}
+  mut('faturas',()=>{Object.assign(f,{venc,desconto:desc||undefined,itens,valor});if(mudou&&f.boleto?.provedor==='asaas'){delete f.boleto}if(f.status==='cancelada'){f.status='aberta';delete f.canceladaEm}},['Honorários','Editou fatura '+fmtComp(f.comp)+' → '+brl(valor),emp(f.empresaId)?.razao]);
+  toast('Fatura atualizada.'+(mudou&&MODO==='api'&&finApi().dados?.conectado?' Emita o novo boleto.':''));ACT['fin-ver']({dataset:{id:f.id}})};
+ACT['fin-cancelar']=el=>{const f=S.faturas.find(x=>x.id===el.dataset.id);if(!f)return;closeModal();pedirMotivo('Cancelar fatura','Motivo do cancelamento (fica no histórico):',async m=>{
+  if(MODO!=='api'){mut('faturas',()=>{f.status='cancelada';f.motivoCancelamento=m},['Honorários','Cancelou fatura '+fmtComp(f.comp),emp(f.empresaId)?.razao]);return}
+  try{await MF.api('POST','/api/financeiro/cancelar',{faturaId:f.id,motivo:m});toast('Fatura cancelada.')}catch(er){toast(er.message,true)}})};
+ACT['fin-bloq']=el=>{const e=emp(el.dataset.id);if(!e)return;const [st]=situacaoBloqueio(e);
+  openModal(`${mHead('Bloqueio do portal · '+(e.fantasia||e.razao))}<div class="modal-body"><p class="small">Situação atual: <b>${st}</b></p>
+   <div class="list"><div class="row"><div class="grow"><b>Bloquear agora</b><div class="sub">Restringe o portal mesmo antes do prazo automático.</div></div><button class="btn sm danger" data-act="fin-bloq-set" data-id="${e.id}" data-v="bloquear">Bloquear</button></div>
+   <div class="row"><div class="grow"><b>Liberar por alguns dias</b><div class="sub">Ex.: o cliente prometeu pagar. Depois, volta a regra normal.</div></div><select id="fin-lib-dias">${[3,7,15,30].map(d=>`<option value="${d}" ${d===7?'selected':''}>${d} dias</option>`).join('')}</select><button class="btn sm" data-act="fin-bloq-set" data-id="${e.id}" data-v="liberar">Liberar</button></div>
+   <div class="row"><div class="grow"><b>${e.isentoBloqueio?'Voltar a aplicar o bloqueio':'Isentar do bloqueio'}</b><div class="sub">Clientes especiais que nunca são bloqueados.</div></div><button class="btn sm" data-act="fin-bloq-set" data-id="${e.id}" data-v="isentar">${e.isentoBloqueio?'Remover isenção':'Isentar'}</button></div>
+   ${e.bloqueioManual||e.desbloqueioAte?`<div class="row"><div class="grow"><b>Voltar à regra automática</b><div class="sub">Remove o bloqueio manual e a liberação temporária.</div></div><button class="btn sm" data-act="fin-bloq-set" data-id="${e.id}" data-v="normal">Regra automática</button></div>`:''}</div></div>
+   <div class="modal-foot"><button class="btn" data-act="close-modal">Fechar</button></div>`)};
+ACT['fin-bloq-set']=el=>{const e=emp(el.dataset.id);if(!e)return;const v=el.dataset.v;
+  mut('empresas',()=>{if(v==='bloquear'){e.bloqueioManual=true;delete e.desbloqueioAte}else if(v==='liberar'){e.bloqueioManual=false;e.desbloqueioAte=addDias(hoje(),Number(($('#fin-lib-dias')||{}).value||7))}else if(v==='isentar'){e.isentoBloqueio=!e.isentoBloqueio}else{e.bloqueioManual=false;delete e.desbloqueioAte}},
+    ['Financeiro',{bloquear:'Bloqueou o portal',liberar:'Liberou o portal até '+fmtData(addDias(hoje(),Number(($('#fin-lib-dias')||{}).value||7))),isentar:e.isentoBloqueio?'Removeu isenção de bloqueio':'Isentou do bloqueio',normal:'Voltou à regra automática de bloqueio'}[v],e.razao]);closeModal();toast('Feito: '+situacaoBloqueio(e)[0]+'.')};
+FORM['fin-cfg']=(fd,form)=>{const n=(k,d)=>{const v=Number(fd.get(k));return isNaN(v)?d:v};const regua=finCfg().regua.map((r,i)=>({dias:Math.max(1,n('r'+i+'-dias',r.dias)),ativo:!!fd.get('r'+i+'-ativo'),canais:fd.getAll('r'+i+'-canais'),mensagem:String(fd.get('r'+i+'-msg')||'').trim()})).sort((a,b)=>a.dias-b.dias);
+  if(new Set(regua.map(r=>r.dias)).size!==regua.length){toast('Cada etapa da régua precisa ter um número de dias diferente.',true);return}
+  const multa=n('multa',2),juros=n('juros',1);if(multa>2||juros>1){toast('Pelo Código de Defesa do Consumidor, a multa vai até 2% e os juros de mora até 1% ao mês.',true);return}
+  const financeiro={gerarAuto:!!fd.get('gerarAuto'),diaGeracao:Math.min(28,Math.max(1,n('diaGeracao',1))),vencDia:Math.min(31,Math.max(1,n('vencDia',10))),boletoAuto:!!fd.get('boletoAuto'),hora:n('hora',9),multa,juros,
+    envioAoGerar:{ativo:!!fd.get('envioAtivo'),canais:fd.getAll('envioCanais')},lembreteAntes:{ativo:!!fd.get('antesAtivo'),dias:Math.min(10,Math.max(1,n('antesDias',3))),canais:fd.getAll('antesCanais')},noVencimento:{ativo:!!fd.get('vencAtivo'),canais:fd.getAll('vencCanais')},
+    regua,bloqueio:{ativo:!!fd.get('bloqAtivo'),dias:Math.min(180,Math.max(1,n('bloqDias',30)))},mensagens:Object.fromEntries(['envio','antes','venc'].map(k=>[k,String(fd.get('msg-'+k)||'').trim()]).filter(([,v])=>v))};
+  mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].financeiro=financeiro},['Financeiro','Atualizou régua de cobrança e automação','']);toast('Régua e automação salvas.')};
+ACT['fin-regua-agora']=async el=>{el.disabled=true;el.textContent='Rodando…';try{const r=await MF.api('POST','/api/financeiro/regua',{});toast(`Régua executada: ${r.resumo.geradas} gerada(s), ${r.resumo.enviados} envio(s), ${r.resumo.falhas} falha(s).`,!!r.resumo.falhas)}catch(er){toast(er.message,true)}invalidar('financeiro')};
+FORM['fin-banco']=async fd=>{try{await MF.api('PUT','/api/financeiro',{provedor:fd.get('provedor'),ambiente:fd.get('ambiente'),apiKey:String(fd.get('apiKey')||'').trim()});toast('Banco salvo.');invalidar('financeiro')}catch(er){toast(er.message,true)}};
+ACT['fin-banco-testar']=async el=>{el.disabled=true;try{const r=await MF.api('POST','/api/financeiro/testar',{});toast(r.texto)}catch(er){toast(er.message,true)}el.disabled=false};
+ACT['fin-csv']=()=>{const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const f=UI.ffin;const L=S.faturas.filter(x=>f.comp==='todas'||x.comp===f.comp);
+  baixar('financeiro-'+(f.comp||'todas')+'.csv','﻿'+['Cliente;CNPJ;Competência;Vencimento;Valor;Situação;Pago em;Valor pago;Forma;Boleto'].concat(L.map(x=>{const e=emp(x.empresaId)||{};return [e.razao,fmtCNPJ(e.cnpj||''),fmtComp(x.comp),fmtData(x.venc),String(x.valor).replace('.',','),x.status==='paga'?'Paga':x.status==='cancelada'?'Cancelada':atrasoDe(x)?atrasoDe(x)+' dias em atraso':x.status==='informada'?'Pagamento informado':'Em aberto',x.pagaEm?fmtData(x.pagaEm):'',x.valorPago?String(x.valorPago).replace('.',','):'',x.formaPagamento||'',x.boleto?'sim':'não'].map(c).join(';')})).join('\r\n'),'text/csv')};
+
+/* ---------- portal: linha digitável, PIX copia e cola e página de pagamento do banco ---------- */
+const finFaturasV1=finFaturas;
+finFaturas=function(e){let h=finFaturasV1(e);
+  S.faturas.filter(f=>f.empresaId===e.id&&f.boleto&&fatAtiva(f)).forEach(f=>{const b=f.boleto;const extra=[b.linkPagamento?`<a class="btn primary" href="${esc(b.linkPagamento)}" target="_blank" rel="noopener">Pagar online (boleto, PIX ou cartão)</a>`:'',b.linhaDigitavel?`<button class="btn" data-act="copiar" data-t="${esc(b.linhaDigitavel)}">Copiar linha digitável</button>`:'',b.pixCopiaCola?`<button class="btn" data-act="copiar" data-t="${esc(b.pixCopiaCola)}">Copiar PIX</button>`:''].join('');
+    if(extra)h=h.replace(`data-act="pix-fatura" data-id="${f.id}"`,`data-act="pix-fatura" data-id="${f.id}" style="display:none"`).replace(new RegExp(`(<button class="btn" data-act="pagar-fatura" data-id="${f.id}">)`),extra+'$1')});
+  return h;
+};
+/* ==== MÓDULOS v12 (fim) ==== */
+
 
 
 

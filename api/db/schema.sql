@@ -228,3 +228,15 @@ CREATE TABLE IF NOT EXISTS integra_execucoes (
   lote          TEXT
 );
 CREATE INDEX IF NOT EXISTS integra_exec_esc ON integra_execucoes (escritorio_id, em DESC);
+
+-- Financeiro: banco integrado para boletos/PIX (Asaas). A chave da API fica cifrada; o token valida os avisos de pagamento.
+CREATE TABLE IF NOT EXISTS financeiro_config (
+  escritorio_id    UUID PRIMARY KEY REFERENCES escritorios(id) ON DELETE CASCADE,
+  provedor         TEXT NOT NULL DEFAULT 'manual',
+  ambiente         TEXT NOT NULL DEFAULT 'producao',
+  api_key_cifrada  BYTEA,
+  webhook_token    TEXT,
+  ultima_execucao  JSONB,
+  atualizado_por   UUID,
+  atualizado_em    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
