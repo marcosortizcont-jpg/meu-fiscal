@@ -488,7 +488,7 @@ function obrigacoesDevidasFixas(e,comp,funcs){
 }
 
 /* ===================== Estado e persistência ===================== */
-const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos','docsinternos','contatos'];
+const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos','docsinternos','contatos','parceiros'];
 const S={}; COLS.forEach(c=>S[c]=[]);
 const CAP={db:null,user:null,sample:null,assets:null,downloads:null};
 const ME={id:null,nome:'',canEdit:true};
@@ -3861,7 +3861,7 @@ abaDocs=function(e){
 };
 
 /* ---------- histórico de alterações ---------- */
-const COL_NOME={empresas:'Cadastro da empresa',documentos:'Documentos',docsinternos:'Documentos da equipe',checklist:'Envio mensal',guias:'Guias',obrigacoes:'Obrigações',faturamento:'Faturamento',despesas:'Despesas',lancamentos:'Receitas e despesas',
+const COL_NOME={parceiros:'Clientes e fornecedores',empresas:'Cadastro da empresa',documentos:'Documentos',docsinternos:'Documentos da equipe',checklist:'Envio mensal',guias:'Guias',obrigacoes:'Obrigações',faturamento:'Faturamento',despesas:'Despesas',lancamentos:'Receitas e despesas',
   funcionarios:'Funcionários',folhas:'Folha',admissoes:'Admissões',notas:'Notas fiscais',tomadores:'Tomadores',servicos:'Serviços',certificados:'Certificado',certificado_a1:'Certificado A1',cofre:'Cofre de senhas',tickets:'Solicitações',
   cnds:'Certidões',ecac:'e-CAC',faturas:'Honorários',fechamentos:'Fechamento do mês',acesso_portal:'Acesso ao portal',usuario:'Usuários da equipe',config:'Configurações',catalogo:'Catálogo de obrigações',regimes:'Regimes',leads:'Interessados',operadores:'Operadores'};
 const CAMPO_NOME={razao:'Razão social',fantasia:'Nome fantasia',grupo:'Grupo de empresas',cnpj:'CNPJ',ie:'Inscrição estadual',im:'Inscrição municipal',abertura:'Início das atividades',cnae:'CNAE',atividade:'Atividade',regime:'Regime (base)',regimeId:'Regime tributário',anexo:'Anexo do Simples',
@@ -4529,6 +4529,247 @@ ACT['crm-csv']=()=>{const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
 painelLeads=function(){const n=S.leads.filter(l=>etapaDe(l)==='novo').length;if(!n||!podeMod('comercial','ver'))return '';return `<div class="banner info"><span class="small"><b>${n} novo(s) lead(s)</b> chegaram pelo site e aguardam o primeiro contato.</span><a class="btn sm primary" href="#a-crm">Abrir CRM comercial</a></div>`};
 const motorV5=motor;motor=function(eid,publico){return motorV5(eid,publico).filter(a=>a.area!=='Novo interessado'||podeMod('comercial','ver')).map(a=>a.area==='Novo interessado'?{...a,view:'a-crm',area:'Novo lead (CRM)'}:a)};
 /* ==== MÓDULOS v9 (fim) ==== */
+/* ==== MÓDULOS v10: Gestão do negócio · cadastro de clientes, fornecedores e prestadores ==== */
+(function(){const st=document.createElement('style');st.textContent=`
+.ac{position:relative}
+.ac-lista{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 28px rgb(0 0 0 / .14);max-height:300px;overflow:auto;padding:4px}
+.ac-it{display:flex;justify-content:space-between;gap:10px;align-items:center;width:100%;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:8px;cursor:pointer;font:inherit;color:var(--ink)}
+.ac-it:hover,.ac-it.sel{background:var(--surface-2)}
+.ac-it small{color:var(--muted);font-size:11.5px;display:block}.ac-it mark{background:color-mix(in srgb,var(--accent) 22%,transparent);color:inherit;border-radius:3px;padding:0 1px}
+.ac-it.novo{color:var(--accent);font-weight:600;border-top:1px solid var(--line);border-radius:0 0 8px 8px}
+.ac-ok{font-size:12px;color:var(--ok);margin-top:4px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.parc-novo{border:1px dashed var(--accent);border-radius:12px;padding:12px;background:color-mix(in srgb,var(--accent) 5%,transparent)}
+.tipos-chk{display:flex;gap:8px;flex-wrap:wrap}.tipos-chk label{display:flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:99px;padding:6px 12px;cursor:pointer;font-size:13px}
+.tipos-chk label:has(input:checked){border-color:var(--accent);background:color-mix(in srgb,var(--accent) 10%,transparent);font-weight:600}
+`;document.head.appendChild(st)})();
+const PTIPOS={cliente:'Cliente',fornecedor:'Fornecedor',prestador:'Prestador de serviço'};
+const normTxt=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim();
+const parceirosDe=eid=>S.parceiros.filter(p=>p.empresaId===eid);
+const parc=id=>S.parceiros.find(p=>p.id===id);
+const docOk=d=>{d=soDig(d);return d.length===11?cpfValido(d):d.length===14?cnpjValido(d):false};
+const mascaraDoc=v=>{const d=soDig(v).slice(0,14);if(d.length<=11)return d.replace(/^(\d{3})(\d)/,'$1.$2').replace(/^(\d{3})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1-$2');
+  return d.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2')};
+const tiposDoLanc=tipo=>tipo==='receita'?['cliente']:['fornecedor','prestador'];
+const docTxt=p=>p.semDoc?'Sem CPF/CNPJ':p.doc?(soDig(p.doc).length===14?'CNPJ ':'CPF ')+fmtDoc(p.doc):'Falta CPF/CNPJ';
+document.addEventListener('input',ev=>{const el=ev.target;if(el.matches&&el.matches('input[data-mask=doc]')){const p=el.selectionStart===el.value.length;el.value=mascaraDoc(el.value);if(p)el.selectionStart=el.selectionEnd=el.value.length}});
+
+/* ---------- lançamentos passam a mostrar o nome atual do cadastro (o B.I. agrupa pelo cadastro) ---------- */
+const lancDeV1=lancamentosDe;
+lancamentosDe=function(eid){
+  const P=parceirosDe(eid);const porNome={};P.forEach(p=>{porNome[normTxt(p.nome)]=p;if(p.fantasia)porNome[normTxt(p.fantasia)]=porNome[normTxt(p.fantasia)]||p});
+  return lancDeV1(eid).map(l=>{const p=(l.parceiroId&&parc(l.parceiroId))||(l.contraparte&&porNome[normTxt(l.contraparte)]);return p?{...l,parceiroId:p.id,contraparte:p.fantasia||p.nome}:l});
+};
+function usoParceiro(eid){const u={};lancamentosDe(eid).forEach(l=>{if(!l.parceiroId)return;const x=u[l.parceiroId]||(u[l.parceiroId]={n:0,rec:0,desp:0,ult:'',rec12:0,desp12:0});x.n++;const v=Number(l.valor)||0;
+  if(l.tipo==='receita')x.rec+=v;else x.desp+=v;if(l.comp>=addMes(compAtual(),-11)){if(l.tipo==='receita')x.rec12+=v;else x.desp12+=v}if(String(l.data)>x.ult)x.ult=String(l.data)});return u}
+
+/* ---------- aba Clientes e fornecedores ---------- */
+UI.fparc=UI.fparc||{tipo:'',q:'',sit:''};
+function cadastrosView(e){
+  const f=UI.fparc;const q=normTxt(f.q);const qd=soDig(f.q);const U=usoParceiro(e.id);
+  const todos=parceirosDe(e.id);
+  const L=todos.filter(p=>(!f.tipo||(p.tipos||[]).includes(f.tipo))&&(!f.sit||(f.sit==='incompleto'?(!p.semDoc&&!p.doc):f.sit==='inativo'?p.ativo===false:p.ativo!==false))
+    &&(!q||normTxt([p.nome,p.fantasia,p.email,p.cidade].join(' ')).includes(q)||(qd.length>=3&&soDig(p.doc).includes(qd))))
+    .sort((a,b)=>(U[b.id]?.rec12||0)+(U[b.id]?.desp12||0)-((U[a.id]?.rec12||0)+(U[a.id]?.desp12||0))||a.nome.localeCompare(b.nome));
+  const cont=k=>todos.filter(p=>(p.tipos||[]).includes(k)).length;const incomp=todos.filter(p=>!p.semDoc&&!p.doc).length;
+  const recT=Object.values(U).reduce((a,x)=>a+x.rec12,0);
+  const semCad=lancamentosDe(e.id).filter(l=>l.contraparte&&!l.parceiroId&&!l.antigo).length+lancamentosDe(e.id).filter(l=>l.antigo&&l.contraparte&&!l.parceiroId).length;
+  const tomSem=S.tomadores.filter(t=>t.empresaId===e.id&&t.doc&&!todos.some(p=>soDig(p.doc)===soDig(t.doc))).length;
+  return `<div class="panel"><div class="barra-filtros">
+    <label class="f busca"><span>Pesquisar</span><input type="search" id="busca-parc" data-live="1" value="${esc(f.q)}" placeholder="Nome, CPF/CNPJ, e-mail ou cidade"></label>
+    <label class="f"><span>Tipo</span><select data-fparc="tipo"><option value="">Todos (${todos.length})</option>${Object.entries(PTIPOS).map(([k,r])=>`<option value="${k}" ${f.tipo===k?'selected':''}>${r}s (${cont(k)})</option>`).join('')}</select></label>
+    <label class="f"><span>Situação</span><select data-fparc="sit"><option value="">Ativos</option><option value="incompleto" ${f.sit==='incompleto'?'selected':''}>Faltando CPF/CNPJ (${incomp})</option><option value="inativo" ${f.sit==='inativo'?'selected':''}>Inativos</option></select></label>
+   </div><div class="filtro-resumo"><span class="small muted">${L.length} cadastro(s)${incomp?` · <b style="color:var(--warn)">${incomp} sem CPF/CNPJ informado</b>`:''}</span><div class="actions">${semCad||tomSem?`<button class="btn sm" data-act="parc-importar">Trazer dos lançamentos e notas (${semCad+tomSem})</button>`:''}<button class="btn sm primary" data-act="parc-form">${svg('plus')}Novo cadastro</button></div></div></div>
+  <div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr><th>Nome</th><th>Tipo</th><th>CPF / CNPJ</th><th class="r">Recebido 12m</th><th class="r">Pago 12m</th><th>Último lançamento</th><th></th></tr></thead><tbody>${L.map(p=>{const u=U[p.id]||{};const inc=!p.semDoc&&!p.doc;return `<tr>
+    <td><b>${esc(p.nome)}</b>${p.fantasia&&p.fantasia!==p.nome?`<div class="sub">${esc(p.fantasia)}</div>`:''}${[p.telefone?fmtFone(p.telefone):'',p.email].filter(Boolean).length?`<div class="sub">${[p.telefone?fmtFone(p.telefone):'',p.email].filter(Boolean).map(esc).join(' · ')}</div>`:''}${p.ativo===false?' '+pill('Inativo',''):''}</td>
+    <td class="small">${(p.tipos||[]).map(t=>PTIPOS[t]).join(', ')}</td>
+    <td class="small mono">${inc?pill('Falta CPF/CNPJ','warn'):p.semDoc?'<span class="muted">Sem documento</span>':fmtDoc(p.doc)}</td>
+    <td class="r num">${u.rec12?brl(u.rec12)+(recT?`<div class="sub">${pct(u.rec12/recT)} das receitas</div>`:''):'—'}</td><td class="r num">${u.desp12?brl(u.desp12):'—'}</td>
+    <td class="small">${u.ult?fmtData(u.ult)+` · ${u.n} lanç.`:'—'}</td>
+    <td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${(p.tipos||[]).includes('cliente')?`<button class="btn sm" data-act="parc-lancar" data-id="${p.id}" data-v="receita" title="Lançar receita">+ Receita</button>`:''}${(p.tipos||[]).some(t=>t!=='cliente')?`<button class="btn sm" data-act="parc-lancar" data-id="${p.id}" data-v="despesa" title="Lançar despesa">+ Despesa</button>`:''}<button class="btn sm ${inc?'primary':'ghost'}" data-act="parc-form" data-id="${p.id}">${inc?'Completar':'Editar'}</button></div></td></tr>`}).join('')}</tbody></table></div>`
+   :vazio(todos.length?'Nenhum cadastro com esses filtros.':'Cadastre seus clientes, fornecedores e prestadores. Na hora de lançar, o sistema sugere o nome enquanto você digita e o painel mostra quem mais compra e para quem você mais paga.',`<button class="btn primary" data-act="parc-form">${svg('plus')}Novo cadastro</button>`)}</div>`;
+}
+Object.assign(buscaVivas,{'busca-parc':v=>{UI.fparc.q=v}});
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.fparc){UI.fparc[el.dataset.fparc]=el.value;render()}});
+const vBIV2=vBI;
+vBI=function(e){
+  const t=UI.tab.lanc||'visao';
+  const inj=h=>h.replace(/(<button role="tab" aria-selected="(?:true|false)" data-act="tab" data-k="lanc" data-v="consolidacao">)/,`<button role="tab" aria-selected="${t==='cadastros'}" data-act="tab" data-k="lanc" data-v="cadastros">Clientes e fornecedores</button>$1`);
+  if(t!=='cadastros')return inj(vBIV2(e));
+  UI.tab.lanc='receitas';let h=vBIV2(e);UI.tab.lanc='cadastros';h=inj(h).replace(/aria-selected="true" data-act="tab" data-k="lanc" data-v="receitas"/,'aria-selected="false" data-act="tab" data-k="lanc" data-v="receitas"');
+  return h.slice(0,h.indexOf('</div>',h.indexOf('role="tablist"'))+6)+cadastrosView(e);
+};
+
+/* ---------- formulário de cadastro ---------- */
+function camposCatPadrao(x){const op=(cats,v)=>`<option value="">—</option>`+cats.map(([k,n])=>`<option value="${k}" ${v===k?'selected':''}>${esc(n)}</option>`).join('');
+  return `<label class="f"><span>Categoria padrão nas receitas</span><select name="catRec">${op(CAT_REC,x.catRec)}</select></label><label class="f"><span>Categoria padrão nas despesas</span><select name="catDesp">${op(CAT_DESP,x.catDesp)}</select></label>`}
+ACT['parc-form']=el=>abrirParceiro(el.dataset.id?parc(el.dataset.id):null);
+function abrirParceiro(p,pre){
+  pre=pre||{};const x=p||{tipos:pre.tipos||['cliente'],nome:pre.nome||'',ativo:true};
+  openModal(`${mHead(p?'Editar cadastro':'Novo cliente, fornecedor ou prestador')}<form data-form="parceiro" data-id="${p?.id||''}"><div class="modal-body"><div class="grid-f">
+   <div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">É meu… (pode marcar mais de um)</span><div class="tipos-chk">${Object.entries(PTIPOS).map(([k,r])=>`<label><input type="checkbox" name="tipos" value="${k}" ${(x.tipos||[]).includes(k)?'checked':''}> ${r}</label>`).join('')}</div></div>
+   <label class="f"><span>CPF ou CNPJ ${x.semDoc?'':'*'}</span><input name="doc" data-mask="doc" inputmode="numeric" maxlength="18" value="${esc(x.doc?mascaraDoc(x.doc):'')}" ${x.semDoc?'disabled':''} placeholder="000.000.000-00 ou 00.000.000/0000-00"></label>
+   <label class="chk" style="align-self:end;padding-bottom:10px"><input type="checkbox" name="semDoc" data-sem-doc ${x.semDoc?'checked':''}> Cadastrar sem CPF/CNPJ</label>
+   <label class="f"><span>Nome completo ou razão social *</span><input name="nome" required maxlength="120" value="${esc(x.nome||'')}"></label>
+   <label class="f"><span>Apelido ou nome fantasia</span><input name="fantasia" maxlength="80" value="${esc(x.fantasia||'')}" placeholder="Como você chama no dia a dia"></label>
+   <label class="f"><span>Telefone / WhatsApp</span><input name="telefone" inputmode="tel" maxlength="20" value="${esc(x.telefone?fmtFone(x.telefone):'')}"></label>
+   <label class="f"><span>E-mail</span><input name="email" type="email" maxlength="120" value="${esc(x.email||'')}"></label>
+   <label class="f"><span>Cidade / UF</span><input name="cidade" maxlength="80" value="${esc(x.cidade||'')}"></label>
+   <span></span>
+   ${camposCatPadrao(x)}
+   <label class="f full"><span>Observações</span><input name="obs" maxlength="300" value="${esc(x.obs||'')}"></label>
+   ${p?`<label class="chk full"><input type="checkbox" name="ativo" ${x.ativo!==false?'checked':''}> Ativo (aparece nas sugestões dos lançamentos)</label>`:''}
+  </div><p class="small muted" style="margin:10px 0 0">Com o CPF/CNPJ, o escritório confere as notas e despesas certas no seu fechamento. Só cadastre sem documento quando não tiver como pedir (ex.: cliente de balcão).</p></div>
+  <div class="modal-foot">${p?`<button type="button" class="btn danger" data-act="parc-excluir" data-id="${p.id}">Excluir</button>`:''}<span class="grow"></span><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar cadastro</button></div></form>`,true);
+}
+document.addEventListener('change',ev=>{const el=ev.target;if(!el.matches||!el.matches('[data-sem-doc]'))return;const f=el.form;const d=f&&(f.querySelector('[name=doc]')||f.querySelector('[name=pdoc]'));if(!d)return;d.disabled=el.checked;if(el.checked)d.value='';else d.focus()});
+// valida e devolve os dados do cadastro (ou null com aviso)
+function validarParceiro(eid,{id,nome,doc,semDoc,tipos}){
+  nome=String(nome||'').trim();doc=soDig(doc);
+  if(nome.length<2){toast('Informe o nome.',true);return null}
+  if(!tipos.length){toast('Marque se é cliente, fornecedor ou prestador.',true);return null}
+  if(!semDoc){if(!doc){toast('Informe o CPF ou CNPJ, ou marque "Cadastrar sem CPF/CNPJ".',true);return null}
+    if(!docOk(doc)){toast((doc.length===14?'CNPJ':doc.length===11?'CPF':'CPF/CNPJ')+' inválido. Confira os números.',true);return null}
+    const dup=parceirosDe(eid).find(p=>p.id!==id&&soDig(p.doc)===doc);if(dup){toast('Este CPF/CNPJ já está cadastrado: '+dup.nome+'.',true);return null}}
+  else{const dup=parceirosDe(eid).find(p=>p.id!==id&&normTxt(p.nome)===normTxt(nome));if(dup){toast('Já existe um cadastro com o nome '+dup.nome+'. Use-o ou diferencie o nome.',true);return null}}
+  return {nome,doc:semDoc?'':doc,semDoc:!!semDoc,tipos};
+}
+FORM['parceiro']=(fd,form)=>{
+  const e=empAtual();if(!e)return;const id=form.dataset.id;const g=k=>String(fd.get(k)||'').trim();
+  const v=validarParceiro(e.id,{id,nome:g('nome'),doc:g('doc'),semDoc:!!fd.get('semDoc'),tipos:fd.getAll('tipos')});if(!v)return;
+  const email=g('email').toLowerCase();if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){toast('E-mail inválido.',true);return}
+  const dados={...v,fantasia:g('fantasia'),telefone:soDig(g('telefone')),email,cidade:g('cidade'),catRec:g('catRec'),catDesp:g('catDesp'),obs:g('obs'),ativo:id?!!fd.get('ativo'):true,alteradoEm:agora()};
+  const antes=id&&parc(id);
+  mut(['parceiros','lancamentos'],()=>{
+    let p=antes;if(p)Object.assign(p,dados);else{p={id:'pc-'+uid(),empresaId:e.id,...dados,criadoEm:agora(),uid:ME.id};S.parceiros.push(p)}
+    // lançamentos antigos com o mesmo nome passam a apontar para o cadastro
+    const nomes=new Set([normTxt(p.nome),normTxt(p.fantasia)].filter(Boolean));
+    S.lancamentos.filter(l=>l.empresaId===e.id&&!l.parceiroId&&nomes.has(normTxt(l.contraparte))).forEach(l=>{l.parceiroId=p.id});
+  },['Gestão do negócio',(antes?'Editou':'Cadastrou')+' '+(v.tipos.map(t=>PTIPOS[t].toLowerCase()).join('/'))+' '+v.nome,e.razao]);
+  closeModal();toast('Cadastro salvo.');
+};
+ACT['parc-excluir']=el=>{const p=parc(el.dataset.id);if(!p)return;const n=S.lancamentos.filter(l=>l.parceiroId===p.id).length;closeModal();
+  if(n){confirmar('Cadastro em uso',`${esc(p.nome)} tem ${n} lançamento(s). Para não perder o histórico do seu B.I., o cadastro será desativado: ele some das sugestões, mas os lançamentos continuam.`,'Desativar',()=>mut('parceiros',()=>{p.ativo=false},['Gestão do negócio','Desativou cadastro '+p.nome,'']));return}
+  confirmar('Excluir cadastro',`Excluir ${esc(p.nome)}?`,'Excluir',()=>mut('parceiros',()=>{S.parceiros=S.parceiros.filter(x=>x.id!==p.id)},['Gestão do negócio','Excluiu cadastro '+p.nome,'']),true)};
+ACT['parc-lancar']=el=>{UI.parcPre=el.dataset.id;abrirLanc(el.dataset.v,null)};
+ACT['parc-importar']=()=>{
+  const e=empAtual();if(!e)return;let n=0,v=0;
+  mut(['parceiros','lancamentos'],()=>{
+    S.tomadores.filter(t=>t.empresaId===e.id&&t.doc).forEach(t=>{const d=soDig(t.doc);let p=parceirosDe(e.id).find(x=>soDig(x.doc)===d);
+      if(!p){p={id:'pc-'+uid(),empresaId:e.id,nome:t.nome,fantasia:'',doc:d,semDoc:false,tipos:['cliente'],telefone:soDig(t.telefone),email:t.email||'',cidade:t.municipio||'',catRec:'servicos',ativo:true,criadoEm:agora(),obs:'Trazido dos tomadores da NFS-e'};S.parceiros.push(p);n++}
+      else if(!(p.tipos||[]).includes('cliente'))p.tipos=[...(p.tipos||[]),'cliente']});
+    lancamentosDe(e.id).filter(l=>l.contraparte&&!l.parceiroId).forEach(l=>{const k=normTxt(l.contraparte);let p=parceirosDe(e.id).find(x=>normTxt(x.nome)===k||normTxt(x.fantasia)===k);
+      const tp=l.tipo==='receita'?'cliente':'fornecedor';
+      if(!p){p={id:'pc-'+uid(),empresaId:e.id,nome:l.contraparte,fantasia:'',doc:'',semDoc:false,tipos:[tp],ativo:true,criadoEm:agora(),obs:'Trazido dos lançamentos',[l.tipo==='receita'?'catRec':'catDesp']:l.categoria};S.parceiros.push(p);n++}
+      else if(!(p.tipos||[]).includes(tp)&&!(tp==='fornecedor'&&(p.tipos||[]).includes('prestador')))p.tipos=[...(p.tipos||[]),tp];
+      const o=S.lancamentos.find(x=>x.id===l.id);if(o&&!o.parceiroId){o.parceiroId=p.id;v++}});
+  },['Gestão do negócio','Trouxe cadastros dos lançamentos e notas',e.razao]);
+  UI.fparc.sit=parceirosDe(e.id).some(p=>!p.semDoc&&!p.doc)?'incompleto':'';
+  toast(n+' cadastro(s) criado(s) e '+v+' lançamento(s) vinculados.'+(UI.fparc.sit?' Complete o CPF/CNPJ dos que estão em amarelo.':''));render();
+};
+
+/* ---------- lançamento: campo com sugestões enquanto digita ---------- */
+const abrirLancV1=abrirLanc;
+abrirLanc=function(tipo,l){
+  abrirLancV1(tipo,l);if(!UI.modal)return;
+  const pre=UI.parcPre&&parc(UI.parcPre);UI.parcPre=null;
+  const p=(l&&l.parceiroId&&parc(l.parceiroId))||pre||null;
+  const rot=tipo==='receita'?'Cliente / pagador':'Fornecedor ou prestador';
+  const val=p?(p.fantasia||p.nome):(l?.contraparte||'');
+  const widget=`<div class="f full ac" id="ac-parc"><span>${rot}</span><input name="contraparte" id="lanc-parc" maxlength="120" autocomplete="off" value="${esc(val)}" placeholder="Digite o primeiro nome ou o CPF/CNPJ" data-tipo="${tipo}" role="combobox" aria-autocomplete="list" aria-expanded="false">
+    <input type="hidden" name="parceiroId" value="${esc(p?.id||'')}"><div class="ac-lista" hidden role="listbox"></div><div class="ac-ok" ${p?'':'hidden'}>${p?okParc(p):''}</div>
+    <div class="parc-novo" hidden><b class="small">Novo cadastro: <span data-novo-nome></span></b><div class="grid-f" style="margin-top:8px">
+      <div class="f full"><div class="tipos-chk">${Object.entries(PTIPOS).map(([k,r])=>`<label><input type="checkbox" name="ptipos" value="${k}" ${tiposDoLanc(tipo)[0]===k?'checked':''}> ${r}</label>`).join('')}</div></div>
+      <label class="f"><span>CPF ou CNPJ *</span><input name="pdoc" data-mask="doc" inputmode="numeric" maxlength="18" placeholder="Só números"></label>
+      <label class="chk" style="align-self:end;padding-bottom:10px"><input type="checkbox" name="psemDoc" data-sem-doc> Cadastrar sem CPF/CNPJ</label>
+      <label class="f"><span>Telefone (opcional)</span><input name="ptel" inputmode="tel" maxlength="20"></label>
+      <div class="f" style="align-self:end"><button type="button" class="btn sm ghost" data-act="parc-novo-cancelar">Escolher um cadastrado</button></div></div></div></div>`;
+  const h=UI.modal.html.replace(/<label class="f"><span>[^<]*<\/span><input name="contraparte"[\s\S]*?<\/datalist><\/label>/,widget);
+  if(h===UI.modal.html)return;UI.modal.html=h;renderModal();
+  if(pre){const c=document.querySelector('form[data-form=lancamento] select[name=categoria]');const cp=tipo==='receita'?pre.catRec:pre.catDesp;if(c&&!c.value&&cp)c.value=cp}
+};
+function okParc(p){return `✓ ${esc(p.nome)} · ${esc(docTxt(p))}${!p.semDoc&&!p.doc?' <a href="#" data-act="parc-form" data-id="'+p.id+'">completar</a>':''}`}
+function sugestoesParc(eid,tipo,q){
+  const qn=normTxt(q);const qd=soDig(q);const toks=qn.split(' ').filter(Boolean);const U=usoParceiro(eid);const pref=tiposDoLanc(tipo);
+  const L=parceirosDe(eid).filter(p=>p.ativo!==false).map(p=>{const nomes=[normTxt(p.nome),normTxt(p.fantasia)].filter(Boolean);const pal=nomes.join(' ').split(' ');
+    let s=0;if(!toks.length)s=1;
+    else if(qd.length>=3&&qd.length===String(q).replace(/[\s.\/-]/g,'').length){if(soDig(p.doc).includes(qd))s=5}
+    else if(toks.every(t=>pal.some(w=>w.startsWith(t)))){s=nomes.some(n=>n.startsWith(qn))?4:pal.some(w=>w.startsWith(toks[0]))?3:2}
+    else if(nomes.some(n=>n.includes(qn)))s=1;
+    if(!s)return null;return {p,s:s*10+((p.tipos||[]).some(t=>pref.includes(t))?5:0)+Math.min(4,(U[p.id]?.n||0)/5)}}).filter(Boolean);
+  return L.sort((a,b)=>b.s-a.s||a.p.nome.localeCompare(b.p.nome)).slice(0,8).map(x=>x.p);
+}
+const realce=(txt,q)=>{const toks=normTxt(q).split(' ').filter(Boolean);if(!toks.length)return esc(txt);
+  return String(txt).split(/(\s+)/).map(w=>{const n=normTxt(w);const t=toks.find(t=>n.startsWith(t));return t?`<mark>${esc(w.slice(0,t.length))}</mark>${esc(w.slice(t.length))}`:esc(w)}).join('')};
+function abrirSug(inp){
+  const box=inp.closest('.ac');const lista=box.querySelector('.ac-lista');const tipo=inp.dataset.tipo;const q=inp.value.trim();const e=empAtual();if(!e)return;
+  const L=sugestoesParc(e.id,tipo,q);UI.acSel=L.length&&q?0:-1;
+  const novo=q.length>=2&&!L.some(p=>normTxt(p.nome)===normTxt(q)||normTxt(p.fantasia)===normTxt(q));
+  if(!L.length&&!novo){lista.hidden=true;inp.setAttribute('aria-expanded','false');return}
+  lista.innerHTML=(q?'':'<div class="small muted" style="padding:6px 10px">Mais usados</div>')+L.map((p,i)=>`<button type="button" class="ac-it ${i===UI.acSel?'sel':''}" data-parc="${p.id}" role="option"><span><b>${realce(p.fantasia||p.nome,q)}</b>${p.fantasia&&p.fantasia!==p.nome?`<small>${realce(p.nome,q)}</small>`:''}</span><small style="text-align:right">${(p.tipos||[]).map(t=>PTIPOS[t]).join(', ')}<br>${esc(docTxt(p))}</small></button>`).join('')
+    +(novo?`<button type="button" class="ac-it novo" data-parc-novo="1">+ Cadastrar “${esc(q)}”</button>`:'');
+  lista.hidden=false;inp.setAttribute('aria-expanded','true');
+}
+function escolherParc(inp,p){const box=inp.closest('.ac');inp.value=p.fantasia||p.nome;box.querySelector('[name=parceiroId]').value=p.id;
+  box.querySelector('.ac-lista').hidden=true;const ok=box.querySelector('.ac-ok');ok.innerHTML=okParc(p);ok.hidden=false;box.querySelector('.parc-novo').hidden=true;
+  const f=inp.form;const c=f.querySelector('select[name=categoria]');const cp=inp.dataset.tipo==='receita'?p.catRec:p.catDesp;if(c&&!c.value&&cp)c.value=cp;
+  // sem categoria padrão: usa a do último lançamento com ele
+  if(c&&!c.value){const u=S.lancamentos.filter(l=>l.parceiroId===p.id&&l.tipo===inp.dataset.tipo).sort((a,b)=>String(b.data).localeCompare(String(a.data)))[0];if(u)c.value=u.categoria}}
+function abrirNovoParc(inp){const box=inp.closest('.ac');box.querySelector('.ac-lista').hidden=true;box.querySelector('[name=parceiroId]').value='';box.querySelector('.ac-ok').hidden=true;
+  const pn=box.querySelector('.parc-novo');pn.hidden=false;pn.querySelector('[data-novo-nome]').textContent=inp.value.trim();setTimeout(()=>pn.querySelector('[name=pdoc]').focus(),30)}
+document.addEventListener('input',ev=>{const inp=ev.target;if(inp.id!=='lanc-parc')return;const box=inp.closest('.ac');box.querySelector('[name=parceiroId]').value='';box.querySelector('.ac-ok').hidden=true;
+  const pn=box.querySelector('.parc-novo');if(!pn.hidden)pn.querySelector('[data-novo-nome]').textContent=inp.value.trim();abrirSug(inp)});
+document.addEventListener('focusin',ev=>{if(ev.target.id==='lanc-parc'&&!ev.target.closest('.ac').querySelector('[name=parceiroId]').value)abrirSug(ev.target)});
+document.addEventListener('keydown',ev=>{const inp=ev.target;if(inp.id!=='lanc-parc')return;const lista=inp.closest('.ac').querySelector('.ac-lista');if(lista.hidden)return;
+  const its=[...lista.querySelectorAll('.ac-it')];if(!its.length)return;
+  if(ev.key==='ArrowDown'||ev.key==='ArrowUp'){ev.preventDefault();UI.acSel=(UI.acSel+(ev.key==='ArrowDown'?1:-1)+its.length)%its.length;its.forEach((b,i)=>b.classList.toggle('sel',i===UI.acSel));its[UI.acSel].scrollIntoView({block:'nearest'})}
+  else if(ev.key==='Enter'&&UI.acSel>=0){ev.preventDefault();its[UI.acSel].click()}
+  else if(ev.key==='Escape'){ev.stopPropagation();lista.hidden=true}});
+document.addEventListener('mousedown',ev=>{const b=ev.target.closest&&ev.target.closest('.ac-it');if(b)ev.preventDefault()});
+document.addEventListener('click',ev=>{const b=ev.target.closest&&ev.target.closest('.ac-it');
+  if(b){const inp=b.closest('.ac').querySelector('#lanc-parc');if(b.dataset.parcNovo)abrirNovoParc(inp);else{const p=parc(b.dataset.parc);if(p)escolherParc(inp,p)}return}
+  document.querySelectorAll('.ac-lista:not([hidden])').forEach(l=>{if(!l.closest('.ac').contains(ev.target))l.hidden=true})});
+ACT['parc-novo-cancelar']=el=>{const box=el.closest('.ac');box.querySelector('.parc-novo').hidden=true;const inp=box.querySelector('#lanc-parc');inp.focus();abrirSug(inp)};
+
+/* ---------- salvar o lançamento já com o cadastro ---------- */
+FORM['lancamento']=(fd,form)=>{
+  const e=empAtual();if(!e)return;const tipo=form.dataset.tipo;const id=form.dataset.id;
+  const valor=Math.round(Number(String(fd.get('valor')).replace(',','.'))*100)/100;const data=String(fd.get('data')||'');const desc=String(fd.get('descricao')||'').trim();const cat=String(fd.get('categoria')||'');
+  if(!(valor>0)){toast('Informe um valor maior que zero.',true);return}if(!data){toast('Informe a data.',true);return}if(!desc){toast('Informe a descrição.',true);return}if(!cat){toast('Escolha a categoria.',true);return}
+  const nomeCp=String(fd.get('contraparte')||'').trim();let pid=String(fd.get('parceiroId')||'');let novoP=null;
+  const box=form.querySelector('#ac-parc');
+  if(nomeCp&&!pid){
+    // digitou exatamente um nome já cadastrado
+    const ex=parceirosDe(e.id).find(p=>p.ativo!==false&&(normTxt(p.nome)===normTxt(nomeCp)||normTxt(p.fantasia)===normTxt(nomeCp)));
+    if(ex)pid=ex.id;
+    else if(box){const pn=box.querySelector('.parc-novo');
+      if(pn.hidden){abrirNovoParc(box.querySelector('#lanc-parc'));toast('“'+nomeCp+'” ainda não está cadastrado. Informe o CPF/CNPJ (ou marque sem documento) para salvar.',true);return}
+      const v=validarParceiro(e.id,{nome:nomeCp,doc:fd.get('pdoc'),semDoc:!!fd.get('psemDoc'),tipos:fd.getAll('ptipos')});if(!v)return;
+      novoP={id:'pc-'+uid(),empresaId:e.id,...v,fantasia:'',telefone:soDig(fd.get('ptel')),email:'',cidade:'',[tipo==='receita'?'catRec':'catDesp']:cat,ativo:true,criadoEm:agora(),uid:ME.id};pid=novoP.id}
+  }
+  const p=novoP||(pid&&parc(pid));
+  const base={empresaId:e.id,tipo,valor,data,comp:data.slice(0,7),descricao:desc,categoria:cat,parceiroId:pid||'',contraparte:p?(p.fantasia||p.nome):nomeCp,forma:String(fd.get('forma')||''),situacao:fd.get('situacao')==='pendente'?'pendente':'realizado',vencimento:String(fd.get('vencimento')||''),obs:String(fd.get('obs')||'').trim(),comprovante:UI.lancComp||null};
+  const rep=Number(fd.get('repetir')||0);const mais=!!UI.lancMais;UI.lancMais=false;
+  mut(novoP?['parceiros','lancamentos']:'lancamentos',()=>{
+    if(novoP)S.parceiros.push(novoP);
+    if(id){const l=S.lancamentos.find(x=>x.id===id);Object.assign(l,base,{alteradoEm:agora()})}
+    else{const n=Math.max(1,rep);for(let i=0;i<n;i++){const d=new Date(data+'T12:00:00');d.setMonth(d.getMonth()+i);const di=d.toISOString().slice(0,10);
+      S.lancamentos.push({id:uid(),...base,data:di,comp:di.slice(0,7),situacao:i===0?base.situacao:'pendente',vencimento:i===0?base.vencimento:di,comprovante:i===0?base.comprovante:null,criadoEm:agora(),uid:ME.id,...(n>1?{serie:i+1+'/'+n}:{})})}}
+  },['Gestão do negócio',(id?'Editou ':'Lançou ')+tipo+(p?' · '+p.nome:''),e.razao]);
+  UI.lancComp=null;
+  if(mais){toast((novoP?'Cadastro criado e l':'L')+'ançamento salvo. Pode lançar o próximo.');abrirLanc(tipo,null);return}
+  closeModal();toast((novoP?(PTIPOS[novoP.tipos[0]]+' cadastrado e '):'')+(tipo==='receita'?'receita lançada.':'despesa lançada.'));
+  if(!id){UI.flanc=UI.flanc||{};UI.flanc[tipo]={...(UI.flanc[tipo]||{cat:'',sit:'',q:''}),mes:data.slice(0,7)}}
+};
+// notas emitidas trazidas como receita já entram com o cliente (tomador) cadastrado
+const lancNotasV1=ACT['lanc-notas'];
+ACT['lanc-notas']=el=>{const e=empAtual();const antes=new Set(S.lancamentos.map(l=>l.id));lancNotasV1(el);
+  const novos=S.lancamentos.filter(l=>!antes.has(l.id)&&l.notaId);if(!novos.length)return;
+  mut(['parceiros','lancamentos'],()=>novos.forEach(l=>{const n=S.notas.find(x=>x.id===l.notaId);const t=n&&n.tomador;if(!t)return;const d=soDig(t.doc);
+    let p=d?parceirosDe(e.id).find(x=>soDig(x.doc)===d):parceirosDe(e.id).find(x=>normTxt(x.nome)===normTxt(t.nome));
+    if(!p&&t.nome){p={id:'pc-'+uid(),empresaId:e.id,nome:t.nome,fantasia:'',doc:d&&docOk(d)?d:'',semDoc:false,tipos:['cliente'],catRec:'servicos',ativo:true,criadoEm:agora(),obs:'Criado a partir da NFS-e'};S.parceiros.push(p)}
+    if(p)l.parceiroId=p.id}),null)};
+/* ==== MÓDULOS v10 (fim) ==== */
+
 
 
 lerHash();

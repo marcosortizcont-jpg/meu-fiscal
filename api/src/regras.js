@@ -6,7 +6,7 @@
 
 export const COLECOES = ['config', 'operadores', 'empresas', 'faturamento', 'despesas', 'guias', 'documentos', 'checklist', 'obrigacoes',
   'fechamentos', 'funcionarios', 'folhas', 'admissoes', 'notas', 'tomadores', 'servicos', 'certificados', 'tickets', 'conversas', 'cnds',
-  'ecac', 'faturas', 'consentimentos', 'auditoria', 'catalogo', 'regimes', 'leads', 'lancamentos', 'docsinternos', 'contatos'];
+  'ecac', 'faturas', 'consentimentos', 'auditoria', 'catalogo', 'regimes', 'leads', 'lancamentos', 'docsinternos', 'contatos', 'parceiros'];
 import { MODULO_DA_COLECAO, SEMPRE_LEGIVEIS, pode } from './permissoes.js';
 
 // Coleções que existem para o escritório inteiro (sem empresa)
@@ -30,6 +30,7 @@ const CLIENTE = {
   despesas:       { criar: true, editar: true, apagar: true },
   faturamento:    { criar: true, editar: true, apagar: true },
   lancamentos:    { criar: true, editar: true, apagar: true },   // receitas e despesas lançadas pelo próprio cliente
+  parceiros:      { criar: true, editar: true, apagar: true },   // clientes, fornecedores e prestadores do cliente (Gestão do negócio)
   funcionarios:   { criar: true, editar: true },
   conversas:      { criar: true, editar: true, bloqueados: ['atendenteUid', 'atendenteId'] },
   notas:          { criar: true, editar: true },
