@@ -33,7 +33,9 @@ export function registrarEnvios(r, { db, exigir, log, pode, wa }) {
     const mensagem = String(c.mensagem || '').slice(0, 1500);
     const resultados = {};
     if (canais.includes('email')) {
-      const para = [...new Set([e.email, ...(e.contatos || []).map(x => x.email)].map(x => String(x || '').trim().toLowerCase()).filter(x => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(x)))];
+      const doAtend = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'contatos'`, [u.escritorio_id])).map(x => x.dados)
+        .filter(x => (x.empresas || []).includes(String(c.empresaId)) && x.email && x.recebeEmail !== false && x.ativo !== false).map(x => x.email);
+      const para = [...new Set([e.email, ...(e.contatos || []).map(x => x.email), ...doAtend].map(x => String(x || '').trim().toLowerCase()).filter(x => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(x)))];
       if (!para.length) resultados.email = { ok: false, erro: 'A empresa não tem e-mail no cadastro.' };
       else {
         const esc = s => String(s).replace(/[&<>"]/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[x]));
@@ -46,12 +48,8 @@ export function registrarEnvios(r, { db, exigir, log, pode, wa }) {
     if (canais.includes('whatsapp')) {
       try {
         const fone = e.telefone || (e.contatos || []).map(x => x.telefone).find(Boolean);
-        let para = null;
-        for (let i = 0; i < anexos.length; i++) {
-          const x = anexos[i];
-          ({ para } = await wa.enviarArquivo({ esc: u.escritorio_id, empresaId: String(c.empresaId), fone, buffer: x.conteudo, tipo: x.tipo, nome: x.nome, legenda: i === 0 ? mensagem : '' }));
-        }
-        resultados.whatsapp = { ok: true, para };
+        const r2 = await wa.enviarArquivos({ esc: u.escritorio_id, empresaId: String(c.empresaId), fone, anexos: anexos.map((x, i) => ({ ...x, id: arqs[i].id })), legenda: mensagem, u });
+        resultados.whatsapp = { ok: true, para: r2.para + (r2.falhas.length ? ' (não recebeu: ' + r2.falhas.join('; ') + ')' : '') };
       } catch (er) { resultados.whatsapp = { ok: false, erro: er.message }; }
     }
     await log('obrigacao_enviada', { usuarioId: u.id, ip: ctx.ip, detalhe: `${e.razao || ''} · ${assunto} · ${Object.entries(resultados).map(([k, v]) => k + ':' + (v.ok ? 'ok' : 'falhou')).join(' ')}` });

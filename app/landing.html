@@ -408,6 +408,71 @@
   </div>
 </footer>
 
+
+<!-- Contratar: janela em duas etapas que cria o lead no CRM -->
+<dialog id="contratar" class="m-auto w-[calc(100%-24px)] max-w-xl overflow-hidden rounded-3xl bg-white p-0 shadow-2xl backdrop:bg-marinho/70 backdrop:backdrop-blur-sm" aria-labelledby="ct-titulo">
+  <form id="form-contratar" method="dialog" novalidate class="flex max-h-[92vh] flex-col">
+    <div class="relative bg-gradient-to-br from-marinho to-slate-800 px-6 pb-5 pt-6 text-white sm:px-8">
+      <button type="button" data-fechar class="absolute right-4 top-4 grid h-9 w-9 place-items-center rounded-full text-slate-300 hover:bg-white/10 hover:text-white" aria-label="Fechar">✕</button>
+      <p class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Contratar o Meu Fiscal</p>
+      <h2 id="ct-titulo" class="mt-1 pr-10 text-2xl font-extrabold tracking-tight">Falta pouco para sua empresa ficar em dia</h2>
+      <div id="ct-plano" class="mt-4 flex items-center justify-between gap-3 rounded-2xl bg-white/10 px-4 py-3 text-sm">
+        <label class="flex min-w-0 flex-1 items-center gap-2"><span class="shrink-0 text-slate-300">Plano</span>
+          <select name="plano" class="min-w-0 flex-1 truncate rounded-lg border-0 bg-transparent font-semibold text-white focus:ring-2 focus:ring-emerald-400 [&>option]:text-marinho"><option value="">Quero ajuda para escolher</option><!--@PLANOS_OPCOES--></select></label>
+        <span id="ct-preco" class="whitespace-nowrap font-bold text-emerald-300"></span>
+      </div>
+      <div class="mt-5 flex items-center gap-3 text-xs font-semibold text-slate-300">
+        <span class="flex items-center gap-2"><span data-passo-ind="1" class="grid h-6 w-6 place-items-center rounded-full bg-esmeralda text-white">1</span>Você</span>
+        <span class="h-0.5 flex-1 overflow-hidden rounded bg-white/20"><span id="ct-barra" class="block h-full w-0 bg-esmeralda transition-all duration-500"></span></span>
+        <span class="flex items-center gap-2"><span data-passo-ind="2" class="grid h-6 w-6 place-items-center rounded-full bg-white/20 text-white transition">2</span>Sua empresa</span>
+      </div>
+    </div>
+    <div class="overflow-y-auto px-6 py-6 sm:px-8">
+      <div data-passo="1" class="grid gap-4">
+        <label class="campo"><span>Nome completo</span><input name="nome" required autocomplete="name" maxlength="120" placeholder="Como está no seu documento"></label>
+        <label class="campo"><span>WhatsApp com DDD</span><input name="whatsapp" required inputmode="tel" autocomplete="tel" placeholder="(67) 99999-9999" maxlength="16"></label>
+        <label class="campo"><span>E-mail</span><input name="email" type="email" required autocomplete="email" maxlength="160" placeholder="voce@empresa.com.br"></label>
+      </div>
+      <div data-passo="2" class="hidden grid gap-4">
+        <label class="campo"><span>Nome da empresa</span><input name="empresa" required autocomplete="organization" maxlength="120" placeholder="Razão social ou nome fantasia"></label>
+        <label class="campo"><span>CNPJ <em class="font-normal not-italic text-slate-400">(deixe em branco se ainda vai abrir)</em></span><input name="cnpj" inputmode="numeric" maxlength="18" placeholder="00.000.000/0000-00"></label>
+        <fieldset><legend class="mb-2 text-sm font-medium text-marinho">Quantos funcionários?</legend>
+          <div class="grid grid-cols-3 gap-2 sm:grid-cols-5">
+            <label class="opcao"><input type="radio" name="funcionarios" value="0" class="peer sr-only"><span>Nenhum</span></label>
+            <label class="opcao"><input type="radio" name="funcionarios" value="1-3" class="peer sr-only"><span>1 a 3</span></label>
+            <label class="opcao"><input type="radio" name="funcionarios" value="4-10" class="peer sr-only"><span>4 a 10</span></label>
+            <label class="opcao"><input type="radio" name="funcionarios" value="11-30" class="peer sr-only"><span>11 a 30</span></label>
+            <label class="opcao"><input type="radio" name="funcionarios" value="30+" class="peer sr-only"><span>Mais de 30</span></label>
+          </div></fieldset>
+        <fieldset><legend class="mb-2 text-sm font-medium text-marinho">Já tem contador?</legend>
+          <div class="grid grid-cols-2 gap-2">
+            <label class="opcao"><input type="radio" name="temContador" value="sim" class="peer sr-only"><span>Sim, quero trocar</span></label>
+            <label class="opcao"><input type="radio" name="temContador" value="nao" class="peer sr-only"><span>Não tenho</span></label>
+          </div></fieldset>
+        <p id="ct-dica" class="hidden rounded-xl bg-emerald-50 px-4 py-3 text-sm text-esmeralda-escuro"></p>
+        <label class="hidden" aria-hidden="true">Não preencha<input name="site_empresa" tabindex="-1" autocomplete="off"></label>
+      </div>
+      <div data-passo="ok" class="hidden py-4 text-center" role="status">
+        <span class="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-50 text-esmeralda ring-8 ring-emerald-50/50"><svg viewBox="0 0 24 24" class="h-8 w-8" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg></span>
+        <h3 class="mt-5 text-2xl font-extrabold text-marinho">Pedido recebido, <span id="ct-nome"></span>!</h3>
+        <p class="mx-auto mt-2 max-w-sm text-sm text-slate-600">Um especialista vai chamar você no WhatsApp em horário comercial para confirmar o plano e explicar os próximos passos.</p>
+        <ol class="mx-auto mt-6 max-w-sm space-y-3 text-left text-sm text-slate-600">
+          <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-esmeralda text-xs font-bold text-white">1</span>Conversa rápida para entender sua empresa</li>
+          <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-bold text-marinho">2</span>Proposta e contrato digital</li>
+          <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-bold text-marinho">3</span>Acesso ao portal e cuidamos do resto</li>
+        </ol>
+        <a id="ct-wa" href="https://wa.me/{{whatsapp}}" target="_blank" rel="noopener" class="mt-7 inline-flex rounded-xl bg-esmeralda px-6 py-3 font-semibold text-white shadow-lg shadow-esmeralda/25 hover:bg-esmeralda-escuro">Adiantar pelo WhatsApp</a>
+      </div>
+      <p id="ct-erro" class="mt-4 hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert"></p>
+    </div>
+    <div id="ct-rodape" class="flex items-center gap-3 border-t border-slate-100 px-6 py-4 sm:px-8">
+      <button type="button" id="ct-voltar" class="hidden rounded-xl px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-100">Voltar</button>
+      <p class="flex-1 text-xs text-slate-400"><span class="hidden sm:inline">Seus dados servem só para este atendimento. </span><a href="/privacidade" class="underline">Privacidade</a></p>
+      <button type="submit" id="ct-avancar" class="rounded-xl bg-esmeralda px-6 py-3 font-semibold text-white shadow-lg shadow-esmeralda/25 transition hover:bg-esmeralda-escuro disabled:opacity-60">Continuar</button>
+    </div>
+  </form>
+</dialog>
+
 <script>
 (function(){
   var topo=document.getElementById('topo'),btn=document.getElementById('btn-menu'),menu=document.getElementById('menu-movel');
@@ -452,6 +517,60 @@
         var w=document.createElement('a');w.href=document.getElementById('contato-wa').href;w.target='_blank';w.rel='noopener';w.className='font-semibold underline';w.textContent='Enviar pelo WhatsApp';erro.appendChild(w);erro.classList.remove('hidden')});
   });
   function falha(m,el){erro.textContent=m;erro.classList.remove('hidden');el.focus()}
+
+  /* ---------- janela Contratar ---------- */
+  var dlg=document.getElementById('contratar'),fc=document.getElementById('form-contratar');
+  if(dlg&&dlg.showModal){
+    var passo=1,ctErro=document.getElementById('ct-erro'),av=document.getElementById('ct-avancar'),vo=document.getElementById('ct-voltar');
+    function mostrar(p){passo=p;fc.querySelectorAll('[data-passo]').forEach(function(x){x.classList.toggle('hidden',x.getAttribute('data-passo')!==String(p))});
+      document.getElementById('ct-barra').style.width=p===1?'0':'100%';var i2=fc.querySelector('[data-passo-ind="2"]');i2.classList.toggle('bg-esmeralda',p!==1);i2.classList.toggle('bg-white/20',p===1);
+      vo.classList.toggle('hidden',p!==2);document.getElementById('ct-rodape').classList.toggle('hidden',p==='ok');document.getElementById('ct-plano').classList.toggle('hidden',p==='ok');
+      av.textContent=p===1?'Continuar':'Enviar pedido';ctErro.classList.add('hidden');
+      var foco=fc.querySelector('[data-passo="'+p+'"] input:not([type=radio])');if(foco)setTimeout(function(){foco.focus()},60)}
+    function preco(){var o=fc.plano.options[fc.plano.selectedIndex];document.getElementById('ct-preco').textContent=o&&o.dataset.preco?'R$ '+Number(o.dataset.preco).toLocaleString('pt-BR')+'/mês':''}
+    fc.plano.addEventListener('change',preco);
+    function abrir(plano){if(dlg.open)return;if(fc.querySelector('[data-passo="ok"]:not(.hidden)')){fc.reset();av.disabled=false}
+      if(plano!=null)fc.plano.value=plano;preco();mostrar(1);dlg.showModal();document.documentElement.style.overflow='hidden'}
+    dlg.addEventListener('close',function(){document.documentElement.style.overflow=''});
+    dlg.addEventListener('click',function(e){if(e.target===dlg||e.target.closest('[data-fechar]'))dlg.close()});
+    vo.addEventListener('click',function(){mostrar(1)});
+    document.addEventListener('click',function(e){var a=e.target.closest('a[href="#comecar"]');if(!a||a.closest('#comecar'))return;
+      if(a.dataset.objetivo==='outro')return; // "Lucro Presumido / particularidade" vai para o formulário completo
+      e.preventDefault();e.stopImmediatePropagation();abrir(a.dataset.plano||'')},true);
+    fc.whatsapp.addEventListener('input',function(){var d=this.value.replace(/\D/g,'').slice(0,11),s=d;
+      if(d.length>2)s='('+d.slice(0,2)+') '+d.slice(2);if(d.length>7)s='('+d.slice(0,2)+') '+d.slice(2,d.length===11?7:6)+'-'+d.slice(d.length===11?7:6);this.value=s});
+    fc.cnpj.addEventListener('input',function(){var d=this.value.replace(/\D/g,'').slice(0,14);
+      this.value=d.replace(/^(\d{2})(\d)/,'$1.$2').replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3').replace(/\.(\d{3})(\d)/,'.$1/$2').replace(/(\d{4})(\d)/,'$1-$2')});
+    function cnpjOk(c){c=c.replace(/\D/g,'');if(c.length!==14||/^(\d)\1+$/.test(c))return false;
+      function dv(n){var s=0,p=n-7;for(var i=0;i<n;i++){s+=c[i]*p--;if(p<2)p=9}var r=s%11;return r<2?0:11-r}return dv(12)==c[12]&&dv(13)==c[13]}
+    fc.addEventListener('change',function(e){if(e.target.name!=='temContador')return;var t=document.getElementById('ct-dica');
+      t.textContent=e.target.value==='sim'?'Ótimo: nós pedimos os documentos ao seu contador atual e cuidamos da transição, sem você precisar intermediar.':'Sem problema: se a empresa ainda não existe, a abertura do CNPJ está inclusa nos planos.';t.classList.remove('hidden')});
+    function erroCt(m,el){ctErro.textContent=m;ctErro.classList.remove('hidden');if(el&&el.focus)el.focus()}
+    fc.addEventListener('submit',function(e){
+      e.preventDefault();ctErro.classList.add('hidden');var g=function(n){return String((fc[n]&&fc[n].value)||'').trim()};
+      if(passo===1){
+        if(g('nome').split(/\s+/).length<2||g('nome').length<5)return erroCt('Informe seu nome completo.',fc.nome);
+        if(g('whatsapp').replace(/\D/g,'').length<10)return erroCt('Informe seu WhatsApp com DDD.',fc.whatsapp);
+        if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(g('email')))return erroCt('Confira o e-mail.',fc.email);
+        return mostrar(2)}
+      if(g('empresa').length<2)return erroCt('Informe o nome da empresa.',fc.empresa);
+      if(g('cnpj')&&!cnpjOk(g('cnpj')))return erroCt('Confira o CNPJ.',fc.cnpj);
+      var fu=fc.querySelector('input[name=funcionarios]:checked'),tc=fc.querySelector('input[name=temContador]:checked');
+      if(!fu)return erroCt('Escolha a quantidade de funcionários.',fc.querySelector('input[name=funcionarios]'));
+      if(!tc)return erroCt('Conte se você já tem contador.',fc.querySelector('input[name=temContador]'));
+      var o=fc.plano.options[fc.plano.selectedIndex];
+      var d={nome:g('nome'),whatsapp:g('whatsapp'),email:g('email'),empresa:g('empresa'),cnpj:g('cnpj'),funcionarios:fu.value,temContador:tc.value,
+        plano:fc.plano.value,planoNome:fc.plano.value?o.text.split(' · R$')[0]:'',planoPreco:o&&o.dataset.preco?Number(o.dataset.preco):0,site_empresa:g('site_empresa')};
+      var q=new URLSearchParams(location.search);['utm_source','utm_medium','utm_campaign'].forEach(function(k){if(q.get(k))d[k]=q.get(k)});
+      var texto='Olá! Sou '+d.nome+', da '+d.empresa+'. Acabei de pedir pelo site'+(d.planoNome?' o plano '+d.planoNome:'')+'.';
+      document.getElementById('ct-wa').href='https://wa.me/{{whatsapp}}?text='+encodeURIComponent(texto);
+      av.disabled=true;av.textContent='Enviando…';
+      fetch('/api/publico/contato',{method:'POST',headers:{'Content-Type':'application/json','X-MF-Site':'cliente'},body:JSON.stringify(d)})
+        .then(function(r){return r.json().catch(function(){return{}}).then(function(j){if(!r.ok)throw new Error(j.erro||'');return j})})
+        .then(function(){document.getElementById('ct-nome').textContent=d.nome.split(' ')[0];mostrar('ok')})
+        .catch(function(err){av.disabled=false;av.textContent='Enviar pedido';erroCt((err.message||'Não conseguimos enviar agora.')+' Se preferir, use o botão do WhatsApp no fim da página.')});
+    });
+  }
 })();
 </script>
 </body>

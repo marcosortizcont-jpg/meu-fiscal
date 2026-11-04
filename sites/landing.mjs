@@ -68,7 +68,7 @@ export function montarLanding(tpl, c, { siteUrl, painelUrl }) {
   return tpl
     .replace('<!--@JSONLD-->', `<script type="application/ld+json">${JSON.stringify(jsonld).replace(/</g, '\\u003c')}</script>`)
     .replace('<!--@PLANOS-->', planos(c))
-    .replace('<!--@PLANOS_OPCOES-->', (c.planos || []).map(p => `<option value="${esc(p.id)}">${esc(p.nome)}${p.grupo && !/comércio/i.test(p.nome) && (c.gruposPlanos || []).length > 1 ? ' (' + esc((c.gruposPlanos.find(g => g.id === p.grupo) || {}).nome || '') + ')' : ''} · R$ ${brl(p.preco)}/mês</option>`).join(''))
+    .replaceAll('<!--@PLANOS_OPCOES-->', (c.planos || []).map(p => `<option value="${esc(p.id)}" data-preco="${esc(p.preco)}">${esc(p.nome)}${p.grupo && !/comércio/i.test(p.nome) && (c.gruposPlanos || []).length > 1 ? ' (' + esc((c.gruposPlanos.find(g => g.id === p.grupo) || {}).nome || '') + ')' : ''} · R$ ${brl(p.preco)}/mês</option>`).join(''))
     .replace('<!--@METRICAS-->', metricas(c))
     .replace('<!--@DEPOIMENTOS-->', depoimentos(c))
     .replace('<!--@CLIENTES_BADGE-->', clientes)

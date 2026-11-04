@@ -17,26 +17,28 @@ export const MODULOS = [
   ['hon', 'Honorários'],
   ['equipe', 'Equipe e auditoria'],
   ['config', 'Configurações do escritório'],
+  ['comercial', 'Comercial (CRM de vendas)'],
 ];
 export const NIVEIS = ['nenhum', 'ver', 'editar', 'excluir'];
 const RANK = { nenhum: 0, ver: 1, editar: 2, excluir: 3 };
 
 export const FUNCOES = {
   'Master': Object.fromEntries(MODULOS.map(([m]) => [m, 'excluir'])),
-  'Analista Fiscal': { carteira: 'ver', obrig: 'editar', guias: 'editar', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum' },
-  'Analista de DP': { carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum' },
-  'Analista Contábil': { carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'ver', equipe: 'nenhum', config: 'nenhum' },
-  'Legalização': { carteira: 'editar', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'editar', cofre: 'editar', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum' },
+  'Analista Fiscal': { carteira: 'ver', obrig: 'editar', guias: 'editar', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Analista de DP': { carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Analista Contábil': { carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Legalização': { carteira: 'editar', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'editar', cofre: 'editar', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Comercial': { carteira: 'ver', obrig: 'nenhum', guias: 'nenhum', docs: 'nenhum', chat: 'editar', fiscal: 'nenhum', cert: 'nenhum', cofre: 'nenhum', dem: 'ver', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'excluir' },
 };
 export const FUNCAO_PADRAO = 'Analista Fiscal';
 
 // Coleção do app → módulo que a governa (para leitura e gravação da equipe)
 export const MODULO_DA_COLECAO = {
-  empresas: 'carteira', leads: 'carteira',
+  empresas: 'carteira', leads: 'comercial',
   catalogo: 'obrig', regimes: 'obrig', obrigacoes: 'obrig', fechamentos: 'obrig',
   guias: 'guias', faturamento: 'guias', despesas: 'guias', lancamentos: 'guias', notas: 'guias', tomadores: 'guias', servicos: 'guias',
   documentos: 'docs', checklist: 'docs', docsinternos: 'docs',
-  conversas: 'chat',
+  conversas: 'chat', contatos: 'chat',
   cnds: 'fiscal', ecac: 'fiscal',
   certificados: 'cert',
   tickets: 'dem', admissoes: 'dem', funcionarios: 'dem', folhas: 'dem',

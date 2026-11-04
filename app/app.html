@@ -488,7 +488,7 @@ function obrigacoesDevidasFixas(e,comp,funcs){
 }
 
 /* ===================== Estado e persistência ===================== */
-const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos','docsinternos'];
+const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos','docsinternos','contatos'];
 const S={}; COLS.forEach(c=>S[c]=[]);
 const CAP={db:null,user:null,sample:null,assets:null,downloads:null};
 const ME={id:null,nome:'',canEdit:true};
@@ -4213,6 +4213,323 @@ FORM['msg-humano']=async(fd,form)=>{
 const enviarArqV7=enviarArquivosHumano;
 enviarArquivosHumano=async function(convId,files){if(UI.resposta&&UI.resposta.convId===convId){UI.respostaPendente=UI.resposta;UI.resposta=null}return enviarArqV7(convId,files)};
 /* ==== MÓDULOS v8 (fim) ==== */
+/* ==== MÓDULOS v9: Contatos do atendimento e CRM comercial (kanban de leads) ==== */
+(function(){const st=document.createElement('style');st.textContent=`
+.crm-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+.kanban{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(260px,1fr);gap:12px;overflow-x:auto;padding-bottom:8px;align-items:start}
+.kcol{background:var(--surface-2);border:1px solid var(--line);border-radius:14px;display:flex;flex-direction:column;max-height:calc(100vh - 320px);min-height:220px}
+.kcol.alvo{outline:2px dashed var(--accent);outline-offset:-4px}
+.kcol-head{padding:10px 12px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px;align-items:center}
+.kcol-head b{display:flex;gap:8px;align-items:center;font-size:14px;white-space:nowrap}.kcol-head i{width:10px;height:10px;border-radius:99px;display:inline-block}
+.kcol-head small{color:var(--muted);font-size:12px;text-align:right}
+.kcol-body{padding:10px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+.kcard2{background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--cor,#94a3b8);border-radius:10px;padding:10px 12px;cursor:grab;text-align:left;display:flex;flex-direction:column;gap:6px;box-shadow:0 1px 2px rgb(0 0 0 / .04)}
+.kcard2:hover{box-shadow:0 6px 16px rgb(0 0 0 / .08)}.kcard2.arrastando{opacity:.45}
+.kcard2 .t{font-weight:700;color:var(--ink);font-size:14px}.kcard2 .s{font-size:12px;color:var(--muted)}
+.kcard2 .rod{display:flex;justify-content:space-between;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.kcard2 .chips{display:flex;flex-wrap:wrap;gap:4px}.kcard2 .chips span{font-size:10.5px;background:var(--surface-2);border-radius:99px;padding:1px 7px;color:var(--muted)}
+.av{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:99px;background:var(--navy);color:#fff;font-size:10px;font-weight:700}
+.prox{font-weight:600}.prox.atras{color:var(--crit)}.prox.hoje{color:var(--warn)}
+.crm-det{display:grid;grid-template-columns:1.1fr 1fr;gap:18px}@media (max-width:900px){.crm-det{grid-template-columns:1fr}}
+.tl{display:flex;flex-direction:column;gap:10px;max-height:52vh;overflow:auto;padding-right:4px}
+.tl .it{border-left:2px solid var(--line);padding:0 0 0 12px;position:relative}.tl .it:before{content:'';position:absolute;left:-6px;top:4px;width:10px;height:10px;border-radius:99px;background:var(--accent)}
+.tl .it small{color:var(--muted);font-size:11px}.tl .it.sistema:before{background:var(--muted)}
+.ct-empresas{max-height:200px;overflow:auto;border:1px solid var(--line);border-radius:8px;padding:6px;display:grid;gap:2px}
+`;document.head.appendChild(st)})();
+const chaveFoneC=f=>{let d=soDig(f);if(d.length>=12&&d.startsWith('55'))d=d.slice(2);return d.length>=10?d.slice(0,2)+d.slice(-8):null};
+DEPTOS_TICKET.includes('Comercial')||DEPTOS_TICKET.push('Comercial');
+if(typeof DEPTOS_DOC!=='undefined'&&!DEPTOS_DOC.includes('Comercial'))DEPTOS_DOC.push('Comercial');
+const iniciais=n=>String(n||'?').trim().split(/\s+/).slice(0,2).map(x=>x[0]).join('').toUpperCase();
+const waAtivo=()=>APIC.wa?.dados?.status==='conectado';
+function garantirWa(){if(MODO==='api'&&!APIC.wa)apiDado('wa','/api/whatsapp')}
+
+/* ============================== CONTATOS ============================== */
+UI.fcont=UI.fcont||{q:'',empresa:'',atend:''};
+const contatosDaEmpresa=eid=>S.contatos.filter(c=>c.ativo!==false&&(c.empresas||[]).includes(eid));
+function contatosView(){
+  garantirWa();listaEquipe();
+  const f=UI.fcont;const q=(f.q||'').toLowerCase().trim();const qd=soDig(q);const eq=listaEquipe()||[];const ed=podeMod('chat','editar');
+  const L=S.contatos.filter(c=>(!f.empresa||(c.empresas||[]).includes(f.empresa)||(f.empresa==='__sem'&&!(c.empresas||[]).length))&&(!f.atend||c.atendente===f.atend)
+    &&(!q||[c.nome,c.cargo,c.email,...(c.empresas||[]).map(id=>emp(id)?.fantasia||emp(id)?.razao||'')].join(' ').toLowerCase().includes(q)||(qd.length>=4&&soDig(c.telefone).includes(qd))))
+    .sort((a,b)=>a.nome.localeCompare(b.nome));
+  const semContato=S.empresas.filter(e=>e.status!=='inativo'&&!contatosDaEmpresa(e.id).some(c=>c.telefone)).length;
+  return `<div class="panel nao-imprimir"><div class="barra-filtros">
+    <label class="f busca"><span>Pesquisar</span><input type="search" id="busca-cont" data-live="1" value="${esc(f.q)}" placeholder="Nome, telefone, e-mail, cargo ou empresa"></label>
+    ${selF('empresa','Empresa',[...S.empresas.slice().sort((a,b)=>(a.fantasia||a.razao).localeCompare(b.fantasia||b.razao)).map(e=>[e.id,e.fantasia||e.razao]),['__sem','Sem empresa vinculada']],f.empresa,'fcont')}
+    ${selF('atend','Atendente responsável',eq.map(p=>[p.id,p.nome]),f.atend,'fcont')}
+   </div><div class="filtro-resumo"><span class="small muted">${L.length} contato(s)${semContato?` · <b style="color:var(--warn)">${semContato} empresa(s) sem contato com WhatsApp</b> (não recebem guias pelo WhatsApp)`:''}</span>
+    ${ed?`<div class="actions"><button class="btn sm" data-act="cont-importar">Importar dos cadastros</button><button class="btn sm primary" data-act="cont-form">${svg('plus')}Novo contato</button></div>`:''}</div></div>
+  <div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr><th>Contato</th><th>WhatsApp</th><th>E-mail</th><th>Empresas</th><th>Atendente</th><th>Recebe guias</th><th></th></tr></thead><tbody>${L.map(c=>`<tr>
+    <td><b>${esc(c.nome)}</b>${c.cargo?`<div class="sub">${esc(c.cargo)}</div>`:''}${c.ativo===false?' '+pill('Inativo',''):''}</td>
+    <td class="mono small">${c.telefone?fmtFone(c.telefone):'—'}</td><td class="small">${esc(c.email||'—')}</td>
+    <td class="small">${(c.empresas||[]).map((id,i)=>`<div>${esc(emp(id)?.fantasia||emp(id)?.razao||'(excluída)')}${i===0&&c.empresas.length>1?' <span class="tag">principal</span>':''}</div>`).join('')||'<span class="muted">—</span>'}</td>
+    <td class="small">${esc(nomeEquipe(c.atendente))||'<span class="muted">—</span>'}</td>
+    <td class="small">${c.telefone&&c.recebeWhatsApp!==false?'WhatsApp ':''}${c.email&&c.recebeEmail!==false?'E-mail':''}${!(c.telefone&&c.recebeWhatsApp!==false)&&!(c.email&&c.recebeEmail!==false)?'<span class="muted">Não</span>':''}</td>
+    <td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${c.telefone&&ed?`<button class="btn sm primary" data-act="cont-iniciar" data-id="${c.id}" data-canal="whatsapp">WhatsApp</button>`:''}${(c.empresas||[]).length&&ed?`<button class="btn sm" data-act="cont-iniciar" data-id="${c.id}" data-canal="portal">Portal</button>`:''}${c.email?`<a class="btn sm" href="mailto:${esc(c.email)}">E-mail</a>`:''}${ed?`<button class="btn sm ghost" data-act="cont-form" data-id="${c.id}">Editar</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`
+   :vazio(S.contatos.length?'Nenhum contato com esses filtros.':'Nenhum contato salvo. Cadastre ou importe os contatos dos cadastros das empresas.',ed&&!S.contatos.length?`<button class="btn primary" data-act="cont-importar">Importar dos cadastros</button>`:'')}</div>`;
+}
+Object.assign(buscaVivas,{'busca-cont':v=>{UI.fcont.q=v}});
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.fcont){UI.fcont[el.dataset.fcont]=el.value;render()}});
+ACT['cont-form']=el=>abrirContato(el.dataset.id?S.contatos.find(x=>x.id===el.dataset.id):null,el.dataset);
+function abrirContato(c,pre){
+  pre=pre||{};const x=c||{nome:pre.nome||'',telefone:pre.fone||'',email:'',cargo:'',empresas:pre.empresa?[pre.empresa]:[],atendente:ME.id,canal:'whatsapp',recebeWhatsApp:true,recebeEmail:true,ativo:true,obs:''};
+  const eq=listaEquipe()||[];const es=S.empresas.slice().sort((a,b)=>(a.fantasia||a.razao).localeCompare(b.fantasia||b.razao));
+  openModal(`${mHead(c?'Editar contato':'Novo contato')}<form data-form="contato" data-id="${c?.id||''}" data-conv="${esc(pre.conv||'')}"><div class="modal-body"><div class="grid-f">
+   <label class="f"><span>Nome *</span><input name="nome" required maxlength="80" value="${esc(x.nome)}" autofocus></label>
+   <label class="f"><span>Cargo ou função</span><input name="cargo" maxlength="60" value="${esc(x.cargo||'')}" placeholder="Ex.: Sócia, Financeiro, RH"></label>
+   <label class="f"><span>WhatsApp com DDD</span><input name="telefone" inputmode="tel" maxlength="20" value="${esc(x.telefone?fmtFone(String(x.telefone).replace(/^55(?=\d{10,11}$)/,'')):'')}" placeholder="(67) 99999-9999"></label>
+   <label class="f"><span>E-mail</span><input name="email" type="email" maxlength="120" value="${esc(x.email||'')}"></label>
+   <label class="f"><span>Atendente responsável</span><select name="atendente"><option value="">—</option>${eq.map(p=>`<option value="${p.id}" ${p.id===x.atendente?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></label>
+   <label class="f"><span>Canal preferido</span><select name="canal">${[['whatsapp','WhatsApp'],['portal','Portal do cliente'],['email','E-mail']].map(([v,r])=>`<option value="${v}" ${x.canal===v?'selected':''}>${r}</option>`).join('')}</select></label>
+   <div class="f full"><span class="small" style="font-weight:600;color:var(--muted)">Empresas pelas quais responde (a primeira marcada é a principal)</span><input type="search" id="ct-busca-emp" placeholder="Filtrar empresas" style="margin:4px 0 6px"><div class="ct-empresas">${es.map(e=>`<label class="chk" data-nome="${esc((e.fantasia||'')+' '+e.razao+' '+e.cnpj).toLowerCase()}"><input type="checkbox" name="empresas" value="${e.id}" ${(x.empresas||[]).includes(e.id)?'checked':''}> ${esc(e.fantasia||e.razao)} <span class="small muted">${fmtCNPJ(e.cnpj)}</span></label>`).join('')}</div></div>
+   <label class="chk full"><input type="checkbox" name="recebeWhatsApp" ${x.recebeWhatsApp!==false?'checked':''}> Recebe guias e documentos das obrigações pelo WhatsApp</label>
+   <label class="chk full"><input type="checkbox" name="recebeEmail" ${x.recebeEmail!==false?'checked':''}> Recebe guias e documentos por e-mail</label>
+   ${c?`<label class="chk full"><input type="checkbox" name="ativo" ${x.ativo!==false?'checked':''}> Contato ativo</label>`:''}
+   <label class="f full"><span>Observações</span><input name="obs" maxlength="300" value="${esc(x.obs||'')}"></label>
+  </div></div><div class="modal-foot">${c&&podeMod('chat','excluir')?`<button type="button" class="btn danger" data-act="cont-excluir" data-id="${c.id}">Excluir</button>`:''}<span class="grow"></span><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar contato</button></div></form>`,true);
+}
+document.addEventListener('input',ev=>{if(ev.target.id!=='ct-busca-emp')return;const q=ev.target.value.toLowerCase();document.querySelectorAll('.ct-empresas label').forEach(l=>{l.style.display=!q||l.dataset.nome.includes(q)?'':'none'})});
+FORM['contato']=(fd,form)=>{
+  const id=form.dataset.id;const nome=String(fd.get('nome')||'').trim();const tel=soDig(fd.get('telefone'));const email=String(fd.get('email')||'').trim().toLowerCase();
+  if(nome.length<2){toast('Informe o nome.',true);return}
+  if(tel&&(tel.length<10||tel.length>13)){toast('WhatsApp inválido: informe DDD e número.',true);return}
+  if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){toast('E-mail inválido.',true);return}
+  if(!tel&&!email){toast('Informe pelo menos o WhatsApp ou o e-mail.',true);return}
+  const dup=tel&&S.contatos.find(c=>c.id!==id&&chaveFoneC(c.telefone)===chaveFoneC(tel));if(dup){toast('Já existe um contato com este WhatsApp: '+dup.nome+'.',true);return}
+  const marcadas=[...form.querySelectorAll('input[name=empresas]:checked')].map(i=>i.value);
+  const antes=id?S.contatos.find(c=>c.id===id):null;const ordem=antes?[...(antes.empresas||[]).filter(e=>marcadas.includes(e)),...marcadas.filter(e=>!(antes.empresas||[]).includes(e))]:marcadas;
+  const dados={nome,cargo:String(fd.get('cargo')||'').trim(),telefone:tel,email,empresas:ordem,atendente:String(fd.get('atendente')||''),canal:String(fd.get('canal')||'whatsapp'),
+    recebeWhatsApp:!!fd.get('recebeWhatsApp'),recebeEmail:!!fd.get('recebeEmail'),ativo:id?!!fd.get('ativo'):true,obs:String(fd.get('obs')||'').trim(),atualizadoEm:agora()};
+  let novoId=id;
+  mut(['contatos','conversas'],()=>{
+    if(antes)Object.assign(antes,dados);else{novoId='ct-'+uid();S.contatos.push({id:novoId,...dados,criadoEm:agora(),criadoPor:ME.id})}
+    // conversas do WhatsApp com este número passam a usar o contato (empresa e atendente)
+    if(tel)S.conversas.filter(c=>c.canal==='whatsapp'&&c.status!=='encerrada'&&chaveFoneC(c.waFone)===chaveFoneC(tel)).forEach(c=>{c.contatoId=novoId;c.contatoNome=nome;if(!c.empresaId&&ordem[0])c.empresaId=ordem[0];if(!c.atendenteUid&&dados.atendente)c.atendenteUid=dados.atendente});
+  },['Atendimento',(antes?'Editou':'Cadastrou')+' contato '+nome,ordem.map(e=>emp(e)?.razao).filter(Boolean).join(', ')]);
+  closeModal();toast('Contato salvo.');
+};
+ACT['cont-excluir']=el=>{const c=S.contatos.find(x=>x.id===el.dataset.id);if(!c)return;closeModal();confirmar('Excluir contato',`Excluir ${esc(c.nome)}? As conversas continuam no histórico.`,'Excluir',()=>mut('contatos',()=>{S.contatos=S.contatos.filter(x=>x.id!==c.id)},['Atendimento','Excluiu contato '+c.nome,'']))};
+ACT['cont-importar']=()=>{
+  const novos=[];const existe=t=>S.contatos.some(c=>chaveFoneC(c.telefone)===chaveFoneC(t))||novos.some(c=>chaveFoneC(c.telefone)===chaveFoneC(t));
+  S.empresas.filter(e=>e.status!=='inativo').forEach(e=>{
+    (e.contatos||[]).forEach(k=>{if(!k.nome&&!k.telefone)return;if(k.telefone&&existe(k.telefone)){const c=[...S.contatos,...novos].find(c=>chaveFoneC(c.telefone)===chaveFoneC(k.telefone));if(c&&!(c.empresas||[]).includes(e.id))c.empresas=[...(c.empresas||[]),e.id];return}
+      if(!k.telefone&&!k.email)return;novos.push({id:'ct-'+uid(),nome:k.nome||e.fantasia||e.razao,cargo:k.cargo||'',telefone:soDig(k.telefone),email:String(k.email||'').toLowerCase(),empresas:[e.id],atendente:respDe(e,'Fiscal')||'',canal:'whatsapp',recebeWhatsApp:true,recebeEmail:true,ativo:true,obs:'Importado do cadastro',criadoEm:agora()})});
+    if(e.telefone&&!existe(e.telefone)&&!(e.contatos||[]).some(k=>k.telefone))novos.push({id:'ct-'+uid(),nome:(e.socios||[])[0]?.nome||e.fantasia||e.razao,cargo:(e.socios||[])[0]?'Sócio(a)':'Telefone da empresa',telefone:soDig(e.telefone),email:String(e.email||'').toLowerCase(),empresas:[e.id],atendente:respDe(e,'Fiscal')||'',canal:'whatsapp',recebeWhatsApp:true,recebeEmail:true,ativo:true,obs:'Importado do cadastro',criadoEm:agora()});
+  });
+  if(!novos.length){toast('Nenhum contato novo encontrado nos cadastros.');return}
+  mut('contatos',()=>S.contatos.push(...novos),['Atendimento','Importou '+novos.length+' contato(s) dos cadastros','']);toast(novos.length+' contato(s) importado(s). Confira o atendente responsável de cada um.');
+};
+ACT['cont-iniciar']=el=>{
+  const c=S.contatos.find(x=>x.id===el.dataset.id);if(!c)return;const canal=el.dataset.canal;const p1=primeiroNome(c.nome);
+  const padrao=`Olá, ${p1}! Aqui é ${primeiroNome(ME.nome)||'a equipe'}, do escritório ${cfg().escritorio||''}. `;
+  const emps=(c.empresas||[]).map(id=>emp(id)).filter(Boolean);
+  if(canal==='portal'&&!emps.length){toast('Vincule o contato a uma empresa para atender pelo portal.',true);return}
+  openModal(`${mHead((canal==='whatsapp'?'WhatsApp':'Portal do cliente')+' · '+c.nome)}<form data-form="cont-iniciar" data-id="${c.id}" data-canal="${canal}"><div class="modal-body">
+   ${emps.length>1||canal==='portal'?`<label class="f"><span>Empresa do atendimento</span><select name="empresa">${emps.map(e=>`<option value="${e.id}">${esc(e.fantasia||e.razao)}</option>`).join('')}</select></label>`:''}
+   <label class="f"><span>Primeira mensagem ${canal==='whatsapp'?'(vai pelo WhatsApp do escritório)':'(aparece no Atendimento do portal)'}</span><textarea name="texto" rows="4" maxlength="2000">${esc(padrao)}</textarea></label>
+   ${canal==='whatsapp'&&MODO==='api'&&!waAtivo()?`<div class="banner warn"><span class="small">O WhatsApp do escritório não está conectado no sistema. Você pode abrir a conversa no seu WhatsApp pelo botão ao lado.</span><a class="btn sm" target="_blank" rel="noopener" href="${waLink(String(c.telefone).replace(/^55(?=\d{10,11}$)/,''),padrao)}">Abrir no WhatsApp</a></div>`:''}
+  </div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Iniciar atendimento</button></div></form>`);
+};
+FORM['cont-iniciar']=async(fd,form)=>{
+  const c=S.contatos.find(x=>x.id===form.dataset.id);const canal=form.dataset.canal;const texto=String(fd.get('texto')||'').trim();const eid=String(fd.get('empresa')||(c.empresas||[])[0]||'');
+  if(canal==='whatsapp'){
+    if(MODO!=='api'){toast('O WhatsApp funciona na versão publicada.',true);return}
+    try{const r=await MF.api('POST','/api/whatsapp/iniciar',{fone:c.telefone,nome:c.nome,contatoId:c.id,empresaId:eid||null,texto});closeModal();UI.tab.atend='caixa';UI.convSel=r.conversaId;UI.convFiltro='todas';toast('Atendimento iniciado pelo WhatsApp.');render()}
+    catch(er){toast(er.message,true)}return;
+  }
+  let conv=S.conversas.find(x=>x.empresaId===eid&&x.canal!=='whatsapp'&&x.status!=='encerrada');
+  mut('conversas',()=>{if(!conv){conv={id:uid(),empresaId:eid,canal:'portal',status:'humano',atendenteUid:ME.id,contatoId:c.id,contatoNome:c.nome,criadoEm:agora(),mensagens:[{de:'sistema',texto:(primeiroNome(ME.nome)||'A equipe')+' iniciou o atendimento.',em:agora()}]};S.conversas.push(conv)}
+    if(!conv.contatoId){conv.contatoId=c.id;conv.contatoNome=c.nome}
+    else if(conv.status!=='humano'){conv.status='humano';conv.atendenteUid=ME.id;conv.mensagens.push({de:'sistema',texto:(primeiroNome(ME.nome)||'Um atendente')+' assumiu a conversa.',em:agora()})}
+    if(texto)conv.mensagens.push({de:'humano',texto,em:agora(),uid:ME.id,nome:ME.nome||''})},['Atendimento','Iniciou atendimento pelo portal',emp(eid)?.razao]);
+  closeModal();UI.tab.atend='caixa';UI.convSel=conv.id;UI.convFiltro='todas';toast('Atendimento iniciado no portal. O cliente vê a mensagem em Atendimento.');render();
+};
+// aba Contatos no Atendimento + "Salvar contato" nas conversas do WhatsApp
+const aChatV8=aChat;
+aChat=function(){
+  const t=UI.tab.atend||'caixa';
+  const inj=h=>h.replace(/(<button role="tab" aria-selected="(?:true|false)" data-act="tab" data-k="atend" data-v="historico">)/,`<button role="tab" aria-selected="${t==='contatos'}" data-act="tab" data-k="atend" data-v="contatos">Contatos (${S.contatos.length})</button>$1`);
+  if(t==='contatos'){const abas=`<div class="tabs" role="tablist">${[['caixa','Caixa de entrada'],['contatos','Contatos ('+S.contatos.length+')'],['historico','Histórico de atendimentos']].map(([k,r])=>`<button role="tab" aria-selected="${t===k}" data-act="tab" data-k="atend" data-v="${k}">${r}</button>`).join('')}</div>`;
+    return head('Atendimento','Contatos dos clientes: empresas que cada um representa, atendente responsável e quem recebe as guias pelo WhatsApp e e-mail.')+abas+contatosView()}
+  let h=inj(aChatV8());
+  const m=h.match(/<form class="composer" data-form="msg-humano" data-id="([^"]+)">/);
+  if(t==='caixa'&&m){const c=S.conversas.find(x=>x.id===m[1]);
+    if(c&&c.canal==='whatsapp'&&podeMod('chat','editar')){const ct=c.contatoId&&S.contatos.find(x=>x.id===c.contatoId);
+      const b=ct?`<button class="btn sm ghost" data-act="cont-form" data-id="${ct.id}">Contato: ${esc(primeiroNome(ct.nome))}</button>`:`<button class="btn sm" data-act="cont-form" data-nome="${esc(c.contatoNome||'')}" data-fone="${esc(c.waFone||'')}" data-empresa="${esc(c.empresaId||'')}">Salvar contato</button>`;
+      h=h.replace(/(data-act="encerrar-conv" data-id="[^"]+">Encerrar<\/button>)/,'$1'+b)}}
+  return h;
+};
+
+/* obrigação: mostra para quem a guia vai pelo WhatsApp e e-mail */
+const detalheObrV5=detalheObr;
+detalheObr=function(o,r){
+  let h=detalheObrV5(o,r);const e=r.e;const cs=contatosDaEmpresa(e.id);
+  const wa=cs.filter(c=>c.telefone&&c.recebeWhatsApp!==false);const em=cs.filter(c=>c.email&&c.recebeEmail!==false);
+  const waTxt=wa.length?wa.map(c=>esc(primeiroNome(c.nome))+' '+fmtFone(String(c.telefone).replace(/^55(?=\d{10,11}$)/,''))).join(', '):e.telefone?'telefone do cadastro '+fmtFone(e.telefone):'';
+  const emTxt=[...new Set([...em.map(c=>c.email),e.email].filter(Boolean))].join(', ');
+  if(wa.length)h=h.replace(/<option value="portal_whatsapp" disabled>Portal \+ WhatsApp \(sem telefone\)<\/option>/,'<option value="portal_whatsapp">Portal + WhatsApp</option>');
+  if(em.length)h=h.replace(/<option value="portal_email" disabled>Portal \+ e-mail \(sem e-mail no cadastro\)<\/option>/,'<option value="portal_email">Portal + e-mail</option>');
+  if(!/value="portal_whatsapp" disabled/.test(h)&&!/value="portal_email" disabled/.test(h))h=h.replace(/<option value="todos" disabled>/,'<option value="todos">');
+  const dica=`<p class="small muted" style="margin:6px 0 0">WhatsApp: ${waTxt||'<b style="color:var(--warn)">nenhum contato</b> (cadastre em Atendimento › Contatos)'}<br>E-mail: ${esc(emTxt)||'nenhum'}</p>`;
+  return h.replace('<p class="small muted" style="margin:6px 0 0">Só os anexos ainda não enviados seguem.',dica+'<p class="small muted" style="margin:6px 0 0">Só os anexos ainda não enviados seguem.');
+};
+
+/* ============================== CRM COMERCIAL ============================== */
+const ETAPAS=[['novo','Novos leads','#2563eb'],['contato','Primeiro contato','#7c3aed'],['proposta','Proposta enviada','#d97706'],['negociacao','Negociação','#db2777'],['ganho','Ganhos','#059669'],['perdido','Perdidos','#64748b']];
+const ORIGENS={site:'Site',whatsapp:'WhatsApp',indicacao:'Indicação',instagram:'Instagram',google:'Google',evento:'Evento',ligacao:'Ligação',manual:'Outro'};
+const FUNC_LEAD={'0':'Sem funcionários','1-3':'1 a 3 funcionários','4-10':'4 a 10 funcionários','11-30':'11 a 30 funcionários','30+':'Mais de 30'};
+const TIPOS_ATV={anotacao:'📝 Anotação',ligacao:'📞 Ligação',whatsapp:'💬 WhatsApp',email:'✉️ E-mail',reuniao:'🤝 Reunião',proposta:'📄 Proposta enviada'};
+const etapaDe=l=>l.etapa||({novo:'novo',contato:'contato',convertido:'ganho',descartado:'perdido'}[l.status]||'novo');
+const statusDaEtapa=et=>et==='novo'?'novo':et==='ganho'?'convertido':et==='perdido'?'descartado':'contato';
+const NAV_CRM=['a-crm','CRM comercial'];
+if(!NAV_A.some(n=>n[0]==='a-crm')){const i=NAV_A.findIndex(n=>n[0]==='a-carteira');NAV_A.splice(i+1,0,NAV_CRM)}
+MOD_DA_VIEW['a-crm']='comercial';if(!IC.funil)IC.funil='<path d="M3 4h18l-7 8v6l-4 2v-8z"/>';NAV_ICON['a-crm']='funil';
+const conteudoV5=conteudo;conteudo=function(){if(UI.modo==='painel'&&UI.view==='a-crm')return aCrm();return conteudoV5()};
+UI.fcrm=UI.fcrm||{q:'',resp:'',origem:'',meus:false,vis:'kanban'};
+function leadsFiltrados(){const f=UI.fcrm;const q=(f.q||'').toLowerCase().trim();const qd=soDig(q);
+  return S.leads.filter(l=>(!f.resp||l.responsavel===f.resp)&&(!f.meus||l.responsavel===ME.id)&&(!f.origem||(l.origem||'site')===f.origem)
+    &&(!q||[l.nome,l.empresa,l.email,l.cidade,l.planoNome||l.plano].join(' ').toLowerCase().includes(q)||(qd.length>=4&&(soDig(l.whatsapp).includes(qd)||soDig(l.cnpj).includes(qd)))))}
+const diasDesde=d=>d?Math.max(0,Math.floor((Date.now()-new Date(d).getTime())/86400000)):0;
+function proxHtml(l){const p=l.proximaAcao;if(!p||!p.data||['ganho','perdido'].includes(etapaDe(l)))return '';const h=hoje();const cls=p.data<h?'atras':p.data===h?'hoje':'';return `<span class="prox ${cls}" title="${esc(p.texto||'')}">⏰ ${p.data===h?'hoje':fmtData(p.data).slice(0,5)}</span>`}
+function aCrm(){
+  if(!podeMod('comercial','ver'))return vazio('Seu acesso não inclui o Comercial.');
+  listaEquipe();garantirWa();
+  const f=UI.fcrm;const L=leadsFiltrados();const ed=podeMod('comercial','editar');const eq=listaEquipe()||[];
+  const abertos=L.filter(l=>!['ganho','perdido'].includes(etapaDe(l)));const mesIni=hoje().slice(0,8)+'01';
+  const ganhosMes=L.filter(l=>etapaDe(l)==='ganho'&&String(l.ganhoEm||l.convertidoEm||'')>=mesIni);
+  const ult90=L.filter(l=>['ganho','perdido'].includes(etapaDe(l))&&diasDesde(l.etapaDesde||l.criadoEm)<=90);const taxa=ult90.length?ult90.filter(l=>etapaDe(l)==='ganho').length/ult90.length:null;
+  const atras=abertos.filter(l=>l.proximaAcao&&l.proximaAcao.data&&l.proximaAcao.data<hoje()).length;const semAcao=abertos.filter(l=>!l.proximaAcao||!l.proximaAcao.data).length;
+  const soma=a=>a.reduce((s,l)=>s+(Number(l.valor)||0),0);
+  const kpis=`<div class="crm-kpis">
+   <div class="kpi"><span class="eyebrow">Em aberto</span><b>${abertos.length}</b><small>${brl(soma(abertos))}/mês em potencial</small></div>
+   <div class="kpi"><span class="eyebrow">Novos (7 dias)</span><b>${L.filter(l=>diasDesde(l.criadoEm)<=7).length}</b><small>${L.filter(l=>etapaDe(l)==='novo').length} aguardando 1º contato</small></div>
+   <div class="kpi"><span class="eyebrow">Ganhos no mês</span><b style="color:var(--ok)">${ganhosMes.length}</b><small>${brl(soma(ganhosMes))}/mês fechados</small></div>
+   <div class="kpi"><span class="eyebrow">Conversão (90 dias)</span><b>${taxa==null?'—':pct(taxa)}</b><small>ganhos ÷ (ganhos + perdidos)</small></div>
+   <div class="kpi"><span class="eyebrow">Próximas ações</span><b style="color:${atras?'var(--crit)':'var(--navy)'}">${atras} atrasada(s)</b><small>${semAcao} lead(s) sem próxima ação</small></div></div>`;
+  const filtros=`<div class="panel"><div class="barra-filtros">
+   <label class="f busca"><span>Pesquisar</span><input type="search" id="busca-crm" data-live="1" value="${esc(f.q)}" placeholder="Nome, empresa, CNPJ, telefone, e-mail ou cidade"></label>
+   ${selF('resp','Responsável',eq.map(p=>[p.id,p.nome]),f.resp,'fcrm')}${selF('origem','Origem',Object.entries(ORIGENS),f.origem,'fcrm')}
+   <label class="chk" style="align-self:end"><input type="checkbox" data-fcrm-meus ${f.meus?'checked':''}> Só os meus</label></div>
+   <div class="filtro-resumo"><div class="filtros" role="group" aria-label="Visualização"><button aria-pressed="${f.vis!=='lista'}" data-act="crm-vis" data-v="kanban">Kanban</button><button aria-pressed="${f.vis==='lista'}" data-act="crm-vis" data-v="lista">Lista</button></div><div class="actions"><button class="btn sm" data-act="crm-csv">${svg('download')}Exportar</button></div></div></div>`;
+  const card=l=>{const et=etapaDe(l);const cor=(ETAPAS.find(x=>x[0]===et)||[])[2];
+    return `<div class="kcard2" draggable="${ed}" data-lead="${l.id}" data-act="crm-abrir" data-id="${l.id}" style="--cor:${cor}" tabindex="0">
+     <span class="t">${esc(l.nome||'Sem nome')}</span>${l.empresa?`<span class="s">${esc(l.empresa)}</span>`:''}
+     <div class="chips">${l.planoNome||l.plano?`<span>${esc(l.planoNome||l.plano)}</span>`:''}${l.valor?`<span>${brl(l.valor)}/mês</span>`:''}<span>${esc(ORIGENS[l.origem||'site']||l.origem)}</span>${l.funcionarios?`<span>${esc(FUNC_LEAD[l.funcionarios]||l.funcionarios)}</span>`:''}${l.temContador==='sim'?'<span>troca de contador</span>':l.temContador==='nao'?'<span>sem contador</span>':''}</div>
+     <div class="rod"><span>${l.responsavel?`<span class="av" title="${esc(nomeEquipe(l.responsavel))}">${esc(iniciais(nomeEquipe(l.responsavel)))}</span>`:'<span class="muted">sem responsável</span>'}</span><span>${proxHtml(l)} ${diasDesde(l.etapaDesde||l.criadoEm)}d na etapa</span></div></div>`};
+  let corpo;
+  if(f.vis==='lista'){
+    corpo=`<div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr><th>Lead</th><th>Etapa</th><th>Plano</th><th class="r">Valor/mês</th><th>Responsável</th><th>Próxima ação</th><th>Entrada</th></tr></thead><tbody>${L.slice().sort((a,b)=>String(b.criadoEm).localeCompare(String(a.criadoEm))).map(l=>{const et=ETAPAS.find(x=>x[0]===etapaDe(l));return `<tr style="cursor:pointer" data-act="crm-abrir" data-id="${l.id}"><td><b>${esc(l.nome)}</b><div class="sub">${esc(l.empresa||'')}${l.whatsapp?' · '+fmtFone(String(l.whatsapp).replace(/^55/,'')):''}</div></td><td><span class="canal" style="background:${et[2]}22;color:${et[2]}">${et[1]}</span></td><td class="small">${esc(l.planoNome||l.plano||'—')}</td><td class="r num">${l.valor?brl(l.valor):'—'}</td><td class="small">${esc(nomeEquipe(l.responsavel)||'—')}</td><td class="small">${l.proximaAcao?.data?fmtData(l.proximaAcao.data)+' · '+esc(l.proximaAcao.texto||''):'—'}</td><td class="small">${fmtData(String(l.criadoEm).slice(0,10))}</td></tr>`}).join('')}</tbody></table></div>`:vazio('Nenhum lead.')}</div>`;
+  } else {
+    corpo=`<div class="kanban">${ETAPAS.map(([k,r,cor])=>{const ls=L.filter(l=>etapaDe(l)===k).sort((a,b)=>(a.proximaAcao?.data||'9').localeCompare(b.proximaAcao?.data||'9')||String(b.criadoEm).localeCompare(String(a.criadoEm)));
+      const lim=['ganho','perdido'].includes(k)&&!UI.crmTudo?.[k]?ls.slice(0,15):ls;
+      return `<section class="kcol" data-etapa="${k}"><div class="kcol-head"><b><i style="background:${cor}"></i>${r} <span class="small muted">${ls.length}</span></b><small>${soma(ls)?brl(soma(ls))+'/mês':''}</small></div><div class="kcol-body">${lim.map(card).join('')||'<p class="small muted" style="text-align:center;margin:12px 0">Arraste um lead para cá</p>'}${lim.length<ls.length?`<button class="btn sm ghost" data-act="crm-tudo" data-v="${k}">Ver os ${ls.length}</button>`:''}</div></section>`}).join('')}</div>
+    <p class="small muted">Arraste os cartões entre as colunas (no celular, abra o lead e troque a etapa). Clique em um lead para ver detalhes, registrar contatos e agendar a próxima ação.</p>`;
+  }
+  return head('CRM comercial','Leads do site e da equipe em funil de vendas: da primeira conversa até virar cliente.',ed?`<button class="btn primary" data-act="crm-novo">${svg('plus')}Novo lead</button>`:'')+kpis+filtros+corpo;
+}
+Object.assign(buscaVivas,{'busca-crm':v=>{UI.fcrm.q=v}});
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.fcrm){UI.fcrm[el.dataset.fcrm]=el.value;render()}else if(el.hasAttribute&&el.hasAttribute('data-fcrm-meus')){UI.fcrm.meus=el.checked;render()}});
+ACT['crm-vis']=el=>{UI.fcrm.vis=el.dataset.v;render()};
+ACT['crm-tudo']=el=>{UI.crmTudo={...(UI.crmTudo||{}),[el.dataset.v]:true};render()};
+// arrastar e soltar entre etapas
+document.addEventListener('dragstart',ev=>{const c=ev.target.closest&&ev.target.closest('.kcard2');if(!c)return;ev.dataTransfer.setData('text/plain',c.dataset.lead);ev.dataTransfer.effectAllowed='move';c.classList.add('arrastando');UI.arrastando=true});
+document.addEventListener('dragend',ev=>{const c=ev.target.closest&&ev.target.closest('.kcard2');if(c)c.classList.remove('arrastando');UI.arrastando=false;document.querySelectorAll('.kcol.alvo').forEach(x=>x.classList.remove('alvo'))});
+document.addEventListener('dragover',ev=>{const col=ev.target.closest&&ev.target.closest('.kcol');if(!col)return;ev.preventDefault();document.querySelectorAll('.kcol.alvo').forEach(x=>x!==col&&x.classList.remove('alvo'));col.classList.add('alvo')});
+document.addEventListener('drop',ev=>{const col=ev.target.closest&&ev.target.closest('.kcol');if(!col)return;ev.preventDefault();col.classList.remove('alvo');UI.arrastando=false;UI.soltouEm=Date.now();const id=ev.dataTransfer.getData('text/plain');const l=S.leads.find(x=>x.id===id);if(l)moverLead(l,col.dataset.etapa)});
+function atvLead(l,tipo,texto,extra){(l.atividades=l.atividades||[]).push({em:agora(),uid:ME.id,nome:ME.nome||'',tipo,texto,...(extra||{})});if(l.atividades.length>300)l.atividades.splice(0,l.atividades.length-300)}
+function moverLead(l,etapa,motivo){
+  const de=etapaDe(l);if(de===etapa||!podeMod('comercial','editar'))return;
+  if(etapa==='perdido'&&motivo==null){pedirMotivo('Lead perdido','Por que não fechou? (preço, já fechou com outro, sem resposta…). Ajuda a melhorar as próximas vendas.',m=>moverLead(l,'perdido',m));return}
+  mut('leads',()=>{l.etapa=etapa;l.status=statusDaEtapa(etapa);l.etapaDesde=agora();if(etapa==='ganho')l.ganhoEm=agora();if(etapa==='perdido')l.motivoPerda=motivo||'';
+    atvLead(l,'etapa',`Moveu de "${ETAPAS.find(x=>x[0]===de)[1]}" para "${ETAPAS.find(x=>x[0]===etapa)[1]}"${motivo?': '+motivo:''}`)},['Comercial','Lead '+l.nome+' → '+ETAPAS.find(x=>x[0]===etapa)[1],l.empresa||'']);
+  if(etapa==='ganho'&&!l.empresaId)confirmar('Lead ganho! 🎉',`Quer cadastrar ${esc(l.empresa||l.nome)} na Carteira de clientes agora? Os dados do lead já vão preenchidos.`,'Cadastrar cliente',()=>converterLead(l));
+}
+ACT['crm-novo']=()=>abrirLead(null);
+ACT['crm-abrir']=(el,ev)=>{if(Date.now()-(UI.soltouEm||0)<300)return;UI.arrastando=false;const l=S.leads.find(x=>x.id===el.dataset.id);if(l)abrirLead(l)};
+function abrirLead(l){
+  const x=l||{nome:'',empresa:'',origem:'manual',etapa:'novo',responsavel:ME.id,temContador:'',funcionarios:''};const ed=podeMod('comercial','editar');const eq=listaEquipe()||[];
+  const opt=(o,v)=>Object.entries(o).map(([k,r])=>`<option value="${k}" ${String(v)===k?'selected':''}>${esc(r)}</option>`).join('');
+  const atv=[...(x.atividades||[])].reverse();const fone=String(x.whatsapp||'').replace(/^55(?=\d{10,11}$)/,'');
+  const form=`<form data-form="lead" data-id="${l?.id||''}"><div class="grid-f">
+    <label class="f"><span>Nome do contato *</span><input name="nome" required maxlength="80" value="${esc(x.nome||'')}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>Empresa</span><input name="empresa" maxlength="120" value="${esc(x.empresa||'')}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>CNPJ</span><input name="cnpj" inputmode="numeric" maxlength="18" value="${esc(x.cnpj?fmtCNPJ(x.cnpj):'')}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>Funcionários</span><select name="funcionarios" ${ed?'':'disabled'}><option value="">—</option>${opt(FUNC_LEAD,x.funcionarios)}</select></label>
+    <label class="f"><span>Já tem contador?</span><select name="temContador" ${ed?'':'disabled'}><option value="">—</option>${opt({sim:'Sim, quer trocar',nao:'Não (abertura ou sem contador)'},x.temContador)}</select></label>
+    <label class="f"><span>WhatsApp</span><input name="whatsapp" inputmode="tel" maxlength="20" value="${esc(fone?fmtFone(fone):'')}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>E-mail</span><input name="email" type="email" maxlength="120" value="${esc(x.email||'')}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>Cidade</span><input name="cidade" maxlength="80" value="${esc(x.cidade||'')}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>Plano de interesse</span><input name="planoNome" maxlength="60" value="${esc(x.planoNome||x.plano||'')}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>Valor mensal (R$)</span><input name="valor" type="number" step="0.01" min="0" value="${x.valor||''}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>Origem</span><select name="origem" ${ed?'':'disabled'}>${opt(ORIGENS,x.origem||'site')}</select></label>
+    <label class="f"><span>Responsável</span><select name="responsavel" ${ed?'':'disabled'}><option value="">—</option>${eq.map(p=>`<option value="${p.id}" ${p.id===x.responsavel?'selected':''}>${esc(p.nome)}</option>`).join('')}</select></label>
+    <label class="f"><span>Etapa</span><select name="etapa" ${ed?'':'disabled'}>${ETAPAS.map(([k,r])=>`<option value="${k}" ${etapaDe(x)===k?'selected':''}>${r}</option>`).join('')}</select></label>
+    <label class="f"><span>Próxima ação</span><input name="proxTexto" maxlength="120" value="${esc(x.proximaAcao?.texto||'')}" placeholder="Ex.: ligar para apresentar proposta" ${ed?'':'disabled'}></label>
+    <label class="f"><span>Data da próxima ação</span><input name="proxData" type="date" value="${esc(x.proximaAcao?.data||'')}" ${ed?'':'disabled'}></label>
+    ${etapaDe(x)==='perdido'?`<label class="f full"><span>Motivo da perda</span><input name="motivoPerda" maxlength="200" value="${esc(x.motivoPerda||'')}" ${ed?'':'disabled'}></label>`:''}
+    <label class="f full"><span>Observações</span><textarea name="mensagem" rows="2" maxlength="1000" ${ed?'':'disabled'}>${esc(x.mensagem||'')}</textarea></label>
+   </div>${ed?`<div class="actions" style="margin-top:12px"><button class="btn primary">${l?'Salvar alterações':'Criar lead'}</button></div>`:''}</form>`;
+  const lado=l?`<div><div class="actions" style="margin-bottom:10px">${fone&&podeMod('chat','editar')?`<button class="btn sm primary" data-act="crm-wa" data-id="${l.id}">WhatsApp</button>`:''}${fone?`<a class="btn sm" target="_blank" rel="noopener" href="${waLink(fone,'Olá, '+primeiroNome(x.nome)+'! Aqui é '+(primeiroNome(ME.nome)||'')+' do escritório '+(cfg().escritorio||'')+'.')}">Abrir no meu WhatsApp</a>`:''}${x.email?`<a class="btn sm" href="mailto:${esc(x.email)}">E-mail</a>`:''}${ed&&!x.empresaId?`<button class="btn sm" data-act="crm-converter" data-id="${l.id}">Cadastrar como cliente</button>`:x.empresaId?`<span class="tag">Cliente cadastrado</span>`:''}${ed&&fone&&!S.contatos.some(c=>chaveFoneC(c.telefone)===chaveFoneC(fone))?`<button class="btn sm ghost" data-act="crm-contato" data-id="${l.id}">Salvar como contato</button>`:''}</div>
+    ${ed?`<form data-form="lead-atv" data-id="${l.id}" class="form-sec" style="margin-top:0"><h3>Registrar movimentação</h3><div class="grid-f"><label class="f"><span>Tipo</span><select name="tipo">${opt(TIPOS_ATV,'anotacao')}</select></label><label class="f"><span>Agendar próxima ação para</span><input type="date" name="proxData"></label><label class="f full"><span>O que aconteceu</span><textarea name="texto" rows="2" maxlength="1000" required placeholder="Ex.: Liguei, ela vai mandar o último balancete até sexta"></textarea></label><label class="f full"><span>Próxima ação (opcional)</span><input name="proxTexto" maxlength="120"></label></div><div class="actions" style="margin-top:8px"><button class="btn sm primary">Registrar</button></div></form>`:''}
+    <h3 style="margin:14px 0 8px">Linha do tempo</h3><div class="tl">${atv.map(a=>`<div class="it ${a.tipo==='sistema'||a.tipo==='etapa'?'sistema':''}"><small>${fmtDH(a.em)} · ${esc(primeiroNome(a.nome)||'Sistema')}</small><div>${a.tipo&&TIPOS_ATV[a.tipo]?`<b>${TIPOS_ATV[a.tipo]}</b> · `:''}${esc(a.texto||'')}</div></div>`).join('')||'<p class="small muted">Nenhuma movimentação ainda.</p>'}</div></div>`:'';
+  openModal(`${mHead(l?(x.nome+(x.empresa?' · '+x.empresa:'')):'Novo lead')}<div class="modal-body">${l?`<div class="crm-det"><div>${form}</div>${lado}</div>`:form}</div><div class="modal-foot">${l&&podeMod('comercial','excluir')?`<button class="btn danger" data-act="crm-excluir" data-id="${l.id}">Excluir lead</button>`:''}<span class="grow"></span><button class="btn" data-act="close-modal">Fechar</button></div>`,true);
+}
+FORM['lead']=(fd,form)=>{
+  const id=form.dataset.id;const g=k=>String(fd.get(k)||'').trim();
+  const nome=g('nome');if(nome.length<2){toast('Informe o nome do contato.',true);return}
+  const cnpj=soDig(g('cnpj'));if(cnpj&&!cnpjValido(cnpj)){toast('CNPJ inválido.',true);return}
+  const email=g('email').toLowerCase();if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){toast('E-mail inválido.',true);return}
+  const wa=soDig(g('whatsapp'));if(wa&&wa.length<10){toast('WhatsApp inválido: informe DDD e número.',true);return}
+  const dados={nome,empresa:g('empresa'),cnpj,funcionarios:g('funcionarios'),temContador:g('temContador'),whatsapp:wa,email,cidade:g('cidade'),planoNome:g('planoNome'),valor:Number(g('valor'))||0,origem:g('origem')||'manual',responsavel:g('responsavel'),
+    proximaAcao:g('proxData')||g('proxTexto')?{data:g('proxData'),texto:g('proxTexto')}:null,mensagem:g('mensagem')};
+  const etapa=g('etapa')||'novo';
+  let l=id&&S.leads.find(x=>x.id===id);const novo=!l;
+  if(etapa==='perdido'&&(!l||etapaDe(l)!=='perdido')&&!fd.get('motivoPerda')){
+    // pede o motivo antes de salvar como perdido
+    pedirMotivo('Lead perdido','Por que não fechou?',m=>{mut('leads',()=>{if(!l){l={id:'lead-'+uid(),criadoEm:agora(),atividades:[]};S.leads.push(l)}Object.assign(l,dados);const de=etapaDe(l);l.etapa='perdido';l.status='descartado';l.motivoPerda=m;l.etapaDesde=agora();atvLead(l,'etapa',`Marcado como perdido: ${m}`)},['Comercial','Lead perdido '+nome,dados.empresa]);toast('Lead salvo.')});return}
+  mut('leads',()=>{
+    if(!l){l={id:'lead-'+uid(),criadoEm:agora(),criadoPor:ME.id,atividades:[]};S.leads.push(l);atvLead(l,'sistema','Lead criado por '+(primeiroNome(ME.nome)||'equipe'))}
+    const antesEt=etapaDe(l);const antesResp=l.responsavel;const antesProx=JSON.stringify(l.proximaAcao||null);
+    Object.assign(l,dados);if(fd.get('motivoPerda')!=null)l.motivoPerda=g('motivoPerda');
+    if(antesEt!==etapa||novo){l.etapa=etapa;l.status=statusDaEtapa(etapa);if(!novo){l.etapaDesde=agora();if(etapa==='ganho')l.ganhoEm=agora();atvLead(l,'etapa',`Moveu de "${ETAPAS.find(x=>x[0]===antesEt)[1]}" para "${ETAPAS.find(x=>x[0]===etapa)[1]}"`)}else{l.etapaDesde=agora()}}
+    if(!novo&&antesResp!==l.responsavel)atvLead(l,'sistema','Responsável: '+(nomeEquipe(l.responsavel)||'ninguém'));
+    if(!novo&&antesProx!==JSON.stringify(l.proximaAcao||null)&&l.proximaAcao)atvLead(l,'sistema',`Próxima ação: ${l.proximaAcao.texto||''}${l.proximaAcao.data?' em '+fmtData(l.proximaAcao.data):''}`);
+  },['Comercial',(novo?'Criou':'Editou')+' lead '+nome,dados.empresa]);
+  toast(novo?'Lead criado.':'Lead salvo.');abrirLead(l);
+};
+FORM['lead-atv']=(fd,form)=>{const l=S.leads.find(x=>x.id===form.dataset.id);if(!l)return;const t=String(fd.get('texto')||'').trim();if(!t){toast('Descreva a movimentação.',true);return}
+  const tipo=String(fd.get('tipo')||'anotacao');const pd=String(fd.get('proxData')||''),pt=String(fd.get('proxTexto')||'').trim();
+  mut('leads',()=>{atvLead(l,tipo,t);if(pd||pt)l.proximaAcao={data:pd,texto:pt||t.slice(0,80)};
+    if(etapaDe(l)==='novo'&&['ligacao','whatsapp','email','reuniao'].includes(tipo)){l.etapa='contato';l.status='contato';l.etapaDesde=agora();atvLead(l,'etapa','Moveu para "Primeiro contato" (primeira conversa registrada)')}
+    if(tipo==='proposta'&&['novo','contato'].includes(etapaDe(l))){l.etapa='proposta';l.status='contato';l.etapaDesde=agora();atvLead(l,'etapa','Moveu para "Proposta enviada"')}
+  },['Comercial','Registrou '+(TIPOS_ATV[tipo]||tipo)+' com '+l.nome,l.empresa||'']);abrirLead(l)};
+ACT['crm-excluir']=el=>{const l=S.leads.find(x=>x.id===el.dataset.id);if(!l)return;closeModal();confirmar('Excluir lead',`Excluir ${esc(l.nome)} e todo o histórico de prospecção?`,'Excluir',()=>mut('leads',()=>{S.leads=S.leads.filter(x=>x.id!==l.id)},['Comercial','Excluiu lead '+l.nome,l.empresa||'']))};
+ACT['crm-wa']=async el=>{const l=S.leads.find(x=>x.id===el.dataset.id);if(!l)return;
+  if(MODO!=='api'||!waAtivo()){toast('O WhatsApp do escritório não está conectado: use "Abrir no meu WhatsApp".',true);return}
+  const texto=`Olá, ${primeiroNome(l.nome)}! Aqui é ${primeiroNome(ME.nome)||'a equipe'}, do escritório ${cfg().escritorio||''}. Recebemos seu interesse${l.planoNome?' no plano '+l.planoNome:''} e quero te ajudar.`;
+  try{const r=await MF.api('POST','/api/whatsapp/iniciar',{fone:l.whatsapp,nome:l.nome,texto});mut('leads',()=>{atvLead(l,'whatsapp','Iniciou conversa pelo WhatsApp do escritório');if(etapaDe(l)==='novo'){l.etapa='contato';l.status='contato';l.etapaDesde=agora()}},null);
+    closeModal();UI.view='a-chat';UI.tab.atend='caixa';UI.convSel=r.conversaId;location.hash='a-chat';toast('Conversa aberta no Atendimento.')}catch(er){toast(er.message,true)}};
+ACT['crm-contato']=el=>{const l=S.leads.find(x=>x.id===el.dataset.id);if(!l)return;closeModal();abrirContato(null,{nome:l.nome,fone:l.whatsapp,empresa:l.empresaId||''})};
+function converterLead(l){
+  closeModal();UI.leadConvertendo=l.id;UI.view='a-carteira';UI.modo='painel';UI.cart={id:null,aba:'dados'};if(location.hash!=='#a-carteira')location.hash='a-carteira';else render();
+  setTimeout(()=>{const f=document.querySelector('form[data-form=empresa360]');if(!f)return;const set=(n,v)=>{if(f[n]&&!f[n].value&&v)f[n].value=v};
+    set('razao',l.empresa);set('fantasia',l.empresa);set('cnpj',l.cnpj?fmtCNPJ(l.cnpj):'');set('email',l.email);set('telefone',l.whatsapp?fmtFone(String(l.whatsapp).replace(/^55(?=\d{10,11}$)/,'')):'');
+    toast('Complete o cadastro de '+(l.empresa||l.nome)+'. Ao salvar, o lead fica como ganho e vinculado à empresa.')},350);
+}
+ACT['crm-converter']=el=>{const l=S.leads.find(x=>x.id===el.dataset.id);if(l)converterLead(l)};
+// ao salvar a empresa convertida: lead ganho + contato criado
+const formEmpV2=FORM['empresa360'];
+FORM['empresa360']=async(fd,form)=>{const lid=UI.leadConvertendo;const antes=S.empresas.length;await formEmpV2(fd,form);
+  const l=lid&&S.leads.find(x=>x.id===lid);const e=S.empresas.length>antes?S.empresas[S.empresas.length-1]:null;
+  if(l&&e){mut(['leads','contatos'],()=>{l.etapa='ganho';l.status='convertido';l.empresaId=e.id;l.ganhoEm=l.ganhoEm||agora();atvLead(l,'etapa','Virou cliente: '+(e.fantasia||e.razao));
+    if(l.whatsapp&&!S.contatos.some(c=>chaveFoneC(c.telefone)===chaveFoneC(l.whatsapp)))S.contatos.push({id:'ct-'+uid(),nome:l.nome,cargo:'',telefone:l.whatsapp,email:l.email||'',empresas:[e.id],atendente:l.responsavel||ME.id,canal:'whatsapp',recebeWhatsApp:true,recebeEmail:true,ativo:true,obs:'Criado a partir do CRM',criadoEm:agora()})},['Comercial','Lead convertido em cliente',e.razao])}};
+ACT['crm-csv']=()=>{const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  baixar('crm-leads-'+hoje()+'.csv','﻿'+['Nome;Empresa;CNPJ;WhatsApp;E-mail;Funcionários;Tem contador;Plano;Valor/mês;Origem;Etapa;Responsável;Próxima ação;Data próxima ação;Entrada'].concat(leadsFiltrados().map(l=>[l.nome,l.empresa,l.cnpj?fmtCNPJ(l.cnpj):'',l.whatsapp,l.email,FUNC_LEAD[l.funcionarios]||'',l.temContador,l.planoNome||l.plano,String(l.valor||'').replace('.',','),ORIGENS[l.origem||'site'],(ETAPAS.find(x=>x[0]===etapaDe(l))||[])[1],nomeEquipe(l.responsavel),l.proximaAcao?.texto,l.proximaAcao?.data?fmtData(l.proximaAcao.data):'',fmtDH(l.criadoEm)].map(c).join(';'))).join('\r\n'),'text/csv')};
+// Carteira: no lugar da lista antiga, um aviso que leva ao CRM
+painelLeads=function(){const n=S.leads.filter(l=>etapaDe(l)==='novo').length;if(!n||!podeMod('comercial','ver'))return '';return `<div class="banner info"><span class="small"><b>${n} novo(s) lead(s)</b> chegaram pelo site e aguardam o primeiro contato.</span><a class="btn sm primary" href="#a-crm">Abrir CRM comercial</a></div>`};
+const motorV5=motor;motor=function(eid,publico){return motorV5(eid,publico).filter(a=>a.area!=='Novo interessado'||podeMod('comercial','ver')).map(a=>a.area==='Novo interessado'?{...a,view:'a-crm',area:'Novo lead (CRM)'}:a)};
+/* ==== MÓDULOS v9 (fim) ==== */
+
 
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();

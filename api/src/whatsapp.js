@@ -159,6 +159,20 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     }
     return null;
   }
+  // contato salvo em Atendimento › Contatos (tem prioridade sobre o telefone do cadastro da empresa)
+  async function contatoPorFone(esc, fone) {
+    const alvo = chaveFone(fone); if (!alvo) return null;
+    const cs = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'contatos'`, [esc]);
+    for (const { dados: c } of cs) if ([c.telefone, c.telefone2].some(f => chaveFone(f) === alvo)) return c;
+    return null;
+  }
+  async function resolverJid(fone) {
+    let d = String(fone || '').replace(/\D/g, ''); if (d.length < 10) throw new ErroHttp(400, 'Telefone inválido: informe DDD e número.');
+    if (!d.startsWith('55') || d.length <= 11) d = '55' + d.replace(/^55(?=\d{10,11}$)/, '');
+    const opcoes = [d]; if (d.length === 13) opcoes.push(d.slice(0, 4) + d.slice(5)); else if (d.length === 12) opcoes.push(d.slice(0, 4) + '9' + d.slice(4));
+    for (const n of opcoes) { try { const [r] = await W.sock.onWhatsApp(n); if (r?.exists) return r.jid; } catch { } }
+    throw new ErroHttp(404, `O número +${d} não tem WhatsApp.`);
+  }
   async function conversaAberta(esc, jid) {
     const [c] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND dados->>'waJid' = $2 AND coalesce(dados->>'status','') <> 'encerrada'
       ORDER BY atualizado_em DESC LIMIT 1`, [esc, jid]);
@@ -217,7 +231,9 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     const nova = !c;
     if (!c) {
       const cfg = await configEscritorio(esc);
-      c = { id: 'wa-' + crypto.randomUUID(), empresaId: await empresaPorFone(esc, fone), canal: 'whatsapp', waJid: jid, waFone: fone, contatoNome: m.pushName || '',
+      const ct = await contatoPorFone(esc, fone);
+      c = { id: 'wa-' + crypto.randomUUID(), empresaId: (ct && (ct.empresas || [])[0]) || await empresaPorFone(esc, fone), canal: 'whatsapp', waJid: jid, waFone: fone,
+        contatoNome: ct?.nome || m.pushName || '', contatoId: ct?.id || null, atendenteUid: ct?.atendente || null,
         status: iaDisponivel() && cfg.whatsappIA !== false ? 'ia' : 'aguardando_humano', atendenteId: null, criadoEm: agora, mensagens: [] };
     }
     if (m.pushName && !c.contatoNome) c.contatoNome = m.pushName;
@@ -392,22 +408,57 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
     } catch (e) { console.error('[whatsapp] religar', e.message); }
   }, 3000).unref();
 
-  // envia um arquivo para o WhatsApp da empresa (usado na entrega de obrigações)
-  async function enviarArquivo({ esc, empresaId, fone, buffer, tipo, nome, legenda }) {
-    if (!W.sock || W.status !== 'conectado') throw new Error('O WhatsApp do escritório está desconectado.');
-    let jid = null;
-    if (empresaId) { const [c] = await db.query(`SELECT dados->>'waJid' AS jid FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND empresa_id = $2 AND dados->>'canal' = 'whatsapp' ORDER BY atualizado_em DESC LIMIT 1`, [esc, empresaId]); jid = c?.jid || null; }
-    if (!jid) {
-      let d = String(fone || '').replace(/\D/g, ''); if (!d) throw new Error('A empresa não tem telefone/WhatsApp no cadastro.');
-      if (!d.startsWith('55')) d = '55' + d;
-      const opcoes = [d]; if (d.length === 13) opcoes.push(d.slice(0, 4) + d.slice(5)); else if (d.length === 12) opcoes.push(d.slice(0, 4) + '9' + d.slice(4));
-      for (const n of opcoes) { try { const [r] = await W.sock.onWhatsApp(n); if (r?.exists) { jid = r.jid; break; } } catch { } }
-      if (!jid) throw new Error('O telefone da empresa não tem WhatsApp.');
-    }
-    const ehImagem = /^image\//.test(tipo);
-    const r = await W.sock.sendMessage(jid, ehImagem ? { image: buffer, caption: legenda || '' } : { document: buffer, mimetype: tipo, fileName: nome, caption: legenda || '' });
-    if (r?.key?.id) enviadas.set(r.key.id, r.message);
-    return { para: '+' + jid.split('@')[0] };
+  // quem recebe as guias da empresa pelo WhatsApp: contatos marcados em Atendimento › Contatos; sem eles, o telefone do cadastro
+  async function destinatarios(esc, empresaId, foneCadastro) {
+    const cs = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'contatos'`, [esc])).map(x => x.dados)
+      .filter(c => (c.empresas || []).includes(String(empresaId)) && c.telefone && c.recebeWhatsApp !== false && c.ativo !== false);
+    if (cs.length) return cs.map(c => ({ fone: c.telefone, nome: c.nome, contatoId: c.id }));
+    return foneCadastro ? [{ fone: foneCadastro, nome: '', contatoId: null }] : [];
   }
-  return { status: () => W.status, enviarArquivo };
+  // envia arquivo(s) e registra no atendimento daquele contato (fica no histórico)
+  async function enviarArquivos({ esc, empresaId, fone, anexos, legenda, u }) {
+    if (!W.sock || W.status !== 'conectado') throw new Error('O WhatsApp do escritório está desconectado.');
+    const lista = await destinatarios(esc, empresaId, fone);
+    if (!lista.length) throw new Error('A empresa não tem contato com WhatsApp: cadastre em Atendimento › Contatos.');
+    const enviados = [], falhas = [], vistos = new Set();
+    for (const d of lista) {
+      try {
+        const jid = await resolverJid(d.fone); if (vistos.has(jid)) continue; vistos.add(jid);
+        const waIds = [];
+        for (let i = 0; i < anexos.length; i++) {
+          const a = anexos[i]; const cap = i === 0 ? legenda || '' : '';
+          const r = await W.sock.sendMessage(jid, /^image\//.test(a.tipo) ? { image: a.conteudo, caption: cap } : { document: a.conteudo, mimetype: a.tipo, fileName: a.nome, caption: cap });
+          if (r?.key?.id) { enviadas.set(r.key.id, r.message); waIds.push(r.key.id); }
+        }
+        let c = await conversaAberta(esc, jid); const nova = !c; const agora = new Date().toISOString();
+        if (!c) c = { id: 'wa-' + crypto.randomUUID(), empresaId: String(empresaId), canal: 'whatsapp', waJid: jid, waFone: jid.split('@')[0], contatoNome: d.nome || '', contatoId: d.contatoId, status: 'encerrada', encerradaEm: agora, criadoEm: agora, mensagens: [] };
+        c.mensagens.push({ de: 'humano', texto: legenda || '', em: agora, uid: u?.id || null, nome: u?.nome || 'Equipe', canal: 'whatsapp', waIds, arquivos: anexos.map(a => ({ id: a.id, nome: a.nome, tipo: a.tipo, tamanho: a.conteudo.length, url: `/api/arquivos/${a.id}` })) });
+        if (nova) c.mensagens.push({ de: 'sistema', texto: 'Envio automático do Controle de obrigações.', em: agora });
+        await salvarConversa(esc, c);
+        enviados.push((d.nome ? d.nome + ' ' : '') + '+' + jid.split('@')[0]);
+      } catch (e) { falhas.push((d.nome || d.fone) + ': ' + e.message); }
+    }
+    if (!enviados.length) throw new Error(falhas.join(' · ') || 'Nenhum contato recebeu.');
+    return { para: enviados.join(', '), falhas };
+  }
+
+  // iniciar um atendimento pelo WhatsApp a partir de um contato
+  r.post('/api/whatsapp/iniciar', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' });
+    if (!pode(u, 'chat', 'editar')) throw new ErroHttp(403, 'Seu acesso ao Atendimento é só de consulta.');
+    if (!W.sock || W.status !== 'conectado') throw new ErroHttp(503, 'O WhatsApp do escritório está desconectado. Conecte pelo QR code em Atendimento.');
+    const b = ctx.corpo || {}; const esc = u.escritorio_id;
+    const jid = await resolverJid(b.fone);
+    const texto = String(b.texto || '').trim().slice(0, 4000);
+    let c = await conversaAberta(esc, jid); const agora = new Date().toISOString();
+    if (!c) c = { id: 'wa-' + crypto.randomUUID(), empresaId: b.empresaId ? String(b.empresaId) : null, canal: 'whatsapp', waJid: jid, waFone: jid.split('@')[0],
+      contatoNome: String(b.nome || '').slice(0, 80), contatoId: b.contatoId ? String(b.contatoId) : null, status: 'humano', atendenteUid: u.id, criadoEm: agora,
+      mensagens: [{ de: 'sistema', texto: `${String(u.nome || '').split(' ')[0]} iniciou o atendimento pelo WhatsApp.`, em: agora }] };
+    else if (c.status !== 'humano') { c.status = 'humano'; c.atendenteUid = u.id; c.mensagens.push({ de: 'sistema', texto: `${String(u.nome || '').split(' ')[0]} assumiu a conversa.`, em: agora }); }
+    if (texto) { const rt = await enviarTexto(jid, texto); c.mensagens.push({ de: 'humano', texto, em: new Date().toISOString(), uid: u.id, nome: u.nome, canal: 'whatsapp', waIds: rt?.key?.id ? [rt.key.id] : [] }); }
+    await salvarConversa(esc, c);
+    await log('whatsapp_atendimento_iniciado', { usuarioId: u.id, ip: ctx.ip, detalhe: '+' + jid.split('@')[0] });
+    return { ok: true, conversaId: c.id };
+  });
+  return { status: () => W.status, enviarArquivos };
 }

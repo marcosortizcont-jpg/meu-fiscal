@@ -145,9 +145,18 @@ export function registrarGestao(r, { db, exigir, log, pode, alt }) {
     if (!esc) throw new ErroHttp(503, 'Escritório ainda não configurado.');
     const id = 'lead-' + crypto.randomUUID();
     const utm = {}; for (const k of ['utm_source', 'utm_medium', 'utm_campaign']) if (c[k]) utm[k] = String(c[k]).slice(0, 80);
-    const dados = { id, nome, whatsapp, email, objetivo: OBJETIVOS[c.objetivo] ? c.objetivo : 'outro', objetivoNome: OBJETIVOS[c.objetivo] || OBJETIVOS.outro,
-      plano: String(c.plano || '').slice(0, 60), cidade: String(c.cidade || '').trim().slice(0, 80), mensagem: String(c.mensagem || '').trim().slice(0, 1000),
-      status: 'novo', origem: 'site', utm, criadoEm: new Date().toISOString() };
+    const cnpj = String(c.cnpj || '').replace(/\D/g, '').slice(0, 14);
+    if (cnpj && cnpj.length !== 14) throw new ErroHttp(400, 'Confira o CNPJ (14 números).');
+    const FUNC = ['0', '1-3', '4-10', '11-30', '30+'];
+    const objetivo = OBJETIVOS[c.objetivo] ? c.objetivo : (c.temContador === 'sim' ? 'migrar' : c.temContador === 'nao' ? 'abrir' : 'outro');
+    const agora = new Date().toISOString();
+    const dados = { id, nome, whatsapp, email, objetivo, objetivoNome: OBJETIVOS[objetivo],
+      empresa: String(c.empresa || '').trim().slice(0, 120), cnpj, funcionarios: FUNC.includes(String(c.funcionarios)) ? String(c.funcionarios) : '',
+      temContador: ['sim', 'nao'].includes(c.temContador) ? c.temContador : '',
+      plano: String(c.plano || '').slice(0, 60), planoNome: String(c.planoNome || '').slice(0, 60), valor: Math.max(0, Math.min(100000, Number(c.planoPreco) || 0)),
+      cidade: String(c.cidade || '').trim().slice(0, 80), mensagem: String(c.mensagem || '').trim().slice(0, 1000),
+      status: 'novo', etapa: 'novo', etapaDesde: agora, origem: 'site', utm, criadoEm: agora,
+      atividades: [{ em: agora, tipo: 'sistema', nome: 'Site', texto: 'Lead criado pelo formulário do site' + (c.plano ? ` (plano ${String(c.planoNome || c.plano).slice(0, 60)})` : '') }] };
     await db.query(`INSERT INTO registros (escritorio_id, colecao, id, empresa_id, dados) VALUES ($1,'leads',$2,NULL,$3::jsonb)`, [esc.id, id, JSON.stringify(dados)]);
     await log('contato_site', { ip: ctx.ip, email: email || null, detalhe: `${nome} · ${dados.objetivoNome}` });
     return { ok: true };
