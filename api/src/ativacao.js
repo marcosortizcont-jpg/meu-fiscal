@@ -98,9 +98,24 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
   const textoCobranca = at => [at.pix ? `PIX copia e cola:\n${at.pix}` : '', at.linha ? `Boleto (linha digitável): ${at.linha}` : '', at.link || ''].filter(Boolean).join('\n\n');
   async function avisarCliente(esc, e, ativ, quem) {
     const cfg = await A.configEscritorio(esc); const nome = String(e.contatos?.[0]?.nome || e.socios?.[0]?.nome || e.fantasia || e.razao || '').split(' ')[0];
-    const texto = `Olá, ${nome}! Que bom ter a ${e.fantasia || e.razao} com a ${marcaDe(cfg)}. 🎉 Para ativar o seu plano ${ativ.planoNome || ''}, é só pagar a 1ª mensalidade de ${brl(ativ.total)}${ativ.desconto ? ' (já com ' + brl(ativ.desconto) + ' de desconto)' : ''} por boleto ou PIX (vencimento ${fmtData(ativ.venc)}):\n\n${textoCobranca(ativ)}\n\nAssim que o pagamento for confirmado, seu cadastro é ativado e enviamos o acesso ao portal.`;
     const res = {};
+    // boleto em PDF ainda não guardado: busca de novo no banco antes de enviar
+    if (!ativ.arquivoId && ativ.cobrancaId && ativ.provedor) {
+      try { const pdf = await fin.banco.pdf(esc, ativ.provedor, ativ.cobrancaId);
+        if (pdf) { const a = await A.guardarArquivo(esc, e.id, pdf, 'Boleto ativação.pdf', 'application/pdf', 'boletos'); ativ.arquivoId = a.id; ativ.arquivoUrl = a.url;
+          const at = await A.empresa(esc, e.id); if (at) await A.gravar(esc, 'empresas', at.id, at.id, { ...at, ativacao: { ...(at.ativacao || {}), arquivoId: a.id, arquivoUrl: a.url } }); } } catch { }
+    }
     let anexo = null; if (ativ.arquivoId) { const buf = await A.conteudoArquivo(ativ.arquivoId).catch(() => null); if (buf) anexo = { id: ativ.arquivoId, nome: 'Boleto ativação.pdf', tipo: 'application/pdf', conteudo: buf }; }
+    const texto = `Olá, ${nome}! Que bom ter a ${e.fantasia || e.razao} com a ${marcaDe(cfg)}. 🎉 Para ativar o seu plano ${ativ.planoNome || ''}, é só pagar a 1ª mensalidade de ${brl(ativ.total)}${ativ.desconto ? ' (já com ' + brl(ativ.desconto) + ' de desconto)' : ''} até ${fmtData(ativ.venc)}${anexo ? '. O boleto em PDF segue anexado (dá para pagar pelo código de barras ou pelo QR Code PIX dele)' : ''}, ou se preferir:\n\n${textoCobranca(ativ)}\n\nAssim que o pagamento for confirmado, seu cadastro é ativado e enviamos o acesso ao portal.`;
+    // o banco ainda não liberou o PDF: tenta de novo daqui a 1 minuto e manda só o boleto
+    if (!anexo && ativ.cobrancaId && ativ.provedor && !ativ._reenvioPdf) setTimeout(async () => {
+      try { const at = await A.empresa(esc, e.id); if (!at || at.status !== 'aguardando_pagamento' || at.ativacao?.cobrancaId !== ativ.cobrancaId) return;
+        const pdf = await fin.banco.pdf(esc, ativ.provedor, ativ.cobrancaId); if (!pdf) return;
+        const a = await A.guardarArquivo(esc, e.id, pdf, 'Boleto ativação.pdf', 'application/pdf', 'boletos');
+        await A.gravar(esc, 'empresas', at.id, at.id, { ...at, ativacao: { ...(at.ativacao || {}), arquivoId: a.id, arquivoUrl: a.url } });
+        await wa.enviarArquivos({ esc, empresaId: e.id, fone: e.telefone, anexos: [{ id: a.id, nome: 'Boleto ativação.pdf', tipo: 'application/pdf', conteudo: pdf }], legenda: 'Segue o boleto em PDF da 1ª mensalidade. 📄', u: { id: null, nome: 'Ativação do cadastro' } }).catch(() => { });
+      } catch (er) { console.error('[ativacao] reenvio do boleto', er.message); }
+    }, 60000);
     try { const rw = await wa.enviarArquivos({ esc, empresaId: e.id, fone: e.telefone, anexos: anexo ? [anexo] : [], legenda: texto, u: { id: null, nome: 'Ativação do cadastro' + (quem ? ' por ' + quem : '') } }); res.whatsapp = 'WhatsApp enviado para ' + rw.para; }
     catch (er) { res.whatsapp = 'WhatsApp não enviado (' + er.message + ')'; }
     const para = await A.emailsDaEmpresa(esc, e.id, e);
@@ -176,7 +191,7 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
       catch (er) { await A.gravar(esc, 'empresas', id, id, { ...e, ativacao: { ...e.ativacao, erro: er.message } }); throw new ErroHttp(er.status || 502, 'Cadastro salvo, mas a cobrança não foi gerada: ' + er.message + ' Use "Gerar cobrança" no cadastro.'); }
       const at = { ...e.ativacao, ...cob };
       await A.gravar(esc, 'empresas', id, id, { ...e, ativacao: at });
-      resultado = { ...resultado, status: 'aguardando_pagamento', link: cob.link, linha: cob.linha, pix: cob.pix };
+      resultado = { ...resultado, status: 'aguardando_pagamento', link: cob.link, linha: cob.linha, pix: cob.pix, arquivoUrl: cob.arquivoUrl || '' };
       if (b.avisar !== false) resultado.aviso = await avisarCliente(esc, { ...e, ativacao: at }, at, String(u.nome || '').split(' ')[0]);
     }
     if (e.leadId) { const l = await A.registro(esc, 'leads', e.leadId); if (l) await A.gravar(esc, 'leads', l.id, null, { ...l, empresaId: id, ...(resultado.status === 'ativo' ? {} : { etapa: 'negociacao', status: 'contato' }),

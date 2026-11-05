@@ -71,17 +71,27 @@ export function criarBanco(db, A) {
       email: email || undefined, ddd: fone.length >= 10 ? fone.slice(0, 2) : undefined, telefone: fone.length >= 10 ? fone.slice(2) : undefined };
   }
   const seuNumero = () => 'M' + Date.now().toString(36).toUpperCase() + crypto.randomBytes(2).toString('hex').toUpperCase();   // até 15 caracteres
+  // o Inter libera o PIX antes do boleto: espera a linha digitável (até ~25 s) para o boleto sair junto
   async function detalheInter(c, id, esperar) {
-    for (let i = 0; i < (esperar ? 6 : 1); i++) {
-      const d = await inter(c, 'GET', `/cobranca/v3/cobrancas/${encodeURIComponent(id)}`);
+    let d = null;
+    for (let i = 0; i < (esperar ? 16 : 1); i++) {
+      d = await inter(c, 'GET', `/cobranca/v3/cobrancas/${encodeURIComponent(id)}`);
       const sit = d.cobranca?.situacao || d.situacao;
-      if (!esperar || (sit && sit !== 'EM_PROCESSAMENTO' && (d.boleto?.linhaDigitavel || d.pix?.pixCopiaECola))) return d;
       if (sit === 'FALHA_EMISSAO') throw new ErroHttp(502, 'O Inter não conseguiu emitir a cobrança (FALHA_EMISSAO). Confira os dados do pagador.');
+      if (!esperar || (sit && sit !== 'EM_PROCESSAMENTO' && d.boleto?.linhaDigitavel)) return d;
       await new Promise(ok => setTimeout(ok, 1500));
     }
-    return inter(c, 'GET', `/cobranca/v3/cobrancas/${encodeURIComponent(id)}`);
+    return d;
   }
-  async function pdfInter(c, id) { const d = await inter(c, 'GET', `/cobranca/v3/cobrancas/${encodeURIComponent(id)}/pdf`); return d.pdf ? Buffer.from(d.pdf, 'base64') : null; }
+  // PDF do boleto (com o QR Code PIX): o Inter pode demorar alguns segundos para liberar
+  async function pdfInter(c, id, tentativas = 1) {
+    for (let i = 0; i < tentativas; i++) {
+      try { const d = await inter(c, 'GET', `/cobranca/v3/cobrancas/${encodeURIComponent(id)}/pdf`); if (d.pdf) { const b = Buffer.from(d.pdf, 'base64'); if (String(b.subarray(0, 4)) === '%PDF') return b; } }
+      catch (er) { if (i === tentativas - 1) console.error('[inter] pdf', id, er.message); }
+      if (i < tentativas - 1) await new Promise(ok => setTimeout(ok, 2500));
+    }
+    return null;
+  }
 
   /* ================= Asaas (mantido para quem já usava) ================= */
   async function asaas(c, metodo, caminho, corpo) {
@@ -119,7 +129,7 @@ export function criarBanco(db, A) {
         mensagem: { linha1: String(descricao || 'Honorários contábeis').slice(0, 78) } });
       const id = r0.codigoSolicitacao; if (!id) throw new ErroHttp(502, 'O Inter não devolveu o código da cobrança.');
       const d = await detalheInter(c, id, true);
-      const pdf = await pdfInter(c, id).catch(() => null);
+      const pdf = await pdfInter(c, id, 6);
       out = { provedor: 'inter', id, seuNumero: sn, linha: d.boleto?.linhaDigitavel || '', pix: d.pix?.pixCopiaECola || '', link: '', venc: v, pdf };
     } else {
       const cliente = await clienteAsaas(c, esc, e);
@@ -157,7 +167,7 @@ export function criarBanco(db, A) {
     if (prov === 'inter') return cancelar(esc, prov, id, 'Pago por outro meio');
     await asaas(c, 'POST', `/payments/${id}/receiveInCash`, { paymentDate: data, value: valor, notifyCustomer: false }).catch(er => { if (!/já|already|received/i.test(er.message)) throw er; });
   }
-  async function pdf(esc, prov, id) { const c = await cfg(esc); if (!pronto(c)) return null; if (FALSO) return Buffer.from(`%PDF-1.4\n% boleto simulado ${id}\n%%EOF\n`); return prov === 'inter' ? pdfInter(c, id) : null; }
+  async function pdf(esc, prov, id) { const c = await cfg(esc); if (!pronto(c)) return null; if (FALSO) return Buffer.from(`%PDF-1.4\n% boleto simulado ${id}\n%%EOF\n`); return prov === 'inter' ? pdfInter(c, id, 4) : null; }
   async function testar(esc, urlAviso) {
     const c = await cfg(esc); if (!pronto(c)) throw new ErroHttp(412, 'Preencha os dados do banco e salve antes de testar.');
     if (FALSO) return 'Conexão simulada (teste local).';
