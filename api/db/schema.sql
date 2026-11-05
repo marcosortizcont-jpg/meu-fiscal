@@ -244,3 +244,32 @@ CREATE TABLE IF NOT EXISTS financeiro_config (
   atualizado_por   UUID,
   atualizado_em    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Vouchers de desconto ou isenção para ativar cadastros (criados só pelo master)
+CREATE TABLE IF NOT EXISTS vouchers (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  codigo        TEXT NOT NULL,
+  tipo          TEXT NOT NULL,              -- percentual | valor | isencao
+  valor         NUMERIC NOT NULL DEFAULT 0,
+  quantidade    INTEGER,                    -- NULL = ilimitado
+  usados        INTEGER NOT NULL DEFAULT 0,
+  meses         INTEGER NOT NULL DEFAULT 1, -- quantas mensalidades recebem o desconto (a 1ª é a da ativação)
+  validade      DATE,
+  ativo         BOOLEAN NOT NULL DEFAULT true,
+  descricao     TEXT,
+  criado_por    UUID,
+  criado_em     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS vouchers_codigo ON vouchers (escritorio_id, upper(codigo));
+CREATE TABLE IF NOT EXISTS voucher_usos (
+  id            BIGSERIAL PRIMARY KEY,
+  escritorio_id UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  voucher_id    UUID NOT NULL REFERENCES vouchers(id) ON DELETE CASCADE,
+  empresa_id    TEXT,
+  empresa_nome  TEXT,
+  desconto      NUMERIC,
+  usuario_id    UUID,
+  usuario_nome  TEXT,
+  em            TIMESTAMPTZ NOT NULL DEFAULT now()
+);

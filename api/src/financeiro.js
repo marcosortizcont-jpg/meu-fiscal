@@ -43,7 +43,7 @@ export const cfgFin = c => {
   return f;
 };
 
-export function registrarFinanceiro(r, { db, exigir, log, pode, wa }) {
+export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {} }) {
   const A = criarApoio(db);
   const exigirHon = (u, nivel = 'editar') => { if (!pode(u, 'hon', nivel)) throw new ErroHttp(403, nivel === 'ver' ? 'Seu acesso não inclui o Financeiro.' : 'Seu acesso ao Financeiro é só de consulta.'); };
   const exigirMaster = u => { if (u.papel !== 'master' && !pode(u, 'config', 'editar')) throw new ErroHttp(403, 'Só o master altera a integração bancária.'); };
@@ -84,7 +84,7 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa }) {
   async function gerarMensalidades(esc, comp, { quem, empresas: somente } = {}) {
     const conf = cfgFin(await A.configEscritorio(esc));
     const emps = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas'`, [esc])).map(x => x.dados)
-      .filter(e => e.status !== 'inativo' && e.plano && Number(e.plano.valor) > 0 && (!somente || somente.includes(e.id)));
+      .filter(e => !['inativo', 'aguardando_pagamento'].includes(e.status) && e.plano && Number(e.plano.valor) > 0 && (!somente || somente.includes(e.id)));
     const existentes = new Set((await db.query(`SELECT empresa_id FROM registros WHERE escritorio_id = $1 AND colecao = 'faturas' AND dados->>'comp' = $2 AND coalesce(dados->>'status','') <> 'cancelada'`, [esc, comp])).map(x => x.empresa_id));
     const criadas = [];
     for (const e of emps) {
@@ -97,9 +97,16 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa }) {
       for (const t of tks) { itens.push({ desc: 'Serviço avulso: ' + t.titulo, valor: r2(t.valor), tipo: 'avulso', detalhe: 'concluído em ' + fmtData(String(t.concluidoEm || t.criadoEm || '').slice(0, 10)) }); await A.gravar(esc, 'tickets', t.id, e.id, { ...t, faturado: true }); }
       for (const ex of (e.plano.extras || [])) if (Number(ex.valor) > 0) itens.push({ desc: ex.desc || 'Adicional', valor: r2(ex.valor), tipo: 'adicional' });
       const dia = Math.min(Number(e.plano.diaVenc || conf.vencDia || 10), ultimoDia(+comp.slice(0, 4), +comp.slice(5, 7)));
-      const desconto = r2(e.plano.desconto || 0);
-      const f = { id: 'fat-' + e.id + '-' + comp, empresaId: e.id, comp, venc: `${comp}-${pad(dia)}`, itens, ...(desconto ? { desconto } : {}), valor: r2(itens.reduce((a, i) => a + i.valor, 0) - desconto),
-        status: 'aberta', lembretes: [], cobrancas: [], criadaEm: new Date().toISOString(), criadaPor: quem || 'Automático' };
+      let desconto = r2(e.plano.desconto || 0); let voucherUsado = null;
+      // voucher de vários meses: desconto nas mensalidades seguintes à ativação
+      if (e.voucherAplicado && e.voucherAplicado.mesesRestantes > 0) {
+        const bruto = itens.reduce((a, i) => a + i.valor, 0) - desconto; const v = e.voucherAplicado;
+        const dv = v.tipo === 'isencao' ? bruto : v.tipo === 'percentual' ? bruto * Number(v.valor) / 100 : Math.min(bruto, Number(v.valor));
+        desconto = r2(desconto + dv); voucherUsado = v.codigo;
+        await A.gravar(esc, 'empresas', e.id, e.id, { ...e, voucherAplicado: { ...v, mesesRestantes: v.mesesRestantes - 1 } });
+      }
+      const f = { id: 'fat-' + e.id + '-' + comp, empresaId: e.id, comp, venc: `${comp}-${pad(dia)}`, itens, ...(desconto ? { desconto } : {}), valor: r2(Math.max(0, itens.reduce((a, i) => a + i.valor, 0) - desconto)), ...(voucherUsado ? { voucher: voucherUsado } : {}),
+        status: r2(itens.reduce((a, i) => a + i.valor, 0) - desconto) <= 0 ? 'paga' : 'aberta', ...(r2(itens.reduce((a, i) => a + i.valor, 0) - desconto) <= 0 ? { pagaEm: agoraLocal().data, formaPagamento: 'Voucher (isenção)' } : {}), lembretes: [], cobrancas: [], criadaEm: new Date().toISOString(), criadaPor: quem || 'Automático' };
       await A.gravar(esc, 'faturas', f.id, e.id, f); criadas.push(f);
     }
     await log('mensalidades_geradas', { detalhe: `${comp} · ${criadas.length} fatura(s) · ${quem || 'automático'}` });
@@ -312,6 +319,11 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa }) {
     if (!c?.webhook_token || tk.length !== c.webhook_token.length || !crypto.timingSafeEqual(Buffer.from(tk), Buffer.from(c.webhook_token))) throw new ErroHttp(401, 'Token inválido.');
     const ev = ctx.corpo || {}; const p = ev.payment || {}; const fid = String(p.externalReference || '');
     if (!fid) return { ok: true };
+    // cobrança de ativação de um cadastro novo
+    if (fid.startsWith('ativ-')) {
+      if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED_IN_CASH'].includes(ev.event) && ganchos.ativacaoPaga) await ganchos.ativacaoPaga(esc, fid.slice(5), p);
+      return { ok: true };
+    }
     const f = await A.registro(esc, 'faturas', fid); if (!f) return { ok: true };
     if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED_IN_CASH'].includes(ev.event) && f.status !== 'paga') {
       await A.gravar(esc, 'faturas', f.id, f.empresaId, { ...f, status: 'paga', pagaEm: String(p.paymentDate || p.clientPaymentDate || p.confirmedDate || agoraLocal().data).slice(0, 10), valorPago: r2(p.value), valorLiquido: r2(p.netValue),
@@ -325,5 +337,5 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa }) {
     return { ok: true };
   }, { semCabecalhoSite: true, limite: 64 * 1024 });
 
-  return { gerarMensalidades, emitirBoleto, enviarFatura, rodarRegua };
+  return { gerarMensalidades, emitirBoleto, enviarFatura, rodarRegua, asaas, cfgBanco, temBanco, clienteAsaas };
 }

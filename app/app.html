@@ -5574,6 +5574,135 @@ function atualizarTextoTheo(){
 }
 setTimeout(function tentar(){if(S.config&&S.config[0]&&MODO!=='local'){atualizarTextoTheo()}else setTimeout(tentar,1500)},2500);
 /* ==== MÓDULOS v14 (fim) ==== */
+/* ==== MÓDULOS v15: cadastro de clientes com ativação por pagamento (Asaas) ou voucher do master ==== */
+const PLANOS_CAD=[['Basic','Serviços',259],['Unique','Serviços',450],['Unique Plus','Serviços',700],['Basic Comércio','Comércio',359],['Unique Comércio','Comércio',550],['Unique Plus Comércio','Comércio',900]];
+const METODOS_CAD=[['escolha','Cliente escolhe (boleto, PIX ou cartão)'],['pix','PIX'],['boleto','Boleto'],['cartao','Cartão de crédito']];
+const pendAtiv=e=>e&&e.status==='aguardando_pagamento';
+const podeCadastrarC=()=>podeMod('comercial','editar')||podeMod('carteira','editar');
+
+/* ---------- formulário de cadastro com ativação ---------- */
+function abrirCadastroAtiv(pre){
+  pre=pre||{};const p0=PLANOS_CAD.find(p=>p[0]===pre.planoNome)||null;
+  openModal(`${mHead('Novo cliente')}<form data-form="cad-ativ" data-lead="${esc(pre.leadId||'')}"><div class="modal-body">
+   <p class="small muted" style="margin-top:0">O cadastro fica <b>aguardando pagamento</b> e só é ativado quando o Asaas confirmar o pagamento da 1ª mensalidade, ou na hora, com um voucher de isenção gerado pelo master.</p>
+   <div class="grid-f">
+    <label class="f"><span>CNPJ *</span><input name="cnpj" required inputmode="numeric" maxlength="18" value="${esc(pre.cnpj?fmtCNPJ(pre.cnpj):'')}"></label>
+    <label class="f"><span>Regime</span><select name="regime"><option value="MEI">MEI</option><option value="SN" selected>Simples Nacional sem IE</option><option value="SN-IE">Simples Nacional com IE</option><option value="OUTRO">Outros</option></select></label>
+    <label class="f full"><span>Razão social *</span><input name="razao" required maxlength="160" value="${esc(pre.empresa||'')}"></label>
+    <label class="f"><span>Nome fantasia</span><input name="fantasia" maxlength="120" value="${esc(pre.empresa||'')}"></label>
+    <label class="f"><span>Município / UF</span><span style="display:flex;gap:6px"><input name="municipio" maxlength="80" value="${esc(pre.cidade||'')}"><input name="uf" maxlength="2" style="width:64px" placeholder="MS"></span></label>
+    <label class="f"><span>Responsável (nome) *</span><input name="contatoNome" required maxlength="80" value="${esc(pre.nome||'')}"></label>
+    <label class="f"><span>WhatsApp *</span><input name="telefone" required inputmode="tel" maxlength="20" value="${esc(pre.whatsapp?fmtFone(String(pre.whatsapp).replace(/^55(?=\d{10,11}$)/,'')):'')}"></label>
+    <label class="f full"><span>E-mail *</span><input name="email" type="email" required maxlength="120" value="${esc(pre.email||'')}"></label>
+   </div>
+   <h3 style="margin:16px 0 8px">Plano e pagamento</h3><div class="grid-f">
+    <label class="f"><span>Plano</span><select name="planoSel" data-cad-plano>${PLANOS_CAD.map(([n,g,v])=>`<option value="${esc(n)}" data-v="${v}" ${p0&&p0[0]===n?'selected':''}>${esc(n)} · ${g} · ${brl(v)}</option>`).join('')}<option value="__outro" ${!p0&&pre.planoNome?'selected':''}>Outro / sob medida</option></select></label>
+    <label class="f"><span>Valor mensal (R$) *</span><input name="valor" type="number" step="0.01" min="1" required value="${esc(pre.valor||(p0?p0[2]:PLANOS_CAD[0][2]))}" data-cad-valor></label>
+    <label class="f"><span>Nome do plano</span><input name="planoNome" maxlength="60" value="${esc(pre.planoNome||(p0?p0[0]:PLANOS_CAD[0][0]))}"></label>
+    <label class="f"><span>Vencimento das mensalidades (dia)</span><input name="diaVenc" type="number" min="1" max="28" value="${esc(finCfg?.().vencDia||10)}"></label>
+    <label class="f full"><span>Forma de pagamento da ativação *</span><select name="metodo">${METODOS_CAD.map(([k,r])=>`<option value="${k}">${r}</option>`).join('')}</select></label>
+    <div class="f full"><span>Voucher de desconto ou isenção (opcional)</span><span style="display:flex;gap:6px"><input name="voucher" maxlength="30" style="text-transform:uppercase" placeholder="Código gerado pelo master" data-cad-voucher><button type="button" class="btn" data-act="cad-voucher">Aplicar</button></span><span class="small" id="cad-voucher-res"></span></div>
+    <div class="f full"><div class="linha-dig" id="cad-resumo" style="font-family:inherit"></div></div>
+    <label class="chk full"><input type="checkbox" name="avisar" checked> Enviar o link de pagamento ao cliente por WhatsApp e e-mail</label></div></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Cadastrar e gerar cobrança</button></div></form>`,true);
+  setTimeout(resumoCad,30);
+}
+function resumoCad(){const f=document.querySelector('form[data-form=cad-ativ]');if(!f)return;const v=Number(f.valor.value)||0;const r=UI.cadVoucher&&UI.cadVoucher.codigo===f.voucher.value.trim().toUpperCase()?UI.cadVoucher:null;
+  const d=r?Math.min(v,r.tipo==='isencao'?v:r.tipo==='percentual'?v*r.percentual/100:r.desconto):0;const t=Math.round((v-d)*100)/100;
+  document.getElementById('cad-resumo').innerHTML=`1ª mensalidade: <b>${brl(v)}</b>${d?` − desconto ${brl(d)} (${esc(r.codigo)})`:''} = <b style="font-size:16px">${brl(t)}</b>${t<=0?' · <b style="color:var(--ok)">ativa na hora (isenção)</b>':' · ativa quando o pagamento for confirmado'}`;
+  const b=f.querySelector('button.primary');b.textContent=t<=0?'Cadastrar e ativar':'Cadastrar e gerar cobrança'}
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-cad-plano]')){const f=s.form;const o=s.selectedOptions[0];if(o.dataset.v){f.valor.value=o.dataset.v;f.planoNome.value=s.value}else{f.planoNome.value='';f.planoNome.focus()}resumoCad()}});
+document.addEventListener('input',ev=>{const s=ev.target;if(s.closest&&s.closest('form[data-form=cad-ativ]')){if(s.matches('[data-cad-voucher]')){UI.cadVoucher=null;const r=document.getElementById('cad-voucher-res');if(r)r.textContent=''}if(s.name==='cnpj')s.value=mascaraDoc?mascaraDoc(s.value):s.value;resumoCad()}});
+ACT['cad-voucher']=async()=>{const f=document.querySelector('form[data-form=cad-ativ]');const cod=f.voucher.value.trim();const out=document.getElementById('cad-voucher-res');if(!cod){out.textContent='Digite o código.';return}
+  if(MODO!=='api'){out.textContent='Vouchers funcionam na versão publicada.';return}
+  try{const r=await MF.api('POST','/api/vouchers/validar',{codigo:cod,valor:Number(f.valor.value)||0});UI.cadVoucher=r;out.innerHTML=`<b style="color:var(--ok)">✓ ${esc(r.texto)}</b>`}catch(er){UI.cadVoucher=null;out.innerHTML=`<b style="color:var(--crit)">${esc(er.message)}</b>`}resumoCad()};
+FORM['cad-ativ']=async(fd,form)=>{
+  const g=k=>String(fd.get(k)||'').trim();const cnpj=soDig(g('cnpj'));
+  if(!cnpjValido(cnpj)){toast('CNPJ inválido.',true);return}if(S.empresas.some(e=>soDig(e.cnpj)===cnpj)){toast('Já existe uma empresa com este CNPJ.',true);return}
+  if(soDig(g('telefone')).length<10){toast('Informe o WhatsApp com DDD.',true);return}
+  if(g('voucher')&&!(UI.cadVoucher&&UI.cadVoucher.codigo===g('voucher').toUpperCase())){toast('Clique em "Aplicar" para conferir o voucher antes de cadastrar.',true);return}
+  if(MODO!=='api'){toast('O cadastro com ativação funciona na versão publicada.',true);return}
+  const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf'),contatoNome:g('contatoNome'),telefone:g('telefone'),email:g('email')},
+    plano:{nome:g('planoNome')||g('planoSel'),valor:Number(g('valor')),diaVenc:Number(g('diaVenc'))||10},metodo:g('metodo'),voucher:g('voucher'),leadId:form.dataset.lead||null,avisar:!!fd.get('avisar')};
+  try{const r=await MF.api('POST','/api/ativacao/cadastrar',corpo);UI.cadVoucher=null;closeModal();
+    if(r.status==='ativo'){toast('Cliente cadastrado e ativado com o voucher. 🎉')}
+    else{openModal(`${mHead('Cadastro aguardando pagamento')}<div class="modal-body"><p>Cobrança de <b>${brl(r.total)}</b>${r.desconto?' (com '+brl(r.desconto)+' de desconto)':''} gerada no Asaas. O cadastro ativa sozinho quando o pagamento for confirmado.</p>
+      ${r.link?`<div class="f"><span>Link de pagamento</span><div class="linha-dig">${esc(r.link)}</div><div class="actions" style="margin-top:6px"><button class="btn sm" data-act="copiar" data-t="${esc(r.link)}">Copiar link</button><a class="btn sm" href="${esc(r.link)}" target="_blank" rel="noopener">Abrir</a></div></div>`:''}
+      ${r.aviso?`<p class="small muted">${esc([r.aviso.whatsapp,r.aviso.email].filter(Boolean).join(' · '))}</p>`:''}</div><div class="modal-foot"><button class="btn primary" data-act="close-modal">Entendi</button></div>`)}
+  }catch(er){toast(er.message,true)}
+};
+// Carteira e CRM passam a usar este cadastro
+const cartAbrirV14=ACT['cart-abrir'];
+ACT['cart-abrir']=el=>{if(!el.dataset.id){if(!podeCadastrarC()){toast('Seu acesso não permite cadastrar clientes.',true);return}UI.cadVoucher=null;abrirCadastroAtiv();return}return cartAbrirV14(el)};
+converterLead=function(l){closeModal();UI.cadVoucher=null;abrirCadastroAtiv({leadId:l.id,nome:l.nome,empresa:l.empresa,cnpj:l.cnpj,email:l.email,whatsapp:l.whatsapp,cidade:l.cidade,planoNome:l.planoNome||l.plano,valor:l.valor})};
+// a Carteira mostra o botão "Novo cliente" também para o Comercial
+const aCarteiraV14=aCarteira;
+aCarteira=function(){let h=aCarteiraV14();if(!UI.cart&&podeCadastrarC()&&!/data-act="cart-abrir" data-id=""/.test(h))h=h.replace(/(<div class="page-head"><div>[\s\S]*?<\/div>)/,'$1<div class="actions"><button class="btn primary" data-act="cart-abrir" data-id="">'+svg('plus')+'Novo cliente</button></div>');
+  return h.replace(/(data-act="cart-abrir" data-id="">)(<svg[\s\S]*?<\/svg>)Nova empresa/,'$1$2Novo cliente')};
+
+/* ---------- cadastro pendente: situação da ativação ---------- */
+function bannerAtivacao(e){const a=e.ativacao||{};const ed=podeCadastrarC();
+  return `<div class="banner warn" style="display:block;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div><b>Aguardando pagamento da ativação</b> · ${brl(a.total)}${a.desconto?' (desconto '+brl(a.desconto)+(a.voucher?' · voucher '+esc(a.voucher.codigo):'')+')':''} por ${esc((METODOS_CAD.find(m=>m[0]===a.metodo)||[,'—'])[1])}${a.venc?' · vence '+fmtData(a.venc):''}
+   <div class="small">${a.erro?'<b style="color:var(--crit)">A cobrança não foi gerada: '+esc(a.erro)+'</b>':'O cadastro ativa sozinho quando o Asaas confirmar o pagamento. Enquanto isso, não gera obrigações nem mensalidades.'}</div></div>
+   ${ed?`<div class="actions">${a.link?`<button class="btn sm" data-act="copiar" data-t="${esc(a.link)}">Copiar link</button><button class="btn sm" data-act="ativ-acao" data-v="reenviar" data-id="${e.id}">Reenviar ao cliente</button>`:''}<button class="btn sm" data-act="ativ-acao" data-v="verificar" data-id="${e.id}">Verificar pagamento</button><button class="btn sm" data-act="ativ-metodo" data-id="${e.id}">${a.cobrancaId?'Trocar forma de pagamento':'Gerar cobrança'}</button>${MODO==='api'&&finApi().dados?.falso?`<button class="btn sm ghost" data-act="ativ-acao" data-v="simular-pagamento" data-id="${e.id}">Simular pagamento (teste)</button>`:''}<button class="btn sm ghost" data-act="ativ-acao" data-v="cancelar" data-id="${e.id}">Cancelar cadastro</button></div>`:''}</div></div>`}
+const detalheEmpresaV14=detalheEmpresa;
+detalheEmpresa=function(){const h=detalheEmpresaV14();const e=UI.cart?.id&&emp(UI.cart.id);if(!pendAtiv(e))return h;finApi();
+  const i=h.indexOf('<div class="tabs" role="tablist">');return i>0?h.slice(0,i)+bannerAtivacao(e)+h.slice(i):bannerAtivacao(e)+h};
+ACT['ativ-acao']=async el=>{const v=el.dataset.v;const e=emp(el.dataset.id);
+  const run=async(extra)=>{el.disabled=true;try{const r=await MF.api('POST',`/api/ativacao/${encodeURIComponent(e.id)}/${v}`,extra||{});
+    toast(v==='verificar'?(r.pago?'Pagamento confirmado: cadastro ativado. 🎉':'Ainda não pago (situação no Asaas: '+r.status+').'):v==='reenviar'?[r.aviso?.whatsapp,r.aviso?.email].filter(Boolean).join(' · '):v==='cancelar'?'Cadastro cancelado.':'Pagamento simulado: cadastro ativado.')}catch(er){toast(er.message,true)}el.disabled=false};
+  if(v==='cancelar')return pedirMotivo('Cancelar cadastro','Motivo (ex.: cliente desistiu). A cobrança no Asaas também é cancelada.',m=>run({motivo:m}));run()};
+ACT['ativ-metodo']=el=>{const e=emp(el.dataset.id);const a=e.ativacao||{};openModal(`${mHead('Cobrança da ativação')}<form data-form="ativ-metodo" data-id="${e.id}"><div class="modal-body"><label class="f"><span>Forma de pagamento</span><select name="metodo">${METODOS_CAD.map(([k,r])=>`<option value="${k}" ${a.metodo===k?'selected':''}>${r}</option>`).join('')}</select></label>
+  <p class="small muted">${a.cobrancaId?'A cobrança atual é cancelada no Asaas e uma nova é gerada.':''} Valor: ${brl(a.total)}.</p><label class="chk"><input type="checkbox" name="avisar" checked> Enviar o novo link ao cliente</label></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Gerar cobrança</button></div></form>`)};
+FORM['ativ-metodo']=async(fd,form)=>{try{const r=await MF.api('POST',`/api/ativacao/${encodeURIComponent(form.dataset.id)}/cobranca`,{metodo:fd.get('metodo'),avisar:!!fd.get('avisar')});closeModal();toast('Nova cobrança gerada.'+(r.aviso?' '+[r.aviso.whatsapp,r.aviso.email].join(' · '):''))}catch(er){toast(er.message,true)}};
+// lista da Carteira: selo de "aguardando pagamento"
+const aCarteiraV15b=aCarteira;
+aCarteira=function(){let h=aCarteiraV15b();if(UI.cart)return h;S.empresas.filter(pendAtiv).forEach(e=>{const nome=esc(e.fantasia||e.razao);h=h.replace(new RegExp('(data-act="cart-abrir" data-id="'+e.id+'"[^>]*>)([^<]*)'),`$1$2 ${pill('aguardando pagamento','warn')}`)});return h};
+// obrigações e alertas: cadastro pendente não gera obrigações; o painel avisa
+const obrigFaixaV14=obrigacoesFaixa;
+obrigacoesFaixa=function(comps){const pend=new Set(S.empresas.filter(pendAtiv).map(e=>e.id));return obrigFaixaV14(comps).filter(o=>!pend.has(o.empresaId)||!o.virtual)};
+const motorV14=motor;motor=function(eid,publico){const A=motorV14(eid,publico);if(publico==='c')return A;
+  S.empresas.filter(e=>pendAtiv(e)&&(!eid||e.id===eid)).forEach(e=>{const a=e.ativacao||{};A.unshift({nivel:a.erro?'crit':'info',empresaId:e.id,empresa:e.fantasia||e.razao,area:'Ativação',texto:a.erro?'Cobrança da ativação não gerada: '+a.erro:`Aguardando pagamento da ativação (${brl(a.total)})${a.venc&&a.venc<hoje()?' · vencida':''}`,view:'a-carteira'})});return A};
+
+/* ---------- Financeiro › Vouchers (só master) ---------- */
+const aHonV14=aHon;
+aHon=function(){if(UI.tab.fin2!=='vouchers'||!ehMaster()){let h=aHonV14();if(ehMaster())h=h.replace(/(<button role="tab" aria-selected="(?:true|false)" data-act="tab" data-k="fin2" data-v="auto">)/,`<button role="tab" aria-selected="false" data-act="tab" data-k="fin2" data-v="vouchers">Vouchers</button>$1`);return h}
+  UI.tab.fin2='visao';let h=aHonV14();UI.tab.fin2='vouchers';
+  h=h.replace(/aria-selected="true"(\s+data-act="tab" data-k="fin2" data-v="visao")/,'aria-selected="false"$1').replace(/(<button role="tab" aria-selected="false" data-act="tab" data-k="fin2" data-v="auto">)/,`<button role="tab" aria-selected="true" data-act="tab" data-k="fin2" data-v="vouchers">Vouchers</button>$1`);
+  const i=h.indexOf('</div>',h.indexOf('role="tablist"'))+6;return h.slice(0,i)+vouchersView()};
+function vouchersView(){
+  const d=MODO==='api'?apiDado('vouchers','/api/vouchers'):{indisponivel:true};if(d.indisponivel)return vazio('Vouchers funcionam na versão publicada.');if(d.carregando)return '<div class="panel"><p class="small muted">Carregando…</p></div>';if(d.erro)return vazio(d.erro);
+  const L=d.dados.vouchers||[];const usos=d.dados.usos||[];const txt=v=>v.tipo==='isencao'?'Isenção total':v.tipo==='percentual'?nfmt(v.valor,2).replace(/,00$/,'')+'%':brl(v.valor);
+  return `<div class="panel"><div class="panel-head"><div><h2>Vouchers de desconto e isenção</h2><p class="small muted" style="margin:4px 0 0">Só o master cria. Sem voucher, todo cadastro novo (inclusive o do master) só ativa com o pagamento da 1ª mensalidade.</p></div><button class="btn primary" data-act="voucher-novo">${svg('plus')}Novo voucher</button></div>
+   ${L.length?`<div class="table-wrap"><table><thead><tr><th>Código</th><th>Benefício</th><th>Meses</th><th>Usos</th><th>Validade</th><th>Situação</th><th></th></tr></thead><tbody>${L.map(v=>{const esgot=v.quantidade!=null&&v.usados>=v.quantidade;const venc=v.validade&&v.validade<hoje();return `<tr>
+    <td><b class="mono">${esc(v.codigo)}</b>${v.descricao?`<div class="sub">${esc(v.descricao)}</div>`:''}</td><td>${txt(v)}</td><td class="small">${v.meses===1?'só a 1ª mensalidade':v.meses+' mensalidades'}</td>
+    <td class="small">${v.usados} de ${v.quantidade==null?'ilimitado':v.quantidade}</td><td class="small">${v.validade?fmtData(v.validade):'sem validade'}</td>
+    <td>${!v.ativo?pill('Desativado',''):esgot?pill('Esgotado','warn'):venc?pill('Vencido','warn'):pill('Ativo','ok')}</td>
+    <td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm ghost" data-act="copiar" data-t="${esc(v.codigo)}">Copiar</button><button class="btn sm" data-act="voucher-ativo" data-id="${v.id}" data-v="${v.ativo?'0':'1'}">${v.ativo?'Desativar':'Reativar'}</button></div></td></tr>`}).join('')}</tbody></table></div>`:vazio('Nenhum voucher criado.')}</div>
+  <div class="panel"><h2>Últimos usos</h2>${usos.length?`<div class="table-wrap"><table><thead><tr><th>Quando</th><th>Voucher</th><th>Empresa</th><th class="r">Desconto</th><th>Por</th></tr></thead><tbody>${usos.slice(0,50).map(x=>`<tr><td class="small">${fmtDH(x.em)}</td><td class="mono small">${esc((L.find(v=>v.id===x.voucher_id)||{}).codigo||'')}</td><td class="small">${esc(x.empresa_nome||'')}</td><td class="r num">${brl(Number(x.desconto))}</td><td class="small">${esc(x.usuario_nome||'')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="small muted">Nenhum uso ainda.</p>'}</div>`;
+}
+ACT['voucher-novo']=()=>{openModal(`${mHead('Novo voucher')}<form data-form="voucher" class="modal-body"><div class="grid-f">
+  <label class="f"><span>Código</span><span style="display:flex;gap:6px"><input name="codigo" maxlength="30" style="text-transform:uppercase" placeholder="Ex.: BEMVINDO10"><button type="button" class="btn sm" data-act="voucher-gerar">Gerar</button></span></label>
+  <label class="f"><span>Tipo</span><select name="tipo" data-voucher-tipo><option value="percentual">Percentual de desconto</option><option value="valor">Valor de desconto (R$)</option><option value="isencao">Isenção total</option></select></label>
+  <label class="f" data-voucher-valor><span>Percentual (%)</span><input name="valor" type="number" step="0.01" min="0.01" value="10"></label>
+  <label class="f"><span>Vale para quantas mensalidades</span><input name="meses" type="number" min="1" max="60" value="1"></label>
+  <label class="f"><span>Quantidade de usos</span><input name="quantidade" type="number" min="1" max="100000" value="1" data-voucher-qtd></label>
+  <label class="chk" style="align-self:end"><input type="checkbox" name="ilimitado" data-voucher-ilim> Ilimitado</label>
+  <label class="f"><span>Válido até (opcional)</span><input name="validade" type="date" min="${hoje()}"></label>
+  <label class="f full"><span>Descrição interna</span><input name="descricao" maxlength="200" placeholder="Ex.: campanha de novembro, indicação de parceiro"></label></div>
+  <p class="small muted">A 1ª mensalidade é a da ativação. Com mais de 1 mês, o desconto segue nas mensalidades seguintes. Isenção total ativa o cadastro na hora, sem pagamento.</p>
+  <div class="actions"><button class="btn primary">Criar voucher</button><button type="button" class="btn" data-act="close-modal">Cancelar</button></div></form>`)};
+ACT['voucher-gerar']=()=>{const f=document.querySelector('form[data-form=voucher]');const a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='MF-';for(let i=0;i<6;i++)s+=a[Math.floor(Math.random()*a.length)];f.codigo.value=s};
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-voucher-tipo]')){const l=s.form.querySelector('[data-voucher-valor]');l.hidden=s.value==='isencao';l.querySelector('span').textContent=s.value==='valor'?'Valor (R$)':'Percentual (%)'}
+  if(s.matches&&s.matches('[data-voucher-ilim]'))s.form.querySelector('[data-voucher-qtd]').disabled=s.checked});
+FORM['voucher']=async fd=>{const tipo=String(fd.get('tipo'));const valor=Number(fd.get('valor'));
+  if(tipo==='percentual'&&!(valor>0&&valor<=100)){toast('O percentual vai de 0,01 a 100.',true);return}if(tipo==='valor'&&!(valor>0)){toast('Informe o valor do desconto.',true);return}
+  try{const r=await MF.api('POST','/api/vouchers',{codigo:String(fd.get('codigo')||'').trim(),tipo,valor,meses:Number(fd.get('meses')),quantidade:Number(fd.get('quantidade')),ilimitado:!!fd.get('ilimitado'),validade:fd.get('validade')||null,descricao:fd.get('descricao')});
+    closeModal();invalidar('vouchers');toast('Voucher '+r.voucher.codigo+' criado.');copiar(r.voucher.codigo)}catch(er){toast(er.message,true)}};
+ACT['voucher-ativo']=async el=>{try{await MF.api('PUT','/api/vouchers/'+el.dataset.id,{ativo:el.dataset.v==='1'});invalidar('vouchers')}catch(er){toast(er.message,true)}};
+/* ==== MÓDULOS v15 (fim) ==== */
+
 
 /* ==== v15: atendimento por setor, triagem pelo Théo, devolução por inatividade e etiquetas ==== */
 const ATEND_PADRAO={porSetor:true,triagemTheo:true,inatividadeMin:30,devolverPara:'setor'};

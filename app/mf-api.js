@@ -61,8 +61,13 @@
     for (let i = 0; i < ops.length; i += 400) {
       const parte = ops.slice(i, i + 400);
       try {
-        await api('POST', '/api/dados/lote', { ops: parte.map(({ _j, ...o }) => o) });
+        const resp = await api('POST', '/api/dados/lote', { ops: parte.map(({ _j, ...o }) => o) });
         parte.forEach(o => o.op === 'apagar' ? BASE[col].delete(o.id) : BASE[col].set(o.id, o._j));
+        // o servidor ajustou algum registro (ex.: cadastro aguardando pagamento): a tela passa a mostrar o que ficou gravado
+        if (resp && Array.isArray(resp.corrigidos) && resp.corrigidos.length) {
+          for (const x of resp.corrigidos) { if (!S[x.c]) continue; const i = S[x.c].findIndex(r => String(r.id) === String(x.id)); if (i >= 0) S[x.c][i] = x.dados; else S[x.c].push(x.dados); if (BASE[x.c]) BASE[x.c].set(String(x.id), JSON.stringify(x.dados)); }
+          render();
+        }
       } catch (e) {
         if (e.code === 'negado') {
           // a API recusou: desfaz localmente e mostra o motivo

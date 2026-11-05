@@ -16,6 +16,7 @@ import { registrarIntegra } from './integra.js';
 import { registrarFinanceiro } from './financeiro.js';
 import { registrarDocumentos } from './documentos.js';
 import { registrarCrmTheo } from './crm-theo.js';
+import { registrarAtivacao } from './ativacao.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
 import { registrarPerfil } from './perfil.js';
 import { registrarAtendimento, cfgAtend, filtroConversas, conversaVisivel, limparDeptos, deptosDoUsuario } from './atendimento.js';
@@ -252,7 +253,7 @@ export function registrarRotas(r, { db, hub }) {
     if (!ops.length) return { ok: true, aplicadas: 0 };
     if (ops.length > 500) throw new ErroHttp(413, 'Muitas alterações de uma vez.');
     if (limitar(`lote:${u.id}`, 600, 600).bloqueado) throw new ErroHttp(429, 'Muitas gravações seguidas. Aguarde um instante.');
-    let aplicadas = 0;
+    let aplicadas = 0; const corrigidos = [];
     await db.tx(async q => {
       for (let i = 0; i < ops.length; i++) {
         const op = { ...ops[i], id: String(ops[i].id ?? '') };
@@ -264,6 +265,18 @@ export function registrarRotas(r, { db, hub }) {
         const [atual] = await q('SELECT empresa_id, dados FROM registros WHERE escritorio_id = $1 AND colecao = $2 AND id = $3 FOR UPDATE', [u.escritorio_id, op.c, op.id]);
         try { conferirEscrita(u, op, atual || null); }
         catch (e) { throw new ErroHttp(403, e.message, { indice: i, colecao: op.c }); }
+        // ativação de cadastro: empresa nova só fica ativa pelo pagamento (Asaas) ou voucher, pelo servidor
+        if (op.op === 'salvar' && op.c === 'empresas' && u.ambiente === 'equipe') {
+          const antesG = JSON.stringify(op.dados);
+          if (!atual && !op.dados.exemplo) { op.dados.status = 'aguardando_pagamento'; op.dados.ativacao = { status: 'pendente', metodo: op.dados.plano?.metodo || 'escolha', valor: Number(op.dados.plano?.valor || 0), desconto: 0, total: Number(op.dados.plano?.valor || 0), planoNome: op.dados.plano?.nome || '' }; }
+          else if (atual) {
+            if (atual.dados?.status === 'aguardando_pagamento') op.dados.status = 'aguardando_pagamento';
+            else if (op.dados.status === 'aguardando_pagamento') op.dados.status = atual.dados?.status || 'ativo';
+            if (atual.dados?.ativacao !== undefined) op.dados.ativacao = atual.dados.ativacao; else delete op.dados.ativacao;
+            if (atual.dados?.voucherAplicado !== undefined) op.dados.voucherAplicado = atual.dados.voucherAplicado; else delete op.dados.voucherAplicado;
+          }
+          if (JSON.stringify(op.dados) !== antesG) corrigidos.push({ c: op.c, id: op.id, dados: op.dados });
+        }
 
         // valor da renovação do certificado vem da configuração do escritório, não do navegador
         if (u.ambiente === 'cliente' && op.op === 'salvar' && !atual && op.c === 'tickets' && op.dados.renovacao) {
@@ -301,7 +314,7 @@ export function registrarRotas(r, { db, hub }) {
         }
       }
     });
-    return { ok: true, aplicadas };
+    return { ok: true, aplicadas, ...(corrigidos.length ? { corrigidos } : {}) };
   }, { limite: 8 * 1024 * 1024 });
 
   r.get('/api/usuarios/nomes', async ctx => {
@@ -615,7 +628,9 @@ export function registrarRotas(r, { db, hub }) {
   const wa = registrarWhatsApp(r, { db, exigir, log, pode });
   registrarEnvios(r, { db, exigir, log, pode, wa });
   registrarIntegra(r, { db, exigir, log, pode, wa });
-  registrarFinanceiro(r, { db, exigir, log, pode, wa });
+  const ganchos = {};
+  const fin = registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos });
+  registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos });
   registrarDocumentos(r, { db, exigir, log, pode, wa });
   registrarCrmTheo(r, { db, exigir, log, pode, wa });
   registrarRotasAlteracoes(r, { db, exigir, log, pode, alt });
