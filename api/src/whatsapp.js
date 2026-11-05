@@ -17,6 +17,7 @@ import { urlEnvio, gravarDisco, caminhoDisco, urlDownload } from './arquivos.js'
 const nada = () => { };
 const LOG = { level: 'silent', child: () => LOG, trace: nada, debug: nada, info: nada, warn: nada, error: nada, fatal: nada };
 const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'video/mp4': 'mp4' };
+const foneDe = (k, jid) => { const pn = [k?.remoteJidAlt, k?.senderPn, k?.participantPn, jid].find(x => typeof x === 'string' && x.endsWith('@s.whatsapp.net')); return pn ? pn.split('@')[0].split(':')[0] : ''; };
 const chaveFone = f => { let d = String(f || '').replace(/\D/g, ''); if (d.length >= 12 && d.startsWith('55')) d = d.slice(2); return d.length >= 10 ? d.slice(0, 2) + d.slice(-8) : null; };
 const limpar = t => String(t || '').replace(/^\s*ANEXAR:.*$/gim, '').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi, '').replace(/\*\*/g, '*').trim();
 const PEDE_HUMANO = /\b(atendente|humano|falar com (o |a |um |uma )?(contador|contadora|algu[eé]m|pessoa|atendente))\b/i;
@@ -194,10 +195,20 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     for (const n of opcoes) { try { const [r] = await W.sock.onWhatsApp(n); if (r?.exists) return r.jid; } catch { } }
     throw new ErroHttp(404, `O número +${d} não tem WhatsApp.`);
   }
-  async function conversaAberta(esc, jid) {
-    const [c] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND dados->>'waJid' = $2 AND coalesce(dados->>'status','') <> 'encerrada'
-      ORDER BY atualizado_em DESC LIMIT 1`, [esc, jid]);
-    return c?.dados || null;
+  // a mesma pessoa pode chegar com o número (…@s.whatsapp.net) ou com o identificador interno do WhatsApp (…@lid):
+  // procura pelos dois e, se não achar, pelo telefone; ao achar por outro caminho, guarda o identificador novo
+  async function conversaAberta(esc, jid, fone) {
+    const [c] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND coalesce(dados->>'status','') <> 'encerrada'
+      AND (dados->>'waJid' = $2 OR dados->>'waLid' = $2) ORDER BY atualizado_em DESC LIMIT 1`, [esc, jid]);
+    if (c?.dados) return c.dados;
+    const alvo = chaveFone(fone || (String(jid).endsWith('@s.whatsapp.net') ? jid.split('@')[0] : ''));
+    if (!alvo) return null;
+    const cs = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'conversas' AND coalesce(dados->>'status','') <> 'encerrada'
+      AND coalesce(dados->>'canal','') = 'whatsapp' ORDER BY atualizado_em DESC LIMIT 300`, [esc]);
+    const x = cs.map(r => r.dados).find(d => chaveFone(d.waFone) === alvo || chaveFone(String(d.waJid || '').split('@')[0]) === alvo);
+    if (!x) return null;
+    if (x.waJid !== jid) { if (String(jid).endsWith('@lid')) x.waLid = jid; else if (String(x.waJid).endsWith('@lid')) { x.waLid = x.waJid; x.waJid = jid; } }
+    return x;
   }
   async function salvarConversa(esc, c) {
     if (c.mensagens.length > 200) c.mensagens.splice(0, c.mensagens.length - 200);
@@ -228,7 +239,7 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
       : msg.videoMessage ? ['vídeo', msg.videoMessage] : msg.stickerMessage ? ['figurinha', null] : msg.contactMessage ? ['contato', null] : msg.locationMessage ? ['localização', null] : null;
     // o contato apagou a mensagem para todos no WhatsApp
     if (msg.protocolMessage && (msg.protocolMessage.type === 0 || msg.protocolMessage.type === 'REVOKE') && msg.protocolMessage.key?.id) {
-      const esc0 = await escritorio(); const c0 = esc0 && await conversaAberta(esc0, jid);
+      const esc0 = await escritorio(); const c0 = esc0 && await conversaAberta(esc0, jid, foneDe(k, jid));
       const m0 = c0 && c0.mensagens.find(x => x.waId === msg.protocolMessage.key.id);
       if (m0 && !m0.apagada) { Object.assign(m0, { apagada: true, apagadaEm: new Date().toISOString(), texto: '' }); delete m0.arquivos; await salvarConversa(esc0, c0); }
       return;
@@ -240,14 +251,14 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     // resposta enviada pelo próprio celular do escritório: entra no histórico (não abre conversa nova)
     if (k.fromMe) {
       if (enviadas.has(k.id)) return;
-      const c = await conversaAberta(esc, jid); if (!c || c.mensagens.some(x => x.waId === k.id)) return;
+      const c = await conversaAberta(esc, jid, foneDe(k, jid)); if (!c || c.mensagens.some(x => x.waId === k.id)) return;
       c.mensagens.push({ de: 'humano', texto: texto || `[${midia[0]}]`, em: agora, nome: 'Equipe · pelo celular', canal: 'whatsapp', waId: k.id });
       await salvarConversa(esc, c); return;
     }
 
-    const pn = [k.remoteJidAlt, k.senderPn, jid].find(x => typeof x === 'string' && x.endsWith('@s.whatsapp.net'));
-    const fone = pn ? pn.split('@')[0].split(':')[0] : '';
-    let c = await conversaAberta(esc, jid);
+    let fone = foneDe(k, jid);
+    if (!fone && jid.endsWith('@lid')) { try { const pn = await W.sock?.signalRepository?.lidMapping?.getPNForLID?.(jid); if (pn) fone = String(pn).split('@')[0].split(':')[0]; } catch { } }
+    let c = await conversaAberta(esc, jid, fone);
     if (c?.mensagens?.some(x => x.waId === k.id)) return;
     const nova = !c;
     if (!c) {
