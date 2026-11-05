@@ -34,7 +34,7 @@ export const CONFIG = {
   },
   // chave do cofre (certificados e senhas de portais): 32+ caracteres; sem ela os segredos não podem ser lidos
   cofreChave: e.COFRE_CHAVE || (PRODUCAO ? '' : 'chave-de-desenvolvimento-nao-usar-em-producao'),
-  email: { resend: e.RESEND_API_KEY, remetente: e.EMAIL_REMETENTE || 'Meu Fiscal <nao-responda@meufiscal.com.br>' },
+  email: { resend: e.RESEND_API_KEY, remetente: e.EMAIL_REMETENTE || 'Meu Fiscal <contato@omeufiscal.com.br>' },
   // IA do copiloto, na ordem de preferência:
   //   Groq (gratuita, sem cartão, não treina com os dados: chave em console.groq.com)
   //   Google Gemini (camada gratuita em aistudio.google.com; o Google pode usar os textos para melhorar produtos)
