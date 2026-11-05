@@ -175,7 +175,7 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
     });
     const total = r2(valor - desconto);
     const e = { id, razao, fantasia: String(d.fantasia || '').trim(), cnpj, regime: regime === 'SN-IE' ? 'SN' : regime, regimeId: REGIME_ID[regime], anexo: regime.startsWith('SN') ? (d.anexo || 'III') : null,
-      email, telefone: fone, endereco, municipio: String(d.municipio || '').slice(0, 80), uf: String(d.uf || '').toUpperCase().slice(0, 2), abertura: String(d.abertura || '').slice(0, 10), cnae: String(d.cnae || '').slice(0, 12), atividade: String(d.atividade || '').slice(0, 200),
+      email, telefone: fone, endereco, municipio: String(d.municipio || '').slice(0, 80), ibge: /^\d{7}$/.test(String(d.ibge || '')) ? String(d.ibge) : '', uf: String(d.uf || '').toUpperCase().slice(0, 2), abertura: String(d.abertura || '').slice(0, 10), cnae: String(d.cnae || '').slice(0, 12), atividade: String(d.atividade || '').slice(0, 200),
       contatos: d.contatoNome ? [{ nome: String(d.contatoNome).slice(0, 80), cargo: 'Responsável', telefone: fone, email }] : [], socios: (Array.isArray(d.socios) ? d.socios : []).slice(0, 10).map(s => ({ nome: String(s?.nome || '').slice(0, 100), qualificacao: String(s?.qualificacao || '').slice(0, 60) })).filter(s => s.nome),
       plano: { nome: String(b.plano?.nome || '').slice(0, 60), valor, funcInclusos: Number(b.plano?.funcInclusos || 0), adicionalFunc: Number(b.plano?.adicionalFunc || 0), metodo, diaVenc: Math.min(28, Math.max(1, Number(b.plano?.diaVenc) || 10)) },
       status: 'aguardando_pagamento', inicioControle: L.comp, checklist: [], origem: 'cadastro-comercial', leadId: b.leadId ? String(b.leadId) : null, criadoEm: agora, criadoPor: u.id, criadoPorNome: u.nome,

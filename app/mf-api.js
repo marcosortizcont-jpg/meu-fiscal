@@ -107,6 +107,9 @@
     filaTr.push(d); clearTimeout(timerTr);
     timerTr = setTimeout(aplicarFila, 120);
   }
+  // registro que o servidor acabou de gravar (ex.: NFS-e emitida): entra já, sem esperar o tempo real
+  M.aplicarRemoto = (c, dados) => { if (!S[c] || !dados) return; if (!BASE[c]) BASE[c] = new Map(); const i = S[c].findIndex(x => String(x.id) === String(dados.id));
+    if (i >= 0) S[c][i] = dados; else S[c].push(dados); BASE[c].set(String(dados.id), JSON.stringify(dados)); };
   async function aplicarFila() {
     const itens = [...new Map(filaTr.map(d => [d.c + '|' + d.id, { c: d.c, id: d.id }])).values()]; filaTr = [];
     if (!itens.length) return;

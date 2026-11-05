@@ -19,6 +19,7 @@ import { registrarCrmTheo } from './crm-theo.js';
 import { registrarAtivacao } from './ativacao.js';
 import { registrarContratos } from './contrato.js';
 import { registrarCnpj } from './cnpj.js';
+import { registrarNfse } from './nfse.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
 import { registrarPerfil } from './perfil.js';
 import { registrarAtendimento, cfgAtend, filtroConversas, conversaVisivel, limparDeptos, deptosDoUsuario } from './atendimento.js';
@@ -282,6 +283,13 @@ export function registrarRotas(r, { db, hub }) {
           if (JSON.stringify(op.dados) !== antesG) corrigidos.push({ c: op.c, id: op.id, dados: op.dados });
         }
 
+        // NFS-e transmitida pelo servidor: situação, número, chave e arquivos não mudam pelo navegador
+        if (op.c === 'notas' && atual?.dados?.transmissao) {
+          if (op.op === 'apagar') throw new ErroHttp(403, 'Nota transmitida ao ambiente nacional não pode ser apagada. Use Cancelar.', { indice: i, colecao: op.c });
+          for (const k of ['status', 'chave', 'numero', 'nDPS', 'serie', 'idDPS', 'ambiente', 'valor', 'tomador', 'servico', 'xml', 'danfse', 'dps', 'erros', 'transmissao', 'autorizadaEm', 'canceladaEm', 'motivoCanc', 'cVerif', 'substitui', 'substituidaPor'])
+            if (atual.dados[k] !== undefined) op.dados[k] = atual.dados[k]; else delete op.dados[k];
+          corrigidos.push({ c: op.c, id: op.id, dados: op.dados });
+        }
         // valor da renovação do certificado vem da configuração do escritório, não do navegador
         if (u.ambiente === 'cliente' && op.op === 'salvar' && !atual && op.c === 'tickets' && op.dados.renovacao) {
           const [cfg] = await q(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'config' LIMIT 1`, [u.escritorio_id]);
@@ -635,6 +643,7 @@ export function registrarRotas(r, { db, hub }) {
   const ganchos = {};
   const fin = registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos });
   registrarCnpj(r, { exigir });
+  registrarNfse(r, { db, exigir, log, pode });
   const contratos = registrarContratos(r, { db, exigir, log, pode }); ganchos.aoAtivar = contratos.aoAtivar;
   registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos });
   registrarDocumentos(r, { db, exigir, log, pode, wa });

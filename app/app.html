@@ -5651,7 +5651,7 @@ FORM['cad-ativ']=async(fd,form)=>{
   if(soDig(g('cep')).length!==8||!g('logradouro')||!g('municipio')||g('uf').length!==2){toast('Informe o endereço completo (CEP, rua, município e UF): o banco exige no boleto.',true);return}
   if(g('voucher')&&!(UI.cadVoucher&&UI.cadVoucher.codigo===g('voucher').toUpperCase())){toast('Clique em "Aplicar" para conferir o voucher antes de cadastrar.',true);return}
   if(MODO!=='api'){toast('O cadastro com ativação funciona na versão publicada.',true);return}
-  const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf').toUpperCase(),endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},abertura:form.dataset.abertura||'',cnae:form.dataset.cnae||'',atividade:form.dataset.atividade||'',socios:JSON.parse(form.dataset.socios||'[]'),contatoNome:g('contatoNome'),representanteCpf:soDig(g('representanteCpf')),telefone:g('telefone'),email:g('email')},
+  const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf').toUpperCase(),endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},abertura:form.dataset.abertura||'',ibge:form.dataset.ibge||'',cnae:form.dataset.cnae||'',atividade:form.dataset.atividade||'',socios:JSON.parse(form.dataset.socios||'[]'),contatoNome:g('contatoNome'),representanteCpf:soDig(g('representanteCpf')),telefone:g('telefone'),email:g('email')},
     plano:{nome:g('planoNome')||g('planoSel'),valor:Number(g('valor')),diaVenc:Number(g('diaVenc'))||10},metodo:'bolepix',voucher:g('voucher'),leadId:form.dataset.lead||null,avisar:!!fd.get('avisar')};
   try{const r=await MF.api('POST','/api/ativacao/cadastrar',corpo);UI.cadVoucher=null;closeModal();
     if(r.status==='ativo'){toast('Cliente cadastrado e ativado com o voucher. 🎉')}
@@ -6063,7 +6063,7 @@ async function preencherReceita(form,manual){
     if(d.telefone)por('telefone',fmtFone?fmtFone(d.telefone):d.telefone);if(d.socios?.[0])por('contatoNome',d.socios[0].nome);
     if(form.regime)form.regime.value=d.regime==='MEI'?'MEI':d.regime==='SN'?'SN':'OUTRO';
     if(d.regime==='MEI'&&form.planoSel&&!/^MEI/.test(form.planoSel.value)){const ops=[...form.planoSel.options];const o=ops.find(x=>x.value==='MEI Serviços');if(o){form.planoSel.value=o.value;form.planoSel.dispatchEvent(new Event('change',{bubbles:true}))}}
-    form.dataset.abertura=d.abertura||'';form.dataset.cnae=d.cnae||'';form.dataset.atividade=d.atividade||'';form.dataset.socios=JSON.stringify(d.socios||[]);
+    form.dataset.abertura=d.abertura||'';form.dataset.ibge=d.ibge||'';form.dataset.cnae=d.cnae||'';form.dataset.atividade=d.atividade||'';form.dataset.socios=JSON.stringify(d.socios||[]);
     const sit=d.situacao&&d.situacao!=='ATIVA'?` · <b style="color:var(--crit)">situação ${esc(d.situacao)}</b>`:` · situação ${esc(d.situacao||'—')}`;
     out.innerHTML=`<b style="color:var(--ok)">✓ Dados da Receita preenchidos</b>${sit} · ${d.regime==='MEI'?'MEI':d.regime==='SN'?'Simples Nacional':'fora do Simples'}${d.cnae?' · CNAE '+esc(d.cnae):''}${d.abertura?' · aberta em '+fmtData(d.abertura):''}. Confira e complete o que faltar.`;
     resumoCad()}
@@ -6076,6 +6076,121 @@ document.addEventListener('input',ev=>{const s=ev.target;if(s.name==='cnpj'&&s.f
 const abrirCadastroAtivV16=abrirCadastroAtiv;
 abrirCadastroAtiv=function(pre){abrirCadastroAtivV16(pre);setTimeout(()=>{const f=document.querySelector('form[data-form=cad-ativ]');if(f&&soDig(f.cnpj.value).length===14)preencherReceita(f,false)},60)};
 /* ==== MÓDULOS v16 (fim) ==== */
+
+
+/* ==== MÓDULOS v17: emissor de NFS-e nacional pelo servidor (assinatura com o A1, envio, cancelamento, DANFSe) ==== */
+const ST_NFSE={dps_gerada:['DPS gerada · transmitir','warn'],processando:['Processando','warn'],autorizada:['Autorizada','ok'],rejeitada:['Rejeitada','crit'],cancelada:['Cancelada','crit'],substituida:['Substituída','']};
+const nfseSit=e=>MODO==='api'?apiDado('nfse-sit:'+e.id,'/api/nfse/situacao/'+encodeURIComponent(e.id)):{indisponivel:true};
+function bannerNfse(e){const d=nfseSit(e);if(d.indisponivel||d.carregando||d.erro)return '';const x=d.dados;
+  if(x.emissor==='municipal')return `<div class="banner warn" style="display:block;margin-bottom:12px"><b>${esc(x.municipio)}/${esc(x.uf)}: empresa fora do Simples Nacional emite pelo emissor da prefeitura</b><div class="small">Pela regra do município, só MEI e optantes do Simples emitem no Emissor Nacional. Gere a DPS aqui para conferir os dados e emita a nota no <a href="${esc(x.portalMunicipal)}" target="_blank" rel="noopener">portal da prefeitura</a>; depois registre o número da nota.</div></div>`;
+  const prob=[!x.certificado&&!x.falso?'a empresa ainda não tem o <b>certificado digital A1</b> no sistema (envie em Certificado digital)':'',x.certificado?.vencido?'o <b>certificado A1 venceu</b>':'',!x.ibge?'falta o <b>município (código IBGE)</b> no cadastro da empresa':''].filter(Boolean);
+  return `<div class="banner ${prob.length?'warn':x.ambiente==='producao'?'ok':'info'}" style="display:block;margin-bottom:12px"><b>${x.ambiente==='producao'?'Emissão em produção (nota com valor fiscal)':'Ambiente de teste: as notas emitidas aqui não têm valor fiscal'}</b> · ${esc(x.municipio)}/${esc(x.uf)} · ${x.regime==='MEI'?'MEI':/^SN/.test(x.regime)?'Simples Nacional':'regime normal'}
+   ${prob.length?`<div class="small">Para emitir pelo sistema: ${prob.join('; ')}. Enquanto isso, dá para gerar a DPS e emitir no Emissor Nacional.</div>`:`<div class="small">A nota é assinada com o certificado da empresa e enviada direto ao Sistema Nacional da NFS-e.${x.ambiente!=='producao'?' O escritório libera a produção quando os testes estiverem certos.':''}</div>`}</div>`}
+const vNfseV16=vNfse;
+vNfse=function(e){
+  let h=vNfseV16(e);if(MODO!=='api')return h;const tab=UI.tab.nfse||'emitir';const sit=nfseSit(e).dados;const pronta=sit?.pronta;
+  if(tab==='emitir'){
+    h=h.replace('<div class="tabs" role="tablist">',bannerNfse(e)+'<div class="tabs" role="tablist">');
+    h=h.replace(/<button class="btn primary">Gerar DPS da nota<\/button>/,pronta?'<button class="btn primary">Emitir NFS-e</button><button type="button" class="btn" data-act="nfse-so-dps">Só gerar a DPS (emitir no portal nacional)</button>':'<button class="btn primary">Gerar DPS da nota</button>');
+    h=h.replace(/A plataforma gera a DPS \(Declaração de Prestação de Serviço\) no leiaute do padrão nacional\. A NFS-e passa a valer depois de transmitida ao ambiente nacional ou ao emissor do município\./,pronta?'A nota é assinada com o certificado A1 da empresa e transmitida ao Sistema Nacional da NFS-e; em segundos volta autorizada, com o DANFSe em PDF.':'A plataforma gera a DPS no leiaute nacional; transmita no Emissor Nacional e registre a autorização.');
+    if(UI._subst)h=h.replace('<label class="chk full"><input type="checkbox" name="issRetido">',`<label class="f full"><span>Motivo da substituição</span><select name="cMotivoSubst"><option value="01">Desenquadramento do Simples Nacional</option><option value="02">Enquadramento no Simples Nacional</option><option value="03">Inclusão retroativa de imunidade/isenção</option><option value="04">Exclusão retroativa de imunidade/isenção</option><option value="05">Rejeição de NFS-e pelo tomador ou intermediário</option><option value="99" selected>Outros</option></select></label><label class="chk full"><input type="checkbox" name="issRetido">`);
+  }
+  if(tab==='notas'){
+    const ns=S.notas.filter(n=>n.empresaId===e.id).sort((a,b)=>String(b.criadaEm||b.data||'').localeCompare(String(a.criadaEm||a.data||'')));
+    const corpo=ns.length?`<div class="panel"><div class="table-wrap"><table><thead><tr><th>Nº</th><th>Data</th><th>Tomador</th><th class="r">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${ns.map(n=>`<tr><td class="num">${n.numero?esc(n.numero):'DPS '+n.nDPS}</td><td class="num">${fmtData(n.data)}</td><td>${esc(n.tomador?.nome)}</td><td class="r num">${brl(n.valor)}</td><td>${pill(...(ST_NFSE[n.status]||[n.status,'']))}${n.ambiente==='homologacao'?' <span class="tag">teste</span>':''}</td>
+      <td><div class="actions" style="justify-content:flex-end">${n.danfse?linkArq(n.danfse,'DANFSe'):''}<button class="btn sm" data-act="ver-nota" data-id="${n.id}">Abrir</button></div></td></tr>`).join('')}</tbody></table></div></div>`:vazio('Nenhuma nota emitida ainda.');
+    const i=h.indexOf('</div>',h.indexOf('role="tablist"'))+6;h=h.slice(0,i)+corpo;
+  }
+  return h};
+async function emitirPeloServidor(e,fd,notaId){
+  const b={empresaId:e.id,tomadorId:fd.get('tomadorId'),servicoId:fd.get('servicoId'),valor:Number(fd.get('valor')),comp:fd.get('comp'),obs:fd.get('obs')||'',issRetido:!!fd.get('issRetido'),substituiId:UI._subst||null,cMotivoSubst:fd.get('cMotivoSubst')||'99',notaId:notaId||null};
+  if(!(b.valor>0)){toast('Informe um valor maior que zero.',true);return}
+  const btn=document.querySelector('form[data-form=emitir-nfse] button.primary');if(btn){btn.disabled=true;btn.textContent='Emitindo…'}
+  try{const r=await MF.api('POST','/api/nfse/emitir',b);UI._subst=null;UI.tab.nfse='notas';
+    if(r.ok)toast(`NFS-e nº ${r.nota.numero||''} autorizada. ✔`);else toast('A nota foi rejeitada. Veja o motivo e corrija.',true);
+    MF.aplicarRemoto?.('notas',r.nota);render();setTimeout(()=>modalNota(S.notas.find(x=>x.id===r.nota.id)||r.nota),100)}
+  catch(er){toast(er.message,true);if(btn){btn.disabled=false;btn.textContent='Emitir NFS-e'}}}
+const formEmitirV16=FORM['emitir-nfse'];
+FORM['emitir-nfse']=(fd,form)=>{const e=empAtual();if(MODO==='api'&&nfseSit(e).dados?.pronta&&!UI._soDps)return emitirPeloServidor(e,fd);UI._soDps=false;return formEmitirV16(fd,form)};
+ACT['nfse-so-dps']=el=>{UI._soDps=true;el.form.requestSubmit()};
+const modalNotaV16=modalNota;
+modalNota=function(n){
+  if(MODO!=='api'||!n.transmissao)return modalNotaV16(n);
+  const e=emp(n.empresaId);const st=ST_NFSE[n.status]||[n.status,''];const tom=S.tomadores.find(t=>t.id===n.tomadorId)||{};
+  const msg=`Olá, ${n.tomador.nome}! Segue a nota fiscal de serviço nº ${n.numero||''} de ${e.fantasia||e.razao}, no valor de ${brl(n.valor)}, referente a: ${n.descricao}.`;
+  openModal(`${mHead((n.numero?'NFS-e nº '+n.numero:'DPS nº '+n.nDPS)+' · '+(n.tomador?.nome||''))}<div class="modal-body">
+   <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">${pill(...st)}${n.ambiente==='homologacao'?'<span class="tag">ambiente de teste · sem valor fiscal</span>':''}</div>
+   ${n.status==='rejeitada'?`<div class="banner crit" style="display:block"><b>O Sistema Nacional recusou a nota</b><ul style="margin:6px 0 0 18px">${(n.erros||[]).map(x=>`<li><b>${esc(x.codigo)}</b> ${esc(x.descricao)}${x.complemento?' <span class="small">('+esc(x.complemento)+')</span>':''}</li>`).join('')}</ul><div class="small" style="margin-top:6px">Corrija o cadastro (empresa, tomador ou serviço) e clique em Reenviar. O número da DPS é reaproveitado.</div></div>`:''}
+   <div class="espelho"><div class="dl"><dt>Prestador</dt><dd>${esc(e.razao)} · <span class="mono">${fmtCNPJ(e.cnpj)}</span></dd><dt>Tomador</dt><dd>${esc(n.tomador.nome)} · <span class="mono">${fmtDoc(n.tomador.doc)}</span></dd><dt>Serviço</dt><dd>${esc(n.descricao)} <span class="small muted">(cód. ${esc(n.servico?.cTribNac||n.cTribNac)})</span>${n.obs?'<br><span class="small muted">'+esc(n.obs)+'</span>':''}</dd><dt>Competência</dt><dd>${fmtComp(n.comp)}</dd><dt>Valor</dt><dd class="num"><b>${brl(n.valor)}</b></dd><dt>ISS</dt><dd>${n.issRetido?'Retido pelo tomador':e.regime==='MEI'?'Incluso no DAS-MEI':'Recolhido pelo prestador'}</dd>
+    ${n.chave?`<dt>Chave de acesso</dt><dd class="mono small">${esc(n.chave)} <button class="btn sm ghost" data-act="copiar" data-t="${esc(n.chave)}">Copiar</button></dd>`:''}${n.status==='cancelada'?`<dt>Cancelamento</dt><dd>${esc(n.motivoCanc||'')} · ${fmtDH(n.canceladaEm)}</dd>`:''}</div></div>
+   <div class="actions" style="margin:10px 0">${n.danfse?linkArq(n.danfse,n.danfse.oficial?'Baixar DANFSe (PDF)':'Baixar espelho (PDF)'):''}${n.xml?linkArq(n.xml,'XML da NFS-e'):''}${n.dps?linkArq(n.dps,'XML da DPS'):''}${n.status==='autorizada'&&n.danfse&&!n.danfse.oficial?`<button class="btn sm" data-act="nfse-danfse" data-id="${n.id}">Baixar DANFSe oficial de novo</button>`:''}${n.chave?`<a class="btn sm" href="https://www.nfse.gov.br/consultapublica" target="_blank" rel="noopener">Consulta pública</a>`:''}</div>
+   ${n.status==='autorizada'?`<div class="panel" style="background:var(--surface-2)"><h3>Enviar ao tomador</h3><p class="small">${esc(msg)}</p><div class="actions">${tom.telefone?`<a class="btn sm" href="${waLink(tom.telefone,msg)}" target="_blank" rel="noopener">Enviar por WhatsApp</a>`:'<span class="small muted">Cadastre o telefone do tomador para enviar por WhatsApp.</span>'}<button class="btn sm" data-act="copiar" data-t="${esc(msg)}">Copiar mensagem</button></div></div>`:''}
+  </div><div class="modal-foot">${n.status==='rejeitada'?`<button class="btn primary" data-act="nfse-reenviar" data-id="${n.id}">Reenviar</button>`:''}${n.status==='autorizada'?`<button class="btn" data-act="substituir-nota" data-id="${n.id}">Substituir</button><button class="btn danger" data-act="nfse-cancelar" data-id="${n.id}">Cancelar nota</button>`:''}</div>`,true)};
+ACT['nfse-reenviar']=async el=>{const n=S.notas.find(x=>x.id===el.dataset.id);const e=emp(n.empresaId);const fd=new FormData();
+  [['tomadorId',n.tomadorId],['servicoId',n.servicoId],['valor',n.valor],['comp',n.comp],['obs',n.obs||'']].forEach(([k,v])=>fd.set(k,v));if(n.issRetido)fd.set('issRetido','1');closeModal();emitirPeloServidor(e,fd,n.id)};
+ACT['nfse-danfse']=async el=>{el.disabled=true;try{const r=await MF.api('POST',`/api/nfse/${encodeURIComponent(el.dataset.id)}/danfse`,{});toast(r.danfse.oficial?'DANFSe oficial baixado.':'O DANFSe oficial ainda não está disponível; segue o espelho.');closeModal()}catch(er){toast(er.message,true)}el.disabled=false};
+ACT['nfse-cancelar']=el=>{const n=S.notas.find(x=>x.id===el.dataset.id);openModal(`${mHead('Cancelar NFS-e nº '+(n.numero||''))}<form data-form="nfse-cancelar" data-id="${n.id}"><div class="modal-body">
+  <p class="small muted" style="margin-top:0">O cancelamento é registrado no Sistema Nacional da NFS-e e não pode ser desfeito. Se for corrigir dados, prefira <b>Substituir</b>.</p>
+  <div class="grid-f"><label class="f full"><span>Motivo</span><select name="cMotivo"><option value="1">Erro na emissão</option><option value="2">Serviço não prestado</option><option value="9">Outros</option></select></label>
+  <label class="f full"><span>Explique o motivo (mínimo 15 caracteres)</span><textarea name="motivo" minlength="15" maxlength="255" required></textarea></label></div></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Voltar</button><button class="btn danger">Cancelar a nota</button></div></form>`)};
+FORM['nfse-cancelar']=async(fd,form)=>{try{const r=await MF.api('POST',`/api/nfse/${encodeURIComponent(form.dataset.id)}/cancelar`,{cMotivo:fd.get('cMotivo'),motivo:fd.get('motivo')});MF.aplicarRemoto?.('notas',r.nota);closeModal();render();toast('NFS-e cancelada no Sistema Nacional.')}catch(er){toast(er.message,true)}};
+const actCancelarNotaV16=ACT['cancelar-nota'];ACT['cancelar-nota']=el=>{const n=S.notas.find(x=>x.id===el.dataset.id);if(MODO==='api'&&n?.transmissao)return ACT['nfse-cancelar'](el);return actCancelarNotaV16(el)};
+
+/* ---------- cadastro de serviço com sugestão pela atividade da empresa ---------- */
+ACT['novo-servico']=el=>{const s=el.dataset.id?S.servicos.find(x=>x.id===el.dataset.id):{};const e=empAtual();
+  openModal(`${mHead(s.id?'Editar serviço':'Novo serviço')}<form data-form="servico" data-id="${s.id||''}"><div class="modal-body">
+   <div id="serv-sug" class="small muted" style="margin-bottom:10px">${MODO==='api'?'Buscando os serviços da sua atividade…':''}</div>
+   <div class="grid-f">
+    <label class="f full"><span>Procurar serviço (palavra ou código)</span><input type="search" data-serv-busca placeholder="ex.: consultoria, manutenção, 17.06" autocomplete="off"></label>
+    <div class="f full" id="serv-res"></div>
+    <label class="f full"><span>Descrição que vai na nota</span><input type="text" name="descricao" required maxlength="300" value="${esc(s.descricao)}" placeholder="Como você descreve o serviço para o cliente"></label>
+    <label class="f"><span>Código de tributação nacional</span><input type="text" name="ctrib" required pattern="\\d{6}" maxlength="6" inputmode="numeric" value="${esc(s.cTribNac)}" class="mono"></label>
+    <label class="f"><span>Item da LC 116</span><input type="text" name="item" readonly value="${esc(s.itemLC116||'')}" class="mono"></label>
+    <div class="f full small muted" id="serv-desc">${s.cTribNac?'':'Escolha um serviço da lista acima.'}</div>
+    <label class="f"><span>Código NBS (opcional)</span><input type="text" name="nbs" pattern="\\d{9}" maxlength="9" inputmode="numeric" value="${esc(s.cNBS||'')}" class="mono" placeholder="9 dígitos"></label>
+    <label class="f"><span>Alíquota de ISS (%) ${e?.regime==='MEI'?'· não se aplica ao MEI':''}</span><input type="number" step="0.01" min="0" max="5" name="aliq" value="${s.aliqISS??(e?.regime==='MEI'?0:2)}"></label>
+    <div class="f full" id="serv-nbs"></div>
+    <label class="f"><span>Código do município (opcional)</span><input type="text" name="ctribmun" maxlength="3" inputmode="numeric" value="${esc(s.cTribMun||'')}" placeholder="3 dígitos, se a prefeitura exigir"></label>
+   </div></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar</button></div></form>`,true);
+  if(MODO==='api'&&e){MF.api('GET',`/api/nfse/servicos?empresaId=${encodeURIComponent(e.id)}`).then(r=>{const box=document.getElementById('serv-sug');if(!box)return;const fm=document.querySelector('form[data-form=servico]');if(fm&&r.atividade)fm.dataset.atividade=String(r.atividade).replace(/^./,c=>c.toUpperCase());
+    box.innerHTML=r.sugeridos.length?`<b>Sugeridos para a sua atividade</b>${r.atividade?' ('+esc(r.cnae)+' · '+esc(r.atividade)+')':''}:<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${r.sugeridos.map(x=>chipServ(x)).join('')}</div>`:r.resultados.length?`<b>Parecidos com a sua atividade</b>${r.atividade?' ('+esc(r.atividade)+')':''}:<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${r.resultados.slice(0,6).map(x=>chipServ(x)).join('')}</div>`:'Procure o serviço pela palavra ou pelo código.';
+    if(!s.cTribNac&&r.sugeridos[0])escolherServ(r.sugeridos[0],true)}).catch(()=>{});
+    if(s.cTribNac)mostrarDescServ(s.cTribNac)}};
+const fmtItem=c=>String(c).slice(0,2)+'.'+String(c).slice(2,4);
+const chipServ=x=>`<button type="button" class="btn sm" data-act="serv-escolher" data-c="${x.cTribNac}" data-d="${esc(x.descricao)}" title="${esc(x.descricao)}">${fmtItem(x.cTribNac)} · ${esc(x.descricao.length>58?x.descricao.slice(0,56)+'…':x.descricao)}</button>`;
+function escolherServ(x,auto){const f=document.querySelector('form[data-form=servico]');if(!f)return;f.ctrib.value=x.cTribNac;f.item.value=fmtItem(x.cTribNac);
+  if(!f.descricao.value.trim()||auto||f.dataset.descAuto==='1'){const atv=auto&&f.dataset.atividade;f.descricao.value=(atv||String(x.descricao).split(/[,;(]/)[0]).replace(/\.$/,'').trim().slice(0,300);f.dataset.descAuto='1'}
+  document.getElementById('serv-desc').innerHTML=`<b>${fmtItem(x.cTribNac)} · ${x.cTribNac}</b> ${esc(x.descricao)}`;buscarNbs(x.cTribNac)}
+function mostrarDescServ(c){MF.api('GET',`/api/nfse/servicos?empresaId=${encodeURIComponent(empAtual().id)}&q=${c}`).then(r=>{const x=r.resultados.find(y=>y.cTribNac===c);const d=document.getElementById('serv-desc');if(x&&d)d.innerHTML=`<b>${fmtItem(c)} · ${c}</b> ${esc(x.descricao)}`}).catch(()=>{})}
+function buscarNbs(c,q){if(MODO!=='api')return;MF.api('GET',`/api/nfse/nbs?cTribNac=${c||''}&q=${encodeURIComponent(q||'')}`).then(r=>{const box=document.getElementById('serv-nbs');if(!box)return;
+  box.innerHTML=r.resultados.length?`<span class="small muted">NBS que combinam com o serviço (confira antes de usar):</span><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${r.resultados.slice(0,6).map(x=>`<button type="button" class="btn sm ghost" data-act="nbs-escolher" data-c="${x.cNBS}" title="${esc(x.descricao)}">${x.cNBS.replace(/^(\d)(\d{2})(\d{2})(\d{2})(\d{2})$/,'$1.$2$3.$4.$5')} · ${esc(x.descricao.slice(0,48))}</button>`).join('')}</div>`:''}).catch(()=>{})}
+ACT['serv-escolher']=el=>escolherServ({cTribNac:el.dataset.c,descricao:el.dataset.d});
+document.addEventListener('input',ev=>{const s=ev.target;if(s.name==='descricao'&&s.form&&s.form.dataset.form==='servico')s.form.dataset.descAuto='0'});
+ACT['nbs-escolher']=el=>{const f=document.querySelector('form[data-form=servico]');if(f)f.nbs.value=el.dataset.c};
+let servBuscaT;document.addEventListener('input',ev=>{const s=ev.target;if(!s.matches||!s.matches('[data-serv-busca]'))return;clearTimeout(servBuscaT);const q=s.value.trim();
+  servBuscaT=setTimeout(()=>{const box=document.getElementById('serv-res');if(!box)return;if(q.length<2){box.innerHTML='';return}
+    MF.api('GET',`/api/nfse/servicos?empresaId=${encodeURIComponent(empAtual().id)}&q=${encodeURIComponent(q)}`).then(r=>{box.innerHTML=r.resultados.length?`<div style="display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto">${r.resultados.map(x=>`<button type="button" class="btn sm" style="justify-content:flex-start;text-align:left;white-space:normal" data-act="serv-escolher" data-c="${x.cTribNac}" data-d="${esc(x.descricao)}"><b class="mono">${fmtItem(x.cTribNac)}</b>&nbsp;${esc(x.descricao)}</button>`).join('')}</div>`:'<span class="small muted">Nada encontrado. Tente outra palavra.</span>'}).catch(()=>{})},250)});
+FORM['servico']=(fd,form)=>{const e=empAtual();const c=String(fd.get('ctrib')||'');if(!/^\d{6}$/.test(c)){toast('Escolha o código de tributação nacional (6 dígitos).',true);return}
+  const dados={descricao:String(fd.get('descricao')).trim(),itemLC116:fmtItem(c),cTribNac:c,cNBS:soDig(fd.get('nbs')||''),cTribMun:soDig(fd.get('ctribmun')||''),aliqISS:Number(fd.get('aliq')||0)};closeModal();
+  mut('servicos',()=>{const s=form.dataset.id&&S.servicos.find(x=>x.id===form.dataset.id);if(s)Object.assign(s,dados);else S.servicos.push({id:uid(),empresaId:e.id,...dados})},['NFS-e','Salvou serviço',dados.descricao])};
+
+/* ---------- painel: configuração da emissão por empresa ---------- */
+const detalheEmpresaV16=detalheEmpresa;
+detalheEmpresa=function(){const h=detalheEmpresaV16();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||MODO!=='api'||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
+  const n=e.nfse||{};const ed=podeMod('carteira','editar');
+  const p=`<div class="panel" style="margin-bottom:12px"><div class="panel-head"><h2>Emissão de NFS-e</h2>${pill(n.ambiente==='producao'?'Produção':'Ambiente de teste',n.ambiente==='producao'?'ok':'warn')}</div>
+   <form data-form="emp-nfse" data-id="${e.id}" class="grid-f"><label class="f"><span>Ambiente</span><select name="ambiente" ${ed?'':'disabled'}><option value="homologacao" ${n.ambiente!=='producao'?'selected':''}>Teste (produção restrita, sem valor fiscal)</option><option value="producao" ${n.ambiente==='producao'?'selected':''}>Produção (nota com valor fiscal)</option></select></label>
+    <label class="f"><span>Inscrição municipal</span><input name="im" maxlength="15" inputmode="numeric" value="${esc(n.im||e.inscricaoMunicipal||'')}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>Série da DPS</span><input name="serie" maxlength="5" inputmode="numeric" value="${esc(n.serie||'1')}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>Código IBGE do município</span><input name="ibge" maxlength="7" inputmode="numeric" value="${esc(e.ibge||'')}" placeholder="ex.: 5002704 (Campo Grande)" ${ed?'':'disabled'}></label>
+    ${ed?'<div class="actions full"><button class="btn sm primary">Salvar</button></div>':''}</form>
+   <p class="small muted" style="margin:6px 0 0">Comece em <b>teste</b>, emita uma nota de conferência e só então mude para <b>produção</b>. É preciso o certificado A1 da empresa guardado no sistema.</p></div>`;
+  const i=h.indexOf('<div class="tabs" role="tablist">');return i>0?h.slice(0,i)+p+h.slice(i):h+p};
+FORM['emp-nfse']=(fd,form)=>{const e=emp(form.dataset.id);const amb=fd.get('ambiente')==='producao'?'producao':'homologacao';const ibge=soDig(fd.get('ibge'));if(ibge&&ibge.length!==7){toast('O código IBGE tem 7 dígitos.',true);return}
+  const go2=()=>{mut('empresas',()=>{e.nfse={...(e.nfse||{}),ambiente:amb,im:soDig(fd.get('im')),serie:soDig(fd.get('serie'))||'1'};if(ibge)e.ibge=ibge},['Carteira','Configurou emissão de NFS-e ('+amb+')',e.razao]);invalidar('nfse-sit:'+e.id);toast('Emissão de NFS-e salva.')};
+  if(amb==='producao'&&e.nfse?.ambiente!=='producao')return confirmar('Emitir em produção',`A partir de agora, as notas de <b>${esc(e.razao)}</b> serão emitidas <b>com valor fiscal</b>. Confirme que a nota de teste saiu correta.`,'Liberar produção',go2);go2()};
+/* ==== MÓDULOS v17 (fim) ==== */
 
 
 lerHash();
