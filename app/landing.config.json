@@ -38,100 +38,145 @@
   "_metricas": "Quando tiver números medidos (economia média, satisfação, tempo de entrega das guias), troque estes cartões pelos números reais.",
   "planos": [
     {
-      "id": "basic",
-      "grupo": "servicos",
-      "nome": "Basic",
-      "subtitulo": "Perfeito para quem precisa de suporte, autonomia e agilidade no dia a dia.",
-      "preco": 259,
+      "id": "mei-servicos",
+      "grupo": "mei",
+      "nome": "MEI Serviços",
+      "subtitulo": "Para o MEI prestador de serviços que quer o mês em dia sem preocupação.",
+      "preco": 99.9,
       "destaque": false,
       "itens": [
-        {
-          "t": "Abertura de CNPJ",
-          "tag": "Grátis"
-        },
-        "Contabilidade completa",
-        {
-          "t": "Certificado digital A1",
-          "tag": "Grátis"
-        },
-        "Atendimento por WhatsApp, telefone, e-mail e chat",
-        "Painel contábil completo para a sua empresa"
+        "DAS-MEI emitido e enviado todo mês, automaticamente",
+        "Declaração anual do MEI (DASN-SIMEI)",
+        "Controle do limite de faturamento do MEI",
+        "Emissor de NFS-e integrado",
+        "Painel financeiro: receitas, despesas e limite do MEI",
+        "Théo, assistente virtual 24h",
+        "Atendimento por WhatsApp, chat e e-mail"
       ]
     },
     {
-      "id": "unique",
+      "id": "mei-comercio",
+      "grupo": "mei",
+      "nome": "MEI Comércio",
+      "subtitulo": "Para o MEI do comércio ou indústria, com controle de compras e vendas.",
+      "preco": 159.9,
+      "destaque": true,
+      "selo": "MEI com mercadorias",
+      "titulo": "Tudo do MEI Serviços, mais:",
+      "itens": [
+        "Relatório mensal de receitas com e sem nota fiscal",
+        "Controle das notas de compra e de venda de mercadorias",
+        "Orientação sobre ICMS e inscrição estadual"
+      ]
+    },
+    {
+      "id": "essencial",
       "grupo": "servicos",
-      "nome": "Unique",
-      "subtitulo": "Tenha um gerente de conta dedicado para sua empresa.",
+      "nome": "Essencial",
+      "subtitulo": "Contabilidade completa e autonomia no dia a dia.",
+      "preco": 259,
+      "destaque": false,
+      "itens": [
+        "Contabilidade completa e impostos apurados todo mês",
+        "Pró-labore dos sócios e obrigações acessórias",
+        "Emissor de NFS-e integrado",
+        "Painel financeiro: receitas, despesas e relatórios do negócio",
+        "Théo, assistente virtual 24h",
+        "Atendimento por WhatsApp, chat e e-mail"
+      ]
+    },
+    {
+      "id": "profissional",
+      "grupo": "servicos",
+      "nome": "Profissional",
+      "subtitulo": "Um gerente de conta dedicado para a sua empresa.",
       "preco": 450,
       "destaque": true,
-      "selo": "Especialista dedicado",
-      "titulo": "Tudo do Basic, mais:",
+      "selo": "Mais escolhido",
+      "titulo": "Tudo do Essencial, mais:",
       "itens": [
-        "Gerente de conta dedicado para cuidar de tudo da sua empresa",
-        "Horário estendido: atendimento das 8h às 21h com o gerente de conta",
-        "Gestão da folha de sócios e funcionários no Painel de RH: até 5 pessoas",
+        "Gerente de conta dedicado",
+        "Atendimento prioritário",
+        "Horário estendido: das 8h às 21h",
+        "Folha de sócios e funcionários: até 5 pessoas",
         "Importação de notas fiscais de qualquer município"
       ]
     },
     {
-      "id": "unique-plus",
+      "id": "premium",
       "grupo": "servicos",
-      "nome": "Unique Plus",
-      "subtitulo": "Para quem tem uma operação maior e mais demandas financeiras.",
+      "nome": "Premium",
+      "subtitulo": "Para operações maiores, com atendimento completo.",
       "preco": 700,
       "destaque": false,
-      "titulo": "Tudo do Unique, mais:",
+      "titulo": "Tudo do Profissional, mais:",
       "itens": [
-        "Gestão da folha de sócios e funcionários no Painel de RH: até 10 colaboradores",
+        "Atendimento também por ligação",
+        {
+          "t": "Abertura de CNPJ",
+          "tag": "Grátis"
+        },
+        {
+          "t": "Certificado digital A1",
+          "tag": "Grátis"
+        },
+        "Folha de sócios e funcionários: até 10 colaboradores",
         "Importação de até 800 notas fiscais",
         "Importação de extrato bancário: até 3 contas"
       ]
     },
     {
-      "id": "basic-comercio",
+      "id": "essencial-comercio",
       "grupo": "comercio",
-      "nome": "Basic Comércio",
-      "subtitulo": "Ideal para quem quer manter tudo em dia sem complicação.",
+      "nome": "Essencial Comércio",
+      "subtitulo": "Tudo em dia, sem complicação, para quem vende mercadorias.",
       "preco": 359,
       "destaque": false,
       "itens": [
-        "Contabilidade completa",
+        "Contabilidade completa e impostos apurados todo mês (inclusive ICMS)",
+        "Folha de sócios e funcionários: até 3 pessoas",
+        "Emissor de NFS-e integrado",
+        "Painel financeiro: receitas, despesas e relatórios do negócio",
+        "Théo, assistente virtual 24h",
+        "Atendimento por WhatsApp, chat e e-mail"
+      ]
+    },
+    {
+      "id": "profissional-comercio",
+      "grupo": "comercio",
+      "nome": "Profissional Comércio",
+      "subtitulo": "Um gerente de conta dedicado para a sua loja ou indústria.",
+      "preco": 550,
+      "destaque": true,
+      "selo": "Mais escolhido",
+      "titulo": "Tudo do Essencial Comércio, mais:",
+      "itens": [
+        "Gerente de conta dedicado",
+        "Atendimento prioritário",
+        {
+          "t": "Abertura de CNPJ",
+          "tag": "Grátis"
+        },
         {
           "t": "Certificado digital A1",
           "tag": "Grátis"
         },
-        "Painel contábil completo para a sua empresa",
-        "Atendimento por WhatsApp, telefone, e-mail e chat",
-        "Gestão da folha de sócios e funcionários no Painel de RH: até 3 pessoas"
-      ]
-    },
-    {
-      "id": "unique-comercio",
-      "grupo": "comercio",
-      "nome": "Unique Comércio",
-      "subtitulo": "Tenha um gerente de conta dedicado para sua empresa.",
-      "preco": 550,
-      "destaque": true,
-      "selo": "Especialista dedicado",
-      "titulo": "Tudo do Basic, mais:",
-      "itens": [
-        "Gerente de conta dedicado para cuidar de tudo da sua empresa",
-        "Gestão da folha de sócios e funcionários no Painel de RH: até 5 pessoas",
+        "Folha de sócios e funcionários: até 5 pessoas",
         "Importação de notas fiscais de qualquer município",
         "Declaração de Imposto de Renda Pessoa Física"
       ]
     },
     {
-      "id": "unique-plus-comercio",
+      "id": "premium-comercio",
       "grupo": "comercio",
-      "nome": "Unique Plus Comércio",
-      "subtitulo": "Para quem tem uma operação maior e mais demandas financeiras.",
+      "nome": "Premium Comércio",
+      "subtitulo": "Para operações maiores, com atendimento completo.",
       "preco": 900,
       "destaque": false,
-      "titulo": "Tudo do Unique, mais:",
+      "titulo": "Tudo do Profissional Comércio, mais:",
       "itens": [
-        "Gestão da folha de sócios e funcionários no Painel de RH: até 10 colaboradores",
+        "Atendimento também por ligação",
+        "Folha de sócios e funcionários: até 10 colaboradores",
         "Importação de extrato bancário: até 3 contas"
       ]
     }
@@ -147,6 +192,10 @@
   ],
   "gruposPlanos": [
     {
+      "id": "mei",
+      "nome": "MEI"
+    },
+    {
       "id": "servicos",
       "nome": "Prestação de serviços"
     },
@@ -155,5 +204,5 @@
       "nome": "Comércio"
     }
   ],
-  "_planos": "Cada plano: grupo (servicos ou comercio), nome, subtitulo, preco, destaque (true no plano em evidência), selo, titulo (ex.: 'Tudo do Basic, mais:'), itens (texto ou {t, tag}) e adicional opcional {nome, preco}."
+  "_planos": "Cada plano: grupo (mei, servicos ou comercio), nome, subtitulo, preco, destaque (true no plano em evidência), selo, titulo (ex.: 'Tudo do Essencial, mais:'), itens (texto ou {t, tag}) e adicional opcional {nome, preco}. Regras atuais: ligação só no Premium; atendimento prioritário do Profissional para cima; abertura de CNPJ e certificado A1 grátis só em planos acima de R$ 450. Os serviços de cada plano que vão no contrato ficam em api/src/planos.js."
 }

@@ -293,3 +293,25 @@ CREATE TABLE IF NOT EXISTS banco_cobrancas (
   criado_em      TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (escritorio_id, provedor, cobranca_id)
 );
+
+-- Comissões do comercial: % do 1º pagamento de cada cliente cadastrado (só o próprio usuário e o Financeiro veem)
+CREATE TABLE IF NOT EXISTS comissoes (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  escritorio_id  UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  empresa_id     TEXT NOT NULL,
+  empresa_nome   TEXT,
+  usuario_id     UUID,
+  usuario_nome   TEXT,
+  base           NUMERIC NOT NULL,
+  percentual     NUMERIC NOT NULL,
+  valor          NUMERIC NOT NULL,
+  referencia     TEXT NOT NULL,
+  status         TEXT NOT NULL DEFAULT 'a_pagar',
+  paga_em        DATE,
+  forma          TEXT,
+  obs            TEXT,
+  pago_por_nome  TEXT,
+  criado_em      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (escritorio_id, empresa_id, referencia)
+);
+CREATE INDEX IF NOT EXISTS comissoes_usuario ON comissoes (escritorio_id, usuario_id);

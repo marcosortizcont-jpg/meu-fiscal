@@ -17,6 +17,7 @@ import { registrarFinanceiro } from './financeiro.js';
 import { registrarDocumentos } from './documentos.js';
 import { registrarCrmTheo } from './crm-theo.js';
 import { registrarAtivacao } from './ativacao.js';
+import { registrarContratos } from './contrato.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
 import { registrarPerfil } from './perfil.js';
 import { registrarAtendimento, cfgAtend, filtroConversas, conversaVisivel, limparDeptos, deptosDoUsuario } from './atendimento.js';
@@ -268,12 +269,14 @@ export function registrarRotas(r, { db, hub }) {
         // ativação de cadastro: empresa nova só fica ativa pelo pagamento no banco ou voucher, pelo servidor
         if (op.op === 'salvar' && op.c === 'empresas' && u.ambiente === 'equipe') {
           const antesG = JSON.stringify(op.dados);
-          if (!atual && !op.dados.exemplo) { op.dados.status = 'aguardando_pagamento'; op.dados.ativacao = { status: 'pendente', metodo: op.dados.plano?.metodo || 'escolha', valor: Number(op.dados.plano?.valor || 0), desconto: 0, total: Number(op.dados.plano?.valor || 0), planoNome: op.dados.plano?.nome || '' }; }
+          if (!atual && !op.dados.exemplo) { op.dados.status = 'aguardando_pagamento'; op.dados.ativacao = { status: 'pendente', metodo: op.dados.plano?.metodo || 'escolha', valor: Number(op.dados.plano?.valor || 0), desconto: 0, total: Number(op.dados.plano?.valor || 0), planoNome: op.dados.plano?.nome || '' }; op.dados.criadoPor = u.id; op.dados.criadoPorNome = u.nome; delete op.dados.contrato; }
           else if (atual) {
             if (atual.dados?.status === 'aguardando_pagamento') op.dados.status = 'aguardando_pagamento';
             else if (op.dados.status === 'aguardando_pagamento') op.dados.status = atual.dados?.status || 'ativo';
             if (atual.dados?.ativacao !== undefined) op.dados.ativacao = atual.dados.ativacao; else delete op.dados.ativacao;
             if (atual.dados?.voucherAplicado !== undefined) op.dados.voucherAplicado = atual.dados.voucherAplicado; else delete op.dados.voucherAplicado;
+            // contrato e autoria do cadastro (base da comissão) também são do servidor
+            for (const k of ['contrato', 'criadoPor', 'criadoPorNome', 'cadastradoPor']) { if (atual.dados?.[k] !== undefined) op.dados[k] = atual.dados[k]; else delete op.dados[k]; }
           }
           if (JSON.stringify(op.dados) !== antesG) corrigidos.push({ c: op.c, id: op.id, dados: op.dados });
         }
@@ -291,7 +294,7 @@ export function registrarRotas(r, { db, hub }) {
           const vistas = new Set(op.dados.mensagens.map(chave));
           const faltam = atual.dados.mensagens.filter(m => !vistas.has(chave(m)));
           if (faltam.length) op.dados.mensagens = [...op.dados.mensagens, ...faltam].sort((a, b) => String(a.em).localeCompare(String(b.em))).slice(-200);
-          for (const k of ['canal', 'waJid', 'waFone']) if (atual.dados[k] !== undefined) op.dados[k] = atual.dados[k];
+          for (const k of ['canal', 'waJid', 'waFone', 'waLid']) if (atual.dados[k] !== undefined) op.dados[k] = atual.dados[k];
         }
         // momento em que alguém assumiu a conversa: base da devolução por inatividade (o servidor carimba)
         if (op.op === 'salvar' && op.c === 'conversas') {
@@ -630,6 +633,7 @@ export function registrarRotas(r, { db, hub }) {
   registrarIntegra(r, { db, exigir, log, pode, wa });
   const ganchos = {};
   const fin = registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos });
+  const contratos = registrarContratos(r, { db, exigir, log, pode }); ganchos.aoAtivar = contratos.aoAtivar;
   registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos });
   registrarDocumentos(r, { db, exigir, log, pode, wa });
   registrarCrmTheo(r, { db, exigir, log, pode, wa });

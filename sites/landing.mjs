@@ -1,7 +1,7 @@
 // Monta a página comercial (index.html do site do cliente) a partir de app/landing.html + app/landing.config.json.
 // Os textos que mudam com frequência (preços, planos, depoimentos, números) ficam no JSON.
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const brl = n => Number(n).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+const brl = n => Number(n).toLocaleString('pt-BR', { minimumFractionDigits: Number(n) % 1 ? 2 : 0, maximumFractionDigits: 2 });
 const CHECK = '<svg viewBox="0 0 24 24" class="mt-0.5 h-5 w-5 shrink-0 text-esmeralda" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg>';
 
 function cartaoPlano(p) {
@@ -22,7 +22,7 @@ function planos(c) {
   const grupos = (c.gruposPlanos && c.gruposPlanos.length) ? c.gruposPlanos : [{ id: '', nome: '' }];
   const lista = c.planos || [];
   const abas = grupos.length > 1 ? `<div class="mt-10 flex justify-center"><div class="inline-flex rounded-2xl border border-slate-200 bg-claro p-1" role="tablist" aria-label="Tipo de empresa">${grupos.map((g, i) => `<button type="button" role="tab" data-grupo-plano="${esc(g.id)}" aria-selected="${i === 0}" class="rounded-xl px-5 py-2.5 text-sm font-semibold transition aria-selected:bg-marinho aria-selected:text-white text-slate-600">${esc(g.nome)}</button>`).join('')}</div></div>` : '';
-  return abas + grupos.map((g, i) => `<div class="mt-12 grid items-stretch gap-6 lg:grid-cols-3 ${i ? 'hidden' : ''}" data-planos-de="${esc(g.id)}">${lista.filter(p => !g.id || (p.grupo || '') === g.id).map(cartaoPlano).join('\n')}</div>`).join('');
+  return abas + grupos.map((g, i) => { const ps = lista.filter(p => !g.id || (p.grupo || '') === g.id); return `<div class="mt-12 grid items-stretch gap-6 ${ps.length === 2 ? 'mx-auto max-w-3xl md:grid-cols-2' : 'lg:grid-cols-3'} ${i ? 'hidden' : ''}" data-planos-de="${esc(g.id)}">${ps.map(cartaoPlano).join('\n')}</div>`; }).join('');
 }
 
 function metricas(c) {
@@ -68,7 +68,7 @@ export function montarLanding(tpl, c, { siteUrl, painelUrl }) {
   return tpl
     .replace('<!--@JSONLD-->', `<script type="application/ld+json">${JSON.stringify(jsonld).replace(/</g, '\\u003c')}</script>`)
     .replace('<!--@PLANOS-->', planos(c))
-    .replaceAll('<!--@PLANOS_OPCOES-->', (c.planos || []).map(p => `<option value="${esc(p.id)}" data-preco="${esc(p.preco)}">${esc(p.nome)}${p.grupo && !/comércio/i.test(p.nome) && (c.gruposPlanos || []).length > 1 ? ' (' + esc((c.gruposPlanos.find(g => g.id === p.grupo) || {}).nome || '') + ')' : ''} · R$ ${brl(p.preco)}/mês</option>`).join(''))
+    .replaceAll('<!--@PLANOS_OPCOES-->', (c.planos || []).map(p => `<option value="${esc(p.id)}" data-preco="${esc(p.preco)}">${esc(p.nome)}${p.grupo && !/comércio|mei/i.test(p.nome) && (c.gruposPlanos || []).length > 1 ? ' (' + esc((c.gruposPlanos.find(g => g.id === p.grupo) || {}).nome || '') + ')' : ''} · R$ ${brl(p.preco)}/mês</option>`).join(''))
     .replace('<!--@METRICAS-->', metricas(c))
     .replace('<!--@DEPOIMENTOS-->', depoimentos(c))
     .replace('<!--@CLIENTES_BADGE-->', clientes)

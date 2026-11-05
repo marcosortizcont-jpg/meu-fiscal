@@ -641,7 +641,7 @@ function gerarExemplo(){
 }
 /*SEED_END*/
 const TIPOS_TICKET={'Abertura de filial':15,'Alteração contratual':10,'Rescisão de funcionário':5,'Admissão de funcionário':3,'Emissão de certidão':3,'Renovação de certificado':5,'Parcelamento de débitos':5,'Pedido de titular (LGPD)':15,'Outros':5};
-const CATEGORIAS_DOC=['Obrigações entregues','Contrato Social','Alterações Contratuais','Cartão CNPJ','Inscrição Estadual','Inscrição Municipal','Alvarás e Licenças','Certidões','Outros'];
+const CATEGORIAS_DOC=['Obrigações entregues','Contrato de prestação de serviços','Contrato Social','Alterações Contratuais','Cartão CNPJ','Inscrição Estadual','Inscrição Municipal','Alvarás e Licenças','Certidões','Outros'];
 const ST_TICKET={aberto:'Aberto',em_andamento:'Em andamento',aguardando_cliente:'Aguardando você',concluido:'Concluído'};
 const DEPTOS_TICKET=['Fiscal','Pessoal','Contábil','Legalização','Financeiro'];
 const SLA_DEPTO={Fiscal:5,Pessoal:5,'Contábil':5,'Legalização':15,Financeiro:3};
@@ -5534,10 +5534,12 @@ perguntarIA=async function(texto){const r=await perguntarIAV13(texto);const e=em
 
 
 /* ---------- CRM: Théo comercial ---------- */
-const THEO_INFO_PADRAO=`Planos mensais (contabilidade online, atendimento por WhatsApp, telefone, e-mail e chat, painel para a empresa):
-PRESTAÇÃO DE SERVIÇOS: Basic R$ 259/mês (abertura de CNPJ grátis, contabilidade completa, certificado digital A1); Unique R$ 450/mês (gerente de conta dedicado, atendimento das 8h às 21h, folha de sócios e funcionários até 5 pessoas, importação de notas de qualquer município); Unique Plus R$ 700/mês (tudo do Unique + folha de sócios e funcionários até 10 colaboradores, importação de até 800 notas e de extrato de até 3 contas).
-COMÉRCIO: Basic Comércio R$ 359/mês; Unique Comércio R$ 550/mês (inclui declaração de IRPF); Unique Plus Comércio R$ 900/mês (folha de sócios e funcionários até 10 colaboradores).
-Troca de contador: o escritório pede os documentos ao contador anterior. Abertura: CNPJ, inscrições e enquadramento no regime certo.`;
+const THEO_INFO_PADRAO=`Planos mensais da Meu Fiscal Contabilidade Online (todos com portal do cliente, emissor de NFS-e integrado, painel financeiro, Théo 24h e atendimento por WhatsApp, chat e e-mail):
+MEI: MEI Serviços R$ 99,90/mês (DAS-MEI automático todo mês, declaração anual DASN-SIMEI, controle do limite); MEI Comércio R$ 159,90/mês (tudo do MEI Serviços + relatório mensal de receitas e controle de notas de compra e venda).
+PRESTAÇÃO DE SERVIÇOS: Essencial R$ 259/mês (contabilidade completa, impostos todo mês, pró-labore e obrigações); Profissional R$ 450/mês (tudo do Essencial + gerente de conta dedicado, atendimento prioritário, horário das 8h às 21h, folha até 5 pessoas, notas de qualquer município); Premium R$ 700/mês (tudo do Profissional + atendimento por ligação, abertura de CNPJ grátis, certificado digital A1 grátis, folha até 10 colaboradores, até 800 notas e extrato de até 3 contas).
+COMÉRCIO: Essencial Comércio R$ 359/mês (contabilidade completa com ICMS, folha até 3 pessoas); Profissional Comércio R$ 550/mês (gerente dedicado, atendimento prioritário, abertura de CNPJ e certificado A1 grátis, folha até 5 pessoas, declaração de IRPF); Premium Comércio R$ 900/mês (tudo do Profissional Comércio + atendimento por ligação, folha até 10 colaboradores, extrato de até 3 contas).
+Atendimento por ligação só no Premium. MEI e Essencial não têm atendimento prioritário. Abertura de CNPJ e certificado digital grátis só nos planos acima de R$ 450.
+Troca de contador: pedimos os documentos ao contador anterior. Abertura: CNPJ, inscrições e enquadramento no regime certo.`;
 const theoCfg=()=>({ativo:false,atrasoMin:2,inicio:8,fim:18,sabado:false,mensagem:'',info:THEO_INFO_PADRAO,...(cfg().crmTheo||{})});
 const aCrmV13=aCrm;
 aCrm=function(){let h=aCrmV13();const t=theoCfg();
@@ -5585,6 +5587,7 @@ ACT['encerrar-conv']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.id);if(!
 function atualizarTextoTheo(){
   const c=S.config[0];const t=c&&c.crmTheo;if(!t||!t.info||UI.modo!=='painel'||!(ehMaster()||podeMod('config','editar')))return;
   let x=t.info;
+  if(/\bUnique\b|\bBasic\b/.test(x)){mut('config',()=>{c.crmTheo={...t,info:THEO_INFO_PADRAO}},['Comercial','Atualizou o texto dos planos do Théo (novos planos)','']);return}
   x=x.replace(/\s*\+?\s*at[eé] 100 (agendamentos de contas ou emiss[oõ]es de nota|opera[cç][oõ]es)[^,;.)]*/gi,' + folha de sócios e funcionários até 10 colaboradores')
      .replace(/tudo do Unique \+ folha de sócios e funcionários até 10 colaboradores,?\s*\+?\s*/i,'tudo do Unique + folha de sócios e funcionários até 10 colaboradores, ')
      .replace(/Unique Plus Comércio R\$ ?900\/mês\.(?!\s*\()/i,'Unique Plus Comércio R$ 900/mês (folha de sócios e funcionários até 10 colaboradores).')
@@ -5594,7 +5597,7 @@ function atualizarTextoTheo(){
 setTimeout(function tentar(){if(S.config&&S.config[0]&&MODO!=='local'){atualizarTextoTheo()}else setTimeout(tentar,1500)},2500);
 /* ==== MÓDULOS v14 (fim) ==== */
 /* ==== MÓDULOS v15: cadastro de clientes com ativação por pagamento (Banco Inter) ou voucher do master ==== */
-const PLANOS_CAD=[['Basic','Serviços',259],['Unique','Serviços',450],['Unique Plus','Serviços',700],['Basic Comércio','Comércio',359],['Unique Comércio','Comércio',550],['Unique Plus Comércio','Comércio',900]];
+const PLANOS_CAD=[['MEI Serviços','MEI',99.9],['MEI Comércio','MEI',159.9],['Essencial','Serviços',259],['Profissional','Serviços',450],['Premium','Serviços',700],['Essencial Comércio','Comércio',359],['Profissional Comércio','Comércio',550],['Premium Comércio','Comércio',900]];
 const METODOS_CAD=[['bolepix','Boleto + PIX (Banco Inter)']];
 const pendAtiv=e=>e&&e.status==='aguardando_pagamento';
 const podeCadastrarC=()=>podeMod('comercial','editar')||podeMod('carteira','editar');
@@ -5616,6 +5619,7 @@ function abrirCadastroAtiv(pre){
     <label class="f"><span>Bairro</span><input name="bairro" maxlength="60"></label>
     <label class="f"><span>Município / UF *</span><span style="display:flex;gap:6px"><input name="municipio" required maxlength="80" value="${esc(pre.cidade||'')}"><input name="uf" required maxlength="2" style="width:64px;text-transform:uppercase" placeholder="MS"></span></label>
     <label class="f"><span>Responsável (nome) *</span><input name="contatoNome" required maxlength="80" value="${esc(pre.nome||'')}"></label>
+    <label class="f"><span>CPF do responsável (vai no contrato)</span><input name="representanteCpf" inputmode="numeric" maxlength="14" placeholder="opcional"></label>
     <label class="f"><span>WhatsApp *</span><input name="telefone" required inputmode="tel" maxlength="20" value="${esc(pre.whatsapp?fmtFone(String(pre.whatsapp).replace(/^55(?=\d{10,11}$)/,'')):'')}"></label>
     <label class="f full"><span>E-mail *</span><input name="email" type="email" required maxlength="120" value="${esc(pre.email||'')}"></label>
    </div>
@@ -5647,7 +5651,7 @@ FORM['cad-ativ']=async(fd,form)=>{
   if(soDig(g('cep')).length!==8||!g('logradouro')||!g('municipio')||g('uf').length!==2){toast('Informe o endereço completo (CEP, rua, município e UF): o banco exige no boleto.',true);return}
   if(g('voucher')&&!(UI.cadVoucher&&UI.cadVoucher.codigo===g('voucher').toUpperCase())){toast('Clique em "Aplicar" para conferir o voucher antes de cadastrar.',true);return}
   if(MODO!=='api'){toast('O cadastro com ativação funciona na versão publicada.',true);return}
-  const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf').toUpperCase(),endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},contatoNome:g('contatoNome'),telefone:g('telefone'),email:g('email')},
+  const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf').toUpperCase(),endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},contatoNome:g('contatoNome'),representanteCpf:soDig(g('representanteCpf')),telefone:g('telefone'),email:g('email')},
     plano:{nome:g('planoNome')||g('planoSel'),valor:Number(g('valor')),diaVenc:Number(g('diaVenc'))||10},metodo:'bolepix',voucher:g('voucher'),leadId:form.dataset.lead||null,avisar:!!fd.get('avisar')};
   try{const r=await MF.api('POST','/api/ativacao/cadastrar',corpo);UI.cadVoucher=null;closeModal();
     if(r.status==='ativo'){toast('Cliente cadastrado e ativado com o voucher. 🎉')}
@@ -5940,6 +5944,109 @@ FORM['acesso-editar']=async(fd,form)=>{try{await MF.api('PATCH','/api/admin/usua
 
 
 
+
+
+/* ==== MÓDULOS v16: contrato de prestação de serviços, quem cadastrou e comissões do comercial ==== */
+const cfgContratoC=()=>({foro:'Campo Grande/MS',reajuste:'IPCA',avisoPrevio:30,comissaoPct:30,...(cfg().contrato||{})});
+const podeFinC=()=>ehMaster()||podeMod('hon','editar');
+const ST_CONTRATO={aguardando_assinatura:['Aguardando assinatura','warn'],assinado:['Assinado','ok'],pendente:['Não gerado','crit']};
+function painelContrato(e){
+  const c=e.contrato;const ed=podeCadastrarC();const quem=e.cadastradoPor?.nome||e.criadoPorNome;
+  const cad=quem?`<p class="small muted" style="margin:0 0 8px">Cadastrado por <b>${esc(quem)}</b>${e.cadastradoPor?.em||e.criadoEm?' em '+fmtDH(e.cadastradoPor?.em||e.criadoEm):''}</p>`:'';
+  if(MODO!=='api')return cad;
+  const st=c?ST_CONTRATO[c.status]||['—','']:['Não gerado',''];
+  return `<div class="panel" style="margin-bottom:12px"><div class="panel-head"><h2>Contrato de prestação de serviços</h2>${pill(st[0],st[1])}</div>${cad}
+   ${c?.erro&&c.status==='pendente'?`<p class="small" style="color:var(--crit)">${esc(c.erro)}</p>`:''}
+   ${c?.arquivoId?`<p class="small muted" style="margin:0 0 8px">Contrato nº ${esc(c.numero||'')} · plano ${esc(c.plano||'')} · ${brl(c.valor||0)}/mês · gerado em ${fmtDH(c.geradoEm)}${c.versao>1?' (versão '+c.versao+')':''}</p>`:'<p class="small muted" style="margin:0 0 8px">O contrato é gerado sozinho quando o pagamento da ativação é confirmado, com os dados do cadastro e do plano.</p>'}
+   ${c?.status==='assinado'?`<p class="small" style="margin:0 0 8px">Assinado anexado por ${esc(c.assinado?.por||'')} em ${fmtDH(c.assinado?.em)}.</p>`:''}
+   <div class="actions">${c?.arquivoId?linkArq({url:c.url,nome:c.nome},'Baixar contrato (PDF)'):''}${c?.assinado?linkArq({url:c.assinado.url,nome:c.assinado.nome},'Ver contrato assinado'):''}
+    ${ed?`<button class="btn sm" data-act="contrato-gerar" data-id="${e.id}">${c?.arquivoId?'Gerar de novo':'Gerar contrato'}</button><button class="btn sm ${c?.status==='aguardando_assinatura'?'primary':''}" data-act="contrato-assinado" data-id="${e.id}">${c?.status==='assinado'?'Trocar contrato assinado':'Anexar contrato assinado'}</button>`:''}</div></div>`}
+const detalheEmpresaV15=detalheEmpresa;
+detalheEmpresa=function(){const h=detalheEmpresaV15();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
+  const i=h.indexOf('<div class="tabs" role="tablist">');const p=painelContrato(e);return i>0?h.slice(0,i)+p+h.slice(i):p+h};
+ACT['contrato-gerar']=async el=>{const e=emp(el.dataset.id);const run=async()=>{el.disabled=true;try{await MF.api('POST',`/api/contratos/${encodeURIComponent(e.id)}/gerar`,{});toast('Contrato gerado. Baixe o PDF para coletar as assinaturas.')}catch(er){toast(er.message,true)}el.disabled=false};
+  if(e.contrato?.status==='assinado')return confirmar('Gerar o contrato de novo',`O contrato de <b>${esc(e.razao)}</b> já está assinado. Gerar de novo cria uma nova versão em PDF (o assinado continua guardado). Use só se o plano ou os dados mudaram.`,'Gerar nova versão',run);run()};
+ACT['contrato-assinado']=el=>{const e=emp(el.dataset.id);openModal(`${mHead('Contrato assinado')}<form data-form="contrato-assinado" data-id="${e.id}"><div class="modal-body">
+  <p class="small muted" style="margin-top:0">Anexe o contrato de <b>${esc(e.razao)}</b> com as assinaturas do cliente, do contador e das testemunhas (PDF ou foto). Ele fica no cadastro e em Documentos do cliente.</p>
+  <div class="grid-f"><label class="f full"><span>Arquivo *</span><input type="file" name="arq" accept=".pdf,.jpg,.jpeg,.png" required></label><label class="f"><span>Data da assinatura</span><input type="date" name="data" value="${hoje()}"></label></div></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Anexar</button></div></form>`)};
+FORM['contrato-assinado']=async(fd,form)=>{const f=fd.get('arq');const v=await validarArquivo(f,['pdf','jpg','jpeg','png']);if(!v.ok){toast(v.msg,true);return}
+  try{const a=await enviarArquivo(f);if(!a.id)throw new Error('Não foi possível guardar o arquivo.');await MF.api('POST',`/api/contratos/${encodeURIComponent(form.dataset.id)}/assinado`,{arquivoId:a.id,nome:f.name,data:fd.get('data')});closeModal();toast('Contrato assinado anexado. ✔')}catch(er){toast(er.message,true)}};
+
+/* ---------- Configurações: dados do contrato e % de comissão ---------- */
+const aConfigV16=aConfig;
+aConfig=function(){let h=aConfigV16();if(!ehMaster())return h;const c=cfgContratoC();
+  const falta=[!(c.contadorNome||cfg().responsavelTecnico||cfg().escritorio)&&'nome',!cfg().crc&&'CRC',!soDig(c.contadorDoc||'')&&'CPF/CNPJ',!(c.contadorEndereco||'').trim()&&'endereço'].filter(Boolean);
+  return h+`<div class="panel"><div class="panel-head"><h2>Contrato de prestação de serviços e comissões</h2>${falta.length?pill('Falta: '+falta.join(', '),'warn'):pill('Pronto para gerar','ok')}</div>
+   <p class="small muted">Dados do contador responsável técnico que entram em todo contrato (Resolução CFC nº 1.590/2020). A Meu Fiscal aparece no contrato só como plataforma. O registro no CRC vem do campo acima.</p>
+   <form data-form="cfg-contrato" class="grid-f"><label class="f"><span>Contador responsável técnico</span><input name="contadorNome" maxlength="100" value="${esc(c.contadorNome||String(cfg().responsavelTecnico||cfg().escritorio||'').replace(/\s*([·|-]\s*)?contabilidade\s*$/i,''))}"></label>
+    <label class="f"><span>CPF ou CNPJ do contador</span><input name="contadorDoc" inputmode="numeric" maxlength="18" value="${esc(c.contadorDoc||'')}"></label>
+    <label class="f full"><span>Endereço profissional (rua, nº, bairro, cidade/UF, CEP)</span><input name="contadorEndereco" maxlength="200" value="${esc(c.contadorEndereco||'')}"></label>
+    <label class="f"><span>Foro (comarca/UF)</span><input name="foro" maxlength="60" value="${esc(c.foro)}"></label>
+    <label class="f"><span>Índice de reajuste anual</span><select name="reajuste">${['IPCA','INPC','IGP-M'].map(x=>`<option ${c.reajuste===x?'selected':''}>${x}</option>`).join('')}</select></label>
+    <label class="f"><span>Aviso prévio para rescisão (dias)</span><input name="avisoPrevio" type="number" min="15" max="90" value="${esc(c.avisoPrevio)}"></label>
+    <label class="f"><span>Comissão do comercial (% do 1º pagamento)</span><input name="comissaoPct" type="number" min="0" max="100" step="0.5" value="${esc(c.comissaoPct)}"></label>
+    <div class="actions full"><button class="btn primary">Salvar</button></div></form></div>`};
+FORM['cfg-contrato']=fd=>{const g=k=>String(fd.get(k)||'').trim();
+  const contrato={contadorNome:g('contadorNome'),contadorDoc:soDig(g('contadorDoc')),contadorEndereco:g('contadorEndereco'),foro:g('foro')||'Campo Grande/MS',reajuste:g('reajuste')||'IPCA',avisoPrevio:Math.min(90,Math.max(15,Number(g('avisoPrevio'))||30)),comissaoPct:Math.min(100,Math.max(0,Number(g('comissaoPct'))||0))};
+  if(contrato.contadorDoc&&![11,14].includes(contrato.contadorDoc.length)){toast('CPF ou CNPJ do contador incompleto.',true);return}
+  mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].contrato=contrato},['Configurações','Atualizou dados do contrato e comissão','']);toast('Dados do contrato salvos.')};
+
+/* ---------- comissões: tela do comercial e aba do Financeiro ---------- */
+const NAV_COM=['a-comissoes','Minhas comissões'];
+if(!NAV_A.some(n=>n[0]==='a-comissoes')){const i=NAV_A.findIndex(n=>n[0]==='a-crm');NAV_A.splice(i+1,0,NAV_COM)}
+MOD_DA_VIEW['a-comissoes']='comercial';if(!IC.moedas)IC.moedas='<circle cx="9" cy="9" r="6"/><path d="M15.5 9.5a6 6 0 1 1-6 6M9 6.5v5M7.5 8h2.2a1 1 0 0 1 0 2H8.3a1 1 0 0 0 0 2h2.2"/>';NAV_ICON['a-comissoes']='moedas';
+const ST_COM={a_pagar:['A pagar','warn'],paga:['Paga','ok'],cancelada:['Cancelada','']};
+function tabelaComissoes(L,{selecionar,mostrarUsuario}){
+  if(!L.length)return vazio('Nenhuma comissão por aqui ainda. A comissão nasce quando o 1º pagamento de um cliente que você cadastrou é confirmado.');
+  return `<div class="table-wrap"><table class="tbl"><thead><tr>${selecionar?'<th></th>':''}<th>Cliente</th>${mostrarUsuario?'<th>Comercial</th>':''}<th>Competência</th><th class="num">1º pagamento</th><th class="num">%</th><th class="num">Comissão</th><th>Situação</th><th>Pagamento</th>${selecionar?'<th></th>':''}</tr></thead><tbody>
+   ${L.map(x=>`<tr>${selecionar?`<td>${x.status==='a_pagar'?`<input type="checkbox" data-com-sel value="${x.id}" aria-label="Selecionar">`:''}</td>`:''}<td><b>${esc(x.empresa||'')}</b></td>${mostrarUsuario?`<td>${esc(x.usuario||'')}</td>`:''}<td>${fmtComp(x.referencia)}</td><td class="num">${brl(x.base)}</td><td class="num">${x.percentual}%</td><td class="num"><b>${brl(x.valor)}</b></td>
+    <td>${pill(...(ST_COM[x.status]||[x.status,'']))}</td><td class="small">${x.pagaEm?fmtData(String(x.pagaEm).slice(0,10))+' · '+esc(x.forma||''):x.obs&&x.status==='cancelada'?esc(x.obs):'—'}</td>
+    ${selecionar?`<td class="small">${x.status==='paga'?`<button class="btn sm ghost" data-act="com-desfazer" data-id="${x.id}">Desfazer</button>`:x.status==='a_pagar'?`<button class="btn sm ghost" data-act="com-cancelar" data-id="${x.id}">Cancelar</button>`:''}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
+function resumoComissoes(L){const s=st=>L.filter(x=>x.status===st).reduce((a,x)=>a+x.valor,0);const mes=hoje().slice(0,7);
+  return `<div class="crm-kpis"><div class="kpi"><span class="eyebrow">A receber</span><b>${brl(s('a_pagar'))}</b><small>${L.filter(x=>x.status==='a_pagar').length} comissão(ões)</small></div>
+   <div class="kpi"><span class="eyebrow">Recebido</span><b>${brl(s('paga'))}</b><small>no total</small></div>
+   <div class="kpi"><span class="eyebrow">Gerado neste mês</span><b>${brl(L.filter(x=>x.status!=='cancelada'&&String(x.geradaEm).slice(0,7)===mes).reduce((a,x)=>a+x.valor,0))}</b><small>${L.filter(x=>String(x.geradaEm).slice(0,7)===mes).length} cliente(s)</small></div></div>`}
+function aComissoes(){
+  if(!podeMod('comercial','ver')&&!podeFinC())return vazio('Seu acesso não inclui o Comercial.');
+  const d=MODO==='api'?apiDado('comissoes-minhas','/api/comissoes?minhas=1'):{indisponivel:true};
+  const head=`<div class="page-head"><div><span class="eyebrow">Comercial</span><h1>Minhas comissões</h1><p class="sub">Você recebe ${esc(d.dados?.percentual??cfgContratoC().comissaoPct)}% do 1º pagamento de cada cliente que cadastrou. O pagamento é registrado pelo Financeiro.</p></div></div>`;
+  if(d.indisponivel)return head+vazio('Comissões funcionam na versão publicada.');if(d.carregando)return head+'<div class="panel"><p class="small muted">Carregando…</p></div>';if(d.erro)return head+vazio(d.erro);
+  const L=d.dados.comissoes;
+  const meus=S.empresas.filter(e=>(e.cadastradoPor?.id||e.criadoPor)===ME.id).sort((a,b)=>String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')));
+  const contratos=meus.filter(e=>e.contrato?.status==='aguardando_assinatura'||e.contrato?.status==='pendente');
+  return head+resumoComissoes(L)+`<div class="panel"><h2>Comissões</h2>${tabelaComissoes(L,{})}</div>
+   ${contratos.length?`<div class="panel"><h2>Contratos para coletar assinatura (${contratos.length})</h2><div class="list">${contratos.map(e=>`<div class="row"><div class="grow"><b>${esc(e.fantasia||e.razao)}</b><div class="small muted">${e.contrato.status==='pendente'?esc(e.contrato.erro||'Contrato não gerado'):'Contrato nº '+esc(e.contrato.numero||'')+' gerado em '+fmtDH(e.contrato.geradoEm)}</div></div>${e.contrato.arquivoId?linkArq({url:e.contrato.url,nome:e.contrato.nome},'Baixar'):''}<button class="btn sm" data-act="com-abrir-cad" data-id="${e.id}">Abrir cadastro</button></div>`).join('')}</div></div>`:''}
+   <div class="panel"><h2>Clientes que você cadastrou (${meus.length})</h2>${meus.length?`<div class="list">${meus.slice(0,100).map(e=>`<div class="row"><div class="grow"><b>${esc(e.fantasia||e.razao)}</b><div class="small muted">${esc(e.plano?.nome||'')} · ${brl(e.plano?.valor||0)}/mês · ${fmtDH(e.cadastradoPor?.em||e.criadoEm)}</div></div>${pendAtiv(e)?pill('aguardando pagamento','warn'):e.status==='inativo'?pill('inativo',''):pill('ativo','ok')}</div>`).join('')}</div>`:vazio('Nenhum cliente cadastrado por você ainda.')}</div>`}
+ACT['com-abrir-cad']=el=>{UI.cart={id:el.dataset.id,aba:'dados'};go('a-carteira')};
+const conteudoV16=conteudo;conteudo=function(){if(UI.modo==='painel'&&UI.view==='a-comissoes')return aComissoes();return conteudoV16()};
+// Financeiro › Comissões (master e quem edita o Financeiro)
+const aHonV16=aHon;
+aHon=function(){if(UI.tab.fin2!=='comissoes'||!podeFinC()){let h=aHonV16();if(podeFinC())h=h.replace(/(<button role="tab" aria-selected="(?:true|false)" data-act="tab" data-k="fin2" data-v="auto">)/,`<button role="tab" aria-selected="false" data-act="tab" data-k="fin2" data-v="comissoes">Comissões</button>$1`);return h}
+  UI.tab.fin2='visao';let h=aHonV16();UI.tab.fin2='comissoes';
+  h=h.replace(/aria-selected="true"(\s+data-act="tab" data-k="fin2" data-v="visao")/,'aria-selected="false"$1').replace(/(<button role="tab" aria-selected="false" data-act="tab" data-k="fin2" data-v="auto">)/,`<button role="tab" aria-selected="true" data-act="tab" data-k="fin2" data-v="comissoes">Comissões</button>$1`);
+  const i=h.indexOf('</div>',h.indexOf('role="tablist"'))+6;return h.slice(0,i)+comissoesFinView()};
+function comissoesFinView(){
+  const d=MODO==='api'?apiDado('comissoes','/api/comissoes'):{indisponivel:true};if(d.indisponivel)return vazio('Comissões funcionam na versão publicada.');if(d.carregando)return '<div class="panel"><p class="small muted">Carregando…</p></div>';if(d.erro)return vazio(d.erro);
+  const f=UI.fcom||(UI.fcom={st:'a_pagar',u:''});let L=d.dados.comissoes;const users=[...new Map(L.map(x=>[x.usuarioId,x.usuario])).entries()];
+  const V=L.filter(x=>(!f.st||x.status===f.st)&&(!f.u||x.usuarioId===f.u));
+  const porUser=users.map(([id,n])=>[n,L.filter(x=>x.usuarioId===id&&x.status==='a_pagar').reduce((a,x)=>a+x.valor,0)]).filter(x=>x[1]>0);
+  return resumoComissoes(L)+`<div class="panel"><div class="panel-head"><h2>Comissões do comercial</h2><div class="actions"><select data-com-f="st"><option value="">Todas</option>${Object.entries(ST_COM).map(([k,[r]])=>`<option value="${k}" ${f.st===k?'selected':''}>${r}</option>`).join('')}</select>
+    <select data-com-f="u"><option value="">Todos os comerciais</option>${users.map(([id,n])=>`<option value="${id}" ${f.u===id?'selected':''}>${esc(n)}</option>`).join('')}</select><button class="btn primary" data-act="com-pagar">Registrar pagamento</button><button class="btn" data-act="com-csv">Exportar CSV</button></div></div>
+   <p class="small muted">Comissão de ${esc(d.dados.percentual)}% do 1º pagamento de cada cliente, para quem fez o cadastro (Configurações › Contrato e comissões). Marque as linhas e registre o pagamento quando pagar o comercial.</p>
+   ${porUser.length?`<p class="small">A pagar por comercial: ${porUser.map(([n,v])=>`<b>${esc(n)}</b> ${brl(v)}`).join(' · ')}</p>`:''}${tabelaComissoes(V,{selecionar:true,mostrarUsuario:true})}</div>`}
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-com-f]')){(UI.fcom||(UI.fcom={}))[s.dataset.comF]=s.value;render()}});
+ACT['com-pagar']=()=>{const ids=[...document.querySelectorAll('[data-com-sel]:checked')].map(x=>x.value);if(!ids.length){toast('Marque as comissões que vai pagar.',true);return}
+  const L=(APIC.comissoes?.dados?.comissoes||[]).filter(x=>ids.includes(x.id));
+  openModal(`${mHead('Registrar pagamento de comissão')}<form data-form="com-pagar"><input type="hidden" name="ids" value="${ids.join(',')}"><div class="modal-body"><p>${L.length} comissão(ões) · <b>${brl(L.reduce((a,x)=>a+x.valor,0))}</b></p>
+   <div class="grid-f"><label class="f"><span>Data do pagamento</span><input type="date" name="data" value="${hoje()}" required></label><label class="f"><span>Forma</span><select name="forma">${['PIX','Transferência','Dinheiro','Folha de pagamento','Outra'].map(x=>`<option>${x}</option>`).join('')}</select></label><label class="f full"><span>Observação</span><input name="obs" maxlength="200"></label></div></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Registrar</button></div></form>`)};
+FORM['com-pagar']=async fd=>{try{const r=await MF.api('POST','/api/comissoes/pagar',{ids:String(fd.get('ids')).split(','),data:fd.get('data'),forma:fd.get('forma'),obs:fd.get('obs')});closeModal();invalidar('comissoes');invalidar('comissoes-minhas');toast(r.atualizadas+' comissão(ões) marcada(s) como paga(s).')}catch(er){toast(er.message,true)}};
+ACT['com-desfazer']=el=>confirmar('Desfazer pagamento','A comissão volta para "a pagar".','Desfazer',async()=>{try{await MF.api('POST','/api/comissoes/pagar',{ids:[el.dataset.id],desfazer:true});invalidar('comissoes');invalidar('comissoes-minhas')}catch(er){toast(er.message,true)}});
+ACT['com-cancelar']=el=>pedirMotivo('Cancelar comissão','Motivo (ex.: cliente cancelou e pediu reembolso).',async m=>{try{await MF.api('POST',`/api/comissoes/${el.dataset.id}/cancelar`,{motivo:m});invalidar('comissoes');invalidar('comissoes-minhas')}catch(er){toast(er.message,true)}});
+ACT['com-csv']=()=>{const L=APIC.comissoes?.dados?.comissoes||[];const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  baixar('comissoes.csv','﻿'+['Cliente;Comercial;Competência;1º pagamento;%;Comissão;Situação;Pago em;Forma'].concat(L.map(x=>[x.empresa,x.usuario,fmtComp(x.referencia),String(x.base).replace('.',','),x.percentual,String(x.valor).replace('.',','),(ST_COM[x.status]||[x.status])[0],x.pagaEm?fmtData(String(x.pagaEm).slice(0,10)):'',x.forma||''].map(c).join(';'))).join('\r\n'),'text/csv')};
+/* ==== MÓDULOS v16 (fim) ==== */
 
 
 lerHash();

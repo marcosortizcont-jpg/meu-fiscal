@@ -125,6 +125,7 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
       if (l) await A.gravar(esc, 'leads', l.id, null, { ...l, etapa: 'ganho', status: 'convertido', empresaId: e.id, ganhoEm: l.ganhoEm || agora, etapaDesde: agora,
         atividades: [...(l.atividades || []), { em: agora, tipo: 'etapa', nome: 'Sistema', texto: pago ? `Pagamento da ativação confirmado (${brl(valorPago ?? at.total)}). Cliente ativo.` : 'Cadastro ativado com voucher de isenção.' }].slice(-300) });
     }
+    if (ganchos.aoAtivar) await ganchos.aoAtivar(esc, e.id, { pago: !!pago, valorPago: valorPago ?? at.total, data: data || L.data }).catch(er => console.error('[ativacao] pós-ativação', er.message));
     await log('empresa_ativada', { detalhe: `${e.razao} · ${pago ? 'pagamento ' + brl(valorPago ?? at.total) : 'voucher ' + (at.voucher?.codigo || '')}` });
     return novo;
   }
@@ -163,6 +164,7 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
       contatos: d.contatoNome ? [{ nome: String(d.contatoNome).slice(0, 80), cargo: 'Responsável', telefone: fone, email }] : [], socios: [],
       plano: { nome: String(b.plano?.nome || '').slice(0, 60), valor, funcInclusos: Number(b.plano?.funcInclusos || 0), adicionalFunc: Number(b.plano?.adicionalFunc || 0), metodo, diaVenc: Math.min(28, Math.max(1, Number(b.plano?.diaVenc) || 10)) },
       status: 'aguardando_pagamento', inicioControle: L.comp, checklist: [], origem: 'cadastro-comercial', leadId: b.leadId ? String(b.leadId) : null, criadoEm: agora, criadoPor: u.id, criadoPorNome: u.nome,
+      cadastradoPor: { id: u.id, nome: u.nome, em: agora }, representante: { nome: String(d.contatoNome || '').slice(0, 80), cpf: soDig(d.representanteCpf).length === 11 ? soDig(d.representanteCpf) : '' },
       ativacao: { status: 'pendente', metodo, valor, desconto, total, voucher, planoNome: String(b.plano?.nome || '') } };
     await A.gravar(esc, 'empresas', id, id, e);
     let resultado = { empresaId: id, total, desconto };

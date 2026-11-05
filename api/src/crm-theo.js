@@ -90,7 +90,7 @@ export function registrarCrmTheo(r, { db, exigir, log, pode, wa }) {
     const u = await exigir(ctx, { site: 'painel' });
     const cfg = await A.configEscritorio(u.escritorio_id); const b = ctx.corpo || {};
     const conf = { ...cfgTheo(cfg), ...(b.conf || {}) };
-    const l = { nome: 'Ana Paula', planoNome: 'Unique', temContador: b.temContador || 'sim' };
+    const l = { nome: 'Ana Paula', planoNome: 'Profissional', temContador: b.temContador || 'sim' };
     return { texto: montar(conf, cfg, l), quando: quandoEnviar(conf).toISOString() };
   });
 }
