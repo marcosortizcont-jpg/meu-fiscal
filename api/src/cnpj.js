@@ -56,6 +56,12 @@ export async function consultarCnpj(cnpj) {
       catch (e2) { throw new ErroHttp(e2.status === 404 ? 404 : 502, e2.status === 404 ? e2.message : 'A consulta à Receita está indisponível agora. Preencha os dados à mão ou tente de novo em instantes.'); }
     }
   }
+  // endereço sem rua (comum em MEI): completa pelo CEP
+  if (!FALSO && d.endereco.cep.length === 8 && (!d.endereco.logradouro || !d.endereco.bairro || !d.municipio)) {
+    try { const ce = await buscar(`https://brasilapi.com.br/api/cep/v2/${d.endereco.cep}`);
+      if (!d.endereco.logradouro && ce.street) d.endereco.logradouro = titulo(ce.street); if (!d.endereco.bairro && ce.neighborhood) d.endereco.bairro = titulo(ce.neighborhood);
+      if (!d.municipio && ce.city) d.municipio = titulo(ce.city); if (!d.uf && ce.state) d.uf = String(ce.state).toUpperCase(); } catch { }
+  }
   cache.set(c, { em: Date.now(), d }); if (cache.size > 2000) cache.delete(cache.keys().next().value);
   return d;
 }
@@ -65,5 +71,13 @@ export function registrarCnpj(r, { exigir }) {
     const u = await exigir(ctx, { site: 'painel' });
     if (limitar(`cnpj:${u.id}`, 30, 300).bloqueado) throw new ErroHttp(429, 'Muitas consultas seguidas. Aguarde alguns minutos.');
     return { ok: true, dados: await consultarCnpj(ctx.params.cnpj) };
+  });
+  r.get('/api/cep/:cep', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' }); const cep = soDig(ctx.params.cep);
+    if (cep.length !== 8) throw new ErroHttp(400, 'CEP inválido.');
+    if (limitar(`cep:${u.id}`, 60, 300).bloqueado) throw new ErroHttp(429, 'Muitas consultas seguidas.');
+    if (FALSO) return { ok: true, dados: { logradouro: 'Rua do Teste', bairro: 'Centro', municipio: 'Campo Grande', uf: 'MS' } };
+    try { const c = await buscar(`https://brasilapi.com.br/api/cep/v2/${cep}`); return { ok: true, dados: { logradouro: titulo(c.street || ''), bairro: titulo(c.neighborhood || ''), municipio: titulo(c.city || ''), uf: String(c.state || '').toUpperCase() } }; }
+    catch (e) { throw new ErroHttp(e.status === 404 ? 404 : 502, e.status === 404 ? 'CEP não encontrado.' : 'Consulta de CEP indisponível agora.'); }
   });
 }

@@ -5608,7 +5608,7 @@ function abrirCadastroAtiv(pre){
   openModal(`${mHead('Novo cliente')}<form data-form="cad-ativ" data-lead="${esc(pre.leadId||'')}"><div class="modal-body">
    <p class="small muted" style="margin-top:0">O cadastro fica <b>aguardando pagamento</b> e só é ativado quando o banco confirmar o pagamento da 1ª mensalidade (boleto ou PIX), ou na hora, com um voucher de isenção gerado pelo master.</p>
    <div class="grid-f">
-    <div class="f"><span>CNPJ *</span><span style="display:flex;gap:6px"><input name="cnpj" required inputmode="numeric" maxlength="18" value="${esc(pre.cnpj?fmtCNPJ(pre.cnpj):'')}" style="flex:1"><button type="button" class="btn" data-act="cad-receita" title="Buscar os dados na Receita Federal">Buscar</button></span><span class="small" id="cad-receita-res">Digite o CNPJ: os dados da Receita são preenchidos sozinhos.</span></div>
+    <div class="f full"><span>CNPJ *</span><span style="display:flex;gap:6px;max-width:420px"><input name="cnpj" required inputmode="numeric" maxlength="18" value="${esc(pre.cnpj?fmtCNPJ(pre.cnpj):'')}" style="flex:1;min-width:200px;font-size:16px;letter-spacing:.3px"><button type="button" class="btn" data-act="cad-receita" title="Buscar os dados na Receita Federal">Buscar</button></span><span class="small" id="cad-receita-res">Digite o CNPJ: os dados da Receita são preenchidos sozinhos.</span></div>
     <label class="f"><span>Regime</span><select name="regime"><option value="MEI">MEI</option><option value="SN" selected>Simples Nacional sem IE</option><option value="SN-IE">Simples Nacional com IE</option><option value="OUTRO">Outros</option></select></label>
     <label class="f full"><span>Razão social *</span><input name="razao" required maxlength="160" value="${esc(pre.empresa||'')}"></label>
     <label class="f"><span>Nome fantasia</span><input name="fantasia" maxlength="120" value="${esc(pre.empresa||'')}"></label>
@@ -6067,6 +6067,8 @@ async function preencherReceita(form,manual){
     out.innerHTML=`<b style="color:var(--ok)">✓ Dados da Receita preenchidos</b>${sit} · ${d.regime==='MEI'?'MEI':d.regime==='SN'?'Simples Nacional':'fora do Simples'}${d.cnae?' · CNAE '+esc(d.cnae):''}${d.abertura?' · aberta em '+fmtData(d.abertura):''}. Confira e complete o que faltar.`;
     resumoCad()}
   catch(er){out.innerHTML=`<b style="color:var(--crit)">${esc(er.message)}</b>`;form.dataset.receita=''}}
+document.addEventListener('input',async ev=>{const s=ev.target;if(s.name!=='cep'||!s.form||s.form.dataset.form!=='cad-ativ'||MODO!=='api')return;const cep=soDig(s.value);if(cep.length!==8||s.form.dataset.cepBuscado===cep)return;s.form.dataset.cepBuscado=cep;
+  try{const {dados:d}=await MF.api('GET','/api/cep/'+cep);const f=s.form;[['logradouro',d.logradouro],['bairro',d.bairro],['municipio',d.municipio],['uf',d.uf]].forEach(([n,v])=>{if(v&&f.elements[n]&&!f.elements[n].value.trim())f.elements[n].value=v});if(d.logradouro&&f.numero&&!f.numero.value.trim())f.numero.focus()}catch{}});
 ACT['cad-receita']=el=>preencherReceita(el.form||el.closest('form'),true);
 document.addEventListener('input',ev=>{const s=ev.target;if(s.name==='cnpj'&&s.form&&s.form.dataset.form==='cad-ativ'&&soDig(s.value).length===14)preencherReceita(s.form,false)});
 // lead que já veio com CNPJ: busca ao abrir
