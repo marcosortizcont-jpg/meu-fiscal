@@ -224,12 +224,12 @@ O build tem uma trava: se o proxy do `vercel.json` apontar para uma API diferent
 
 | Endereço | Onde | Registro DNS |
 |---|---|---|
-| `omeufiscal.com.br` (site + portal do cliente) | Vercel, projeto cliente | `A` no domínio raiz, com o IP que a Vercel mostrar (ex.: 216.198.79.1 ou 76.76.21.21) |
-| `www.omeufiscal.com.br` (redireciona para o raiz) | Vercel, projeto cliente | `CNAME www` → valor que a Vercel mostrar (ex.: `xxxx.vercel-dns-017.com`) |
+| `www.omeufiscal.com.br` (site + portal do cliente, endereço principal) | Vercel, projeto cliente | `CNAME www` → valor que a Vercel mostrar (ex.: `xxxx.vercel-dns-017.com`) |
+| `omeufiscal.com.br` (redireciona para o www) | Vercel, projeto cliente | `A` no domínio raiz (@), com o IP que a Vercel mostrar (ex.: 216.198.79.1) |
 | `painel.omeufiscal.com.br` (painel da equipe) | Vercel, projeto painel | `CNAME painel` → valor que a Vercel mostrar |
 
 - A API continua em `meufiscal-api.onrender.com` (os sites chamam `/api/*` no próprio domínio e a Vercel repassa). Assim o aviso de pagamento do Inter e o resto não mudam.
-- No Render (serviço da API › Environment): `ORIGENS_CLIENTE=https://omeufiscal.com.br,https://www.omeufiscal.com.br,https://meufiscal-cliente.vercel.app` e `ORIGENS_PAINEL=https://painel.omeufiscal.com.br,https://meufiscal-painel.vercel.app` (o primeiro de cada lista é o usado nos links de convite e e-mails).
+- No Render (serviço da API › Environment): `ORIGENS_CLIENTE=https://www.omeufiscal.com.br,https://omeufiscal.com.br,https://meufiscal-cliente.vercel.app` e `ORIGENS_PAINEL=https://painel.omeufiscal.com.br,https://meufiscal-painel.vercel.app` (o primeiro de cada lista é o usado nos links de convite e e-mails).
 - `SITE_URL` e `PAINEL_URL` em `sites/cliente/.env.production` já apontam para o domínio novo; o CORS do R2 (`api/r2-cors.json`) também, se o R2 estiver em uso.
 - Depois, se quiser, a API pode ganhar `api.omeufiscal.com.br` (Render › Settings › Custom Domains, `CNAME api` → endereço do Render); aí é preciso atualizar `URL_PUBLICA_API`, `API_URL` nos dois `.env.production`, rodar `--configurar` e clicar em Testar conexão do banco para recadastrar o aviso do Inter.
 
