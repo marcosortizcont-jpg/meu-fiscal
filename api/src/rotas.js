@@ -18,6 +18,7 @@ import { registrarDocumentos } from './documentos.js';
 import { registrarCrmTheo } from './crm-theo.js';
 import { registrarAtivacao } from './ativacao.js';
 import { registrarContratos } from './contrato.js';
+import { registrarCnpj } from './cnpj.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
 import { registrarPerfil } from './perfil.js';
 import { registrarAtendimento, cfgAtend, filtroConversas, conversaVisivel, limparDeptos, deptosDoUsuario } from './atendimento.js';
@@ -633,6 +634,7 @@ export function registrarRotas(r, { db, hub }) {
   registrarIntegra(r, { db, exigir, log, pode, wa });
   const ganchos = {};
   const fin = registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos });
+  registrarCnpj(r, { exigir });
   const contratos = registrarContratos(r, { db, exigir, log, pode }); ganchos.aoAtivar = contratos.aoAtivar;
   registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos });
   registrarDocumentos(r, { db, exigir, log, pode, wa });

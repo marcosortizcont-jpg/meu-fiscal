@@ -5608,7 +5608,7 @@ function abrirCadastroAtiv(pre){
   openModal(`${mHead('Novo cliente')}<form data-form="cad-ativ" data-lead="${esc(pre.leadId||'')}"><div class="modal-body">
    <p class="small muted" style="margin-top:0">O cadastro fica <b>aguardando pagamento</b> e só é ativado quando o banco confirmar o pagamento da 1ª mensalidade (boleto ou PIX), ou na hora, com um voucher de isenção gerado pelo master.</p>
    <div class="grid-f">
-    <label class="f"><span>CNPJ *</span><input name="cnpj" required inputmode="numeric" maxlength="18" value="${esc(pre.cnpj?fmtCNPJ(pre.cnpj):'')}"></label>
+    <div class="f"><span>CNPJ *</span><span style="display:flex;gap:6px"><input name="cnpj" required inputmode="numeric" maxlength="18" value="${esc(pre.cnpj?fmtCNPJ(pre.cnpj):'')}" style="flex:1"><button type="button" class="btn" data-act="cad-receita" title="Buscar os dados na Receita Federal">Buscar</button></span><span class="small" id="cad-receita-res">Digite o CNPJ: os dados da Receita são preenchidos sozinhos.</span></div>
     <label class="f"><span>Regime</span><select name="regime"><option value="MEI">MEI</option><option value="SN" selected>Simples Nacional sem IE</option><option value="SN-IE">Simples Nacional com IE</option><option value="OUTRO">Outros</option></select></label>
     <label class="f full"><span>Razão social *</span><input name="razao" required maxlength="160" value="${esc(pre.empresa||'')}"></label>
     <label class="f"><span>Nome fantasia</span><input name="fantasia" maxlength="120" value="${esc(pre.empresa||'')}"></label>
@@ -5651,7 +5651,7 @@ FORM['cad-ativ']=async(fd,form)=>{
   if(soDig(g('cep')).length!==8||!g('logradouro')||!g('municipio')||g('uf').length!==2){toast('Informe o endereço completo (CEP, rua, município e UF): o banco exige no boleto.',true);return}
   if(g('voucher')&&!(UI.cadVoucher&&UI.cadVoucher.codigo===g('voucher').toUpperCase())){toast('Clique em "Aplicar" para conferir o voucher antes de cadastrar.',true);return}
   if(MODO!=='api'){toast('O cadastro com ativação funciona na versão publicada.',true);return}
-  const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf').toUpperCase(),endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},contatoNome:g('contatoNome'),representanteCpf:soDig(g('representanteCpf')),telefone:g('telefone'),email:g('email')},
+  const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf').toUpperCase(),endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},abertura:form.dataset.abertura||'',cnae:form.dataset.cnae||'',atividade:form.dataset.atividade||'',socios:JSON.parse(form.dataset.socios||'[]'),contatoNome:g('contatoNome'),representanteCpf:soDig(g('representanteCpf')),telefone:g('telefone'),email:g('email')},
     plano:{nome:g('planoNome')||g('planoSel'),valor:Number(g('valor')),diaVenc:Number(g('diaVenc'))||10},metodo:'bolepix',voucher:g('voucher'),leadId:form.dataset.lead||null,avisar:!!fd.get('avisar')};
   try{const r=await MF.api('POST','/api/ativacao/cadastrar',corpo);UI.cadVoucher=null;closeModal();
     if(r.status==='ativo'){toast('Cliente cadastrado e ativado com o voucher. 🎉')}
@@ -6046,6 +6046,32 @@ ACT['com-desfazer']=el=>confirmar('Desfazer pagamento','A comissão volta para "
 ACT['com-cancelar']=el=>pedirMotivo('Cancelar comissão','Motivo (ex.: cliente cancelou e pediu reembolso).',async m=>{try{await MF.api('POST',`/api/comissoes/${el.dataset.id}/cancelar`,{motivo:m});invalidar('comissoes');invalidar('comissoes-minhas')}catch(er){toast(er.message,true)}});
 ACT['com-csv']=()=>{const L=APIC.comissoes?.dados?.comissoes||[];const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
   baixar('comissoes.csv','﻿'+['Cliente;Comercial;Competência;1º pagamento;%;Comissão;Situação;Pago em;Forma'].concat(L.map(x=>[x.empresa,x.usuario,fmtComp(x.referencia),String(x.base).replace('.',','),x.percentual,String(x.valor).replace('.',','),(ST_COM[x.status]||[x.status])[0],x.pagaEm?fmtData(String(x.pagaEm).slice(0,10)):'',x.forma||''].map(c).join(';'))).join('\r\n'),'text/csv')};
+
+/* ---------- cadastro: dados do CNPJ direto da Receita Federal ---------- */
+async function preencherReceita(form,manual){
+  const cnpj=soDig(form.cnpj.value);const out=document.getElementById('cad-receita-res');if(!out)return;
+  if(cnpj.length!==14){if(manual)out.innerHTML='<b style="color:var(--crit)">Digite os 14 números do CNPJ.</b>';return}
+  if(!cnpjValido(cnpj)){out.innerHTML='<b style="color:var(--crit)">CNPJ inválido. Confira os dígitos.</b>';return}
+  if(!manual&&form.dataset.receita===cnpj)return;form.dataset.receita=cnpj;
+  if(MODO!=='api'){out.textContent='A busca na Receita funciona na versão publicada.';return}
+  out.textContent='Buscando na Receita Federal…';
+  try{const {dados:d}=await MF.api('GET','/api/cnpj/'+cnpj);if(soDig(form.cnpj.value)!==cnpj)return;
+    const por=(n,v,forcar)=>{const el=form.elements[n];if(!el||v==null||v==='')return;if(forcar||!String(el.value||'').trim()){el.value=v;el.classList.add('preenchido-receita')}};
+    por('razao',d.razao,true);por('fantasia',d.fantasia||d.razao,true);por('cep',(d.endereco.cep||'').replace(/^(\d{5})(\d{3})$/,'$1-$2'),true);por('logradouro',d.endereco.logradouro,true);por('numero',d.endereco.numero,true);
+    por('complemento',d.endereco.complemento,true);por('bairro',d.endereco.bairro,true);por('municipio',d.municipio,true);por('uf',d.uf,true);por('email',d.email);
+    if(d.telefone)por('telefone',fmtFone?fmtFone(d.telefone):d.telefone);if(d.socios?.[0])por('contatoNome',d.socios[0].nome);
+    if(form.regime)form.regime.value=d.regime==='MEI'?'MEI':d.regime==='SN'?'SN':'OUTRO';
+    if(d.regime==='MEI'&&form.planoSel&&!/^MEI/.test(form.planoSel.value)){const ops=[...form.planoSel.options];const o=ops.find(x=>x.value==='MEI Serviços');if(o){form.planoSel.value=o.value;form.planoSel.dispatchEvent(new Event('change',{bubbles:true}))}}
+    form.dataset.abertura=d.abertura||'';form.dataset.cnae=d.cnae||'';form.dataset.atividade=d.atividade||'';form.dataset.socios=JSON.stringify(d.socios||[]);
+    const sit=d.situacao&&d.situacao!=='ATIVA'?` · <b style="color:var(--crit)">situação ${esc(d.situacao)}</b>`:` · situação ${esc(d.situacao||'—')}`;
+    out.innerHTML=`<b style="color:var(--ok)">✓ Dados da Receita preenchidos</b>${sit} · ${d.regime==='MEI'?'MEI':d.regime==='SN'?'Simples Nacional':'fora do Simples'}${d.cnae?' · CNAE '+esc(d.cnae):''}${d.abertura?' · aberta em '+fmtData(d.abertura):''}. Confira e complete o que faltar.`;
+    resumoCad()}
+  catch(er){out.innerHTML=`<b style="color:var(--crit)">${esc(er.message)}</b>`;form.dataset.receita=''}}
+ACT['cad-receita']=el=>preencherReceita(el.form||el.closest('form'),true);
+document.addEventListener('input',ev=>{const s=ev.target;if(s.name==='cnpj'&&s.form&&s.form.dataset.form==='cad-ativ'&&soDig(s.value).length===14)preencherReceita(s.form,false)});
+// lead que já veio com CNPJ: busca ao abrir
+const abrirCadastroAtivV16=abrirCadastroAtiv;
+abrirCadastroAtiv=function(pre){abrirCadastroAtivV16(pre);setTimeout(()=>{const f=document.querySelector('form[data-form=cad-ativ]');if(f&&soDig(f.cnpj.value).length===14)preencherReceita(f,false)},60)};
 /* ==== MÓDULOS v16 (fim) ==== */
 
 
