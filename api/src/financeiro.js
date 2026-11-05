@@ -10,7 +10,7 @@ import { CONFIG } from './config.js';
 import { enviarEmail } from './externos.js';
 import { limitar } from './seguranca.js';
 import { criarBanco } from './banco.js';
-import { criarApoio, soDig, pad, brl, fmtData, fmtComp, addMes, addDias, diasEntre, ultimoDia, agoraLocal } from './apoio.js';
+import { criarApoio, soDig, pad, brl, fmtData, fmtComp, addMes, addDias, diasEntre, ultimoDia, agoraLocal, marcaDe } from './apoio.js';
 
 const ASAAS = { producao: 'https://api.asaas.com/v3', sandbox: 'https://api-sandbox.asaas.com/v3' };
 const FALSO = process.env.FINANCEIRO_FALSO === '1' && process.env.NODE_ENV !== 'production';
@@ -126,7 +126,7 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
     const pag = await textoPagamento(esc, f);
     const nome = String(e.socios?.[0]?.nome || e.fantasia || e.razao || '').split(' ')[0];
     const texto = String(modelo).replace(/\{(\w+)\}/g, (_, k) => ({ nome, empresa: e.fantasia || e.razao, competencia: fmtComp(f.comp), valor: brl(f.valor), vencimento: fmtData(f.venc), dias: String(dias),
-      pagamento: pag, link: f.boleto?.linkPagamento || '', linha: f.boleto?.linhaDigitavel || '', pix: f.boleto?.pixCopiaCola || cfg.pix || '', escritorio: cfg.escritorio || '' }[k] ?? _)).trim();
+      pagamento: pag, link: f.boleto?.linkPagamento || '', linha: f.boleto?.linhaDigitavel || '', pix: f.boleto?.pixCopiaCola || cfg.pix || '', escritorio: marcaDe(cfg) }[k] ?? _)).trim();
     let anexo = null;
     if (f.boleto?.id && !f.boleto.arquivoId && !(f.boleto.url || '').startsWith('/api/arquivos/')) {
       try { const pdf = await B.pdf(esc, f.boleto.provedor, f.boleto.id); if (pdf) { const a = await A.guardarArquivo(esc, f.empresaId, pdf, 'Boleto honorários ' + f.comp + '.pdf', 'application/pdf', 'boletos'); f.boleto = { ...f.boleto, arquivoId: a.id, url: a.url, nome: a.nome }; const at0 = await A.registro(esc, 'faturas', faturaId); await A.gravar(esc, 'faturas', faturaId, f.empresaId, { ...at0, boleto: f.boleto }); } } catch { }
@@ -145,7 +145,7 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
       if (!para.length) res.email = 'sem e-mail cadastrado';
       else {
         const assunto = (dias > 0 && etapa !== 'envio' ? 'Mensalidade em atraso · ' : 'Mensalidade · ') + `${fmtComp(f.comp)} · ${brl(f.valor)}`;
-        const html = `<div style="font-family:Arial,sans-serif;max-width:560px;color:#0F172A"><p style="font-size:18px;font-weight:700">${(cfg.escritorio || 'Meu Fiscal').replace(/[<>&]/g, '')}</p><p>${texto.replace(/[&<>]/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[x])).replace(/(https?:\/\/\S+)/g, '<a href="$1">$1</a>')}</p></div>`;
+        const html = `<div style="font-family:Arial,sans-serif;max-width:560px;color:#0F172A"><p style="font-size:18px;font-weight:700">${marcaDe(cfg).replace(/[<>&]/g, '')}</p><p>${texto.replace(/[&<>]/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[x])).replace(/(https?:\/\/\S+)/g, '<a href="$1">$1</a>')}</p></div>`;
         const re = await enviarEmail({ para, assunto, texto, html, anexos: anexo ? [anexo] : [] }); res.email = re.enviado ? 'enviado para ' + para.join(', ') : 'não enviado: ' + (re.motivo || 'falha');
       }
     }

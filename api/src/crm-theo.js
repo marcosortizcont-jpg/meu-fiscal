@@ -7,11 +7,11 @@
 //  - uma pergunta por mensagem, mensagens curtas, identificação clara como assistente virtual;
 //  - respeito ao horário comercial e opção de não receber mais mensagens (SAIR), em linha com a LGPD.
 import { ErroHttp } from './http.js';
-import { criarApoio, agoraLocal, addDias } from './apoio.js';
+import { criarApoio, agoraLocal, addDias, marcaDe } from './apoio.js';
 
 export const CRM_THEO_PADRAO = {
   ativo: false, atrasoMin: 2, inicio: 8, fim: 18, sabado: false,
-  mensagem: 'Olá, {nome}! Aqui é o Théo, assistente virtual do {escritorio}. 😊 Recebi seu pedido{plano} pelo nosso site e já vou te ajudar. {pergunta}\n\nSe preferir que um especialista te ligue, é só dizer. (Para não receber mais mensagens, responda SAIR.)',
+  mensagem: 'Olá, {nome}! Aqui é o Théo, assistente virtual da {escritorio}. 😊 Recebi seu pedido{plano} pelo nosso site e já vou te ajudar. {pergunta}\n\nSe preferir que um especialista te ligue, é só dizer. (Para não receber mais mensagens, responda SAIR.)',
   info: '',
 };
 const pergunta = l => l.temContador === 'sim' ? 'Para indicar o melhor caminho: o que te fez pensar em trocar de contador?'
@@ -35,8 +35,8 @@ export function quandoEnviar(conf, agora = new Date()) {
 
 export function registrarCrmTheo(r, { db, exigir, log, pode, wa }) {
   const A = criarApoio(db);
-  const montar = (conf, cfg, l) => String(conf.mensagem || CRM_THEO_PADRAO.mensagem).replace(/\{(\w+)\}/g, (_, k) => ({
-    nome: String(l.nome || '').trim().split(/\s+/)[0] || 'tudo bem', escritorio: cfg.escritorio || 'escritório', empresa: l.empresa || 'sua empresa',
+  const montar = (conf, cfg, l) => String(conf.mensagem || CRM_THEO_PADRAO.mensagem).replace(/\bdo \{escritorio\}/g, 'da {escritorio}').replace(/\{(\w+)\}/g, (_, k) => ({
+    nome: String(l.nome || '').trim().split(/\s+/)[0] || 'tudo bem', escritorio: marcaDe(cfg), empresa: l.empresa || 'sua empresa',
     plano: l.planoNome ? ' do plano ' + l.planoNome : '', pergunta: pergunta(l) }[k] ?? _));
   async function enviarPrimeira(esc, l, conf, cfg, quem) {
     if (!wa.status || wa.status() !== 'conectado') throw new ErroHttp(503, 'O WhatsApp do escritório está desconectado.');

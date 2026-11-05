@@ -8,7 +8,7 @@ import crypto from 'node:crypto';
 import { ErroHttp } from './http.js';
 import { enviarEmail } from './externos.js';
 import { limitar } from './seguranca.js';
-import { criarApoio, soDig, brl, fmtData, fmtComp, addDias, agoraLocal } from './apoio.js';
+import { criarApoio, soDig, brl, fmtData, fmtComp, addDias, agoraLocal, marcaDe } from './apoio.js';
 
 const r2 = n => Math.round(Number(n || 0) * 100) / 100;
 const FALSO = process.env.FINANCEIRO_FALSO === '1' && process.env.NODE_ENV !== 'production';
@@ -98,7 +98,7 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
   const textoCobranca = at => [at.pix ? `PIX copia e cola:\n${at.pix}` : '', at.linha ? `Boleto (linha digitável): ${at.linha}` : '', at.link || ''].filter(Boolean).join('\n\n');
   async function avisarCliente(esc, e, ativ, quem) {
     const cfg = await A.configEscritorio(esc); const nome = String(e.contatos?.[0]?.nome || e.socios?.[0]?.nome || e.fantasia || e.razao || '').split(' ')[0];
-    const texto = `Olá, ${nome}! Que bom ter a ${e.fantasia || e.razao} com o ${cfg.escritorio || 'escritório'}. 🎉 Para ativar o seu plano ${ativ.planoNome || ''}, é só pagar a 1ª mensalidade de ${brl(ativ.total)}${ativ.desconto ? ' (já com ' + brl(ativ.desconto) + ' de desconto)' : ''} por boleto ou PIX (vencimento ${fmtData(ativ.venc)}):\n\n${textoCobranca(ativ)}\n\nAssim que o pagamento for confirmado, seu cadastro é ativado e enviamos o acesso ao portal.`;
+    const texto = `Olá, ${nome}! Que bom ter a ${e.fantasia || e.razao} com a ${marcaDe(cfg)}. 🎉 Para ativar o seu plano ${ativ.planoNome || ''}, é só pagar a 1ª mensalidade de ${brl(ativ.total)}${ativ.desconto ? ' (já com ' + brl(ativ.desconto) + ' de desconto)' : ''} por boleto ou PIX (vencimento ${fmtData(ativ.venc)}):\n\n${textoCobranca(ativ)}\n\nAssim que o pagamento for confirmado, seu cadastro é ativado e enviamos o acesso ao portal.`;
     const res = {};
     let anexo = null; if (ativ.arquivoId) { const buf = await A.conteudoArquivo(ativ.arquivoId).catch(() => null); if (buf) anexo = { id: ativ.arquivoId, nome: 'Boleto ativação.pdf', tipo: 'application/pdf', conteudo: buf }; }
     try { const rw = await wa.enviarArquivos({ esc, empresaId: e.id, fone: e.telefone, anexos: anexo ? [anexo] : [], legenda: texto, u: { id: null, nome: 'Ativação do cadastro' + (quem ? ' por ' + quem : '') } }); res.whatsapp = 'WhatsApp enviado para ' + rw.para; }

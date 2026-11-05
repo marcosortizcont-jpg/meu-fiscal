@@ -2,7 +2,7 @@
 import { ErroHttp } from './http.js';
 import { enviarEmail } from './externos.js';
 import { limitar } from './seguranca.js';
-import { criarApoio, fmtComp, fmtData } from './apoio.js';
+import { criarApoio, fmtComp, fmtData, marcaDe } from './apoio.js';
 
 export function registrarDocumentos(r, { db, exigir, log, pode, wa }) {
   const A = criarApoio(db);
@@ -18,7 +18,7 @@ export function registrarDocumentos(r, { db, exigir, log, pode, wa }) {
     const motivo = String(b.texto || '').slice(0, 500);
     const texto = b.tipo === 'negado' ? `Olá, ${nome}! Analisamos o documento "${itens[0]}" de ${fmtComp(comp)} da ${empresa} e ele precisa ser enviado de novo: ${motivo}\nÉ só reenviar pelo Portal do Cliente, em Envio mensal.`
       : b.tipo === 'pendencia' ? `Olá, ${nome}! Recebemos "${itens[0]}" de ${fmtComp(comp)} da ${empresa}, mas falta um complemento: ${motivo}\nEnvie só o que falta pelo Portal do Cliente, em Envio mensal (o que você já mandou fica guardado).`
-      : b.avulso ? `Olá, ${nome}! O escritório ${cfg.escritorio || ''} precisa de um documento da ${empresa}:\n${lista}\nPrazo: ${fmtData(b.prazo || '')}. Envie pelo Portal do Cliente, em Envio mensal (competência ${fmtComp(comp)}).`
+      : b.avulso ? `Olá, ${nome}! A ${marcaDe(cfg)} precisa de um documento da ${empresa}:\n${lista}\nPrazo: ${fmtData(b.prazo || '')}. Envie pelo Portal do Cliente, em Envio mensal (competência ${fmtComp(comp)}).`
       : `Olá, ${nome}! Para fecharmos ${fmtComp(comp)} da ${empresa}, ainda precisamos de:\n${lista}\nEnvie pelo Portal do Cliente, em Envio mensal. Se não houve movimento em algum deles, é só marcar "Não tive movimento".`;
     const res = {};
     try { const rw = await wa.enviarArquivos({ esc: u.escritorio_id, empresaId: String(e.id), fone: e.telefone, anexos: [], legenda: texto, u: { id: u.id, nome: 'Cobrança de documentos por ' + String(u.nome || '').split(' ')[0] } }); res.whatsapp = 'WhatsApp enviado para ' + rw.para; }

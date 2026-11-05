@@ -6,6 +6,7 @@
 // Atenção: é uma conexão não oficial. Use um número do escritório e evite envios em massa (risco de bloqueio).
 import crypto from 'node:crypto';
 import { CONFIG } from './config.js';
+import { identidade } from './apoio.js';
 import { ErroHttp } from './http.js';
 import { perguntarIA, iaDisponivel } from './externos.js';
 import { triar, deptoConv, cfgAtend, conversaVisivel } from './atendimento.js';
@@ -344,7 +345,9 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
       }
     }
     const dados = await contexto(esc, c.empresaId);
-    const regras = `Você é o Théo, assistente virtual do escritório "${cfg.escritorio || 'de contabilidade'}", e responde pelo WhatsApp. Apresente-se como Théo na primeira resposta da conversa.
+    const idt = identidade(cfg);
+    const regras = `Você é o Théo, assistente virtual da ${idt.marca}, e responde pelo WhatsApp. Apresente-se como "Théo, assistente da ${idt.marca}" na primeira resposta da conversa.
+${idt.texto}
 Regras:
 - Português do Brasil, até 4 frases curtas, tom cordial, sem markdown, sem listas longas.
 - Se "contato_identificado" for false: não fale de nenhuma empresa nem de valores. Cumprimente, pergunte o nome, a empresa (CNPJ) e o que a pessoa precisa, e diga que a equipe vai retornar. Use CONFIANCA: baixa quando a pessoa já tiver dito o que precisa.
@@ -389,7 +392,9 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
     if ((l.etapa || 'novo') === 'novo') await registrar('Respondeu ao Théo pelo WhatsApp: "' + String(texto).slice(0, 140) + '"', { etapa: 'contato', status: 'contato', etapaDesde: agora() });
     if (!iaDisponivel() || !conf.ativo) return passarParaEquipe(esc, c, 'Obrigado! Um especialista do escritório vai continuar com você por aqui em instantes.');
     const dadosLead = { nome: l.nome, empresa: l.empresa, cnpj: l.cnpj ? 'informado' : 'não informado', funcionarios: l.funcionarios, ja_tem_contador: l.temContador, plano_escolhido: l.planoNome, valor_plano: l.valor, cidade: l.cidade, mensagem_do_site: l.mensagem };
-    const regras = `Você é o Théo, assistente virtual do escritório de contabilidade "${cfg.escritorio || 'Meu Fiscal'}", falando pelo WhatsApp com um interessado que pediu contato pelo site.
+    const idt = identidade(cfg);
+    const regras = `Você é o Théo, assistente virtual da ${idt.marca}, falando pelo WhatsApp com um interessado que pediu contato pelo site.
+${idt.texto}
 Objetivo: entender a empresa e encaminhar para um especialista fechar a contratação. Você não fecha contrato nem dá desconto.
 Regras:
 - Português do Brasil, até 3 frases curtas por mensagem, tom cordial e direto, sem markdown, no máximo 1 emoji.

@@ -33,6 +33,14 @@ export const diaUtil = iso => { const d = new Date(iso + 'T12:00:00Z'); return !
 export function ajustarUtil(iso, sentido = 'prorroga') { let d = iso; while (!diaUtil(d)) d = addDias(d, sentido === 'antecipa' ? -1 : 1); return d; }
 export function ultimoUtil(comp) { return ajustarUtil(`${comp}-${pad(ultimoDia(+comp.slice(0, 4), +comp.slice(5, 7)))}`, 'antecipa'); }
 
+// identidade pública: a marca fala com o cliente; o contador aparece só como responsável técnico
+export const MARCA_PADRAO = 'Meu Fiscal Contabilidade Online';
+export const marcaDe = cfg => String(cfg?.marca || '').trim() || MARCA_PADRAO;
+export function identidade(cfg) {
+  const marca = marcaDe(cfg); const rt = String(cfg?.responsavelTecnico || cfg?.escritorio || '').replace(/\s*([·|-]\s*)?contabilidade\s*$/i, '').trim();
+  return { marca, rt, crc: String(cfg?.crc || '').trim(),
+    texto: `Você trabalha para a ${marca}, uma contabilidade online (plataforma Meu Fiscal: portal do cliente e atendimento digital). Sempre se apresente como assistente da ${marca}.${rt ? ` ${rt}${cfg?.crc ? ' (' + cfg.crc + ')' : ''} é apenas o contador responsável técnico da ${marca}: nunca diga que você é assistente dele nem trate o nome dele como o nome da empresa; cite-o só se perguntarem quem é o contador responsável.` : ''} Se perguntarem se é do sistema ou da plataforma Meu Fiscal, confirme que sim.` };
+}
 export function criarApoio(db) {
   async function guardarArquivo(esc, empresaId, buf, nome, tipo = 'application/pdf', pasta = 'sistema') {
     const id = crypto.randomUUID(); const chave = `${esc}/${pasta}/${id}`; const local = CONFIG.arquivos.driver;
