@@ -166,7 +166,7 @@
           <div><p class="text-lg font-bold text-marinho">{{contador}}</p><p class="text-sm text-slate-500">Contador{{CRC_PONTO}}</p></div>
         </div>
         <p class="mt-5 text-sm leading-relaxed text-slate-600">Cada guia, folha e declaração é conferida por um contador registrado no Conselho Regional de Contabilidade. Quando a dúvida é mais complexa, você fala com gente, não com robô.</p>
-        <a href="https://wa.me/{{whatsapp}}" target="_blank" rel="noopener" class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-esmeralda-escuro hover:underline">Falar com o contador no WhatsApp →</a>
+        <a href="#comecar" class="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-esmeralda-escuro hover:underline">Falar com a nossa equipe →</a>
       </div>
       <div class="rounded-2xl border border-white/10 bg-white/5 p-6 sm:p-8">
         <p class="text-xs font-semibold uppercase tracking-wider text-emerald-400">Comparando com o escritório tradicional</p>
@@ -300,7 +300,7 @@
         <li class="flex gap-3"><span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-esmeralda/20 text-emerald-400">✓</span>Na abertura, cuidamos do CNPJ, inscrições e enquadramento no regime certo.</li>
         <li class="flex gap-3"><span class="mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-full bg-esmeralda/20 text-emerald-400">✓</span>Seu acesso ao portal é liberado assim que a empresa entra na carteira.</li>
       </ul>
-      <a href="https://wa.me/{{whatsapp}}?text=Ol%C3%A1!%20Vim%20pelo%20site%20do%20Meu%20Fiscal." target="_blank" rel="noopener" class="mt-8 inline-flex items-center gap-2 rounded-xl border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">Prefiro chamar no WhatsApp · {{telefone}}</a>
+      <a href="mailto:{{email}}" class="mt-8 inline-flex items-center gap-2 rounded-xl border border-white/20 px-5 py-3 text-sm font-semibold text-white hover:bg-white/10">Prefere e-mail? {{email}}</a>
     </div>
     <form id="form-contato" class="rounded-2xl bg-white p-6 shadow-2xl sm:p-8" novalidate>
       <fieldset class="grid gap-2" aria-label="O que você precisa">
@@ -327,8 +327,7 @@
       <div id="contato-ok" class="hidden text-center" role="status">
         <span class="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-esmeralda"><svg viewBox="0 0 24 24" class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 5 5L20 7"/></svg></span>
         <h3 class="mt-4 text-xl font-bold text-marinho">Recebemos seu contato!</h3>
-        <p class="mt-2 text-sm text-slate-600">Um especialista vai chamar você no WhatsApp informado. Se preferir adiantar, fale agora:</p>
-        <a id="contato-wa" href="https://wa.me/{{whatsapp}}" target="_blank" rel="noopener" class="mt-5 inline-flex rounded-xl bg-esmeralda px-6 py-3 font-semibold text-white">Abrir conversa no WhatsApp</a>
+        <p class="mt-2 text-sm text-slate-600">Um especialista vai entrar em contato com você pelo WhatsApp ou e-mail informado, em até 1 dia útil.</p>
       </div>
     </form>
   </div>
@@ -396,7 +395,7 @@
     </div>
     <div>
       <p class="text-sm font-semibold text-white">Contato</p>
-      <ul class="mt-4 space-y-2.5 text-sm"><li><a href="https://wa.me/{{whatsapp}}" target="_blank" rel="noopener" class="hover:text-white">WhatsApp {{telefone}}</a></li><li><a href="mailto:{{email}}" class="break-all hover:text-white">{{email}}</a></li><li>{{cidade}}</li></ul>
+      <ul class="mt-4 space-y-2.5 text-sm"><li><a href="mailto:{{email}}" class="break-all hover:text-white">{{email}}</a></li><li><a href="https://instagram.com/{{instagram}}" target="_blank" rel="noopener" class="hover:text-white">Instagram @{{instagram}}</a></li><li>{{cidade}}</li></ul>
     </div>
   </div>
   <div class="border-t border-white/10">
@@ -460,7 +459,6 @@
           <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-bold text-marinho">2</span>Proposta e contrato digital</li>
           <li class="flex gap-3"><span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-200 text-xs font-bold text-marinho">3</span>Acesso ao portal e cuidamos do resto</li>
         </ol>
-        <a id="ct-wa" href="https://wa.me/{{whatsapp}}" target="_blank" rel="noopener" class="mt-7 inline-flex rounded-xl bg-esmeralda px-6 py-3 font-semibold text-white shadow-lg shadow-esmeralda/25 hover:bg-esmeralda-escuro">Adiantar pelo WhatsApp</a>
       </div>
       <p id="ct-erro" class="mt-4 hidden rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert"></p>
     </div>
@@ -507,7 +505,6 @@
     var b=f.querySelector('button[type=submit]');b.disabled=true;b.textContent='Enviando…';
     var objetivo=f.querySelector('input[name=objetivo]:checked').parentNode.textContent.trim();
     var texto='Olá! Sou '+d.nome+' e vim pelo site. Preciso de: '+objetivo+(d.plano?' (plano '+d.plano+')':'')+'.'+(d.mensagem?' '+d.mensagem:'');
-    document.getElementById('contato-wa').href='https://wa.me/{{whatsapp}}?text='+encodeURIComponent(texto);
     fetch('/api/publico/contato',{method:'POST',headers:{'Content-Type':'application/json','X-MF-Site':'cliente'},body:JSON.stringify(d)})
       .then(function(r){return r.json().catch(function(){return{}}).then(function(j){if(!r.ok)throw new Error(j.erro||'');return j})})
       .then(function(){Array.prototype.forEach.call(f.children,function(c){if(c.id!=='contato-ok')c.classList.add('hidden')});document.getElementById('contato-ok').classList.remove('hidden')})
@@ -562,7 +559,6 @@
         plano:fc.plano.value,planoNome:fc.plano.value?o.text.split(' · R$')[0]:'',planoPreco:o&&o.dataset.preco?Number(o.dataset.preco):0,site_empresa:g('site_empresa')};
       var q=new URLSearchParams(location.search);['utm_source','utm_medium','utm_campaign'].forEach(function(k){if(q.get(k))d[k]=q.get(k)});
       var texto='Olá! Sou '+d.nome+', da '+d.empresa+'. Acabei de pedir pelo site'+(d.planoNome?' o plano '+d.planoNome:'')+'.';
-      document.getElementById('ct-wa').href='https://wa.me/{{whatsapp}}?text='+encodeURIComponent(texto);
       av.disabled=true;av.textContent='Enviando…';
       fetch('/api/publico/contato',{method:'POST',headers:{'Content-Type':'application/json','X-MF-Site':'cliente'},body:JSON.stringify(d)})
         .then(function(r){return r.json().catch(function(){return{}}).then(function(j){if(!r.ok)throw new Error(j.erro||'');return j})})

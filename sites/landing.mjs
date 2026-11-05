@@ -50,7 +50,7 @@ export function montarLanding(tpl, c, { siteUrl, painelUrl }) {
   const jsonld = {
     '@context': 'https://schema.org', '@type': 'AccountingService', name: 'Meu Fiscal', url: siteUrl + '/',
     description: 'Contabilidade online para MEI e empresas do Simples Nacional.',
-    telephone: c.telefone, email: c.email, areaServed: 'BR',
+    email: c.email, areaServed: 'BR',
     address: { '@type': 'PostalAddress', addressLocality: String(c.cidade || '').split('/')[0], addressRegion: String(c.cidade || '').split('/')[1] || undefined, addressCountry: 'BR' },
     founder: { '@type': 'Person', name: c.contador, jobTitle: 'Contador', ...(c.crc ? { identifier: c.crc } : {}) },
     makesOffer: (c.planos || []).map(p => ({ '@type': 'Offer', name: p.nome, price: p.preco, priceCurrency: 'BRL' })),
