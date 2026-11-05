@@ -29,7 +29,7 @@ export function cfgContrato(cfg) {
   return { ...c, contador, crc: String(cfg.crc || '').trim(), marca: marcaDe(cfg), faltam };
 }
 
-export function montarContrato({ cfg, e, numero, data, financeiro = {} }) {
+export function montarContrato({ cfg, e, numero, data, financeiro = {}, alteracao = null }) {
   const C = cfgContrato(cfg); const p = planoDe(e.plano?.nome || e.ativacao?.planoNome, e.regime); const at = e.ativacao || {};
   const valor = r2(e.plano?.valor || at.valor || p.preco); const dia = Number(e.plano?.diaVenc) || 10;
   const multa = Number(financeiro.multa ?? 2), juros = Number(financeiro.juros ?? 1);
@@ -40,7 +40,7 @@ export function montarContrato({ cfg, e, numero, data, financeiro = {} }) {
   let n = 0; const cl = t => h(`CLÁUSULA ${++n}ª – ${t}`);
 
   B.push({ t: 'titulo', texto: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS PROFISSIONAIS CONTÁBEIS' });
-  B.push({ t: 'subtitulo', texto: `Contrato nº ${numero} · celebrado nos termos da Resolução CFC nº 1.590/2020` });
+  B.push({ t: 'subtitulo', texto: `Contrato nº ${numero} · celebrado nos termos da Resolução CFC nº 1.590/2020${alteracao ? ' · alteração de plano' : ''}` });
   h('CONTRATANTE');
   B.push({ t: 'quadro', itens: [['Razão social', e.razao], ['Nome fantasia', e.fantasia || '—'], ['CNPJ', fmtDoc(e.cnpj)], ['Endereço', endCliente || '—'], ['E-mail / WhatsApp', [e.email, e.telefone].filter(Boolean).join(' · ')],
     ['Representante legal', [rep.nome, rep.cpf ? 'CPF ' + fmtDoc(rep.cpf) : ''].filter(Boolean).join(', ') || '—']] });
@@ -49,6 +49,7 @@ export function montarContrato({ cfg, e, numero, data, financeiro = {} }) {
     ['Contato', [cfg.email, cfg.telefone].filter(Boolean).join(' · ') || '—']] });
   p_(`As partes acima qualificadas celebram o presente contrato, que se rege pelas cláusulas a seguir e pela legislação aplicável, em especial o Código Civil, a Resolução CFC nº 1.590/2020 e o Código de Ética Profissional do Contador (NBC PG 01).`);
 
+  if (alteracao) p_(`Este contrato substitui, a partir de ${porExtenso(data)}, o contrato nº ${alteracao.anterior?.numero || '—'}${alteracao.anterior?.plano ? ' (plano "' + alteracao.anterior.plano + '", honorários de ' + brl(alteracao.anterior.valor) + ')' : ''}, em razão de ${alteracao.tipo === 'reajuste' ? 'reajuste de honorários' : alteracao.tipo === 'downgrade' ? 'mudança de plano' : 'mudança (upgrade) de plano'}${alteracao.motivo ? ': ' + alteracao.motivo : ''}. Até essa data, continuam valendo as condições do contrato anterior.`);
   cl('DO OBJETO');
   p_(`O CONTRATADO, contador regularmente registrado no Conselho Regional de Contabilidade, prestará ao CONTRATANTE os serviços profissionais contábeis do plano "${p.nome}"${p.sobMedida ? ' (condições sob medida)' : ''}, descritos na cláusula seguinte, assumindo a responsabilidade técnica por eles.`);
   cl('DOS SERVIÇOS CONTRATADOS');
@@ -67,8 +68,9 @@ export function montarContrato({ cfg, e, numero, data, financeiro = {} }) {
   cl('DO PRAZO');
   p_(`Este contrato vigora por prazo indeterminado a partir de ${porExtenso(data)}, abrangendo os serviços a partir da competência ${String(e.inicioControle || data).slice(5, 7)}/${String(e.inicioControle || data).slice(0, 4)}. Os fatos anteriores a essa competência não são de responsabilidade do CONTRATADO.`);
   cl('DOS HONORÁRIOS E DO PAGAMENTO');
-  p_(`Pelos serviços permanentes e habituais, o CONTRATANTE pagará honorários mensais de ${brl(valor)}, com vencimento todo dia ${dia} do mês seguinte ao da competência, por boleto ou PIX emitidos pela plataforma. A primeira mensalidade${at.total !== undefined ? ', no valor de ' + brl(at.total) + (at.desconto ? ' (com desconto de ' + brl(at.desconto) + (at.voucher?.codigo ? ', cupom ' + at.voucher.codigo : '') + ')' : '') : ''}, foi paga na ativação do cadastro.`);
-  if (at.voucher && Number(at.voucher.meses) > 1) p_(`O desconto do cupom ${at.voucher.codigo} vale para as ${at.voucher.meses} primeiras mensalidades; depois, volta a valer o valor integral.`);
+  if (alteracao) p_(`Pelos serviços permanentes e habituais, a partir da competência ${String(data).slice(5, 7)}/${String(data).slice(0, 4)}, o CONTRATANTE pagará honorários mensais de ${brl(valor)}, com vencimento todo dia ${dia} do mês seguinte ao da competência, por boleto ou PIX emitidos pela plataforma.`);
+  else p_(`Pelos serviços permanentes e habituais, o CONTRATANTE pagará honorários mensais de ${brl(valor)}, com vencimento todo dia ${dia} do mês seguinte ao da competência, por boleto ou PIX emitidos pela plataforma. A primeira mensalidade${at.total !== undefined ? ', no valor de ' + brl(at.total) + (at.desconto ? ' (com desconto de ' + brl(at.desconto) + (at.voucher?.codigo ? ', cupom ' + at.voucher.codigo : '') + ')' : '') : ''}, foi paga na ativação do cadastro.`);
+  if (!alteracao && at.voucher && Number(at.voucher.meses) > 1) p_(`O desconto do cupom ${at.voucher.codigo} vale para as ${at.voucher.meses} primeiras mensalidades; depois, volta a valer o valor integral.`);
   p_(`Os serviços eventuais serão pagos conforme orçamento aprovado. O atraso no pagamento acarreta multa de ${multa}% e juros de ${juros}% ao mês, e o atraso superior a 30 (trinta) dias permite ao CONTRATADO suspender a execução dos serviços após aviso ao CONTRATANTE, sem prejuízo da cobrança.`);
   cl('DO REAJUSTE');
   p_(`Os honorários serão reajustados anualmente, no mês de aniversário do contrato, pela variação acumulada do ${C.reajuste} dos últimos 12 meses, ou por outro índice oficial que o substitua. Mudança de plano, de regime tributário, de volume de notas ou de funcionários pode alterar o valor mediante aditivo.`);
@@ -116,6 +118,75 @@ export function registrarContratos(r, { db, exigir, log, pode }) {
     await log('contrato_gerado', { detalhe: `${e.razao} · nº ${numero} · v${contrato.versao}` });
     return contrato;
   }
+
+  /* ---------- alteração de plano (upgrade, reajuste, mudança): vale do 1º dia do próximo mês, com novo contrato ---------- */
+  const proximaComp = () => { const L = agoraLocal(); const [a, m] = L.comp.split('-').map(Number); return m === 12 ? `${a + 1}-01` : `${a}-${String(m + 1).padStart(2, '0')}`; };
+  async function alterarPlano(esc, empresaId, b, u) {
+    const e = await A.empresa(esc, empresaId); if (!e) throw new ErroHttp(404, 'Empresa não encontrada.');
+    if (e.status === 'aguardando_pagamento') throw new ErroHttp(409, 'O cadastro ainda está aguardando o pagamento da ativação.');
+    const cfg = await A.configEscritorio(esc); const C = cfgContrato(cfg);
+    if (C.faltam.length) throw new ErroHttp(412, 'Para gerar o contrato, preencha em Configurações › Contrato: ' + C.faltam.join(', ') + '.');
+    const valor = r2(b.valor); if (!(valor > 0)) throw new ErroHttp(400, 'Informe o novo valor mensal.');
+    const nome = String(b.nome || '').trim().slice(0, 60); if (!nome) throw new ErroHttp(400, 'Informe o nome do plano.');
+    const tipo = ['upgrade', 'reajuste', 'downgrade'].includes(b.tipo) ? b.tipo : (valor >= Number(e.plano?.valor || 0) ? 'upgrade' : 'downgrade');
+    const comp = proximaComp(); const vigencia = comp + '-01';
+    const novo = { ...(e.plano || {}), nome, valor, funcInclusos: Math.max(0, Number(b.funcInclusos ?? e.plano?.funcInclusos ?? 0)), adicionalFunc: Math.max(0, r2(b.adicionalFunc ?? e.plano?.adicionalFunc ?? 0)),
+      diaVenc: Math.min(28, Math.max(1, Number(b.diaVenc || e.plano?.diaVenc || 10))) };
+    const anterior = { numero: e.contrato?.numero || '', plano: e.plano?.nome || '', valor: Number(e.plano?.valor || 0) };
+    const versao = (e.contratos || []).length + (e.contrato ? 2 : 1);
+    const numero = `${String(e.contrato?.numero || numeroDe(e, vigencia)).replace(/-A\d+$/, '')}-A${versao - 1}`;
+    const alteracao = { tipo, motivo: String(b.motivo || '').slice(0, 200), anterior, vigencia };
+    const buf = montarContrato({ cfg, e: { ...e, plano: novo, inicioControle: comp, ativacao: {} }, numero, data: vigencia, financeiro: cfg.financeiro || {}, alteracao });
+    const a = await A.guardarArquivo(esc, e.id, buf, `Contrato ${numero} - ${String(e.razao).replace(/[^\wÀ-ú .-]/g, '').slice(0, 50)}.pdf`, 'application/pdf', 'contratos');
+    const agora = new Date().toISOString(); const atual = await A.empresa(esc, empresaId);
+    const contratos = [...(atual.contratos || []), ...(atual.contrato ? [{ ...atual.contrato, substituidoEm: vigencia }] : [])].slice(-30);
+    const contrato = { numero, status: 'aguardando_assinatura', arquivoId: a.id, url: a.url, nome: a.nome, geradoEm: agora, geradoPor: u.nome, versao, plano: nome, valor, vigencia, alteracao: { tipo, motivo: alteracao.motivo, anterior } };
+    const planoAgendado = { ...novo, comp, vigencia, tipo, agendadoEm: agora, agendadoPor: u.nome, anterior };
+    const hist = [...(atual.planosHistorico || []), { em: agora, por: u.nome, tipo, de: anterior, para: { nome, valor }, vigencia, contrato: numero }].slice(-50);
+    await A.gravar(esc, 'empresas', atual.id, atual.id, { ...atual, contrato, contratos, planoAgendado, planosHistorico: hist });
+    await atualizarFaturasAbertas(esc, { ...atual, plano: { ...atual.plano, ...novo } }, comp);
+    await log('plano_alterado', { usuarioId: u.id, detalhe: `${e.razao} · ${anterior.plano} ${brl(anterior.valor)} → ${nome} ${brl(valor)} · a partir de ${vigencia} · contrato ${numero}` });
+    return { planoAgendado, contrato };
+  }
+  // mensalidades já geradas a partir da vigência (abertas, sem boleto) passam a ter o valor novo
+  async function atualizarFaturasAbertas(esc, e, compIni) {
+    const fs = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'faturas' AND empresa_id = $2 AND dados->>'comp' >= $3 AND coalesce(dados->>'status','') IN ('aberta','')`, [esc, e.id, compIni])).map(x => x.dados);
+    for (const f of fs) {
+      if (f.boleto?.id || f.ativacao) continue;
+      const base = { desc: 'Honorários · ' + (e.plano.nome || 'plano contábil'), valor: r2(e.plano.valor), tipo: 'base' };
+      const itens = (f.itens || []).some(i => i.tipo === 'base') ? f.itens.map(i => i.tipo === 'base' ? { ...i, ...base } : i) : [base, ...(f.itens || [])];
+      const valor = r2(Math.max(0, itens.reduce((s, i) => s + Number(i.valor || 0), 0) - Number(f.desconto || 0)));
+      await A.gravar(esc, 'faturas', f.id, f.empresaId, { ...f, itens, valor, atualizadaPorPlano: new Date().toISOString() });
+    }
+  }
+  // quando chega o mês: o plano agendado vira o plano atual
+  async function aplicarAgendados(esc) {
+    const comp = agoraLocal().comp;
+    const es = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas' AND dados ? 'planoAgendado' AND dados->'planoAgendado'->>'comp' <= $2`, [esc, comp])).map(x => x.dados);
+    for (const e of es) {
+      const { comp: c, vigencia, tipo, agendadoEm, agendadoPor, anterior, ...pl } = e.planoAgendado;
+      const novo = { ...e, plano: { ...(e.plano || {}), ...pl, desde: vigencia } }; delete novo.planoAgendado;
+      await A.gravar(esc, 'empresas', e.id, e.id, novo); await atualizarFaturasAbertas(esc, novo, c);
+      await log('plano_aplicado', { detalhe: `${e.razao} · ${pl.nome} ${brl(pl.valor)} desde ${vigencia}` });
+    }
+  }
+  const rodarAgendados = async () => { try { for (const { id } of await db.query('SELECT id FROM escritorios')) await aplicarAgendados(id); } catch (er) { console.error('[planos]', er.message); } };
+  if (process.env.NODE_ENV !== 'test') { setTimeout(rodarAgendados, 20000).unref?.(); setInterval(rodarAgendados, 60 * 60000).unref?.(); }
+  r.post('/api/planos/:id/alterar', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' }); if (!podeComercial(u)) throw new ErroHttp(403, 'Seu acesso não permite alterar planos.');
+    return { ok: true, ...(await alterarPlano(u.escritorio_id, String(ctx.params.id), ctx.corpo || {}, u)) };
+  }, { limite: 16 * 1024 });
+  r.post('/api/planos/:id/cancelar-agendamento', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' }); if (!podeComercial(u)) throw new ErroHttp(403, 'Seu acesso não permite alterar planos.');
+    const e = await A.empresa(u.escritorio_id, String(ctx.params.id)); if (!e?.planoAgendado) throw new ErroHttp(409, 'Não há alteração agendada.');
+    const ant = (e.contratos || []).slice(-1)[0];
+    const novo = { ...e, contrato: ant ? (({ substituidoEm, ...x }) => x)(ant) : e.contrato, contratos: ant ? e.contratos.slice(0, -1) : e.contratos,
+      planosHistorico: [...(e.planosHistorico || []), { em: new Date().toISOString(), por: u.nome, tipo: 'cancelado', de: { nome: e.planoAgendado.nome, valor: e.planoAgendado.valor }, vigencia: e.planoAgendado.vigencia }].slice(-50) };
+    delete novo.planoAgendado;
+    await A.gravar(u.escritorio_id, 'empresas', e.id, e.id, novo); await atualizarFaturasAbertas(u.escritorio_id, novo, e.planoAgendado.comp);
+    await log('plano_agendamento_cancelado', { usuarioId: u.id, detalhe: e.razao });
+    return { ok: true };
+  });
 
   // plano de comissão do usuário que cadastrou: em quais honorários pagos (1º, 3º, 5º) nasce comissão
   async function planoDoUsuario(esc, uid) { const [x] = await db.query('SELECT comissao_plano FROM usuarios WHERE escritorio_id = $1 AND id = $2', [esc, uid]); return PARCELAS_PLANO[x?.comissao_plano] || PARCELAS_PLANO.p1; }
@@ -204,6 +275,6 @@ export function registrarContratos(r, { db, exigir, log, pode }) {
     return { ok: true };
   });
 
-  return { gerarContrato, gerarComissao, aoAtivar, aoFaturaPaga };
+  return { gerarContrato, gerarComissao, aoAtivar, aoFaturaPaga, aplicarAgendados };
 }
 

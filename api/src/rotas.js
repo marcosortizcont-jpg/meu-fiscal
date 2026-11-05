@@ -278,7 +278,7 @@ export function registrarRotas(r, { db, hub }) {
             if (atual.dados?.ativacao !== undefined) op.dados.ativacao = atual.dados.ativacao; else delete op.dados.ativacao;
             if (atual.dados?.voucherAplicado !== undefined) op.dados.voucherAplicado = atual.dados.voucherAplicado; else delete op.dados.voucherAplicado;
             // contrato e autoria do cadastro (base da comissão) também são do servidor
-            for (const k of ['contrato', 'criadoPor', 'criadoPorNome', 'cadastradoPor', 'procuracao']) { if (atual.dados?.[k] !== undefined) op.dados[k] = atual.dados[k]; else delete op.dados[k]; }
+            for (const k of ['contrato', 'contratos', 'planoAgendado', 'planosHistorico', 'criadoPor', 'criadoPorNome', 'cadastradoPor', 'procuracao']) { if (atual.dados?.[k] !== undefined) op.dados[k] = atual.dados[k]; else delete op.dados[k]; }
           }
           if (JSON.stringify(op.dados) !== antesG) corrigidos.push({ c: op.c, id: op.id, dados: op.dados });
         }

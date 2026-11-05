@@ -2242,7 +2242,8 @@ const NIVEL_RANK={nenhum:0,ver:1,editar:2,excluir:3};
 function podeMod(m,n){if(!ME.perm)return true;return (NIVEL_RANK[ME.perm[m]||'nenhum']||0)>=(NIVEL_RANK[n||'ver']||1)}
 const ehMaster=()=>!ME.perm||ME.papel==='master';
 function aplicarPermissoes(){for(let i=NAV_A.length-1;i>=0;i--){const m=MOD_DA_VIEW[NAV_A[i][0]];if(m&&!podeMod(m,'ver'))NAV_A.splice(i,1)}}
-const soConsulta=m=>podeMod(m,'editar')?'':`<div class="banner info"><span class="small">${svg('lock')} Seu acesso a esta área é só de consulta. Para alterar, peça ao administrador master.</span></div>`;
+// sem aviso de "só consulta": quem não pode editar simplesmente não vê os botões de edição
+const soConsulta=m=>'';
 
 /* ---------- dados vindos da API (cache por tela) ---------- */
 const APIC={};
@@ -5973,7 +5974,7 @@ function painelContrato(e){
     ${ed?`<button class="btn sm" data-act="contrato-gerar" data-id="${e.id}">${c?.arquivoId?'Gerar de novo':'Gerar contrato'}</button><button class="btn sm ${c?.status==='aguardando_assinatura'?'primary':''}" data-act="contrato-assinado" data-id="${e.id}">${c?.status==='assinado'?'Trocar contrato assinado':'Anexar contrato assinado'}</button>`:''}</div></div>`}
 const detalheEmpresaV15=detalheEmpresa;
 detalheEmpresa=function(){const h=detalheEmpresaV15();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
-  const i=h.indexOf('<div class="tabs" role="tablist">');const p=painelContrato(e);return i>0?h.slice(0,i)+p+h.slice(i):p+h};
+  return h};   // o contrato fica na aba "Plano e contrato"
 ACT['contrato-gerar']=async el=>{const e=emp(el.dataset.id);const run=async()=>{el.disabled=true;try{await MF.api('POST',`/api/contratos/${encodeURIComponent(e.id)}/gerar`,{});toast('Contrato gerado. Baixe o PDF para coletar as assinaturas.')}catch(er){toast(er.message,true)}el.disabled=false};
   if(e.contrato?.status==='assinado')return confirmar('Gerar o contrato de novo',`O contrato de <b>${esc(e.razao)}</b> já está assinado. Gerar de novo cria uma nova versão em PDF (o assinado continua guardado). Use só se o plano ou os dados mudaram.`,'Gerar nova versão',run);run()};
 ACT['contrato-assinado']=el=>{const e=emp(el.dataset.id);openModal(`${mHead('Contrato assinado')}<form data-form="contrato-assinado" data-id="${e.id}"><div class="modal-body">
@@ -6304,6 +6305,64 @@ detalheRenovacao=function(t){let h=detalheRenovacaoV19(t);const r=t.renovacao;if
   else if(r.cobranca&&r.status!=='pago')h=h.replace(/(<button class="btn sm primary" data-act="renova-pago")/,`<span class="small muted">Cobrança no banco gerada (${fmtData(r.cobranca.venc)}): a baixa é automática. </span>$1`);
   return h};
 /* ==== MÓDULOS v19 (fim) ==== */
+
+
+/* ==== MÓDULOS v20: aba "Plano e contrato" no cadastro do cliente (plano, valores, contratos e upgrade com novo contrato) ==== */
+const proxComp=()=>{const [a,m]=compAtual().split('-').map(Number);return m===12?`${a+1}-01`:`${a}-${String(m+1).padStart(2,'0')}`};
+const TIPO_ALT={upgrade:'Upgrade de plano',reajuste:'Reajuste de honorários',downgrade:'Mudança de plano',cancelado:'Agendamento cancelado'};
+const detalheEmpresaV20=detalheEmpresa;
+detalheEmpresa=function(){
+  const e=UI.cart?.id&&emp(UI.cart.id);const ver=e&&!pendAtiv(e)&&(podeMod('carteira','ver')||podeMod('comercial','ver'));
+  let h=detalheEmpresaV20();if(!ver)return h;
+  const naPlano=UI.cart.aba==='plano';
+  h=h.replace(/(<div class="tabs" role="tablist">\s*<button[^>]*data-v="dados"[^>]*>[\s\S]*?<\/button>)/,m=>m+`<button role="tab" aria-selected="${naPlano}" data-act="cart-aba" data-v="plano">Plano e contrato${e.contrato?.status==='aguardando_assinatura'?' · assinar':''}</button>`);
+  if(!naPlano)return h;
+  h=h.replace(/(<div class="tabs" role="tablist">[\s\S]*?)aria-selected="true"(?=[^>]*data-v="(?!plano))/,'$1aria-selected="false"');
+  const i=h.indexOf('</div>',h.indexOf('role="tablist"'))+6;return h.slice(0,i)+abaPlano(e)};
+function abaPlano(e){
+  const p=e.plano||{};const ag=e.planoAgendado;const ed=podeCadastrarC();const prox=proxComp();
+  const futuras=S.faturas.filter(f=>f.empresaId===e.id&&fatAtiva(f)&&f.status!=='paga').sort((a,b)=>a.comp.localeCompare(b.comp)).slice(0,4);
+  const atual=`<div class="panel"><div class="panel-head"><h2>Plano atual</h2>${ag?pill('Alteração agendada para '+fmtData(ag.vigencia),'warn'):pill('Vigente','ok')}</div>
+   <div class="dl"><dt>Plano</dt><dd><b>${esc(p.nome||'—')}</b></dd><dt>Honorário mensal</dt><dd class="num"><b>${brl(p.valor||0)}</b></dd><dt>Funcionários inclusos</dt><dd>${Number(p.funcInclusos||0)}${Number(p.adicionalFunc)>0?' · adicional '+brl(p.adicionalFunc)+' por pessoa':''}</dd><dt>Vencimento</dt><dd>todo dia ${Number(p.diaVenc||10)}</dd>${p.desde?`<dt>Vigente desde</dt><dd>${fmtData(p.desde)}</dd>`:''}${(p.extras||[]).length?`<dt>Adicionais</dt><dd>${p.extras.map(x=>esc(x.desc)+' '+brl(x.valor)).join(' · ')}</dd>`:''}</div>
+   ${ag?`<div class="banner warn" style="display:block;margin-top:10px"><b>A partir de ${fmtData(ag.vigencia)}:</b> ${esc(ag.nome)} · ${brl(ag.valor)}/mês (${esc(TIPO_ALT[ag.tipo]||ag.tipo)}, por ${esc(ag.agendadoPor||'')}). As mensalidades a partir de ${fmtComp(ag.comp)} já saem com o valor novo.${ed?` <button class="btn sm ghost" data-act="plano-cancelar-ag" data-id="${e.id}">Cancelar alteração</button>`:''}</div>`:''}
+   ${ed?`<details style="margin-top:12px"><summary style="cursor:pointer;font-weight:600" class="small">Ajustar dados do plano atual (sem mudar o valor)</summary><form data-form="plano-ajuste" data-id="${e.id}" class="grid-f" style="margin-top:8px">
+     <label class="f"><span>Funcionários inclusos</span><input type="number" min="0" name="funcInclusos" value="${Number(p.funcInclusos||0)}"></label><label class="f"><span>Adicional por funcionário (R$)</span><input type="number" min="0" step="0.01" name="adicionalFunc" value="${Number(p.adicionalFunc||0)}"></label>
+     <label class="f"><span>Dia do vencimento</span><input type="number" min="1" max="28" name="diaVenc" value="${Number(p.diaVenc||10)}"></label><div class="actions full"><button class="btn sm primary">Salvar</button></div></form></details>`:''}</div>`;
+  const alterar=ed?`<div class="panel"><div class="panel-head"><h2>Upgrade ou reajuste do plano</h2></div>
+   <p class="small muted" style="margin-top:0">A alteração vale sempre a partir do <b>1º dia do próximo mês (${fmtData(prox+'-01')})</b>. O sistema gera na hora o novo contrato de prestação de serviços para assinatura e atualiza os honorários no Financeiro a partir de ${fmtComp(prox)}.</p>
+   <form data-form="plano-alterar" data-id="${e.id}" class="grid-f">
+    <label class="f"><span>Tipo</span><select name="tipo"><option value="upgrade">Upgrade de plano</option><option value="reajuste">Reajuste de honorários</option><option value="downgrade">Mudança para plano menor</option></select></label>
+    <label class="f"><span>Novo plano</span><select name="planoSel" data-plano-alt>${PLANOS_CAD.map(([n,g,v])=>`<option value="${esc(n)}" data-v="${v}" ${n===(ag?.nome||p.nome)?'selected':''}>${esc(n)} · ${g} · ${brl(v)}</option>`).join('')}<option value="__outro" ${PLANOS_CAD.some(x=>x[0]===(ag?.nome||p.nome))?'':'selected'}>Outro / sob medida</option></select></label>
+    <label class="f"><span>Nome do plano</span><input name="nome" maxlength="60" required value="${esc(ag?.nome||p.nome||'')}"></label>
+    <label class="f"><span>Novo honorário mensal (R$) *</span><input name="valor" type="number" min="1" step="0.01" required value="${esc(ag?.valor||p.valor||'')}" data-plano-valor></label>
+    <label class="f"><span>Funcionários inclusos</span><input name="funcInclusos" type="number" min="0" value="${Number((ag||p).funcInclusos||0)}"></label>
+    <label class="f"><span>Adicional por funcionário (R$)</span><input name="adicionalFunc" type="number" min="0" step="0.01" value="${Number((ag||p).adicionalFunc||0)}"></label>
+    <label class="f"><span>Dia do vencimento</span><input name="diaVenc" type="number" min="1" max="28" value="${Number((ag||p).diaVenc||10)}"></label>
+    <label class="f full"><span>Motivo (vai no contrato)</span><input name="motivo" maxlength="200" placeholder="ex.: contratação de funcionários, mudança para o Simples"></label>
+    <div class="f full"><div class="linha-dig" id="plano-dif" style="font-family:inherit"></div></div>
+    <div class="actions full"><button class="btn primary">Agendar e gerar novo contrato</button></div></form></div>`:'';
+  const c=e.contrato;const hist=[...(e.contratos||[])].reverse();
+  const contratos=`<div class="panel"><div class="panel-head"><h2>Contratos de prestação de serviços</h2>${c?pill(...(ST_CONTRATO[c.status]||['—',''])):''}</div>
+   ${painelContrato(e).replace(/^<div class="panel"[^>]*><div class="panel-head">[\s\S]*?<\/div>/,'').replace(/<\/div>$/,'')}
+   ${c?.vigencia?`<p class="small">Vigência deste contrato: a partir de ${fmtData(c.vigencia)}${c.alteracao?.anterior?.numero?' · substitui o nº '+esc(c.alteracao.anterior.numero):''}.</p>`:''}
+   ${hist.length?`<h3 style="margin:14px 0 6px">Contratos anteriores</h3><div class="list">${hist.map(x=>`<div class="row"><div class="grow"><b>Nº ${esc(x.numero||'')}</b> · ${esc(x.plano||'')} · ${brl(x.valor||0)}/mês<div class="small muted">${x.substituidoEm?'substituído em '+fmtData(x.substituidoEm):''}${x.status==='assinado'?' · assinado':' · sem assinatura anexada'}</div></div>${x.arquivoId?linkArq({url:x.url,nome:x.nome},'PDF'):''}${x.assinado?linkArq({url:x.assinado.url,nome:x.assinado.nome},'Assinado'):''}</div>`).join('')}</div>`:''}</div>`;
+  const fin=`<div class="panel"><div class="panel-head"><h2>Honorários no Financeiro</h2></div>${futuras.length?`<div class="list">${futuras.map(f=>`<div class="row"><div class="grow"><b>${fmtComp(f.comp)}</b> · vence ${fmtData(f.venc)}${f.atualizadaPorPlano?' · <span class="small">atualizada pelo novo plano</span>':''}</div><b class="num">${brl(f.valor)}</b></div>`).join('')}</div>`:'<p class="small muted">Nenhuma mensalidade em aberto. As próximas são geradas pelo Financeiro já com o plano vigente na competência.</p>'}</div>`;
+  const histPl=(e.planosHistorico||[]).length?`<div class="panel"><h2>Histórico de alterações do plano</h2><div class="list">${[...e.planosHistorico].reverse().map(x=>`<div class="row"><div class="grow"><b>${esc(TIPO_ALT[x.tipo]||x.tipo)}</b> · ${esc(x.de?.plano||x.de?.nome||'')} ${x.de?.valor?brl(x.de.valor):''}${x.para?' → '+esc(x.para.nome)+' '+brl(x.para.valor):''}<div class="small muted">${fmtDH(x.em)} · ${esc(x.por||'')}${x.vigencia?' · vigência '+fmtData(x.vigencia):''}${x.contrato?' · contrato '+esc(x.contrato):''}</div></div></div>`).join('')}</div></div>`:'';
+  setTimeout(difPlano,30);
+  return `<div class="cols-2-1" style="align-items:start"><div>${atual}${alterar}</div><div>${contratos}${fin}${histPl}</div></div>`}
+function difPlano(){const f=document.querySelector('form[data-form=plano-alterar]');const box=document.getElementById('plano-dif');if(!f||!box)return;const e=emp(f.dataset.id);const v=Number(f.valor.value)||0;const a=Number(e?.plano?.valor||0);const d=Math.round((v-a)*100)/100;
+  box.innerHTML=`Hoje: <b>${brl(a)}</b> → a partir de ${fmtData(proxComp()+'-01')}: <b>${brl(v)}</b> ${d?`(${d>0?'+':''}${brl(d)}/mês${a?', '+(d>0?'+':'')+(d/a*100).toFixed(1).replace('.',',')+'%':''})`:'(mesmo valor)'}`}
+document.addEventListener('input',ev=>{if(ev.target.closest&&ev.target.closest('form[data-form=plano-alterar]'))difPlano()});
+document.addEventListener('change',ev=>{const s=ev.target;if(!s.matches||!s.matches('[data-plano-alt]'))return;const f=s.form;const o=s.selectedOptions[0];if(o.dataset.v){f.valor.value=o.dataset.v;f.nome.value=s.value}else{f.nome.value='';f.nome.focus()}difPlano()});
+FORM['plano-alterar']=(fd,form)=>{const e=emp(form.dataset.id);const v=Number(fd.get('valor'));if(!(v>0)){toast('Informe o novo valor.',true);return}
+  confirmar('Agendar alteração do plano',`<b>${esc(e.fantasia||e.razao)}</b> passa para <b>${esc(fd.get('nome'))} · ${brl(v)}/mês</b> a partir de <b>${fmtData(proxComp()+'-01')}</b>. Um novo contrato será gerado para assinatura e os honorários serão atualizados no Financeiro.`,'Agendar e gerar contrato',async()=>{
+    try{const r=await MF.api('POST',`/api/planos/${encodeURIComponent(e.id)}/alterar`,{tipo:fd.get('tipo'),nome:fd.get('nome'),valor:v,funcInclusos:Number(fd.get('funcInclusos')||0),adicionalFunc:Number(fd.get('adicionalFunc')||0),diaVenc:Number(fd.get('diaVenc')||10),motivo:fd.get('motivo')});
+      MF.aplicarRemoto?.('empresas',{...emp(e.id),contrato:r.contrato,planoAgendado:r.planoAgendado});render();toast('Alteração agendada para '+fmtData(r.planoAgendado.vigencia)+'. Baixe o novo contrato para coletar as assinaturas.')}catch(er){toast(er.message,true)}})};
+ACT['plano-cancelar-ag']=el=>confirmar('Cancelar alteração agendada','O plano atual continua valendo e o novo contrato é descartado (o anterior volta a ser o vigente).','Cancelar alteração',async()=>{
+  try{await MF.api('POST',`/api/planos/${encodeURIComponent(el.dataset.id)}/cancelar-agendamento`,{});toast('Alteração cancelada.')}catch(er){toast(er.message,true)}});
+FORM['plano-ajuste']=(fd,form)=>{const e=emp(form.dataset.id);const n=k=>Math.max(0,Number(fd.get(k)||0));
+  mut('empresas',()=>{e.plano={...(e.plano||{}),funcInclusos:n('funcInclusos'),adicionalFunc:n('adicionalFunc'),diaVenc:Math.min(28,Math.max(1,n('diaVenc')||10))}},['Carteira','Ajustou dados do plano',e.razao]);toast('Plano atualizado.')};
+/* ==== MÓDULOS v20 (fim) ==== */
 
 
 lerHash();

@@ -76,8 +76,10 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
       .filter(e => !['inativo', 'aguardando_pagamento'].includes(e.status) && e.plano && Number(e.plano.valor) > 0 && (!somente || somente.includes(e.id)));
     const existentes = new Set((await db.query(`SELECT empresa_id FROM registros WHERE escritorio_id = $1 AND colecao = 'faturas' AND dados->>'comp' = $2 AND coalesce(dados->>'status','') <> 'cancelada'`, [esc, comp])).map(x => x.empresa_id));
     const criadas = [];
-    for (const e of emps) {
-      if (existentes.has(e.id)) continue;
+    for (const e0 of emps) {
+      if (existentes.has(e0.id)) continue;
+      // alteração de plano agendada: a partir da competência da vigência vale o plano novo
+      const e = e0.planoAgendado && comp >= e0.planoAgendado.comp ? { ...e0, plano: { ...e0.plano, ...e0.planoAgendado } } : e0;
       const nf = (await db.query(`SELECT count(*)::int AS n FROM registros WHERE escritorio_id = $1 AND colecao = 'funcionarios' AND empresa_id = $2 AND coalesce(dados->>'desligado','false') NOT IN ('true')`, [esc, e.id]))[0]?.n || 0;
       const inc = Number(e.plano.funcInclusos || 0), exc = Math.max(0, nf - inc), adic = Number(e.plano.adicionalFunc || 0);
       const itens = [{ desc: 'Honorários · ' + (e.plano.nome || 'plano contábil'), valor: r2(e.plano.valor), tipo: 'base', detalhe: 'inclui até ' + inc + ' funcionário' + (inc !== 1 ? 's' : '') }];
