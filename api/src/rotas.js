@@ -265,7 +265,7 @@ export function registrarRotas(r, { db, hub }) {
         const [atual] = await q('SELECT empresa_id, dados FROM registros WHERE escritorio_id = $1 AND colecao = $2 AND id = $3 FOR UPDATE', [u.escritorio_id, op.c, op.id]);
         try { conferirEscrita(u, op, atual || null); }
         catch (e) { throw new ErroHttp(403, e.message, { indice: i, colecao: op.c }); }
-        // ativação de cadastro: empresa nova só fica ativa pelo pagamento (Asaas) ou voucher, pelo servidor
+        // ativação de cadastro: empresa nova só fica ativa pelo pagamento no banco ou voucher, pelo servidor
         if (op.op === 'salvar' && op.c === 'empresas' && u.ambiente === 'equipe') {
           const antesG = JSON.stringify(op.dados);
           if (!atual && !op.dados.exemplo) { op.dados.status = 'aguardando_pagamento'; op.dados.ativacao = { status: 'pendente', metodo: op.dados.plano?.metodo || 'escolha', valor: Number(op.dados.plano?.valor || 0), desconto: 0, total: Number(op.dados.plano?.valor || 0), planoNome: op.dados.plano?.nome || '' }; }

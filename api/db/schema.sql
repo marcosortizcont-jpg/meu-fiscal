@@ -273,3 +273,23 @@ CREATE TABLE IF NOT EXISTS voucher_usos (
   usuario_nome  TEXT,
   em            TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Banco Inter (cobrança com boleto + PIX): credenciais da integração, cifradas
+ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS inter_client_id TEXT;
+ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS inter_secret_cifrado BYTEA;
+ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS inter_cert_cifrado BYTEA;
+ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS inter_key_cifrada BYTEA;
+ALTER TABLE financeiro_config ADD COLUMN IF NOT EXISTS inter_conta TEXT;
+-- Cobranças emitidas no banco: liga o código do banco ao registro do sistema (fatura ou ativação)
+CREATE TABLE IF NOT EXISTS banco_cobrancas (
+  escritorio_id  UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  provedor       TEXT NOT NULL,
+  cobranca_id    TEXT NOT NULL,
+  seu_numero     TEXT,
+  ref            TEXT NOT NULL,
+  valor          NUMERIC,
+  venc           DATE,
+  pago_simulado  BOOLEAN NOT NULL DEFAULT false,
+  criado_em      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (escritorio_id, provedor, cobranca_id)
+);

@@ -4993,7 +4993,7 @@ function finCobrancas(){
   <div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr>${ed?`<th><input type="checkbox" class="fin-sel" data-act="fin-sel-todas" ${sel.length&&sel.length===L.filter(fatAtiva).length?'checked':''}></th>`:''}<th>Cliente</th><th>Comp.</th><th>Vencimento</th><th class="r">Valor</th><th>Boleto</th><th>Situação</th><th>Última cobrança</th><th></th></tr></thead><tbody>${L.map(x=>{const e=emp(x.empresaId);const u=(x.cobrancas||[]).at(-1);return `<tr>
     ${ed?`<td>${fatAtiva(x)?`<input type="checkbox" class="fin-sel" data-act="fin-sel" data-id="${x.id}" ${UI.finSel.has(x.id)?'checked':''}>`:''}</td>`:''}
     <td><b>${esc(e?.fantasia||e?.razao||'(excluída)')}</b>${e&&empresaBloqueada(e)?' '+pill('portal bloqueado','crit'):''}</td><td class="small">${fmtComp(x.comp)}</td><td class="num small">${fmtData(x.venc)}</td><td class="r num">${brl(x.valor)}</td>
-    <td class="small">${x.boleto?(x.boleto.provedor==='asaas'?'<span class="tag">Asaas</span> ':'')+(x.boleto.url?`<a href="${esc(x.boleto.url)}" target="_blank" rel="noopener">abrir</a>`:esc(x.boleto.nome||'')):'—'}</td>
+    <td class="small">${x.boleto?(x.boleto.provedor?'<span class="tag">'+(x.boleto.provedor==='inter'?'Inter':'Asaas')+'</span> ':'')+(x.boleto.url?`<a href="${esc(x.boleto.url)}" target="_blank" rel="noopener">abrir</a>`:esc(x.boleto.nome||'')):'—'}</td>
     <td>${linhaSit(x)}</td><td class="small">${u?fmtDH(u.em)+'<div class="sub">'+esc(u.etapa==='manual'?'manual · '+u.por:u.etapa==='envio'?'envio do boleto':u.etapa==='antes'?'lembrete antes':u.etapa==='venc'?'no vencimento':u.etapa.replace('atraso-','')+' dia(s) após')+'</div>':'—'}</td>
     <td class="r"><div class="actions" style="flex-wrap:nowrap;justify-content:flex-end">${ed&&fatAtiva(x)?`<button class="btn sm" data-act="fin-cobrar" data-id="${x.id}">${atrasoDe(x)>0?'Cobrar':'Enviar'}</button><button class="btn sm ${x.status==='informada'?'primary':''}" data-act="fin-baixa" data-id="${x.id}">${x.status==='informada'?'Conferir e baixar':'Baixa'}</button>`:''}<button class="btn sm ghost" data-act="fin-ver" data-id="${x.id}">Detalhes</button></div></td></tr>`}).join('')}</tbody></table></div>`
    :vazio(`Nenhuma fatura ${f.comp&&f.comp!=='todas'?'em '+fmtComp(f.comp):''} com esses filtros.`,ed?`<button class="btn primary" data-act="fin-gerar">Gerar mensalidades</button>`:'')}</div>`;
@@ -5043,17 +5043,30 @@ function finAuto(){
   ${MODO==='api'?finBancoPanel(b):''}`;
 }
 function finBancoPanel(b){
-  const ed=b.podeConfigurar;const dis=ed?'':'disabled';
-  return `<div class="panel"><div class="panel-head"><h2>Banco para boletos e PIX</h2>${b.conectado?pill(b.falso?'Simulação local':'Asaas conectado','ok'):pill('Manual','warn')}</div>
-   <p class="small muted">Com o banco conectado, cada mensalidade ganha boleto com PIX (o cliente escolhe como pagar), a linha digitável e o PIX copia e cola vão nas mensagens e o pagamento dá baixa sozinho. Sem banco, anexe o boleto em PDF em cada fatura e o cliente paga pela chave PIX do escritório.</p>
-   <details class="small" style="margin:8px 0"><summary style="cursor:pointer;font-weight:600">Como conectar o Asaas</summary><ol style="margin:8px 0 0 18px;display:grid;gap:6px">
-    <li>Crie a conta do escritório em asaas.com (taxa por boleto/PIX pago, sem mensalidade).</li><li>No Asaas: <b>Integrações › Chaves de API</b> › gerar chave. Cole abaixo e salve.</li>
-    <li>No Asaas: <b>Integrações › Webhooks</b> › novo webhook de <b>Cobranças</b>, com a URL e o token de autenticação mostrados aqui. Marque os eventos de pagamento recebido/confirmado.</li><li>Clique em <b>Testar conexão</b>.</li></ol></details>
-   <form data-form="fin-banco" class="grid-f"><label class="f"><span>Banco</span><select name="provedor" ${dis}><option value="manual" ${b.provedor!=='asaas'?'selected':''}>Manual (boleto anexado + PIX do escritório)</option><option value="asaas" ${b.provedor==='asaas'?'selected':''}>Asaas</option></select></label>
+  const ed=b.podeConfigurar;const dis=ed?'':'disabled';const I=b.inter||{};const prov=b.provedor==='asaas'?'asaas':b.provedor==='inter'||b.falso?'inter':'manual';
+  const estado=b.conectado?pill(b.falso?'Simulação local':prov==='inter'?'Banco Inter conectado':'Asaas conectado','ok'):pill('Manual','warn');
+  return `<div class="panel"><div class="panel-head"><h2>Banco para boletos e PIX</h2>${estado}</div>
+   <p class="small muted">Com o Banco Inter conectado, cada cobrança sai como <b>boleto com QR Code PIX</b> (o cliente paga como preferir). A linha digitável, o PIX copia e cola e o PDF vão nas mensagens, e o pagamento dá baixa sozinho, inclusive a ativação de cadastros novos. Sem banco, anexe o boleto em PDF em cada fatura e o cliente paga pela chave PIX do escritório.</p>
+   <details class="small" style="margin:8px 0"><summary style="cursor:pointer;font-weight:600">Como conectar o Banco Inter</summary><ol style="margin:8px 0 0 18px;display:grid;gap:6px">
+    <li>No <b>Internet Banking PJ</b> do Inter (no computador): menu <b>Soluções para sua empresa › Nova integração</b>.</li>
+    <li>Dê um nome (ex.: Meu Fiscal) e marque as permissões de <b>Boleto com PIX / Cobrança: emitir, consultar e cancelar</b> (leitura e escrita).</li>
+    <li>Baixe a chave e o certificado (.crt e .key) e copie o <b>Client ID</b> e o <b>Client Secret</b>.</li>
+    <li>Preencha abaixo, envie os dois arquivos e salve. Os dados ficam cifrados no cofre do servidor.</li>
+    <li>Clique em <b>Testar conexão</b>: além de testar, o sistema cadastra no Inter o aviso automático de pagamento.</li></ol></details>
+   <form data-form="fin-banco" class="grid-f"><label class="f"><span>Banco</span><select name="provedor" ${dis} onchange="this.form.querySelectorAll('[data-p]').forEach(x=>x.style.display=x.dataset.p===this.value?'':'none')">
+     <option value="inter" ${prov==='inter'?'selected':''}>Banco Inter (boleto + PIX)</option><option value="manual" ${prov==='manual'?'selected':''}>Manual (boleto anexado + PIX do escritório)</option>${b.provedor==='asaas'?'<option value="asaas" selected>Asaas (antigo)</option>':''}</select></label>
     <label class="f"><span>Ambiente</span><select name="ambiente" ${dis}><option value="producao" ${b.ambiente!=='sandbox'?'selected':''}>Produção</option><option value="sandbox" ${b.ambiente==='sandbox'?'selected':''}>Sandbox (teste)</option></select></label>
-    <label class="f full"><span>Chave da API do Asaas</span><input name="apiKey" type="password" autocomplete="new-password" placeholder="${b.temChave?'guardada no cofre (preencha só para trocar)':'$aact_…'}" ${dis}></label>
-    ${b.webhookToken?`<div class="f full"><span>Webhook (cole no Asaas)</span><div class="linha-dig">URL: ${esc(b.webhookUrl)}<br>Token de autenticação: ${esc(b.webhookToken)}</div></div>`:''}
-    ${ed?`<div class="actions full"><button class="btn primary">Salvar banco</button><button type="button" class="btn" data-act="fin-banco-testar">Testar conexão</button></div>`:''}</form></div>`;
+    <div class="full grid-f" data-p="inter" style="${prov==='inter'?'':'display:none'};padding:0">
+     <label class="f"><span>Client ID</span><input name="interClientId" autocomplete="off" placeholder="${I.clientId?esc(I.clientId)+' (preencha só para trocar)':''}" ${dis}></label>
+     <label class="f"><span>Client Secret</span><input name="interSecret" type="password" autocomplete="new-password" placeholder="${I.temSecret?'guardado no cofre (preencha só para trocar)':''}" ${dis}></label>
+     <label class="f"><span>Certificado (.crt) ${I.temCert?'· <span class="ok-t">guardado</span>':''}</span><input name="interCert" type="file" accept=".crt,.pem,.cer" ${dis}></label>
+     <label class="f"><span>Chave (.key) ${I.temKey?'· <span class="ok-t">guardada</span>':''}</span><input name="interKey" type="file" accept=".key,.pem" ${dis}></label>
+     <label class="f"><span>Conta corrente (opcional)</span><input name="interConta" inputmode="numeric" value="${esc(I.conta||'')}" placeholder="só se a integração tiver mais de uma conta" ${dis}></label>
+     ${b.webhookUrl?`<div class="f full"><span>Aviso de pagamento (cadastrado no Inter ao testar)</span><div class="linha-dig">${esc(b.webhookUrl)}</div></div>`:''}
+    </div>
+    <div class="full" data-p="asaas" style="${prov==='asaas'?'':'display:none'}"><label class="f"><span>Chave da API do Asaas</span><input name="apiKey" type="password" autocomplete="new-password" placeholder="${b.temChave?'guardada no cofre (preencha só para trocar)':'$aact_…'}" ${dis}></label>
+     ${b.webhookToken?`<div class="linha-dig small">Webhook: ${esc(b.webhookUrl)} · token ${esc(b.webhookToken)}</div>`:''}</div>
+    ${ed?`<div class="actions full"><button class="btn primary">Salvar banco</button><button type="button" class="btn" data-act="fin-banco-testar">Testar conexão</button>${b.conectado?'<button type="button" class="btn" data-act="fin-conferir">Conferir pagamentos no banco</button>':''}</div>`:''}</form></div>`;
 }
 
 /* ---------- ações ---------- */
@@ -5094,7 +5107,7 @@ ACT['fin-baixa']=el=>{const f=S.faturas.find(x=>x.id===el.dataset.id);if(!f)retu
    <label class="f"><span>Data do pagamento</span><input type="date" name="data" value="${esc(f.informadaEm?String(f.informadaEm).slice(0,10):hoje())}" max="${hoje()}" required></label>
    <label class="f"><span>Valor recebido (R$)</span><input type="number" name="valor" step="0.01" min="0.01" value="${esc(f.valor)}" required></label>
    <label class="f"><span>Forma</span><select name="forma">${['PIX','Boleto','Transferência','Dinheiro','Cartão','Outra'].map(x=>`<option>${x}</option>`).join('')}</select></label></div>
-   ${f.comprovante?`<p class="small">Comprovante enviado pelo cliente: ${linkArq(f.comprovante,'abrir')}</p>`:''}${f.boleto?.provedor==='asaas'?'<p class="small muted">O boleto também é baixado no Asaas, para o cliente não pagar duas vezes.</p>':''}</div>
+   ${f.comprovante?`<p class="small">Comprovante enviado pelo cliente: ${linkArq(f.comprovante,'abrir')}</p>`:''}${f.boleto?.provedor?'<p class="small muted">O boleto também é cancelado no banco, para o cliente não pagar duas vezes.</p>':''}</div>
    <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Confirmar baixa</button></div></form>`)};
 FORM['fin-baixa']=async(fd,form)=>{const f=S.faturas.find(x=>x.id===form.dataset.id);if(!f)return;const data=String(fd.get('data')),valor=Number(fd.get('valor')),forma=String(fd.get('forma'));
   if(MODO!=='api'){mut('faturas',()=>{Object.assign(f,{status:'paga',pagaEm:data,valorPago:valor,formaPagamento:forma})},['Honorários','Baixa '+fmtComp(f.comp)+' '+brl(valor),emp(f.empresaId)?.razao]);closeModal();return}
@@ -5140,7 +5153,11 @@ FORM['fin-cfg']=(fd,form)=>{const n=(k,d)=>{const v=Number(fd.get(k));return isN
     regua,bloqueio:{ativo:!!fd.get('bloqAtivo'),dias:Math.min(180,Math.max(1,n('bloqDias',30)))},mensagens:Object.fromEntries(['envio','antes','venc'].map(k=>[k,String(fd.get('msg-'+k)||'').trim()]).filter(([,v])=>v))};
   mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].financeiro=financeiro},['Financeiro','Atualizou régua de cobrança e automação','']);toast('Régua e automação salvas.')};
 ACT['fin-regua-agora']=async el=>{el.disabled=true;el.textContent='Rodando…';try{const r=await MF.api('POST','/api/financeiro/regua',{});toast(`Régua executada: ${r.resumo.geradas} gerada(s), ${r.resumo.enviados} envio(s), ${r.resumo.falhas} falha(s).`,!!r.resumo.falhas)}catch(er){toast(er.message,true)}invalidar('financeiro')};
-FORM['fin-banco']=async fd=>{try{await MF.api('PUT','/api/financeiro',{provedor:fd.get('provedor'),ambiente:fd.get('ambiente'),apiKey:String(fd.get('apiKey')||'').trim()});toast('Banco salvo.');invalidar('financeiro')}catch(er){toast(er.message,true)}};
+FORM['fin-banco']=async fd=>{try{const arq=async n=>{const f=fd.get(n);return f&&f.size?(f.size>20000?Promise.reject(new Error('Arquivo '+f.name+' grande demais para ser o certificado do Inter.')):f.text()):''};
+  await MF.api('PUT','/api/financeiro',{provedor:fd.get('provedor'),ambiente:fd.get('ambiente'),apiKey:String(fd.get('apiKey')||'').trim(),interClientId:String(fd.get('interClientId')||'').trim(),interSecret:String(fd.get('interSecret')||'').trim(),
+    interCert:await arq('interCert'),interKey:await arq('interKey'),interConta:String(fd.get('interConta')||'')});toast('Banco salvo. Agora clique em Testar conexão.');invalidar('financeiro')}catch(er){toast(er.message,true)}};
+ACT['fin-conferir']=async el=>{const ids=S.faturas.filter(x=>x.boleto?.id&&x.status!=='paga'&&x.status!=='cancelada').map(x=>x.id);if(!ids.length){toast('Nenhum boleto em aberto para conferir.');return}
+  el.disabled=true;try{const r=await MF.api('POST','/api/financeiro/conferir',{faturas:ids});toast(r.pagas?r.pagas+' pagamento(s) encontrado(s) e baixado(s).':'Nenhum pagamento novo no banco.')}catch(er){toast(er.message,true)}el.disabled=false};
 ACT['fin-banco-testar']=async el=>{el.disabled=true;try{const r=await MF.api('POST','/api/financeiro/testar',{});toast(r.texto)}catch(er){toast(er.message,true)}el.disabled=false};
 ACT['fin-csv']=()=>{const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const f=UI.ffin;const L=S.faturas.filter(x=>f.comp==='todas'||x.comp===f.comp);
   baixar('financeiro-'+(f.comp||'todas')+'.csv','﻿'+['Cliente;CNPJ;Competência;Vencimento;Valor;Situação;Pago em;Valor pago;Forma;Boleto'].concat(L.map(x=>{const e=emp(x.empresaId)||{};return [e.razao,fmtCNPJ(e.cnpj||''),fmtComp(x.comp),fmtData(x.venc),String(x.valor).replace('.',','),x.status==='paga'?'Paga':x.status==='cancelada'?'Cancelada':atrasoDe(x)?atrasoDe(x)+' dias em atraso':x.status==='informada'?'Pagamento informado':'Em aberto',x.pagaEm?fmtData(x.pagaEm):'',x.valorPago?String(x.valorPago).replace('.',','):'',x.formaPagamento||'',x.boleto?'sim':'não'].map(c).join(';')})).join('\r\n'),'text/csv')};
@@ -5148,7 +5165,7 @@ ACT['fin-csv']=()=>{const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';const f=
 /* ---------- portal: linha digitável, PIX copia e cola e página de pagamento do banco ---------- */
 const finFaturasV1=finFaturas;
 finFaturas=function(e){let h=finFaturasV1(e);
-  S.faturas.filter(f=>f.empresaId===e.id&&f.boleto&&fatAtiva(f)).forEach(f=>{const b=f.boleto;const extra=[b.linkPagamento?`<a class="btn primary" href="${esc(b.linkPagamento)}" target="_blank" rel="noopener">Pagar online (boleto, PIX ou cartão)</a>`:'',b.linhaDigitavel?`<button class="btn" data-act="copiar" data-t="${esc(b.linhaDigitavel)}">Copiar linha digitável</button>`:'',b.pixCopiaCola?`<button class="btn" data-act="copiar" data-t="${esc(b.pixCopiaCola)}">Copiar PIX</button>`:''].join('');
+  S.faturas.filter(f=>f.empresaId===e.id&&f.boleto&&fatAtiva(f)).forEach(f=>{const b=f.boleto;const extra=[b.linkPagamento?`<a class="btn primary" href="${esc(b.linkPagamento)}" target="_blank" rel="noopener">Pagar online (boleto ou PIX)</a>`:'',b.linhaDigitavel?`<button class="btn" data-act="copiar" data-t="${esc(b.linhaDigitavel)}">Copiar linha digitável</button>`:'',b.pixCopiaCola?`<button class="btn" data-act="copiar" data-t="${esc(b.pixCopiaCola)}">Copiar PIX</button>`:''].join('');
     if(extra)h=h.replace(`data-act="pix-fatura" data-id="${f.id}"`,`data-act="pix-fatura" data-id="${f.id}" style="display:none"`).replace(new RegExp(`(<button class="btn" data-act="pagar-fatura" data-id="${f.id}">)`),extra+'$1')});
   return h;
 };
@@ -5574,9 +5591,9 @@ function atualizarTextoTheo(){
 }
 setTimeout(function tentar(){if(S.config&&S.config[0]&&MODO!=='local'){atualizarTextoTheo()}else setTimeout(tentar,1500)},2500);
 /* ==== MÓDULOS v14 (fim) ==== */
-/* ==== MÓDULOS v15: cadastro de clientes com ativação por pagamento (Asaas) ou voucher do master ==== */
+/* ==== MÓDULOS v15: cadastro de clientes com ativação por pagamento (Banco Inter) ou voucher do master ==== */
 const PLANOS_CAD=[['Basic','Serviços',259],['Unique','Serviços',450],['Unique Plus','Serviços',700],['Basic Comércio','Comércio',359],['Unique Comércio','Comércio',550],['Unique Plus Comércio','Comércio',900]];
-const METODOS_CAD=[['escolha','Cliente escolhe (boleto, PIX ou cartão)'],['pix','PIX'],['boleto','Boleto'],['cartao','Cartão de crédito']];
+const METODOS_CAD=[['bolepix','Boleto + PIX (Banco Inter)']];
 const pendAtiv=e=>e&&e.status==='aguardando_pagamento';
 const podeCadastrarC=()=>podeMod('comercial','editar')||podeMod('carteira','editar');
 
@@ -5584,13 +5601,18 @@ const podeCadastrarC=()=>podeMod('comercial','editar')||podeMod('carteira','edit
 function abrirCadastroAtiv(pre){
   pre=pre||{};const p0=PLANOS_CAD.find(p=>p[0]===pre.planoNome)||null;
   openModal(`${mHead('Novo cliente')}<form data-form="cad-ativ" data-lead="${esc(pre.leadId||'')}"><div class="modal-body">
-   <p class="small muted" style="margin-top:0">O cadastro fica <b>aguardando pagamento</b> e só é ativado quando o Asaas confirmar o pagamento da 1ª mensalidade, ou na hora, com um voucher de isenção gerado pelo master.</p>
+   <p class="small muted" style="margin-top:0">O cadastro fica <b>aguardando pagamento</b> e só é ativado quando o banco confirmar o pagamento da 1ª mensalidade (boleto ou PIX), ou na hora, com um voucher de isenção gerado pelo master.</p>
    <div class="grid-f">
     <label class="f"><span>CNPJ *</span><input name="cnpj" required inputmode="numeric" maxlength="18" value="${esc(pre.cnpj?fmtCNPJ(pre.cnpj):'')}"></label>
     <label class="f"><span>Regime</span><select name="regime"><option value="MEI">MEI</option><option value="SN" selected>Simples Nacional sem IE</option><option value="SN-IE">Simples Nacional com IE</option><option value="OUTRO">Outros</option></select></label>
     <label class="f full"><span>Razão social *</span><input name="razao" required maxlength="160" value="${esc(pre.empresa||'')}"></label>
     <label class="f"><span>Nome fantasia</span><input name="fantasia" maxlength="120" value="${esc(pre.empresa||'')}"></label>
-    <label class="f"><span>Município / UF</span><span style="display:flex;gap:6px"><input name="municipio" maxlength="80" value="${esc(pre.cidade||'')}"><input name="uf" maxlength="2" style="width:64px" placeholder="MS"></span></label>
+    <label class="f"><span>CEP *</span><input name="cep" required inputmode="numeric" maxlength="9" placeholder="00000-000"></label>
+    <label class="f full"><span>Endereço (rua, avenida) *</span><input name="logradouro" required maxlength="90"></label>
+    <label class="f"><span>Número</span><input name="numero" maxlength="10" placeholder="S/N"></label>
+    <label class="f"><span>Complemento</span><input name="complemento" maxlength="30"></label>
+    <label class="f"><span>Bairro</span><input name="bairro" maxlength="60"></label>
+    <label class="f"><span>Município / UF *</span><span style="display:flex;gap:6px"><input name="municipio" required maxlength="80" value="${esc(pre.cidade||'')}"><input name="uf" required maxlength="2" style="width:64px;text-transform:uppercase" placeholder="MS"></span></label>
     <label class="f"><span>Responsável (nome) *</span><input name="contatoNome" required maxlength="80" value="${esc(pre.nome||'')}"></label>
     <label class="f"><span>WhatsApp *</span><input name="telefone" required inputmode="tel" maxlength="20" value="${esc(pre.whatsapp?fmtFone(String(pre.whatsapp).replace(/^55(?=\d{10,11}$)/,'')):'')}"></label>
     <label class="f full"><span>E-mail *</span><input name="email" type="email" required maxlength="120" value="${esc(pre.email||'')}"></label>
@@ -5600,10 +5622,10 @@ function abrirCadastroAtiv(pre){
     <label class="f"><span>Valor mensal (R$) *</span><input name="valor" type="number" step="0.01" min="1" required value="${esc(pre.valor||(p0?p0[2]:PLANOS_CAD[0][2]))}" data-cad-valor></label>
     <label class="f"><span>Nome do plano</span><input name="planoNome" maxlength="60" value="${esc(pre.planoNome||(p0?p0[0]:PLANOS_CAD[0][0]))}"></label>
     <label class="f"><span>Vencimento das mensalidades (dia)</span><input name="diaVenc" type="number" min="1" max="28" value="${esc(finCfg?.().vencDia||10)}"></label>
-    <label class="f full"><span>Forma de pagamento da ativação *</span><select name="metodo">${METODOS_CAD.map(([k,r])=>`<option value="${k}">${r}</option>`).join('')}</select></label>
+    <div class="f full"><span>Forma de pagamento da ativação</span><div class="small">Boleto com QR Code PIX emitido no Banco Inter: o cliente paga pelo boleto ou pelo PIX.</div></div>
     <div class="f full"><span>Voucher de desconto ou isenção (opcional)</span><span style="display:flex;gap:6px"><input name="voucher" maxlength="30" style="text-transform:uppercase" placeholder="Código gerado pelo master" data-cad-voucher><button type="button" class="btn" data-act="cad-voucher">Aplicar</button></span><span class="small" id="cad-voucher-res"></span></div>
     <div class="f full"><div class="linha-dig" id="cad-resumo" style="font-family:inherit"></div></div>
-    <label class="chk full"><input type="checkbox" name="avisar" checked> Enviar o link de pagamento ao cliente por WhatsApp e e-mail</label></div></div>
+    <label class="chk full"><input type="checkbox" name="avisar" checked> Enviar o boleto e o PIX ao cliente por WhatsApp e e-mail</label></div></div>
   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Cadastrar e gerar cobrança</button></div></form>`,true);
   setTimeout(resumoCad,30);
 }
@@ -5620,14 +5642,17 @@ FORM['cad-ativ']=async(fd,form)=>{
   const g=k=>String(fd.get(k)||'').trim();const cnpj=soDig(g('cnpj'));
   if(!cnpjValido(cnpj)){toast('CNPJ inválido.',true);return}if(S.empresas.some(e=>soDig(e.cnpj)===cnpj)){toast('Já existe uma empresa com este CNPJ.',true);return}
   if(soDig(g('telefone')).length<10){toast('Informe o WhatsApp com DDD.',true);return}
+  if(soDig(g('cep')).length!==8||!g('logradouro')||!g('municipio')||g('uf').length!==2){toast('Informe o endereço completo (CEP, rua, município e UF): o banco exige no boleto.',true);return}
   if(g('voucher')&&!(UI.cadVoucher&&UI.cadVoucher.codigo===g('voucher').toUpperCase())){toast('Clique em "Aplicar" para conferir o voucher antes de cadastrar.',true);return}
   if(MODO!=='api'){toast('O cadastro com ativação funciona na versão publicada.',true);return}
-  const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf'),contatoNome:g('contatoNome'),telefone:g('telefone'),email:g('email')},
-    plano:{nome:g('planoNome')||g('planoSel'),valor:Number(g('valor')),diaVenc:Number(g('diaVenc'))||10},metodo:g('metodo'),voucher:g('voucher'),leadId:form.dataset.lead||null,avisar:!!fd.get('avisar')};
+  const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf').toUpperCase(),endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},contatoNome:g('contatoNome'),telefone:g('telefone'),email:g('email')},
+    plano:{nome:g('planoNome')||g('planoSel'),valor:Number(g('valor')),diaVenc:Number(g('diaVenc'))||10},metodo:'bolepix',voucher:g('voucher'),leadId:form.dataset.lead||null,avisar:!!fd.get('avisar')};
   try{const r=await MF.api('POST','/api/ativacao/cadastrar',corpo);UI.cadVoucher=null;closeModal();
     if(r.status==='ativo'){toast('Cliente cadastrado e ativado com o voucher. 🎉')}
-    else{openModal(`${mHead('Cadastro aguardando pagamento')}<div class="modal-body"><p>Cobrança de <b>${brl(r.total)}</b>${r.desconto?' (com '+brl(r.desconto)+' de desconto)':''} gerada no Asaas. O cadastro ativa sozinho quando o pagamento for confirmado.</p>
-      ${r.link?`<div class="f"><span>Link de pagamento</span><div class="linha-dig">${esc(r.link)}</div><div class="actions" style="margin-top:6px"><button class="btn sm" data-act="copiar" data-t="${esc(r.link)}">Copiar link</button><a class="btn sm" href="${esc(r.link)}" target="_blank" rel="noopener">Abrir</a></div></div>`:''}
+    else{openModal(`${mHead('Cadastro aguardando pagamento')}<div class="modal-body"><p>Cobrança de <b>${brl(r.total)}</b>${r.desconto?' (com '+brl(r.desconto)+' de desconto)':''} gerada no banco (boleto + PIX). O cadastro ativa sozinho quando o pagamento for confirmado.</p>
+      ${r.pix?`<div class="f"><span>PIX copia e cola</span><div class="linha-dig" style="word-break:break-all">${esc(r.pix)}</div><div class="actions" style="margin-top:6px"><button class="btn sm" data-act="copiar" data-t="${esc(r.pix)}">Copiar PIX</button></div></div>`:''}
+      ${r.linha?`<div class="f"><span>Linha digitável do boleto</span><div class="linha-dig">${esc(r.linha)}</div><div class="actions" style="margin-top:6px"><button class="btn sm" data-act="copiar" data-t="${esc(r.linha)}">Copiar linha</button></div></div>`:''}
+      ${r.link?`<div class="f"><span>Link de pagamento</span><div class="linha-dig">${esc(r.link)}</div><div class="actions" style="margin-top:6px"><button class="btn sm" data-act="copiar" data-t="${esc(r.link)}">Copiar link</button></div></div>`:''}
       ${r.aviso?`<p class="small muted">${esc([r.aviso.whatsapp,r.aviso.email].filter(Boolean).join(' · '))}</p>`:''}</div><div class="modal-foot"><button class="btn primary" data-act="close-modal">Entendi</button></div>`)}
   }catch(er){toast(er.message,true)}
 };
@@ -5642,20 +5667,20 @@ aCarteira=function(){let h=aCarteiraV14();if(!UI.cart&&podeCadastrarC()&&!/data-
 
 /* ---------- cadastro pendente: situação da ativação ---------- */
 function bannerAtivacao(e){const a=e.ativacao||{};const ed=podeCadastrarC();
-  return `<div class="banner warn" style="display:block;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div><b>Aguardando pagamento da ativação</b> · ${brl(a.total)}${a.desconto?' (desconto '+brl(a.desconto)+(a.voucher?' · voucher '+esc(a.voucher.codigo):'')+')':''} por ${esc((METODOS_CAD.find(m=>m[0]===a.metodo)||[,'—'])[1])}${a.venc?' · vence '+fmtData(a.venc):''}
-   <div class="small">${a.erro?'<b style="color:var(--crit)">A cobrança não foi gerada: '+esc(a.erro)+'</b>':'O cadastro ativa sozinho quando o Asaas confirmar o pagamento. Enquanto isso, não gera obrigações nem mensalidades.'}</div></div>
-   ${ed?`<div class="actions">${a.link?`<button class="btn sm" data-act="copiar" data-t="${esc(a.link)}">Copiar link</button><button class="btn sm" data-act="ativ-acao" data-v="reenviar" data-id="${e.id}">Reenviar ao cliente</button>`:''}<button class="btn sm" data-act="ativ-acao" data-v="verificar" data-id="${e.id}">Verificar pagamento</button><button class="btn sm" data-act="ativ-metodo" data-id="${e.id}">${a.cobrancaId?'Trocar forma de pagamento':'Gerar cobrança'}</button>${MODO==='api'&&finApi().dados?.falso?`<button class="btn sm ghost" data-act="ativ-acao" data-v="simular-pagamento" data-id="${e.id}">Simular pagamento (teste)</button>`:''}<button class="btn sm ghost" data-act="ativ-acao" data-v="cancelar" data-id="${e.id}">Cancelar cadastro</button></div>`:''}</div></div>`}
+  return `<div class="banner warn" style="display:block;margin-bottom:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div><b>Aguardando pagamento da ativação</b> · ${brl(a.total)}${a.desconto?' (desconto '+brl(a.desconto)+(a.voucher?' · voucher '+esc(a.voucher.codigo):'')+')':''} por boleto ou PIX${a.venc?' · vence '+fmtData(a.venc):''}
+   <div class="small">${a.erro?'<b style="color:var(--crit)">A cobrança não foi gerada: '+esc(a.erro)+'</b>':'O cadastro ativa sozinho quando o banco confirmar o pagamento. Enquanto isso, não gera obrigações nem mensalidades.'}</div></div>
+   ${ed?`<div class="actions">${a.pix?`<button class="btn sm" data-act="copiar" data-t="${esc(a.pix)}">Copiar PIX</button>`:''}${a.linha?`<button class="btn sm" data-act="copiar" data-t="${esc(a.linha)}">Copiar linha digitável</button>`:''}${a.arquivoUrl?linkArq({url:a.arquivoUrl,nome:'Boleto ativação.pdf'},'Boleto PDF'):''}${a.cobrancaId?`<button class="btn sm" data-act="ativ-acao" data-v="reenviar" data-id="${e.id}">Reenviar ao cliente</button>`:''}<button class="btn sm" data-act="ativ-acao" data-v="verificar" data-id="${e.id}">Verificar pagamento</button><button class="btn sm" data-act="ativ-metodo" data-id="${e.id}">${a.cobrancaId?'Gerar nova cobrança':'Gerar cobrança'}</button>${MODO==='api'&&finApi().dados?.falso?`<button class="btn sm ghost" data-act="ativ-acao" data-v="simular-pagamento" data-id="${e.id}">Simular pagamento (teste)</button>`:''}<button class="btn sm ghost" data-act="ativ-acao" data-v="cancelar" data-id="${e.id}">Cancelar cadastro</button></div>`:''}</div></div>`}
 const detalheEmpresaV14=detalheEmpresa;
 detalheEmpresa=function(){const h=detalheEmpresaV14();const e=UI.cart?.id&&emp(UI.cart.id);if(!pendAtiv(e))return h;finApi();
   const i=h.indexOf('<div class="tabs" role="tablist">');return i>0?h.slice(0,i)+bannerAtivacao(e)+h.slice(i):bannerAtivacao(e)+h};
 ACT['ativ-acao']=async el=>{const v=el.dataset.v;const e=emp(el.dataset.id);
   const run=async(extra)=>{el.disabled=true;try{const r=await MF.api('POST',`/api/ativacao/${encodeURIComponent(e.id)}/${v}`,extra||{});
-    toast(v==='verificar'?(r.pago?'Pagamento confirmado: cadastro ativado. 🎉':'Ainda não pago (situação no Asaas: '+r.status+').'):v==='reenviar'?[r.aviso?.whatsapp,r.aviso?.email].filter(Boolean).join(' · '):v==='cancelar'?'Cadastro cancelado.':'Pagamento simulado: cadastro ativado.')}catch(er){toast(er.message,true)}el.disabled=false};
-  if(v==='cancelar')return pedirMotivo('Cancelar cadastro','Motivo (ex.: cliente desistiu). A cobrança no Asaas também é cancelada.',m=>run({motivo:m}));run()};
-ACT['ativ-metodo']=el=>{const e=emp(el.dataset.id);const a=e.ativacao||{};openModal(`${mHead('Cobrança da ativação')}<form data-form="ativ-metodo" data-id="${e.id}"><div class="modal-body"><label class="f"><span>Forma de pagamento</span><select name="metodo">${METODOS_CAD.map(([k,r])=>`<option value="${k}" ${a.metodo===k?'selected':''}>${r}</option>`).join('')}</select></label>
-  <p class="small muted">${a.cobrancaId?'A cobrança atual é cancelada no Asaas e uma nova é gerada.':''} Valor: ${brl(a.total)}.</p><label class="chk"><input type="checkbox" name="avisar" checked> Enviar o novo link ao cliente</label></div>
+    toast(v==='verificar'?(r.pago?'Pagamento confirmado: cadastro ativado. 🎉':'Ainda não pago (situação no banco: '+r.status+').'):v==='reenviar'?[r.aviso?.whatsapp,r.aviso?.email].filter(Boolean).join(' · '):v==='cancelar'?'Cadastro cancelado.':'Pagamento simulado: cadastro ativado.')}catch(er){toast(er.message,true)}el.disabled=false};
+  if(v==='cancelar')return pedirMotivo('Cancelar cadastro','Motivo (ex.: cliente desistiu). A cobrança no banco também é cancelada.',m=>run({motivo:m}));run()};
+ACT['ativ-metodo']=el=>{const e=emp(el.dataset.id);const a=e.ativacao||{};openModal(`${mHead('Cobrança da ativação')}<form data-form="ativ-metodo" data-id="${e.id}"><div class="modal-body"><p>Boleto + PIX no Banco Inter, vencimento em 3 dias. Valor: <b>${brl(a.total)}</b>.</p>
+  <p class="small muted">${a.cobrancaId?'A cobrança atual é cancelada no banco e uma nova é gerada.':''} O endereço do cadastro precisa estar completo.</p><label class="chk"><input type="checkbox" name="avisar" checked> Enviar o novo boleto e PIX ao cliente</label></div>
   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Gerar cobrança</button></div></form>`)};
-FORM['ativ-metodo']=async(fd,form)=>{try{const r=await MF.api('POST',`/api/ativacao/${encodeURIComponent(form.dataset.id)}/cobranca`,{metodo:fd.get('metodo'),avisar:!!fd.get('avisar')});closeModal();toast('Nova cobrança gerada.'+(r.aviso?' '+[r.aviso.whatsapp,r.aviso.email].join(' · '):''))}catch(er){toast(er.message,true)}};
+FORM['ativ-metodo']=async(fd,form)=>{try{const r=await MF.api('POST',`/api/ativacao/${encodeURIComponent(form.dataset.id)}/cobranca`,{avisar:!!fd.get('avisar')});closeModal();toast('Nova cobrança gerada.'+(r.aviso?' '+[r.aviso.whatsapp,r.aviso.email].join(' · '):''))}catch(er){toast(er.message,true)}};
 // lista da Carteira: selo de "aguardando pagamento"
 const aCarteiraV15b=aCarteira;
 aCarteira=function(){let h=aCarteiraV15b();if(UI.cart)return h;S.empresas.filter(pendAtiv).forEach(e=>{const nome=esc(e.fantasia||e.razao);h=h.replace(new RegExp('(data-act="cart-abrir" data-id="'+e.id+'"[^>]*>)([^<]*)'),`$1$2 ${pill('aguardando pagamento','warn')}`)});return h};

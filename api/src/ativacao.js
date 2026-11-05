@@ -1,7 +1,7 @@
 // Cadastro de clientes com ativação por pagamento (ou voucher do master).
 //
-// Toda empresa nova nasce "aguardando_pagamento": a primeira mensalidade é cobrada no Asaas (boleto, PIX, cartão ou
-// o cliente escolhe) e o cadastro só fica ativo quando o banco confirma o pagamento (webhook) ou quando um voucher
+// Toda empresa nova nasce "aguardando_pagamento": a primeira mensalidade é cobrada no Banco Inter (um boleto com QR Code
+// PIX) e o cadastro só fica ativo quando o banco confirma o pagamento (webhook) ou quando um voucher
 // de isenção zera o valor. Vouchers são criados só pelo master (código, % ou valor, quantidade ou ilimitado,
 // quantos meses vale e validade); o uso é conferido e contado aqui no servidor.
 import crypto from 'node:crypto';
@@ -12,8 +12,9 @@ import { criarApoio, soDig, brl, fmtData, fmtComp, addDias, agoraLocal } from '.
 
 const r2 = n => Math.round(Number(n || 0) * 100) / 100;
 const FALSO = process.env.FINANCEIRO_FALSO === '1' && process.env.NODE_ENV !== 'production';
-const METODOS = { boleto: 'BOLETO', pix: 'PIX', cartao: 'CREDIT_CARD', escolha: 'UNDEFINED' };
-const NOME_METODO = { boleto: 'boleto', pix: 'PIX', cartao: 'cartão de crédito', escolha: 'boleto, PIX ou cartão' };
+// cobrança única no banco: boleto com QR Code PIX (o cliente paga como preferir)
+const METODOS = { bolepix: 'BOLEPIX' };
+const NOME_METODO = { bolepix: 'boleto ou PIX' };
 const REGIME_ID = { MEI: 'reg2-mei', SN: 'reg2-sn-sem-ie', 'SN-IE': 'reg2-sn-com-ie', OUTRO: 'reg2-outros' };
 export function cnpjValido(c) {
   c = soDig(c); if (c.length !== 14 || /^(\d)\1+$/.test(c)) return false;
@@ -90,23 +91,20 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
 
   /* ---------------- cobrança de ativação ---------------- */
   async function cobrar(esc, e, ativ) {
-    const c = await fin.cfgBanco(esc); if (!fin.temBanco(c)) throw new ErroHttp(412, 'Conecte o Asaas em Financeiro › Régua e automação › Banco para cobrar a ativação.');
-    const cliente = await fin.clienteAsaas(c, esc, e);
-    const hoje = agoraLocal().data; const venc = ativ.metodo === 'pix' ? addDias(hoje, 1) : addDias(hoje, 3);
-    const p = await fin.asaas(c, 'POST', '/payments', { customer: cliente, billingType: METODOS[ativ.metodo] || 'UNDEFINED', value: ativ.total, dueDate: venc,
-      description: `Ativação · ${ativ.planoNome || 'plano contábil'} · 1ª mensalidade · ${e.fantasia || e.razao}`.slice(0, 500), externalReference: 'ativ-' + e.id, postalService: false });
-    const pix = ativ.metodo === 'pix' || ativ.metodo === 'escolha' ? await fin.asaas(c, 'GET', `/payments/${p.id}/pixQrCode`).catch(() => null) : null;
-    const linha = ativ.metodo === 'boleto' || ativ.metodo === 'escolha' ? await fin.asaas(c, 'GET', `/payments/${p.id}/identificationField`).catch(() => null) : null;
-    return { cobrancaId: p.id, link: p.invoiceUrl, linha: linha?.identificationField || '', pix: pix?.payload || '', venc, emitidaEm: new Date().toISOString() };
+    const hoje = agoraLocal().data; const venc = addDias(hoje, 3);
+    const b = await fin.banco.emitir(esc, { ref: 'ativ-' + e.id, e, valor: ativ.total, venc, descricao: `Ativação ${ativ.planoNome || 'plano contábil'} · 1ª mensalidade` });
+    return { provedor: b.provedor, cobrancaId: b.id, link: b.link || '', linha: b.linha, pix: b.pix, venc: b.venc, arquivoId: b.arquivo?.id || null, arquivoUrl: b.arquivo?.url || '', emitidaEm: new Date().toISOString() };
   }
+  const textoCobranca = at => [at.pix ? `PIX copia e cola:\n${at.pix}` : '', at.linha ? `Boleto (linha digitável): ${at.linha}` : '', at.link || ''].filter(Boolean).join('\n\n');
   async function avisarCliente(esc, e, ativ, quem) {
     const cfg = await A.configEscritorio(esc); const nome = String(e.contatos?.[0]?.nome || e.socios?.[0]?.nome || e.fantasia || e.razao || '').split(' ')[0];
-    const texto = `Olá, ${nome}! Que bom ter a ${e.fantasia || e.razao} com o ${cfg.escritorio || 'escritório'}. 🎉 Para ativar o seu plano ${ativ.planoNome || ''}, é só pagar a 1ª mensalidade de ${brl(ativ.total)}${ativ.desconto ? ' (já com ' + brl(ativ.desconto) + ' de desconto)' : ''} por ${NOME_METODO[ativ.metodo] || 'boleto ou PIX'}: ${ativ.link}\nAssim que o pagamento for confirmado, seu cadastro é ativado e enviamos o acesso ao portal.`;
+    const texto = `Olá, ${nome}! Que bom ter a ${e.fantasia || e.razao} com o ${cfg.escritorio || 'escritório'}. 🎉 Para ativar o seu plano ${ativ.planoNome || ''}, é só pagar a 1ª mensalidade de ${brl(ativ.total)}${ativ.desconto ? ' (já com ' + brl(ativ.desconto) + ' de desconto)' : ''} por boleto ou PIX (vencimento ${fmtData(ativ.venc)}):\n\n${textoCobranca(ativ)}\n\nAssim que o pagamento for confirmado, seu cadastro é ativado e enviamos o acesso ao portal.`;
     const res = {};
-    try { const rw = await wa.enviarArquivos({ esc, empresaId: e.id, fone: e.telefone, anexos: [], legenda: texto, u: { id: null, nome: 'Ativação do cadastro' + (quem ? ' por ' + quem : '') } }); res.whatsapp = 'WhatsApp enviado para ' + rw.para; }
+    let anexo = null; if (ativ.arquivoId) { const buf = await A.conteudoArquivo(ativ.arquivoId).catch(() => null); if (buf) anexo = { id: ativ.arquivoId, nome: 'Boleto ativação.pdf', tipo: 'application/pdf', conteudo: buf }; }
+    try { const rw = await wa.enviarArquivos({ esc, empresaId: e.id, fone: e.telefone, anexos: anexo ? [anexo] : [], legenda: texto, u: { id: null, nome: 'Ativação do cadastro' + (quem ? ' por ' + quem : '') } }); res.whatsapp = 'WhatsApp enviado para ' + rw.para; }
     catch (er) { res.whatsapp = 'WhatsApp não enviado (' + er.message + ')'; }
     const para = await A.emailsDaEmpresa(esc, e.id, e);
-    if (para.length) { const re = await enviarEmail({ para, assunto: 'Ativação do seu plano · ' + brl(ativ.total), texto, html: `<p>${texto.replace(/[&<>]/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[x])).replace(/(https?:\/\/\S+)/g, '<a href="$1">$1</a>').replace(/\n/g, '<br>')}</p>` }); res.email = re.enviado ? 'e-mail enviado' : 'e-mail não enviado (' + (re.motivo || 'falha') + ')'; }
+    if (para.length) { const re = await enviarEmail({ para, assunto: 'Ativação do seu plano · ' + brl(ativ.total), texto, anexos: anexo ? [anexo] : [], html: `<p>${texto.replace(/[&<>]/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[x])).replace(/(https?:\/\/\S+)/g, '<a href="$1">$1</a>').replace(/\n/g, '<br>')}</p>` }); res.email = re.enviado ? 'e-mail enviado' : 'e-mail não enviado (' + (re.motivo || 'falha') + ')'; }
     else res.email = 'sem e-mail';
     return res;
   }
@@ -119,7 +117,7 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
     await A.gravar(esc, 'empresas', e.id, e.id, novo);
     // a 1ª mensalidade fica registrada como paga (ou isenta) no Financeiro
     const f = { id: 'fat-' + e.id + '-' + L.comp, empresaId: e.id, comp: L.comp, venc: at.venc || L.data, itens: [{ desc: 'Honorários · ' + (at.planoNome || e.plano?.nome || 'plano contábil'), valor: r2(at.valor), tipo: 'base', detalhe: '1ª mensalidade (ativação do cadastro)' }],
-      ...(at.desconto ? { desconto: r2(at.desconto), voucher: at.voucher?.codigo } : {}), valor: r2(at.total), status: 'paga', pagaEm: data || L.data, valorPago: r2(valorPago ?? at.total), formaPagamento: pago ? (forma || 'Asaas') : 'Voucher (isenção)',
+      ...(at.desconto ? { desconto: r2(at.desconto), voucher: at.voucher?.codigo } : {}), valor: r2(at.total), status: 'paga', pagaEm: data || L.data, valorPago: r2(valorPago ?? at.total), formaPagamento: pago ? (forma || 'Banco') : 'Voucher (isenção)',
       baixaAutomatica: !!pago, ativacao: true, cobrancas: [], criadaEm: agora, criadaPor: quem || 'Ativação' };
     const [ja] = await db.query(`SELECT 1 FROM registros WHERE escritorio_id = $1 AND colecao = 'faturas' AND id = $2`, [esc, f.id]); if (!ja) await A.gravar(esc, 'faturas', f.id, e.id, f);
     if (e.leadId) {
@@ -130,7 +128,7 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
     await log('empresa_ativada', { detalhe: `${e.razao} · ${pago ? 'pagamento ' + brl(valorPago ?? at.total) : 'voucher ' + (at.voucher?.codigo || '')}` });
     return novo;
   }
-  ganchos.ativacaoPaga = async (esc, empresaId, p) => ativar(esc, empresaId, { pago: true, valorPago: p.value, forma: { BOLETO: 'Boleto', PIX: 'PIX', CREDIT_CARD: 'Cartão de crédito' }[p.billingType] || 'Asaas', data: String(p.paymentDate || p.clientPaymentDate || p.confirmedDate || '').slice(0, 10) || undefined, quem: 'Asaas' });
+  ganchos.ativacaoPaga = async (esc, empresaId, p) => ativar(esc, empresaId, { pago: true, valorPago: p.value, forma: { BOLETO: 'Boleto', PIX: 'PIX', CREDIT_CARD: 'Cartão de crédito' }[p.billingType] || p.billingType || 'Banco', data: String(p.paymentDate || '').slice(0, 10) || undefined, quem: 'Banco' });
 
   r.post('/api/ativacao/cadastrar', async ctx => {
     const u = await exigir(ctx, { site: 'painel' }); if (!podeCadastrar(u)) throw new ErroHttp(403, 'Seu acesso não permite cadastrar clientes.');
@@ -141,7 +139,10 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
     const email = String(d.email || '').trim().toLowerCase(); if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) throw new ErroHttp(400, 'Informe um e-mail válido do cliente.');
     const fone = soDig(d.telefone); if (fone.length < 10) throw new ErroHttp(400, 'Informe o WhatsApp do cliente com DDD.');
     const valor = r2(b.plano?.valor); if (!(valor > 0)) throw new ErroHttp(400, 'Informe o valor mensal do plano.');
-    const metodo = METODOS[b.metodo] ? b.metodo : 'escolha';
+    const metodo = 'bolepix';
+    const en = d.endereco || {}; const endereco = { cep: soDig(en.cep).slice(0, 8), logradouro: String(en.logradouro || '').trim().slice(0, 90), numero: String(en.numero || '').trim().slice(0, 10),
+      complemento: String(en.complemento || '').trim().slice(0, 30), bairro: String(en.bairro || '').trim().slice(0, 60) };
+    if (endereco.cep.length !== 8 || !endereco.logradouro || !String(d.municipio || '').trim() || String(d.uf || '').trim().length !== 2) throw new ErroHttp(400, 'Informe o endereço completo da empresa (CEP, rua, cidade e UF): o banco exige no boleto.');
     const [dup] = await db.query(`SELECT dados->>'razao' AS razao FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas' AND regexp_replace(coalesce(dados->>'cnpj',''),'\\D','','g') = $2 LIMIT 1`, [esc, cnpj]);
     if (dup) throw new ErroHttp(409, 'Já existe uma empresa com este CNPJ: ' + dup.razao + '.');
     const id = 'e-' + crypto.randomBytes(6).toString('hex'); const agora = new Date().toISOString(); const L = agoraLocal();
@@ -158,7 +159,7 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
     });
     const total = r2(valor - desconto);
     const e = { id, razao, fantasia: String(d.fantasia || '').trim(), cnpj, regime: regime === 'SN-IE' ? 'SN' : regime, regimeId: REGIME_ID[regime], anexo: regime.startsWith('SN') ? (d.anexo || 'III') : null,
-      email, telefone: fone, municipio: String(d.municipio || '').slice(0, 80), uf: String(d.uf || '').toUpperCase().slice(0, 2), abertura: d.abertura || '',
+      email, telefone: fone, endereco, municipio: String(d.municipio || '').slice(0, 80), uf: String(d.uf || '').toUpperCase().slice(0, 2), abertura: d.abertura || '',
       contatos: d.contatoNome ? [{ nome: String(d.contatoNome).slice(0, 80), cargo: 'Responsável', telefone: fone, email }] : [], socios: [],
       plano: { nome: String(b.plano?.nome || '').slice(0, 60), valor, funcInclusos: Number(b.plano?.funcInclusos || 0), adicionalFunc: Number(b.plano?.adicionalFunc || 0), metodo, diaVenc: Math.min(28, Math.max(1, Number(b.plano?.diaVenc) || 10)) },
       status: 'aguardando_pagamento', inicioControle: L.comp, checklist: [], origem: 'cadastro-comercial', leadId: b.leadId ? String(b.leadId) : null, criadoEm: agora, criadoPor: u.id, criadoPorNome: u.nome,
@@ -177,7 +178,7 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
       if (b.avisar !== false) resultado.aviso = await avisarCliente(esc, { ...e, ativacao: at }, at, String(u.nome || '').split(' ')[0]);
     }
     if (e.leadId) { const l = await A.registro(esc, 'leads', e.leadId); if (l) await A.gravar(esc, 'leads', l.id, null, { ...l, empresaId: id, ...(resultado.status === 'ativo' ? {} : { etapa: 'negociacao', status: 'contato' }),
-      atividades: [...(l.atividades || []), { em: agora, uid: u.id, nome: u.nome, tipo: 'sistema', texto: resultado.status === 'ativo' ? 'Cadastro criado e ativado (voucher de isenção).' : `Cadastro criado. Aguardando pagamento da ativação: ${brl(total)} por ${NOME_METODO[metodo]}.` }].slice(-300) }); }
+      atividades: [...(l.atividades || []), { em: agora, uid: u.id, nome: u.nome, tipo: 'sistema', texto: resultado.status === 'ativo' ? 'Cadastro criado e ativado (voucher de isenção).' : `Cadastro criado. Aguardando pagamento da ativação: ${brl(total)} por boleto ou PIX.` }].slice(-300) }); }
     await log('empresa_cadastrada', { usuarioId: u.id, ip: ctx.ip, detalhe: `${razao} · ${brl(total)}${voucher ? ' · voucher ' + voucher.codigo : ''} · ${resultado.status}` });
     return { ok: true, ...resultado };
   }, { limite: 64 * 1024 });
@@ -188,10 +189,10 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
   }
   r.post('/api/ativacao/:id/cobranca', async ctx => {           // gera de novo (ou troca o método)
     const u = await exigir(ctx, { site: 'painel' }); if (!podeCadastrar(u)) throw new ErroHttp(403, 'Seu acesso não permite esta ação.');
-    const e = await pendente(u, ctx.params.id); const b = ctx.corpo || {}; const c = await fin.cfgBanco(u.escritorio_id);
-    if (e.ativacao?.cobrancaId && fin.temBanco(c)) await fin.asaas(c, 'DELETE', `/payments/${e.ativacao.cobrancaId}`).catch(() => { });
-    const metodo = METODOS[b.metodo] ? b.metodo : (e.ativacao?.metodo || 'escolha');
-    const at0 = { ...e.ativacao, metodo }; delete at0.erro;
+    const e = await pendente(u, ctx.params.id); const b = ctx.corpo || {};
+    if (e.ativacao?.cobrancaId && e.ativacao.provedor) await fin.banco.cancelar(u.escritorio_id, e.ativacao.provedor, e.ativacao.cobrancaId, 'Substituida por nova cobranca').catch(() => { });
+    const metodo = 'bolepix';
+    const at0 = { ...e.ativacao, metodo }; delete at0.erro; delete at0.arquivoId; delete at0.arquivoUrl; delete at0.link;
     const cob = await cobrar(u.escritorio_id, e, at0); const at = { ...at0, ...cob };
     const novo = { ...e, plano: { ...e.plano, metodo }, ativacao: at }; await A.gravar(u.escritorio_id, 'empresas', e.id, e.id, novo);
     const aviso = b.avisar !== false ? await avisarCliente(u.escritorio_id, novo, at, String(u.nome || '').split(' ')[0]) : null;
@@ -199,21 +200,20 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
   });
   r.post('/api/ativacao/:id/reenviar', async ctx => {
     const u = await exigir(ctx, { site: 'painel' }); if (!podeCadastrar(u)) throw new ErroHttp(403, 'Seu acesso não permite esta ação.');
-    const e = await pendente(u, ctx.params.id); if (!e.ativacao?.link) throw new ErroHttp(409, 'Ainda não há cobrança gerada. Use "Gerar cobrança".');
+    const e = await pendente(u, ctx.params.id); if (!e.ativacao?.cobrancaId) throw new ErroHttp(409, 'Ainda não há cobrança gerada. Use "Gerar cobrança".');
     return { ok: true, aviso: await avisarCliente(u.escritorio_id, e, e.ativacao, String(u.nome || '').split(' ')[0]) };
   });
-  r.post('/api/ativacao/:id/verificar', async ctx => {           // confere no Asaas (caso o aviso automático não tenha chegado)
-    const u = await exigir(ctx, { site: 'painel' }); const e = await pendente(u, ctx.params.id); const c = await fin.cfgBanco(u.escritorio_id);
-    if (!e.ativacao?.cobrancaId || !fin.temBanco(c)) throw new ErroHttp(409, 'Não há cobrança no banco para conferir.');
-    if (FALSO) return { ok: true, status: 'PENDING', pago: false };
-    const p = await fin.asaas(c, 'GET', `/payments/${e.ativacao.cobrancaId}`);
-    if (['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'].includes(p.status)) { await ganchos.ativacaoPaga(u.escritorio_id, e.id, p); return { ok: true, status: p.status, pago: true }; }
-    return { ok: true, status: p.status, pago: false };
+  r.post('/api/ativacao/:id/verificar', async ctx => {           // confere no banco (caso o aviso automático não tenha chegado)
+    const u = await exigir(ctx, { site: 'painel' }); const e = await pendente(u, ctx.params.id);
+    if (!e.ativacao?.cobrancaId || !e.ativacao.provedor) throw new ErroHttp(409, 'Não há cobrança no banco para conferir.');
+    const st = await fin.banco.consultar(u.escritorio_id, e.ativacao.provedor, e.ativacao.cobrancaId);
+    if (st.pago) { await fin.pagamentoConfirmado(u.escritorio_id, 'ativ-' + e.id, st); return { ok: true, status: st.situacao, pago: true }; }
+    return { ok: true, status: st.situacao, pago: false };
   });
   r.post('/api/ativacao/:id/cancelar', async ctx => {
     const u = await exigir(ctx, { site: 'painel' }); if (!podeCadastrar(u)) throw new ErroHttp(403, 'Seu acesso não permite esta ação.');
-    const e = await pendente(u, ctx.params.id); const c = await fin.cfgBanco(u.escritorio_id);
-    if (e.ativacao?.cobrancaId && fin.temBanco(c)) await fin.asaas(c, 'DELETE', `/payments/${e.ativacao.cobrancaId}`).catch(() => { });
+    const e = await pendente(u, ctx.params.id);
+    if (e.ativacao?.cobrancaId && e.ativacao.provedor) await fin.banco.cancelar(u.escritorio_id, e.ativacao.provedor, e.ativacao.cobrancaId, 'Cadastro cancelado').catch(() => { });
     await A.gravar(u.escritorio_id, 'empresas', e.id, e.id, { ...e, status: 'inativo', inativoDesde: agoraLocal().comp, ativacao: { ...e.ativacao, status: 'cancelada', canceladaEm: new Date().toISOString(), canceladaPor: u.nome, motivo: String(ctx.corpo?.motivo || '').slice(0, 200) } });
     await log('ativacao_cancelada', { usuarioId: u.id, ip: ctx.ip, detalhe: e.razao });
     return { ok: true };
@@ -222,7 +222,8 @@ export function registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos }
   r.post('/api/ativacao/:id/simular-pagamento', async ctx => {
     if (!FALSO) throw new ErroHttp(404, 'Não encontrado.');
     const u = await exigir(ctx, { site: 'painel' }); const e = await pendente(u, ctx.params.id);
-    await ganchos.ativacaoPaga(u.escritorio_id, e.id, { value: e.ativacao.total, billingType: 'PIX', paymentDate: agoraLocal().data });
+    if (e.ativacao?.cobrancaId) await fin.banco.simularPago(u.escritorio_id, e.ativacao.cobrancaId);
+    await fin.pagamentoConfirmado(u.escritorio_id, 'ativ-' + e.id, { valor: e.ativacao.total, data: agoraLocal().data, forma: 'PIX' });
     return { ok: true };
   });
 
