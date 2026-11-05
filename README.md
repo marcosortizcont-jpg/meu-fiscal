@@ -309,3 +309,12 @@ Tudo abaixo rodou contra um PostgreSQL 16 real, com os dois sites em domínios s
 - **Novo serviço com sugestão pela atividade**: o sistema lê o CNAE da empresa e sugere o código de tributação nacional (LC 116) mais provável, já preenchendo descrição e código; também busca por palavra ou código e sugere NBS. A tabela CNAE → serviço fica em `api/src/nfse-cnae.js` (não existe tabela oficial nacional; o usuário confirma).
 - **Campo Grande/MS**: desde 01/11/2026 MEI e optantes do Simples emitem só no Emissor Nacional (é o que o sistema faz). Empresas fora do Simples emitem pelo emissor da prefeitura (nfse.campogrande.ms.gov.br): o sistema avisa, não envia ao SEFIN e gera a DPS para conferência.
 - **Teste offline**: `node api/test/nfse-teste.mjs <pasta> <cert.pfx> <senha>` gera DPS de MEI, Simples, Simples com retenção, não optante e cancelamento assinados, para validar nos schemas oficiais em `api/test/xsd` (o xmllint precisa de uma cópia dos XSD sem os `^`/`$` dos padrões).
+
+### Procurações eletrônicas (e-CAC)
+
+- **Procurações** (menu da Operação): lista todas as empresas ativas com a situação da procuração do cliente para o escritório (ativa, vence em até 30 dias, vencida, sem procuração, não consultada), validade e serviços.
+- **Consulta na Receita**: pelo Integra Contador (`PROCURACOES / OBTERPROCURACAO41`), com o certificado e-CNPJ do escritório já cadastrado em Configurações › Integração com a Receita (o outorgado é o CNPJ desse certificado). Botão "Consultar todas", consulta por empresa e reconsulta automática a cada 7 dias (de madrugada).
+- **Registro manual**: quando a integração não está configurada, registre a validade à mão.
+- **Pedir ao cliente / Pedir renovação**: envia por WhatsApp e e-mail o passo a passo do e-CAC (Senhas e Procurações › Procuração eletrônica › Cadastrar) com o CNPJ do escritório.
+- **Alertas** na Central de alertas e no cadastro da empresa: vencida, vence em até 30 dias e sem procuração. A situação da procuração é gravada só pelo servidor.
+- **Notas fiscais**: a procuração do e-CAC não vale para a NFS-e; a emissão continua com o certificado A1 de cada empresa.

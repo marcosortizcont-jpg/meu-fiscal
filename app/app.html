@@ -6193,6 +6193,78 @@ FORM['emp-nfse']=(fd,form)=>{const e=emp(form.dataset.id);const amb=fd.get('ambi
 /* ==== MÓDULOS v17 (fim) ==== */
 
 
+/* ==== MÓDULOS v18: procurações eletrônicas (e-CAC) dos clientes para o escritório ==== */
+const ST_PROC={ativa:['Ativa','ok'],vence:['Vence em breve','warn'],vencida:['Vencida','crit'],inexistente:['Sem procuração','crit'],erro:['Erro na consulta','warn'],nao:['Não consultada','']};
+const DIAS_AVISO_PROC=30;
+const normP=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+function sitProc(e){const p=e.procuracao;if(!p||!p.status)return 'nao';if(p.status==='ativa'){const n=diasAte(p.validade);return n<0?'vencida':n<=DIAS_AVISO_PROC?'vence':'ativa'}return p.status}
+const empsProc=()=>S.empresas.filter(e=>!['inativo','aguardando_pagamento'].includes(e.status)&&!e.exemplo);
+const NAV_PROC=['a-procuracoes','Procurações'];
+if(!NAV_A.some(n=>n[0]==='a-procuracoes')){const i=NAV_A.findIndex(n=>n[0]==='a-fiscal');NAV_A.splice(i>=0?i+1:NAV_A.length-1,0,NAV_PROC)}
+MOD_DA_VIEW['a-procuracoes']='carteira';if(!IC.selo)IC.selo='<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="m9 12 2 2 4-4"/>';NAV_ICON['a-procuracoes']='selo';
+function aProcuracoes(){
+  if(!podeMod('carteira','ver'))return vazio('Seu acesso não inclui a Carteira.');
+  const d=MODO==='api'?apiDado('procuracoes','/api/procuracoes'):{indisponivel:true};const x=d.dados||{};const ed=podeMod('carteira','editar');
+  const L=empsProc().map(e=>({e,st:sitProc(e)}));const f=UI.fproc||(UI.fproc={st:'',q:''});
+  const cont=k=>L.filter(r=>r.st===k).length;
+  const V=L.filter(r=>(!f.st||r.st===f.st)&&(!f.q||normP((r.e.fantasia||'')+' '+r.e.razao+' '+r.e.cnpj).includes(normP(f.q)))).sort((a,b)=>{const o={vencida:0,inexistente:1,vence:2,erro:3,nao:4,ativa:5};return (o[a.st]-o[b.st])||String(a.e.procuracao?.validade||'').localeCompare(String(b.e.procuracao?.validade||''))});
+  const cert=x.cert;const nCert=cert?.validade?diasAte(String(cert.validade).slice(0,10)):null;
+  const certBox=MODO!=='api'?'':d.carregando?'<p class="small muted">Carregando…</p>':`<div class="banner ${!x.configurado?'warn':nCert!=null&&nCert<=30?'warn':'ok'}" style="display:block;margin-bottom:12px">
+    ${x.configurado?`<b>Certificado do escritório:</b> ${esc(cert?.titular||'')}${cert?.validade?' · válido até '+fmtData(String(cert.validade).slice(0,10))+(nCert<=30?` · <b>${nCert<0?'vencido':'vence em '+nCert+' dias'}</b>`:''):''} · procurador (outorgado): <span class="mono">${fmtCNPJ(x.outorgado||'')}</span>${x.falso?' · <i>simulação local</i>':''}
+     <div class="small">O sistema consulta na Receita, pelo Integra Contador, a procuração de cada cliente para este CNPJ e confere de novo a cada 7 dias.</div>`
+    :`<b>Cadastre o certificado digital do escritório</b><div class="small">Em <a href="#a-config">Configurações › Integração com a Receita</a>, envie o e-CNPJ A1 do escritório (o mesmo CNPJ que contratou o Integra Contador). Sem ele, dá para registrar as procurações à mão.</div>`}</div>`;
+  return `<div class="page-head"><div><span class="eyebrow">Operação contábil</span><h1>Procurações eletrônicas</h1><p class="sub">Procuração de cada cliente para o escritório no e-CAC: é ela que libera guias, declarações e consultas na Receita em nome da empresa.</p></div>
+   ${ed&&MODO==='api'?`<div class="actions"><button class="btn primary" data-act="proc-consultar-todas" ${x.configurado?'':'disabled'}>${x.consultando?'Consultando…':'Consultar todas na Receita'}</button></div>`:''}</div>${certBox}
+   <div class="crm-kpis">${[['ativa','Ativas'],['vence','Vencem em até '+DIAS_AVISO_PROC+' dias'],['vencida','Vencidas'],['inexistente','Sem procuração'],['nao','Não consultadas']].map(([k,r])=>`<button class="kpi" style="text-align:left;cursor:pointer;${f.st===k?'outline:2px solid var(--brand)':''}" data-act="proc-filtro" data-v="${f.st===k?'':k}"><span class="eyebrow">${r}</span><b>${cont(k)}</b></button>`).join('')}</div>
+   <div class="panel"><div class="panel-head"><h2>Clientes (${V.length})</h2><input type="search" placeholder="Buscar empresa ou CNPJ" value="${esc(f.q)}" data-proc-busca style="max-width:260px"></div>
+   ${V.length?`<div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Situação</th><th>Validade</th><th>Serviços</th><th>Conferida</th><th></th></tr></thead><tbody>${V.map(({e,st})=>{const p=e.procuracao||{};const n=p.validade?diasAte(p.validade):null;
+     return `<tr><td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted mono">${fmtCNPJ(e.cnpj||'')}</div></td><td>${pill(...ST_PROC[st])}${p.pedidoEm?`<div class="small muted">pedida ao cliente em ${fmtData(p.pedidoEm.slice(0,10))}</div>`:''}</td>
+      <td>${p.validade?fmtData(p.validade)+(n!=null?`<div class="small muted">${n<0?'venceu há '+(-n)+' dia(s)':'faltam '+n+' dia(s)'}</div>`:''):'—'}</td>
+      <td class="small">${(p.sistemas||[]).length?esc(p.sistemas.slice(0,3).join(', '))+(p.sistemas.length>3?' +'+(p.sistemas.length-3):''):p.status==='erro'||p.status==='inexistente'?`<span class="muted">${esc(String(p.mensagem||'').slice(0,90))}</span>`:'—'}</td>
+      <td class="small">${p.consultadoEm?fmtDH(p.consultadoEm)+'<div class="muted">'+(p.origem==='manual'?'registrada à mão':'na Receita')+'</div>':'—'}</td>
+      <td><div class="actions" style="justify-content:flex-end">${ed&&MODO==='api'?`${x.configurado?`<button class="btn sm" data-act="proc-consultar" data-id="${e.id}">Consultar</button>`:''}<button class="btn sm ${['vencida','inexistente','vence'].includes(st)?'primary':''}" data-act="proc-pedir" data-id="${e.id}">${['vencida','vence'].includes(st)?'Pedir renovação':'Pedir ao cliente'}</button><button class="btn sm ghost" data-act="proc-manual" data-id="${e.id}">Registrar</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`:vazio('Nenhuma empresa neste filtro.')}</div>
+   <details class="panel small"><summary style="cursor:pointer;font-weight:600">Como o cliente dá a procuração (passo a passo)</summary><ol style="margin:8px 0 0 18px;display:grid;gap:6px">
+    <li>O cliente entra no <b>e-CAC</b> (cav.receita.fazenda.gov.br) com a conta gov.br prata/ouro ou o certificado da empresa.</li>
+    <li><b>Senhas e Procurações › Procuração eletrônica › Cadastrar</b>.</li>
+    <li>Procurador: o CNPJ do escritório (${fmtCNPJ(x.outorgado||'')||'o do certificado em Configurações'}).</li>
+    <li>Marca <b>todos os serviços</b> (ou ao menos Simples Nacional/MEI, DCTFWeb, Caixa Postal e parcelamentos) e a validade máxima (até 5 anos).</li>
+    <li>Depois é só clicar em <b>Consultar</b> aqui: a validade aparece e o sistema avisa 30 dias antes de vencer.</li></ol></details>`}
+const conteudoV18=conteudo;conteudo=function(){if(UI.modo==='painel'&&UI.view==='a-procuracoes')return aProcuracoes();return conteudoV18()};
+ACT['proc-filtro']=el=>{(UI.fproc||(UI.fproc={})).st=el.dataset.v;render()};
+document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-proc-busca]')){(UI.fproc||(UI.fproc={})).q=s.value;clearTimeout(UI._procT);UI._procT=setTimeout(()=>{render();const i=document.querySelector('[data-proc-busca]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)}});
+ACT['proc-consultar']=async el=>{el.disabled=true;el.textContent='…';try{const r=await MF.api('POST','/api/procuracoes/consultar',{empresaId:el.dataset.id});MF.aplicarRemoto?.('empresas',{...emp(el.dataset.id),procuracao:r.procuracao});render();
+  const p=r.procuracao;toast(p.status==='ativa'?'Procuração ativa até '+fmtData(p.validade)+'.':p.status==='vencida'?'A procuração venceu em '+fmtData(p.validade)+'.':p.status==='inexistente'?'Sem procuração do cliente para o escritório.':'Não foi possível consultar: '+(p.mensagem||''),p.status!=='ativa')}catch(er){toast(er.message,true);el.disabled=false;el.textContent='Consultar'}};
+ACT['proc-consultar-todas']=async el=>{el.disabled=true;el.textContent='Consultando…';toast('Consultando as procurações na Receita. Pode levar alguns minutos.');
+  try{const r=await MF.api('POST','/api/procuracoes/consultar',{});const s=r.resumo;toast(`${s.total} empresa(s): ${s.ativa||0} ativa(s), ${s.vencida||0} vencida(s), ${s.inexistente||0} sem procuração${s.erro?', '+s.erro+' com erro':''}.`)}catch(er){toast(er.message,true)}invalidar('procuracoes');el.disabled=false};
+ACT['proc-pedir']=el=>{const e=emp(el.dataset.id);const renovar=['vencida','vence'].includes(sitProc(e));
+  confirmar(renovar?'Pedir renovação da procuração':'Pedir procuração ao cliente',`Envia para <b>${esc(e.fantasia||e.razao)}</b>, por WhatsApp e e-mail, o passo a passo para ${renovar?'renovar':'cadastrar'} a procuração eletrônica no e-CAC para o CNPJ do escritório.`,'Enviar',async()=>{
+    try{const r=await MF.api('POST',`/api/procuracoes/${encodeURIComponent(e.id)}/pedir`,{});toast([r.whatsapp,r.email].filter(Boolean).join(' · '))}catch(er){toast(er.message,true)}})};
+ACT['proc-manual']=el=>{const e=emp(el.dataset.id);const p=e.procuracao||{};openModal(`${mHead('Procuração de '+(e.fantasia||e.razao))}<form data-form="proc-manual" data-id="${e.id}"><div class="modal-body">
+  <p class="small muted" style="margin-top:0">Use quando não der para consultar na Receita (ou para registrar o que o cliente mandou). A consulta automática substitui este registro quando rodar.</p>
+  <div class="grid-f"><label class="f"><span>Válida até *</span><input type="date" name="validade" required value="${esc(p.validade||'')}"></label>
+   <label class="f"><span>Procurador (CNPJ/CPF)</span><input name="outorgado" inputmode="numeric" value="${esc(p.outorgado||'')}"></label>
+   <label class="f full"><span>Serviços (separe por vírgula)</span><input name="sistemas" value="${esc((p.sistemas||[]).join(', '))}" placeholder="ex.: Todos os serviços"></label>
+   <label class="f full"><span>Observação</span><input name="obs" maxlength="300" value="${esc(p.obs||'')}"></label></div></div>
+  <div class="modal-foot">${p.status?'<button type="button" class="btn ghost" data-act="proc-remover" data-id="'+e.id+'">Remover registro</button>':''}<button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar</button></div></form>`)};
+FORM['proc-manual']=async(fd,form)=>{try{const r=await MF.api('PUT',`/api/procuracoes/${encodeURIComponent(form.dataset.id)}`,{validade:fd.get('validade'),outorgado:fd.get('outorgado'),sistemas:fd.get('sistemas'),obs:fd.get('obs')});
+  MF.aplicarRemoto?.('empresas',{...emp(form.dataset.id),procuracao:r.procuracao});closeModal();render();toast('Procuração registrada.')}catch(er){toast(er.message,true)}};
+ACT['proc-remover']=async el=>{try{await MF.api('PUT',`/api/procuracoes/${encodeURIComponent(el.dataset.id)}`,{remover:true});const e={...emp(el.dataset.id)};delete e.procuracao;MF.aplicarRemoto?.('empresas',e);closeModal();render()}catch(er){toast(er.message,true)}};
+// Central de alertas: procuração vencendo, vencida ou inexistente; certificado do escritório perto de vencer
+const motorV18=motor;motor=function(eid,publico){const A=motorV18(eid,publico);if(publico==='c'||!podeMod('carteira','ver'))return A;
+  empsProc().filter(e=>!eid||e.id===eid).forEach(e=>{const st=sitProc(e);const p=e.procuracao||{};
+    if(st==='vencida')A.unshift({nivel:'crit',empresaId:e.id,empresa:e.fantasia||e.razao,area:'Procuração',texto:'Procuração eletrônica vencida em '+fmtData(p.validade)+'. Peça a renovação ao cliente.',view:'a-procuracoes'});
+    else if(st==='vence')A.unshift({nivel:'warn',empresaId:e.id,empresa:e.fantasia||e.razao,area:'Procuração',texto:'Procuração eletrônica vence em '+diasAte(p.validade)+' dia(s) ('+fmtData(p.validade)+').',view:'a-procuracoes'});
+    else if(st==='inexistente')A.push({nivel:'warn',empresaId:e.id,empresa:e.fantasia||e.razao,area:'Procuração',texto:'Sem procuração eletrônica para o escritório: guias e declarações pela Receita não funcionam.',view:'a-procuracoes'})});
+  return A};
+// cadastro da empresa: linha da procuração
+const detalheEmpresaV18=detalheEmpresa;
+detalheEmpresa=function(){const h=detalheEmpresaV18();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||MODO!=='api'||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
+  const st=sitProc(e);const p=e.procuracao||{};
+  const b=`<div class="banner ${st==='ativa'?'ok':st==='nao'?'info':'warn'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><div><b>Procuração eletrônica (e-CAC):</b> ${ST_PROC[st][0]}${p.validade?' · válida até '+fmtData(p.validade):''}</div><div class="actions">${podeMod('carteira','editar')?`<button class="btn sm" data-act="proc-consultar" data-id="${e.id}">Consultar</button><button class="btn sm" data-act="proc-pedir" data-id="${e.id}">${['vencida','vence'].includes(st)?'Pedir renovação':'Pedir ao cliente'}</button>`:''}<a class="btn sm ghost" href="#a-procuracoes">Ver todas</a></div></div>`;
+  const i=h.indexOf('<div class="tabs" role="tablist">');return i>0?h.slice(0,i)+b+h.slice(i):b+h};
+/* ==== MÓDULOS v18 (fim) ==== */
+
+
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();
 </script>

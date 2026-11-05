@@ -493,5 +493,125 @@ export function registrarIntegra(r, { db, exigir, log, pode, wa }) {
     return { tratado: true, continua: estados.has(k), ...resto, arquivo: anexo ? { id: anexo.id, nome: anexo.nome, tipo: anexo.tipo, url: anexo.url, tamanho: anexo.tamanho } : null };
   });
 
-  return { emitirGuia, emitirDasMei, fluxoTheo, executarLote };
+  /* ================= procurações eletrônicas (e-CAC) ================= */
+  // Consulta, pelo Integra Contador (PROCURACOES/OBTERPROCURACAO41), se a empresa deu procuração ao escritório
+  // (outorgado = CNPJ do certificado do escritório) e até quando vale. Resultado guardado no cadastro da empresa.
+  const dataProc = v => { const s = String(v || '').replace(/\D/g, ''); return s.length >= 8 ? `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}` : ''; };
+  function lerProcuracao(d, msgs) {
+    const lista = [].concat(Array.isArray(d) ? d : d && typeof d === 'object' ? (d.procuracoes || d.lista || [d]) : []);
+    let validade = '', sistemas = [];
+    for (const it of lista) {
+      if (!it || typeof it !== 'object') continue;
+      const k = Object.keys(it).find(x => /expira|validade|dtfim|datafim/i.test(x)); const v = k ? dataProc(it[k]) : '';
+      if (v && v > validade) validade = v;
+      const ss = it.sistemas || it.servicos || it.listaSistemas; if (Array.isArray(ss)) sistemas.push(...ss.map(x => typeof x === 'string' ? x : x.descricao || x.nome || x.codigo || JSON.stringify(x)));
+    }
+    const txt = (msgs || []).join(' ');
+    if (!validade) return { status: 'inexistente', validade: '', sistemas: [], mensagem: txt || 'Nenhuma procuração do cliente para o escritório foi encontrada no e-CAC.' };
+    return { status: validade < agoraLocal().data ? 'vencida' : 'ativa', validade, sistemas: [...new Set(sistemas)].slice(0, 60), mensagem: txt };
+  }
+  async function consultarProcuracao(esc, empresaId, quem) {
+    const e = await A.empresa(esc, empresaId); if (!e) throw new ErroHttp(404, 'Empresa não encontrada.');
+    const c = await cfgIntegra(esc); if (!pronto(c)) throw new ErroHttp(412, 'Configure a integração com a Receita (certificado do escritório) em Configurações para consultar procurações.');
+    const doc = soDig(e.cnpj || e.cpf); if (![11, 14].includes(doc.length)) throw new ErroHttp(400, 'A empresa está sem CNPJ no cadastro.');
+    let res;
+    try {
+      if (FALSO) {
+        const n = parseInt(doc.slice(-4), 10);
+        res = doc.endsWith('0000') ? lerProcuracao([], ['Não existe procuração (simulação).']) : lerProcuracao([{ dtexpiracao: addDiasIso(agoraLocal().data, (n % 9) * 45 - 40).replace(/-/g, ''), nrsistemas: 3, sistemas: ['Simples Nacional / PGDAS-D', 'DCTFWeb', 'Caixa Postal'] }], []);
+      } else {
+        const outorgado = soDig(c.cnpj);
+        const { dados, mensagens } = await chamar(c, 'Consultar', doc, { idSistema: 'PROCURACOES', idServico: 'OBTERPROCURACAO41', versaoSistema: '1',
+          dados: { outorgante: doc, tipoOutorgante: doc.length === 11 ? '1' : '2', outorgado, tipoOutorgado: outorgado.length === 11 ? '1' : '2' } });
+        res = lerProcuracao(dados, mensagens);
+      }
+    } catch (er) {
+      if (/procura/i.test(er.message) && !/autentica|Consumer|certificado do escrit/i.test(er.message)) res = { status: 'inexistente', validade: '', sistemas: [], mensagem: er.message };
+      else res = { status: 'erro', validade: e.procuracao?.validade || '', sistemas: e.procuracao?.sistemas || [], mensagem: er.message };
+    }
+    const atual = await A.empresa(esc, empresaId);
+    const procuracao = { ...(atual.procuracao || {}), ...res, origem: 'receita', outorgado: soDig(c.cnpj) || '', consultadoEm: new Date().toISOString(), consultadoPor: quem || 'Automático' };
+    if (res.status === 'erro') procuracao.ultimoErro = res.mensagem; else delete procuracao.ultimoErro;
+    await A.gravar(esc, 'empresas', atual.id, atual.id, { ...atual, procuracao });
+    return procuracao;
+  }
+  const addDiasIso = (d, n) => { const x = new Date(d + 'T12:00:00Z'); x.setUTCDate(x.getUTCDate() + n); return x.toISOString().slice(0, 10); };
+  const consultando = new Set();
+  async function consultarTodas(esc, { quem, somente, idadeDias = 0 } = {}) {
+    if (consultando.has(esc)) throw new ErroHttp(409, 'Já existe uma consulta de procurações em andamento. Aguarde terminar.');
+    consultando.add(esc);
+    try {
+      const es = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas' AND coalesce(dados->>'status','') NOT IN ('inativo','aguardando_pagamento') AND coalesce(dados->>'exemplo','') <> 'true'`, [esc])).map(x => x.dados)
+        .filter(e => !somente || somente.includes(String(e.id)))
+        .filter(e => !idadeDias || !e.procuracao?.consultadoEm || (Date.now() - new Date(e.procuracao.consultadoEm)) > idadeDias * 86400e3);
+      const r0 = { total: es.length, ativa: 0, vencida: 0, inexistente: 0, erro: 0 };
+      for (const e of es) { const p = await consultarProcuracao(esc, e.id, quem).catch(er => ({ status: 'erro', mensagem: er.message })); r0[p.status] = (r0[p.status] || 0) + 1; if (es.length > 1) await new Promise(ok => setTimeout(ok, FALSO ? 5 : 1500)); }
+      return r0;
+    } finally { consultando.delete(esc); }
+  }
+  // de 7 em 7 dias o sistema confere de novo cada empresa (uma vez por dia, de madrugada)
+  async function rotinaProcuracoes() {
+    const L = agoraLocal(); if (Number(L.hora ?? new Date().getHours()) !== 6) return;
+    const cs = await db.query('SELECT escritorio_id FROM integra_config');
+    for (const { escritorio_id: esc } of cs) { const c = await cfgIntegra(esc); if (!pronto(c) || c.ambiente === 'demonstracao') continue; await consultarTodas(esc, { quem: 'Automático', idadeDias: 7 }).catch(er => console.error('[procuracoes]', er.message)); }
+  }
+  if (process.env.NODE_ENV !== 'test') setInterval(() => rotinaProcuracoes().catch(() => { }), 60 * 60000).unref?.();
+
+  const exigirCarteira = (u, nivel = 'editar') => { if (u.papel !== 'master' && !pode(u, 'carteira', nivel) && !pode(u, 'config', nivel)) throw new ErroHttp(403, 'Seu acesso não permite gerenciar procurações.'); };
+  r.get('/api/procuracoes', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' }); exigirCarteira(u, 'ver'); const c = await cfgIntegra(u.escritorio_id);
+    return { configurado: pronto(c), falso: FALSO, ambiente: c?.ambiente || '', outorgado: soDig(c?.cnpj || ''), cert: c?.pfx_cifrado ? { titular: c.cert_titular, validade: c.cert_validade } : null, consultando: consultando.has(u.escritorio_id) };
+  });
+  r.post('/api/procuracoes/consultar', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' }); exigirCarteira(u);
+    if (limitar(`proc:${u.id}`, 20, 3600).bloqueado) throw new ErroHttp(429, 'Muitas consultas seguidas. Aguarde um pouco.');
+    const b = ctx.corpo || {};
+    if (b.empresaId) return { ok: true, procuracao: await consultarProcuracao(u.escritorio_id, String(b.empresaId), u.nome) };
+    const somente = Array.isArray(b.empresas) && b.empresas.length ? b.empresas.map(String) : null;
+    const resumo = await consultarTodas(u.escritorio_id, { quem: u.nome, somente });
+    await log('procuracoes_consultadas', { usuarioId: u.id, ip: ctx.ip, detalhe: JSON.stringify(resumo) });
+    return { ok: true, resumo };
+  });
+  // registro manual (quando a integração não está configurada ou para conferir o que o cliente mandou)
+  r.put('/api/procuracoes/:empresaId', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' }); exigirCarteira(u); const b = ctx.corpo || {};
+    const e = await A.empresa(u.escritorio_id, ctx.params.empresaId); if (!e) throw new ErroHttp(404, 'Empresa não encontrada.');
+    let procuracao;
+    if (b.remover) procuracao = null;
+    else {
+      const validade = /^\d{4}-\d{2}-\d{2}$/.test(String(b.validade || '')) ? b.validade : ''; if (!validade) throw new ErroHttp(400, 'Informe a data de validade da procuração.');
+      procuracao = { ...(e.procuracao || {}), status: validade < agoraLocal().data ? 'vencida' : 'ativa', validade, sistemas: (Array.isArray(b.sistemas) ? b.sistemas : String(b.sistemas || '').split(/[,;\n]/)).map(x => String(x).trim()).filter(Boolean).slice(0, 40),
+        origem: 'manual', obs: String(b.obs || '').slice(0, 300), outorgado: soDig(b.outorgado || e.procuracao?.outorgado || ''), consultadoEm: new Date().toISOString(), consultadoPor: u.nome, mensagem: 'Registrada manualmente' };
+    }
+    const novo = { ...e }; if (procuracao) novo.procuracao = procuracao; else delete novo.procuracao;
+    await A.gravar(u.escritorio_id, 'empresas', e.id, e.id, novo);
+    await log('procuracao_registrada', { usuarioId: u.id, ip: ctx.ip, detalhe: `${e.razao} · ${procuracao ? 'válida até ' + procuracao.validade : 'removida'}` });
+    return { ok: true, procuracao };
+  });
+  // pede ao cliente para dar (ou renovar) a procuração: WhatsApp e e-mail com o passo a passo
+  r.post('/api/procuracoes/:empresaId/pedir', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' }); exigirCarteira(u); const esc = u.escritorio_id;
+    const e = await A.empresa(esc, ctx.params.empresaId); if (!e) throw new ErroHttp(404, 'Empresa não encontrada.');
+    const c = await cfgIntegra(esc); const cfg = await A.configEscritorio(esc); const outorgado = soDig(c?.cnpj || ctx.corpo?.outorgado || '');
+    if (outorgado.length !== 14 && outorgado.length !== 11) throw new ErroHttp(412, 'Cadastre o CNPJ do escritório (certificado) em Configurações › Integração com a Receita.');
+    const fmt = d => d.length === 14 ? d.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5') : d.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, '$1.$2.$3-$4');
+    const nome = String(e.contatos?.[0]?.nome || e.socios?.[0]?.nome || '').split(' ')[0] || 'tudo bem';
+    const renovar = e.procuracao?.status === 'ativa' || e.procuracao?.status === 'vencida';
+    const texto = String(ctx.corpo?.mensagem || '').trim() || `Olá, ${nome}! ${renovar ? `A procuração eletrônica da ${e.fantasia || e.razao} para a nossa contabilidade ${e.procuracao.status === 'vencida' ? 'venceu' : 'vence em ' + fmtData(e.procuracao.validade)}` : `Para cuidarmos das guias e declarações da ${e.fantasia || e.razao} direto na Receita, precisamos de uma procuração eletrônica`}. É rápido:
+1) Acesse cav.receita.fazenda.gov.br (e-CAC) com o gov.br nível prata/ouro ou o certificado da empresa;
+2) Vá em "Senhas e Procurações" › "Procuração eletrônica" › "Cadastrar";
+3) Procurador: CNPJ ${fmt(outorgado)}${cfg.escritorio ? ' (' + cfg.escritorio + ')' : ''};
+4) Marque "Todos os serviços" (ou pelo menos Simples Nacional/MEI, DCTFWeb, Caixa Postal e parcelamentos) e a validade máxima (até 5 anos);
+5) Confirme e nos avise por aqui.
+Se preferir, fazemos com você por videochamada. 😊`;
+    const res = {};
+    try { const rw = await wa.enviarArquivos({ esc, empresaId: e.id, fone: e.telefone, anexos: [], legenda: texto, u: { id: u.id, nome: u.nome } }); res.whatsapp = 'WhatsApp enviado para ' + rw.para; } catch (er) { res.whatsapp = 'WhatsApp não enviado (' + er.message + ')'; }
+    const para = await A.emailsDaEmpresa(esc, e.id, e);
+    if (para.length) { const re = await enviarEmail({ para, assunto: (renovar ? 'Renovação da procuração eletrônica · ' : 'Procuração eletrônica · ') + (e.fantasia || e.razao), texto, html: `<p>${texto.replace(/[&<>]/g, x => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[x])).replace(/\n/g, '<br>')}</p>` }); res.email = re.enviado ? 'e-mail enviado' : 'e-mail não enviado (' + (re.motivo || 'falha') + ')'; }
+    const atual = await A.empresa(esc, e.id); await A.gravar(esc, 'empresas', atual.id, atual.id, { ...atual, procuracao: { ...(atual.procuracao || { status: 'inexistente' }), pedidoEm: new Date().toISOString(), pedidoPor: u.nome } });
+    await log('procuracao_pedida', { usuarioId: u.id, ip: ctx.ip, detalhe: e.razao });
+    return { ok: true, ...res };
+  });
+
+  return { emitirGuia, emitirDasMei, fluxoTheo, executarLote, consultarProcuracao };
 }
