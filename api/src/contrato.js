@@ -17,6 +17,8 @@ const fmtDoc = d => { d = soDig(d); return d.length === 14 ? d.replace(/^(\d{2})
 const fmtCep = c => soDig(c).replace(/^(\d{5})(\d{3})$/, '$1-$2');
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
 const porExtenso = d => { const [a, m, dd] = String(d).slice(0, 10).split('-'); return `${Number(dd)} de ${MESES[Number(m) - 1]} de ${a}`; };
+export const PLANOS_COMISSAO = ['p1', 'p13', 'p135'];
+const PARCELAS_PLANO = { p1: [1], p13: [1, 3], p135: [1, 3, 5] };
 const PADRAO_CONTRATO = { foro: 'Campo Grande/MS', reajuste: 'IPCA', avisoPrevio: 30, comissaoPct: 30 };
 
 // configuração do contrato e o que falta preencher para gerar
@@ -115,22 +117,34 @@ export function registrarContratos(r, { db, exigir, log, pode }) {
     return contrato;
   }
 
-  async function gerarComissao(esc, e, { valorPago, data }) {
+  // plano de comissão do usuário que cadastrou: em quais honorários pagos (1º, 3º, 5º) nasce comissão
+  async function planoDoUsuario(esc, uid) { const [x] = await db.query('SELECT comissao_plano FROM usuarios WHERE escritorio_id = $1 AND id = $2', [esc, uid]); return PARCELAS_PLANO[x?.comissao_plano] || PARCELAS_PLANO.p1; }
+  async function gerarComissao(esc, e, { valorPago, data, parcela = 1 }) {
     const quem = e.cadastradoPor || (e.criadoPor ? { id: e.criadoPor, nome: e.criadoPorNome } : null);
     if (!quem?.id || !(Number(valorPago) > 0)) return null;
+    if (!(await planoDoUsuario(esc, quem.id)).includes(parcela)) return null;
     const cfg = await A.configEscritorio(esc); const pct = Number(cfgContrato(cfg).comissaoPct) || 30;
     const valor = r2(Number(valorPago) * pct / 100);
     const [x] = await db.query(`INSERT INTO comissoes (escritorio_id, empresa_id, empresa_nome, usuario_id, usuario_nome, base, percentual, valor, referencia)
       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT (escritorio_id, empresa_id, referencia) DO NOTHING RETURNING id`,
-    [esc, e.id, e.fantasia || e.razao, quem.id, quem.nome || '', r2(valorPago), pct, valor, String(data || agoraLocal().data).slice(0, 7)]);
-    if (x) await log('comissao_gerada', { detalhe: `${quem.nome} · ${e.razao} · ${brl(valor)} (${pct}% de ${brl(valorPago)})` });
+    [esc, e.id, e.fantasia || e.razao, quem.id, quem.nome || '', r2(valorPago), pct, valor, 'p' + parcela]);
+    if (x) await log('comissao_gerada', { detalhe: `${quem.nome} · ${e.razao} · ${parcela}º honorário · ${brl(valor)} (${pct}% de ${brl(valorPago)})` });
     return x || null;
+  }
+  // a cada honorário pago: descobre se é o 3º ou o 5º pago do cliente (a 1ª é a ativação)
+  async function aoFaturaPaga(esc, f) {
+    if (!f?.empresaId || f.ativacao) return;
+    const e = await A.empresa(esc, f.empresaId); if (!e || !(e.cadastradoPor || e.criadoPor)) return;
+    const pagas = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'faturas' AND empresa_id = $2 AND dados->>'status' = 'paga'`, [esc, e.id])).map(x => x.dados)
+      .sort((a, b) => String(a.comp || '').localeCompare(String(b.comp || '')) || String(a.pagaEm || '').localeCompare(String(b.pagaEm || '')));
+    const n = pagas.findIndex(x => x.id === f.id) + 1; if (n < 2) return;
+    await gerarComissao(esc, e, { valorPago: Number(f.valorPago || f.valor), data: f.pagaEm, parcela: n }).catch(er => console.error('[comissao]', er.message));
   }
 
   // chamado pela ativação do cadastro
   async function aoAtivar(esc, empresaId, { pago, valorPago, data }) {
     const e = await A.empresa(esc, empresaId); if (!e) return;
-    if (pago) await gerarComissao(esc, e, { valorPago, data }).catch(er => console.error('[comissao]', er.message));
+    if (pago) await gerarComissao(esc, e, { valorPago, data, parcela: 1 }).catch(er => console.error('[comissao]', er.message));
     await gerarContrato(esc, empresaId, 'Automático (ativação)').catch(async er => {
       const at = await A.empresa(esc, empresaId);
       await A.gravar(esc, 'empresas', at.id, at.id, { ...at, contrato: { ...(at.contrato || {}), status: 'pendente', erro: er.message } });
@@ -163,12 +177,12 @@ export function registrarContratos(r, { db, exigir, log, pode }) {
 
   /* ---------- comissões ---------- */
   const linha = x => ({ id: x.id, empresaId: x.empresa_id, empresa: x.empresa_nome, usuarioId: x.usuario_id, usuario: x.usuario_nome, base: Number(x.base), percentual: Number(x.percentual), valor: Number(x.valor),
-    referencia: x.referencia, status: x.status, geradaEm: x.criado_em, pagaEm: x.paga_em, forma: x.forma, obs: x.obs, pagoPor: x.pago_por_nome });
+    referencia: x.referencia, parcela: /^p\d+$/.test(x.referencia) ? Number(x.referencia.slice(1)) : 1, status: x.status, geradaEm: x.criado_em, pagaEm: x.paga_em, forma: x.forma, obs: x.obs, pagoPor: x.pago_por_nome });
   r.get('/api/comissoes', async ctx => {
     const u = await exigir(ctx, { site: 'painel' }); const todos = podeFin(u) && ctx.query?.minhas !== '1';
     const xs = await db.query(`SELECT * FROM comissoes WHERE escritorio_id = $1 ${todos ? '' : 'AND usuario_id = $2'} ORDER BY criado_em DESC LIMIT 2000`, todos ? [u.escritorio_id] : [u.escritorio_id, u.id]);
-    const cfg = await A.configEscritorio(u.escritorio_id);
-    return { comissoes: xs.map(linha), todos, percentual: Number(cfgContrato(cfg).comissaoPct) || 30, podePagar: podeFin(u) };
+    const cfg = await A.configEscritorio(u.escritorio_id); const [eu] = await db.query('SELECT comissao_plano FROM usuarios WHERE id = $1', [u.id]);
+    return { comissoes: xs.map(linha), todos, percentual: Number(cfgContrato(cfg).comissaoPct) || 30, plano: eu?.comissao_plano || 'p1', podePagar: podeFin(u) };
   });
   r.post('/api/comissoes/pagar', async ctx => {
     const u = await exigir(ctx, { site: 'painel' }); if (!podeFin(u)) throw new ErroHttp(403, 'Só o master ou quem edita o Financeiro registra pagamento de comissão.');
@@ -190,6 +204,6 @@ export function registrarContratos(r, { db, exigir, log, pode }) {
     return { ok: true };
   });
 
-  return { gerarContrato, gerarComissao, aoAtivar };
+  return { gerarContrato, gerarComissao, aoAtivar, aoFaturaPaga };
 }
 

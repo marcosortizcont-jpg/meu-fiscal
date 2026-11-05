@@ -34,6 +34,8 @@ ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS permissoes JSONB NOT NULL DEFAULT 
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS deptos TEXT[];
 -- telefone de contato da pessoa (mostrado em Meu perfil; só o escritório altera)
 ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefone TEXT;
+-- plano de comissão do comercial: p1 = 1º honorário; p13 = 1º e 3º; p135 = 1º, 3º e 5º
+ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS comissao_plano TEXT;
 UPDATE usuarios SET funcao = 'Master' WHERE papel = 'master' AND funcao IS NULL;
 
 -- Quais empresas cada usuário-cliente enxerga e com que perfil (vários CNPJs no mesmo login)

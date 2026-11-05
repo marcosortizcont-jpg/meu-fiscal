@@ -17,7 +17,7 @@ import { registrarFinanceiro } from './financeiro.js';
 import { registrarDocumentos } from './documentos.js';
 import { registrarCrmTheo } from './crm-theo.js';
 import { registrarAtivacao } from './ativacao.js';
-import { registrarContratos } from './contrato.js';
+import { registrarContratos, PLANOS_COMISSAO } from './contrato.js';
 import { registrarCnpj } from './cnpj.js';
 import { registrarNfse } from './nfse.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
@@ -256,7 +256,7 @@ export function registrarRotas(r, { db, hub }) {
     if (!ops.length) return { ok: true, aplicadas: 0 };
     if (ops.length > 500) throw new ErroHttp(413, 'Muitas alterações de uma vez.');
     if (limitar(`lote:${u.id}`, 600, 600).bloqueado) throw new ErroHttp(429, 'Muitas gravações seguidas. Aguarde um instante.');
-    let aplicadas = 0; const corrigidos = [];
+    let aplicadas = 0; const corrigidos = []; const pagasAgora = [];
     await db.tx(async q => {
       for (let i = 0; i < ops.length; i++) {
         const op = { ...ops[i], id: String(ops[i].id ?? '') };
@@ -290,6 +290,12 @@ export function registrarRotas(r, { db, hub }) {
             if (atual.dados[k] !== undefined) op.dados[k] = atual.dados[k]; else delete op.dados[k];
           corrigidos.push({ c: op.c, id: op.id, dados: op.dados });
         }
+        // renovação do certificado: cobrança no banco e baixa automática são gravadas só pelo servidor
+        if (op.op === 'salvar' && op.c === 'tickets' && atual?.dados?.renovacao && op.dados.renovacao) {
+          const ra = atual.dados.renovacao;
+          for (const k of ['cobranca', 'baixaAutomatica', 'valorPago', 'formaPagamento']) { if (ra[k] !== undefined) op.dados.renovacao[k] = ra[k]; else delete op.dados.renovacao[k]; }
+          if (ra.status === 'pago') { op.dados.renovacao.status = 'pago'; op.dados.renovacao.pagoEm = ra.pagoEm; }
+        }
         // valor da renovação do certificado vem da configuração do escritório, não do navegador
         if (u.ambiente === 'cliente' && op.op === 'salvar' && !atual && op.c === 'tickets' && op.dados.renovacao) {
           const [cfg] = await q(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'config' LIMIT 1`, [u.escritorio_id]);
@@ -322,10 +328,13 @@ export function registrarRotas(r, { db, hub }) {
             WHERE registros.dados IS DISTINCT FROM EXCLUDED.dados`,
           [u.escritorio_id, op.c, op.id, empresaDe(op.c, op.dados), JSON.stringify(op.dados), u.id]);
           aplicadas += res.count;
+          if (res.count && op.c === 'faturas' && u.ambiente === 'equipe' && op.dados.status === 'paga' && atual?.dados?.status !== 'paga') pagasAgora.push(op.dados);
           if (res.count) await alt.registrar(q, u, ctx.ip, { colecao: op.c, id: op.id, empresaId: empresaDe(op.c, op.dados), acao: atual ? 'alterou' : 'criou', antes: atual?.dados, depois: op.dados });
         }
       }
     });
+    // honorário baixado à mão no painel: confere se gera comissão (3º/5º honorário)
+    for (const f of pagasAgora) if (ganchos.faturaPaga) ganchos.faturaPaga(u.escritorio_id, f).catch(() => { });
     return { ok: true, aplicadas, ...(corrigidos.length ? { corrigidos } : {}) };
   }, { limite: 8 * 1024 * 1024 });
 
@@ -483,7 +492,7 @@ export function registrarRotas(r, { db, hub }) {
     const u = await exigir(ctx, { site: 'painel' });
     const verEquipe = u.papel === 'master' || pode(u, 'equipe', 'ver');
     if (!verEquipe && !pode(u, 'carteira', 'ver')) throw new ErroHttp(403, 'Sem acesso.');
-    const usuarios = await db.query(`SELECT u.id, u.nome, u.email, u.telefone, u.ambiente, u.papel, u.funcao, u.permissoes, u.deptos, u.status, u.ultimo_login_em,
+    const usuarios = await db.query(`SELECT u.id, u.nome, u.email, u.telefone, u.ambiente, u.papel, u.funcao, u.permissoes, u.deptos, u.status, u.ultimo_login_em, u.comissao_plano AS "comissaoPlano",
         COALESCE((SELECT json_agg(json_build_object('id', ue.empresa_id, 'perfil', ue.perfil)) FROM usuarios_empresas ue WHERE ue.usuario_id = u.id), '[]'::json) AS empresas
       FROM usuarios u WHERE u.escritorio_id = $1 ${verEquipe ? '' : "AND u.ambiente = 'cliente'"} ORDER BY u.ambiente DESC, u.nome`, [u.escritorio_id]);
     const [escr] = await db.query('SELECT funcoes FROM escritorios WHERE id = $1', [u.escritorio_id]);
@@ -529,14 +538,15 @@ export function registrarRotas(r, { db, hub }) {
     const papel = ambiente === 'equipe' ? (funcao === 'Master' ? 'master' : 'analista') : null;
     const permissoes = ambiente === 'equipe' ? limparPermissoes(c.permissoes) : {};
     const deptos = ambiente === 'equipe' ? limparDeptos(c.deptos) : null;
+    const comissaoPlano = ambiente === 'equipe' && (deptos || []).some(d => d === 'Comercial' || d === '*') && PLANOS_COMISSAO.includes(c.comissaoPlano) ? c.comissaoPlano : null;
     const empresas = ambiente === 'cliente' ? validarEmpresas(c.empresas) : [];
     if (ambiente === 'cliente' && !empresas.length) throw new ErroHttp(400, 'Escolha ao menos uma empresa.');
     const hash = senha ? await hashSenha(senha) : null;
     const resultado = await db.tx(async q => {
       const [existe] = await q('SELECT id, ambiente FROM usuarios WHERE lower(email) = $1', [email]);
       if (existe) throw new ErroHttp(409, existe.ambiente === ambiente ? 'Este e-mail já tem acesso. Use "Editar" para mudar empresas ou permissões.' : 'Este e-mail já é usado por uma conta do outro ambiente.');
-      const [novo] = await q(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, funcao, permissoes, status, senha_hash, deptos, telefone) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::text[],$11) RETURNING id, nome, email`,
-        [u.escritorio_id, nome, email, ambiente, papel, funcao, JSON.stringify(permissoes), senha ? 'ativo' : 'convidado', hash, deptos, String(c.telefone || '').replace(/[^\d+() -]/g, '').slice(0, 30) || null]);
+      const [novo] = await q(`INSERT INTO usuarios (escritorio_id, nome, email, ambiente, papel, funcao, permissoes, status, senha_hash, deptos, telefone, comissao_plano) VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8,$9,$10::text[],$11,$12) RETURNING id, nome, email`,
+        [u.escritorio_id, nome, email, ambiente, papel, funcao, JSON.stringify(permissoes), senha ? 'ativo' : 'convidado', hash, deptos, String(c.telefone || '').replace(/[^\d+() -]/g, '').slice(0, 30) || null, comissaoPlano]);
       for (const e of empresas) await q('INSERT INTO usuarios_empresas (usuario_id, empresa_id, perfil) VALUES ($1,$2,$3)', [novo.id, e.id, e.perfil]);
       if (senha) return { usuario: novo, ativo: true, endereco: CONFIG.origens[ambiente === 'equipe' ? 'painel' : 'cliente'][0] + (ambiente === 'equipe' ? '/admin/login' : '/login') };
       return { usuario: novo, ...(await enviarConvite(q, novo, ambiente === 'equipe' ? 'painel' : 'cliente', u.nome)) };
@@ -584,6 +594,8 @@ export function registrarRotas(r, { db, hub }) {
         if (f) await q('UPDATE usuarios SET funcao = $1, papel = $2 WHERE id = $3', [f, f === 'Master' ? 'master' : 'analista', alvo.id]);
         if (c.permissoes) await q('UPDATE usuarios SET permissoes = $1::jsonb WHERE id = $2', [JSON.stringify(limparPermissoes(c.permissoes)), alvo.id]);
         if (Array.isArray(c.deptos)) await q('UPDATE usuarios SET deptos = $1::text[] WHERE id = $2', [limparDeptos(c.deptos), alvo.id]);
+        if (c.comissaoPlano !== undefined) { const ds = Array.isArray(c.deptos) ? limparDeptos(c.deptos) : (await q('SELECT deptos FROM usuarios WHERE id = $1', [alvo.id]))[0]?.deptos || [];
+          await q('UPDATE usuarios SET comissao_plano = $1 WHERE id = $2', [(ds || []).some(d => d === 'Comercial' || d === '*') && PLANOS_COMISSAO.includes(c.comissaoPlano) ? c.comissaoPlano : null, alvo.id]); }
       }
       if (alvo.ambiente === 'cliente' && Array.isArray(c.empresas)) {
         await q('DELETE FROM usuarios_empresas WHERE usuario_id = $1', [alvo.id]);
@@ -595,7 +607,7 @@ export function registrarRotas(r, { db, hub }) {
     await log('usuario_alterado', { usuarioId: alvo.id, ip: ctx.ip, detalhe: `por ${u.email}: ${JSON.stringify(c).slice(0, 300)}` });
     {
       const partes = []; if (c.nome) partes.push('nome'); if (typeof c.email === 'string') partes.push('e-mail: ' + c.email.trim().toLowerCase()); if (typeof c.telefone === 'string') partes.push('telefone'); if (c.status) partes.push('situação: ' + c.status); if (c.funcao) partes.push('função: ' + c.funcao);
-      if (c.permissoes) partes.push('permissões'); if (Array.isArray(c.deptos)) partes.push('departamentos: ' + (limparDeptos(c.deptos).includes('*') ? 'todos' : limparDeptos(c.deptos).join(', ') || 'nenhum')); if (Array.isArray(c.empresas)) partes.push('empresas liberadas');
+      if (c.permissoes) partes.push('permissões'); if (c.comissaoPlano !== undefined) partes.push('comissão: ' + (c.comissaoPlano || 'nenhuma')); if (Array.isArray(c.deptos)) partes.push('departamentos: ' + (limparDeptos(c.deptos).includes('*') ? 'todos' : limparDeptos(c.deptos).join(', ') || 'nenhum')); if (Array.isArray(c.empresas)) partes.push('empresas liberadas');
       const resumoU = `Alterou ${alvo.ambiente === 'equipe' ? 'o colaborador' : 'o acesso de'} ${alvo.nome || ''}${partes.length ? ' (' + partes.join(', ') + ')' : ''}`;
       const emps = alvo.ambiente === 'cliente' ? (await db.query('SELECT empresa_id FROM usuarios_empresas WHERE usuario_id = $1', [alvo.id])).map(x => x.empresa_id) : [];
       if (emps.length) for (const e of emps) await alt.registrar(db.query, u, ctx.ip, { colecao: 'acesso_portal', id: alvo.id, empresaId: e, acao: 'alterou', resumo: resumoU, mudancas: [] });
@@ -644,7 +656,7 @@ export function registrarRotas(r, { db, hub }) {
   const fin = registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos });
   registrarCnpj(r, { exigir });
   registrarNfse(r, { db, exigir, log, pode });
-  const contratos = registrarContratos(r, { db, exigir, log, pode }); ganchos.aoAtivar = contratos.aoAtivar;
+  const contratos = registrarContratos(r, { db, exigir, log, pode }); ganchos.aoAtivar = contratos.aoAtivar; ganchos.faturaPaga = contratos.aoFaturaPaga;
   registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos });
   registrarDocumentos(r, { db, exigir, log, pode, wa });
   registrarCrmTheo(r, { db, exigir, log, pode, wa });

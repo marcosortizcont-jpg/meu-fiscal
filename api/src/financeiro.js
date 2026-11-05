@@ -53,10 +53,19 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
   // pagamento confirmado no banco (aviso automático, verificação manual ou simulação): baixa a fatura ou ativa o cadastro
   async function pagamentoConfirmado(esc, ref, { valor, data, forma, liquido }) {
     if (!ref) return;
+    if (ref.startsWith('cert-')) {   // renovação do certificado digital pedida no portal
+      const t = await A.registro(esc, 'tickets', ref.slice(5)); if (!t?.renovacao || t.renovacao.status === 'pago') return;
+      const agora = new Date().toISOString();
+      await A.gravar(esc, 'tickets', t.id, t.empresaId, { ...t, status: t.status === 'aberto' ? 'em_andamento' : t.status,
+        renovacao: { ...t.renovacao, status: 'pago', pagoEm: agora, formaPagamento: forma || 'Banco', valorPago: r2(valor || t.renovacao.valor), baixaAutomatica: true },
+        eventos: [...(t.eventos || []), { em: agora, autor: 'Sistema', texto: `Pagamento da renovação confirmado pelo banco (${forma || 'PIX/boleto'}, ${brl(valor || t.renovacao.valor)}). O escritório vai agendar a validação.` }] });
+      await log('renovacao_cert_paga', { detalhe: `${t.empresaId} · ${brl(valor || t.renovacao.valor)}` }); return;
+    }
     if (ref.startsWith('ativ-')) { if (ganchos.ativacaoPaga) await ganchos.ativacaoPaga(esc, ref.slice(5), { value: valor, billingType: forma === 'PIX' ? 'PIX' : forma === 'Boleto' ? 'BOLETO' : forma, paymentDate: data }); return; }
     const f = await A.registro(esc, 'faturas', ref); if (!f || f.status === 'paga') return;
     await A.gravar(esc, 'faturas', f.id, f.empresaId, { ...f, status: 'paga', pagaEm: String(data || agoraLocal().data).slice(0, 10), valorPago: r2(valor || f.valor), ...(liquido ? { valorLiquido: r2(liquido) } : {}),
       formaPagamento: forma || 'Banco', baixaAutomatica: true, baixaEm: new Date().toISOString() });
+    if (ganchos.faturaPaga) await ganchos.faturaPaga(esc, await A.registro(esc, 'faturas', f.id)).catch(() => { });
     await log('fatura_paga_banco', { detalhe: `${f.empresaId} · ${f.comp} · ${brl(valor || f.valor)} · ${forma || ''}` });
   }
 
@@ -296,6 +305,7 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
     const novo = { ...f, status: 'paga', pagaEm: data, valorPago: valor, formaPagamento: String(b.forma || 'Manual').slice(0, 40), baixaPor: u.nome, baixaEm: new Date().toISOString() };
     await A.gravar(u.escritorio_id, 'faturas', f.id, f.empresaId, novo);
     await log('fatura_baixa', { usuarioId: u.id, ip: ctx.ip, detalhe: `${f.empresaId} · ${f.comp} · ${brl(valor)}` });
+    if (ganchos.faturaPaga) await ganchos.faturaPaga(u.escritorio_id, novo).catch(() => { });
     return { ok: true };
   });
   r.post('/api/financeiro/cancelar', async ctx => {
@@ -330,6 +340,42 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
     }
     return { ok: true };
   }, { semCabecalhoSite: true, limite: 64 * 1024 });
+
+  /* ---------- renovação do certificado digital: cobrança no banco (boleto + QR Code PIX) ---------- */
+  async function ticketRenovacao(ctx) {
+    const u = await exigir(ctx); const t = await A.registro(u.escritorio_id, 'tickets', String(ctx.params.id || ''));
+    if (!t?.renovacao) throw new ErroHttp(404, 'Pedido de renovação não encontrado.');
+    if (u.ambiente === 'cliente' && !(u.empresas || []).some(x => String(x.id) === String(t.empresaId))) throw new ErroHttp(403, 'Sem acesso a esta empresa.');
+    return { u, t };
+  }
+  r.post('/api/renovacao/:id/cobranca', async ctx => {
+    const { u, t } = await ticketRenovacao(ctx); const esc = u.escritorio_id;
+    if (t.renovacao.status === 'pago') return { ok: true, pago: true, cobranca: t.renovacao.cobranca || null };
+    if (t.renovacao.cobranca?.id) return { ok: true, cobranca: t.renovacao.cobranca, falso: FALSO };
+    if (limitar(`renov:${u.id}`, 10, 3600).bloqueado) throw new ErroHttp(429, 'Muitas tentativas. Aguarde um pouco.');
+    const c = await cfgBanco(esc); if (!temBanco(c) || B.provedor(c) === 'manual') throw new ErroHttp(412, 'O escritório ainda não conectou o banco: pague pela chave PIX do escritório.');
+    const e = await A.empresa(esc, t.empresaId); if (!e) throw new ErroHttp(404, 'Empresa não encontrada.');
+    const cfg = await A.configEscritorio(esc); const valor = r2(Number(cfg.valorRenovacaoCert || 180));   // valor vem do escritório, não do pedido
+    const b = await B.emitir(esc, { ref: 'cert-' + t.id, e, valor, venc: addDias(agoraLocal().data, 3), descricao: 'Renovação do certificado digital A1' });
+    const cobranca = { provedor: b.provedor, id: b.id, pix: b.pix, linha: b.linha, link: b.link || '', venc: b.venc, valor, arquivoId: b.arquivo?.id || null, url: b.arquivo?.url || '', emitidaEm: new Date().toISOString() };
+    const atual = await A.registro(esc, 'tickets', t.id);
+    await A.gravar(esc, 'tickets', t.id, t.empresaId, { ...atual, renovacao: { ...atual.renovacao, valor, cobranca }, eventos: [...(atual.eventos || []), { em: cobranca.emitidaEm, autor: 'Sistema', texto: `Cobrança da renovação gerada no banco (${brl(valor)}, boleto + PIX, vence ${fmtData(b.venc)}).` }] });
+    return { ok: true, cobranca, falso: FALSO };
+  }, { limite: 8 * 1024 });
+  r.post('/api/renovacao/:id/verificar', async ctx => {
+    const { u, t } = await ticketRenovacao(ctx); const cb = t.renovacao.cobranca;
+    if (t.renovacao.status === 'pago') return { ok: true, pago: true };
+    if (!cb?.id) throw new ErroHttp(409, 'Ainda não há cobrança no banco para este pedido.');
+    const st = await B.consultar(u.escritorio_id, cb.provedor, cb.id);
+    if (st.pago) await pagamentoConfirmado(u.escritorio_id, 'cert-' + t.id, st);
+    return { ok: true, pago: !!st.pago, situacao: st.situacao };
+  });
+  // só no teste local
+  r.post('/api/renovacao/:id/simular-pagamento', async ctx => {
+    if (!FALSO) throw new ErroHttp(404, 'Não encontrado.');
+    const { u, t } = await ticketRenovacao(ctx); if (t.renovacao.cobranca?.id) await B.simularPago(u.escritorio_id, t.renovacao.cobranca.id);
+    await pagamentoConfirmado(u.escritorio_id, 'cert-' + t.id, { valor: t.renovacao.valor, data: agoraLocal().data, forma: 'PIX' }); return { ok: true };
+  });
 
   // aviso do Inter: não é assinado, então só diz qual cobrança olhar; a situação é conferida no próprio Inter
   r.post('/api/publico/inter/:esc/:token', async ctx => {

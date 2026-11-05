@@ -2651,10 +2651,11 @@ document.addEventListener('change',ev=>{if(ev.target.dataset.change!=='funcao-pe
 FORM['colaborador']=async(fd,form)=>{
   const d=APIC['equipe-admin'].dados;const permissoes={};d.modulos.forEach(([m])=>{const v=fd.get('perm_'+m);if(v)permissoes[m]=v});
   let deptos=fd.getAll('depto').map(String);if(deptos.includes('*'))deptos=['*'];
+  const comissaoPlano=deptos.includes('*')||deptos.includes('Comercial')?String(fd.get('comissaoPlano')||'p1'):null;
   const senha=String(fd.get('senha')||'').trim();if(senha&&!SENHA8.test(senha)){toast('A senha inicial precisa ter exatamente 8 letras ou números.',true);return}
   try{
-    if(form.dataset.id){await MF.api('PATCH','/api/admin/usuarios/'+form.dataset.id,{nome:fd.get('nome'),email:String(fd.get('email')||'').trim(),telefone:String(fd.get('telefone')||'').trim(),funcao:fd.get('funcao'),permissoes,deptos});closeModal();invalidar('equipe-admin');invalidar('equipe');toast('Colaborador atualizado. As novas permissões valem em até 10 segundos.');return}
-    const r=await MF.api('POST','/api/admin/usuarios',{nome:fd.get('nome'),email:fd.get('email'),telefone:String(fd.get('telefone')||'').trim(),ambiente:'equipe',funcao:fd.get('funcao'),permissoes,deptos,senha:senha||undefined});
+    if(form.dataset.id){await MF.api('PATCH','/api/admin/usuarios/'+form.dataset.id,{nome:fd.get('nome'),email:String(fd.get('email')||'').trim(),telefone:String(fd.get('telefone')||'').trim(),funcao:fd.get('funcao'),permissoes,deptos,comissaoPlano});closeModal();invalidar('equipe-admin');invalidar('equipe');toast('Colaborador atualizado. As novas permissões valem em até 10 segundos.');return}
+    const r=await MF.api('POST','/api/admin/usuarios',{nome:fd.get('nome'),email:fd.get('email'),telefone:String(fd.get('telefone')||'').trim(),ambiente:'equipe',funcao:fd.get('funcao'),permissoes,deptos,comissaoPlano,senha:senha||undefined});
     closeModal();invalidar('equipe-admin');invalidar('equipe');
     const texto=senha?`Seu acesso ao Painel Contábil do Meu Fiscal está pronto.\nEndereço: ${r.endereco}\nLogin: ${fd.get('email')}\nSenha: ${senha}`:`Crie a sua senha do Painel Contábil do Meu Fiscal por este link (vale 72 horas): ${r.link}`;
     openModal(`${mHead('Colaborador cadastrado')}<div class="modal-body"><p>${r.emailEnviado?'O convite foi enviado por e-mail. ':''}Repasse os dados de acesso:</p><textarea id="dl-text" class="mono" readonly style="min-height:110px">${esc(texto)}</textarea></div><div class="modal-foot"><button class="btn" data-act="copy-dl">Copiar</button><button class="btn primary" data-act="close-modal">Concluir</button></div>`);
@@ -5751,8 +5752,16 @@ function camposDeptos(u,func){
   return `<div class="f full"><span>Departamentos no Atendimento</span><div class="deptos-chk">
     <label><input type="checkbox" name="depto" value="*" ${todos?'checked':''}> <b>Todos os setores</b></label>
     ${DEPTOS_ATEND.map(d=>`<label><input type="checkbox" name="depto" value="${d}" ${!todos&&marc.includes(d)?'checked':''}> <span class="tag-depto" style="color:${COR_DEPTO[d]};background:${COR_DEPTO[d]}1a">${d}</span></label>`).join('')}</div>
-    <span class="small muted" style="font-weight:400">A pessoa recebe só as conversas dos setores marcados, mais as que forem transferidas para ela. "Triagem" é a recepção: conversas que o Théo não conseguiu encaminhar.</span></div>`;
+    <span class="small muted" style="font-weight:400">A pessoa recebe só as conversas dos setores marcados, mais as que forem transferidas para ela. "Triagem" é a recepção: conversas que o Théo não conseguiu encaminhar.</span></div>
+   ${camposComissao(u,todos||marc.includes('Comercial'))}`;
 }
+const PLANOS_COM=[['p1','30% do 1º honorário'],['p13','30% do 1º e do 3º honorário'],['p135','30% do 1º, do 3º e do 5º honorário']];
+function camposComissao(u,mostrar){const v=u?.comissaoPlano||'p1';const pct=(typeof cfgContratoC==='function'?cfgContratoC().comissaoPct:30)||30;
+  return `<div class="f full" data-comissao-box style="${mostrar?'':'display:none'}"><span>Comissão do comercial (clientes que esta pessoa cadastrar)</span>
+   <select name="comissaoPlano">${PLANOS_COM.map(([k,r])=>`<option value="${k}" ${v===k?'selected':''}>${r.replace('30%',pct+'%')}</option>`).join('')}</select>
+   <span class="small muted" style="font-weight:400">O 1º honorário é o pagamento da ativação do cadastro. O 3º e o 5º contam quando cada mensalidade é paga. A comissão aparece em Minhas comissões e em Financeiro › Comissões.</span></div>`}
+document.addEventListener('change',ev=>{const el=ev.target;if(el.name!=='depto'&&el.dataset?.change!=='funcao-perm')return;const f=el.closest('form[data-form=colaborador]');if(!f)return;
+  setTimeout(()=>{const box=f.querySelector('[data-comissao-box]');if(!box)return;const m=[...f.querySelectorAll('input[name=depto]:checked')].map(x=>x.value);box.style.display=m.includes('Comercial')||m.includes('*')?'':'none'},0)});
 document.addEventListener('change',ev=>{const el=ev.target;if(el.name!=='depto'||!el.closest('form[data-form=colaborador]'))return;const f=el.closest('form');
   if(el.value==='*'&&el.checked)f.querySelectorAll('input[name=depto]:not([value="*"])').forEach(x=>x.checked=false);
   else if(el.value!=='*'&&el.checked){const t=f.querySelector('input[name=depto][value="*"]');if(t)t.checked=false}});
@@ -5986,7 +5995,7 @@ aConfig=function(){let h=aConfigV16();if(!ehMaster())return h;const c=cfgContrat
     <label class="f"><span>Foro (comarca/UF)</span><input name="foro" maxlength="60" value="${esc(c.foro)}"></label>
     <label class="f"><span>Índice de reajuste anual</span><select name="reajuste">${['IPCA','INPC','IGP-M'].map(x=>`<option ${c.reajuste===x?'selected':''}>${x}</option>`).join('')}</select></label>
     <label class="f"><span>Aviso prévio para rescisão (dias)</span><input name="avisoPrevio" type="number" min="15" max="90" value="${esc(c.avisoPrevio)}"></label>
-    <label class="f"><span>Comissão do comercial (% do 1º pagamento)</span><input name="comissaoPct" type="number" min="0" max="100" step="0.5" value="${esc(c.comissaoPct)}"></label>
+    <label class="f"><span>Comissão do comercial (% de cada honorário do plano)</span><input name="comissaoPct" type="number" min="0" max="100" step="0.5" value="${esc(c.comissaoPct)}"></label>
     <div class="actions full"><button class="btn primary">Salvar</button></div></form></div>`};
 FORM['cfg-contrato']=fd=>{const g=k=>String(fd.get(k)||'').trim();
   const contrato={contadorNome:g('contadorNome'),contadorDoc:soDig(g('contadorDoc')),contadorEndereco:g('contadorEndereco'),foro:g('foro')||'Campo Grande/MS',reajuste:g('reajuste')||'IPCA',avisoPrevio:Math.min(90,Math.max(15,Number(g('avisoPrevio'))||30)),comissaoPct:Math.min(100,Math.max(0,Number(g('comissaoPct'))||0))};
@@ -6000,8 +6009,8 @@ MOD_DA_VIEW['a-comissoes']='comercial';if(!IC.moedas)IC.moedas='<circle cx="9" c
 const ST_COM={a_pagar:['A pagar','warn'],paga:['Paga','ok'],cancelada:['Cancelada','']};
 function tabelaComissoes(L,{selecionar,mostrarUsuario}){
   if(!L.length)return vazio('Nenhuma comissão por aqui ainda. A comissão nasce quando o 1º pagamento de um cliente que você cadastrou é confirmado.');
-  return `<div class="table-wrap"><table class="tbl"><thead><tr>${selecionar?'<th></th>':''}<th>Cliente</th>${mostrarUsuario?'<th>Comercial</th>':''}<th>Competência</th><th class="num">1º pagamento</th><th class="num">%</th><th class="num">Comissão</th><th>Situação</th><th>Pagamento</th>${selecionar?'<th></th>':''}</tr></thead><tbody>
-   ${L.map(x=>`<tr>${selecionar?`<td>${x.status==='a_pagar'?`<input type="checkbox" data-com-sel value="${x.id}" aria-label="Selecionar">`:''}</td>`:''}<td><b>${esc(x.empresa||'')}</b></td>${mostrarUsuario?`<td>${esc(x.usuario||'')}</td>`:''}<td>${fmtComp(x.referencia)}</td><td class="num">${brl(x.base)}</td><td class="num">${x.percentual}%</td><td class="num"><b>${brl(x.valor)}</b></td>
+  return `<div class="table-wrap"><table class="tbl"><thead><tr>${selecionar?'<th></th>':''}<th>Cliente</th>${mostrarUsuario?'<th>Comercial</th>':''}<th>Honorário</th><th class="num">Valor pago</th><th class="num">%</th><th class="num">Comissão</th><th>Situação</th><th>Pagamento</th>${selecionar?'<th></th>':''}</tr></thead><tbody>
+   ${L.map(x=>`<tr>${selecionar?`<td>${x.status==='a_pagar'?`<input type="checkbox" data-com-sel value="${x.id}" aria-label="Selecionar">`:''}</td>`:''}<td><b>${esc(x.empresa||'')}</b></td>${mostrarUsuario?`<td>${esc(x.usuario||'')}</td>`:''}<td>${/^p\d+$/.test(x.referencia)?x.referencia.slice(1)+'º honorário':fmtComp(x.referencia)}</td><td class="num">${brl(x.base)}</td><td class="num">${x.percentual}%</td><td class="num"><b>${brl(x.valor)}</b></td>
     <td>${pill(...(ST_COM[x.status]||[x.status,'']))}</td><td class="small">${x.pagaEm?fmtData(String(x.pagaEm).slice(0,10))+' · '+esc(x.forma||''):x.obs&&x.status==='cancelada'?esc(x.obs):'—'}</td>
     ${selecionar?`<td class="small">${x.status==='paga'?`<button class="btn sm ghost" data-act="com-desfazer" data-id="${x.id}">Desfazer</button>`:x.status==='a_pagar'?`<button class="btn sm ghost" data-act="com-cancelar" data-id="${x.id}">Cancelar</button>`:''}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
 function resumoComissoes(L){const s=st=>L.filter(x=>x.status===st).reduce((a,x)=>a+x.valor,0);const mes=hoje().slice(0,7);
@@ -6011,7 +6020,7 @@ function resumoComissoes(L){const s=st=>L.filter(x=>x.status===st).reduce((a,x)=
 function aComissoes(){
   if(!podeMod('comercial','ver')&&!podeFinC())return vazio('Seu acesso não inclui o Comercial.');
   const d=MODO==='api'?apiDado('comissoes-minhas','/api/comissoes?minhas=1'):{indisponivel:true};
-  const head=`<div class="page-head"><div><span class="eyebrow">Comercial</span><h1>Minhas comissões</h1><p class="sub">Você recebe ${esc(d.dados?.percentual??cfgContratoC().comissaoPct)}% do 1º pagamento de cada cliente que cadastrou. O pagamento é registrado pelo Financeiro.</p></div></div>`;
+  const head=`<div class="page-head"><div><span class="eyebrow">Comercial</span><h1>Minhas comissões</h1><p class="sub">Seu plano: ${esc(d.dados?.percentual??cfgContratoC().comissaoPct)}% ${({p1:'do 1º honorário',p13:'do 1º e do 3º honorário',p135:'do 1º, do 3º e do 5º honorário'})[d.dados?.plano||'p1']} de cada cliente que você cadastrou. O pagamento é registrado pelo Financeiro.</p></div></div>`;
   if(d.indisponivel)return head+vazio('Comissões funcionam na versão publicada.');if(d.carregando)return head+'<div class="panel"><p class="small muted">Carregando…</p></div>';if(d.erro)return head+vazio(d.erro);
   const L=d.dados.comissoes;
   const meus=S.empresas.filter(e=>(e.cadastradoPor?.id||e.criadoPor)===ME.id).sort((a,b)=>String(b.criadoEm||'').localeCompare(String(a.criadoEm||'')));
@@ -6034,7 +6043,7 @@ function comissoesFinView(){
   const porUser=users.map(([id,n])=>[n,L.filter(x=>x.usuarioId===id&&x.status==='a_pagar').reduce((a,x)=>a+x.valor,0)]).filter(x=>x[1]>0);
   return resumoComissoes(L)+`<div class="panel"><div class="panel-head"><h2>Comissões do comercial</h2><div class="actions"><select data-com-f="st"><option value="">Todas</option>${Object.entries(ST_COM).map(([k,[r]])=>`<option value="${k}" ${f.st===k?'selected':''}>${r}</option>`).join('')}</select>
     <select data-com-f="u"><option value="">Todos os comerciais</option>${users.map(([id,n])=>`<option value="${id}" ${f.u===id?'selected':''}>${esc(n)}</option>`).join('')}</select><button class="btn primary" data-act="com-pagar">Registrar pagamento</button><button class="btn" data-act="com-csv">Exportar CSV</button></div></div>
-   <p class="small muted">Comissão de ${esc(d.dados.percentual)}% do 1º pagamento de cada cliente, para quem fez o cadastro (Configurações › Contrato e comissões). Marque as linhas e registre o pagamento quando pagar o comercial.</p>
+   <p class="small muted">Comissão de ${esc(d.dados.percentual)}% sobre o 1º honorário (e o 3º e o 5º, conforme o plano de cada comercial em Equipe e permissões) de cada cliente, para quem fez o cadastro. Marque as linhas e registre o pagamento quando pagar o comercial.</p>
    ${porUser.length?`<p class="small">A pagar por comercial: ${porUser.map(([n,v])=>`<b>${esc(n)}</b> ${brl(v)}`).join(' · ')}</p>`:''}${tabelaComissoes(V,{selecionar:true,mostrarUsuario:true})}</div>`}
 document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-com-f]')){(UI.fcom||(UI.fcom={}))[s.dataset.comF]=s.value;render()}});
 ACT['com-pagar']=()=>{const ids=[...document.querySelectorAll('[data-com-sel]:checked')].map(x=>x.value);if(!ids.length){toast('Marque as comissões que vai pagar.',true);return}
@@ -6046,7 +6055,7 @@ FORM['com-pagar']=async fd=>{try{const r=await MF.api('POST','/api/comissoes/pag
 ACT['com-desfazer']=el=>confirmar('Desfazer pagamento','A comissão volta para "a pagar".','Desfazer',async()=>{try{await MF.api('POST','/api/comissoes/pagar',{ids:[el.dataset.id],desfazer:true});invalidar('comissoes');invalidar('comissoes-minhas')}catch(er){toast(er.message,true)}});
 ACT['com-cancelar']=el=>pedirMotivo('Cancelar comissão','Motivo (ex.: cliente cancelou e pediu reembolso).',async m=>{try{await MF.api('POST',`/api/comissoes/${el.dataset.id}/cancelar`,{motivo:m});invalidar('comissoes');invalidar('comissoes-minhas')}catch(er){toast(er.message,true)}});
 ACT['com-csv']=()=>{const L=APIC.comissoes?.dados?.comissoes||[];const c=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
-  baixar('comissoes.csv','﻿'+['Cliente;Comercial;Competência;1º pagamento;%;Comissão;Situação;Pago em;Forma'].concat(L.map(x=>[x.empresa,x.usuario,fmtComp(x.referencia),String(x.base).replace('.',','),x.percentual,String(x.valor).replace('.',','),(ST_COM[x.status]||[x.status])[0],x.pagaEm?fmtData(String(x.pagaEm).slice(0,10)):'',x.forma||''].map(c).join(';'))).join('\r\n'),'text/csv')};
+  baixar('comissoes.csv','﻿'+['Cliente;Comercial;Honorário;Valor pago;%;Comissão;Situação;Pago em;Forma'].concat(L.map(x=>[x.empresa,x.usuario,/^p\d+$/.test(x.referencia)?x.referencia.slice(1)+'º':fmtComp(x.referencia),String(x.base).replace('.',','),x.percentual,String(x.valor).replace('.',','),(ST_COM[x.status]||[x.status])[0],x.pagaEm?fmtData(String(x.pagaEm).slice(0,10)):'',x.forma||''].map(c).join(';'))).join('\r\n'),'text/csv')};
 
 /* ---------- cadastro: dados do CNPJ direto da Receita Federal ---------- */
 async function preencherReceita(form,manual){
@@ -6263,6 +6272,38 @@ detalheEmpresa=function(){const h=detalheEmpresaV18();const e=UI.cart?.id&&emp(U
   const b=`<div class="banner ${st==='ativa'?'ok':st==='nao'?'info':'warn'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><div><b>Procuração eletrônica (e-CAC):</b> ${ST_PROC[st][0]}${p.validade?' · válida até '+fmtData(p.validade):''}</div><div class="actions">${podeMod('carteira','editar')?`<button class="btn sm" data-act="proc-consultar" data-id="${e.id}">Consultar</button><button class="btn sm" data-act="proc-pedir" data-id="${e.id}">${['vencida','vence'].includes(st)?'Pedir renovação':'Pedir ao cliente'}</button>`:''}<a class="btn sm ghost" href="#a-procuracoes">Ver todas</a></div></div>`;
   const i=h.indexOf('<div class="tabs" role="tablist">');return i>0?h.slice(0,i)+b+h.slice(i):b+h};
 /* ==== MÓDULOS v18 (fim) ==== */
+
+
+/* ==== MÓDULOS v19: renovação do certificado paga pelo banco (boleto + QR Code PIX, baixa automática) ==== */
+const modalPixRenovacaoV19=modalPixRenovacao;
+modalPixRenovacao=function(t,tentativa){
+  if(MODO!=='api'||!t||!t.renovacao)return modalPixRenovacaoV19(t);const r=t.renovacao;
+  if(r.status==='pago')return modalPixRenovacaoV19(t);
+  const cb=r.cobranca;
+  if(cb&&UI._bancoFalso===undefined)MF.api('POST',`/api/renovacao/${encodeURIComponent(t.id)}/cobranca`,{}).then(x=>{UI._bancoFalso=!!x.falso}).catch(()=>{});
+  if(!cb){openModal(`${mHead('Pagamento da renovação')}<div class="modal-body"><p class="small muted">Gerando o QR Code PIX e o boleto no banco…</p></div>`);
+    MF.api('POST',`/api/renovacao/${encodeURIComponent(t.id)}/cobranca`,{}).then(x=>{UI._bancoFalso=!!x.falso;if(x.pago){toast('Pagamento já confirmado.');closeModal();return}const tt=S.tickets.find(y=>y.id===t.id)||t;tt.renovacao={...tt.renovacao,cobranca:x.cobranca};modalPixRenovacao(tt)})
+      .catch(er=>{if(/não encontrado/i.test(er.message)&&(tentativa||0)<6)return setTimeout(()=>modalPixRenovacao(S.tickets.find(y=>y.id===t.id)||t,(tentativa||0)+1),1200);
+        modalPixRenovacaoV19(t);if(!/conectou o banco/i.test(er.message))toast('Não deu para gerar a cobrança no banco ('+er.message+'). Use o PIX do escritório.',true)});return}
+  openModal(`${mHead('Pagamento da renovação · PIX ou boleto')}<div class="modal-body">
+   <div class="pix"><div class="pix-qr" id="pix-renov-b"><span class="small muted">Gerando QR Code…</span></div>
+    <div style="display:flex;flex-direction:column;gap:10px;min-width:0"><div><span class="eyebrow">Valor</span><div class="fat-total">${brl(cb.valor||r.valor)}</div><span class="sub">Renovação de certificado A1 · vence ${fmtData(cb.venc)}</span></div>
+     ${cb.pix?`<div><span class="eyebrow">PIX copia e cola</span><div class="pix-code">${esc(cb.pix)}</div></div><button type="button" class="btn primary" data-act="copiar" data-t="${esc(cb.pix)}">${svg('pix')}Copiar código PIX</button>`:''}
+     ${cb.linha?`<div><span class="eyebrow">Boleto (linha digitável)</span><div class="pix-code">${esc(cb.linha)}</div></div><button type="button" class="btn" data-act="copiar" data-t="${esc(cb.linha)}">Copiar linha do boleto</button>`:''}
+     ${cb.url?linkArq({url:cb.url,nome:'Boleto renovação.pdf'},'Baixar boleto (PDF)'):''}
+     <span class="sub">Pague pelo app do seu banco. A confirmação é automática: assim que o banco avisar, o pedido muda para pago e o escritório agenda a validação.</span></div></div>
+   <div class="dl" style="margin-top:10px"><dt>Código da sala</dt><dd>enviado para ${esc(r.email)}</dd><dt>Contato</dt><dd>${esc(fmtFone(r.whatsapp))}</dd><dt>CNH</dt><dd>${linkArq(r.cnh,'Ver documento')}</dd></div>
+  </div><div class="modal-foot"><button class="btn" data-act="renova-verificar" data-id="${t.id}">Já paguei · conferir</button>${UI._bancoFalso?`<button class="btn ghost" data-act="renova-simular" data-id="${t.id}">Simular pagamento (teste)</button>`:''}<button class="btn primary" data-act="close-modal">Concluir</button></div>`,true);
+  if(cb.pix)setTimeout(()=>desenharQR('pix-renov-b',cb.pix),0);else document.getElementById('pix-renov-b').innerHTML='<span class="small muted">Use o boleto ao lado.</span>'};
+ACT['renova-verificar']=async el=>{el.disabled=true;try{const r=await MF.api('POST',`/api/renovacao/${encodeURIComponent(el.dataset.id)}/verificar`,{});toast(r.pago?'Pagamento confirmado. ✔ O escritório vai agendar a validação.':'O banco ainda não confirmou o pagamento. PIX costuma cair em segundos; boleto, em até 2 dias úteis.',!r.pago);if(r.pago)closeModal()}catch(er){toast(er.message,true)}el.disabled=false};
+ACT['renova-simular']=async el=>{try{await MF.api('POST',`/api/renovacao/${encodeURIComponent(el.dataset.id)}/simular-pagamento`,{});toast('Pagamento simulado.');closeModal()}catch(er){toast(er.message,true)}};
+// detalhe do pedido: mostra que a baixa veio do banco
+const detalheRenovacaoV19=detalheRenovacao;
+detalheRenovacao=function(t){let h=detalheRenovacaoV19(t);const r=t.renovacao;if(!r||MODO!=='api')return h;
+  if(r.baixaAutomatica)h=h.replace('PIX confirmado','pago pelo banco ('+esc(r.formaPagamento||'')+')').replace(/<button class="btn sm primary" data-act="renova-pago"[^>]*>[^<]*<\/button>/,'');
+  else if(r.cobranca&&r.status!=='pago')h=h.replace(/(<button class="btn sm primary" data-act="renova-pago")/,`<span class="small muted">Cobrança no banco gerada (${fmtData(r.cobranca.venc)}): a baixa é automática. </span>$1`);
+  return h};
+/* ==== MÓDULOS v19 (fim) ==== */
 
 
 lerHash();

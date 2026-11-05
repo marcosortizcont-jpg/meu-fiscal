@@ -318,3 +318,8 @@ Tudo abaixo rodou contra um PostgreSQL 16 real, com os dois sites em domínios s
 - **Pedir ao cliente / Pedir renovação**: envia por WhatsApp e e-mail o passo a passo do e-CAC (Senhas e Procurações › Procuração eletrônica › Cadastrar) com o CNPJ do escritório.
 - **Alertas** na Central de alertas e no cadastro da empresa: vencida, vence em até 30 dias e sem procuração. A situação da procuração é gravada só pelo servidor.
 - **Notas fiscais**: a procuração do e-CAC não vale para a NFS-e; a emissão continua com o certificado A1 de cada empresa.
+
+### Plano de comissão por comercial e renovação do certificado pelo banco
+
+- **Plano de comissão** (Equipe e permissões › colaborador): aparece só quando o departamento Comercial (ou "Todos os setores") está marcado. Opções: % do 1º honorário; do 1º e do 3º; do 1º, do 3º e do 5º (o % padrão é o de Configurações › Contrato e comissões, 30%). O 1º honorário é o pagamento da ativação; o 3º e o 5º contam pela ordem das mensalidades pagas do cliente (baixa no banco ou manual). Cada comissão mostra o honorário de origem.
+- **Renovação do certificado digital**: quando o cliente pede a renovação no portal, o sistema gera a cobrança no Banco Inter (QR Code PIX, PIX copia e cola e boleto em PDF, vencimento em 3 dias) pelo valor configurado pelo escritório. O pagamento dá baixa sozinho pelo aviso do banco (ou pelo botão "Já paguei · conferir"), o pedido vai para "em andamento" e o escritório agenda a validação. Sem banco conectado, continua o PIX da chave do escritório com envio de comprovante.
