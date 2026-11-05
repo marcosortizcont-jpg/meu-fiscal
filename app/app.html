@@ -6365,6 +6365,34 @@ FORM['plano-ajuste']=(fd,form)=>{const e=emp(form.dataset.id);const n=k=>Math.ma
 /* ==== MÓDULOS v20 (fim) ==== */
 
 
+/* ==== MÓDULOS v21: mensalidade paga pelo banco no portal (boleto + QR Code PIX do Inter); chave PIX só como reserva ==== */
+const modalPixFaturaV21=modalPixFatura;
+modalPixFatura=function(f){
+  if(MODO!=='api'||!f)return modalPixFaturaV21(f);
+  openModal(`${mHead('Pagar mensalidade de '+fmtCompL(f.comp))}<div class="modal-body"><p class="small muted">Gerando o boleto com QR Code PIX…</p></div>`);
+  MF.api('POST',`/api/faturas/${encodeURIComponent(f.id)}/cobranca`,{}).then(r=>{
+    if(r.pago){toast('Esta mensalidade já está paga. ✔');closeModal();return}
+    if(!r.banco)return modalPixFaturaV21(f);
+    const b=r.boleto;
+    openModal(`${mHead('Pagar mensalidade de '+fmtCompL(f.comp))}<div class="modal-body">
+     <div class="pix"><div class="pix-qr" id="pix-fat-b"><span class="small muted">Gerando QR Code…</span></div>
+      <div style="display:flex;flex-direction:column;gap:10px;min-width:0"><div><span class="eyebrow">Valor</span><div class="fat-total">${brl(b.valor)}</div><span class="sub">Honorários ${fmtComp(f.comp)} · vence ${fmtData(b.venc)}</span></div>
+       ${b.pix?`<div><span class="eyebrow">PIX copia e cola</span><div class="pix-code">${esc(b.pix)}</div></div><button type="button" class="btn primary" data-act="copiar" data-t="${esc(b.pix)}">${svg('pix')}Copiar código PIX</button>`:''}
+       ${b.linha?`<div><span class="eyebrow">Boleto (linha digitável)</span><div class="pix-code">${esc(b.linha)}</div></div><button type="button" class="btn" data-act="copiar" data-t="${esc(b.linha)}">Copiar linha do boleto</button>`:''}
+       ${b.url?linkArq({url:b.url,nome:b.nome},'Baixar boleto (PDF)'):''}
+       <span class="sub">Pague pelo app do seu banco. A baixa é automática: assim que o banco confirmar, a mensalidade aparece como paga.</span></div></div></div>
+     <div class="modal-foot"><button class="btn" data-act="fat-verificar" data-id="${f.id}">Já paguei · conferir</button><button class="btn primary" data-act="close-modal">Fechar</button></div>`,true);
+    if(b.pix)setTimeout(()=>desenharQR('pix-fat-b',b.pix),0);else{const q=document.getElementById('pix-fat-b');if(q)q.innerHTML='<span class="small muted">Use o boleto ao lado.</span>'}
+  }).catch(er=>{toast('Não deu para gerar a cobrança no banco agora ('+er.message+').',true);modalPixFaturaV21(f)})};
+ACT['fat-verificar']=async el=>{el.disabled=true;try{const r=await MF.api('POST',`/api/faturas/${encodeURIComponent(el.dataset.id)}/verificar`,{});toast(r.pago?'Pagamento confirmado. ✔':'O banco ainda não confirmou. PIX costuma cair em segundos; boleto, em até 2 dias úteis.',!r.pago);if(r.pago)closeModal()}catch(er){toast(er.message,true)}el.disabled=false};
+// Configurações: a chave PIX vira reserva quando o banco está conectado
+const aConfigV21=aConfig;
+aConfig=function(){let h=aConfigV21();if(MODO!=='api'||!podeMod('hon','ver'))return h;const fb=finApi().dados;
+  if(fb?.conectado&&fb.provedor!=='manual')h=h.replace(/(<span>Chave PIX[^<]*<\/span>)/,`$1<span class="small" style="color:var(--ok);font-weight:400">Inter conectado: todas as cobranças saem pelo banco. Esta chave só é usada se o banco ficar fora do ar.</span>`);
+  return h};
+/* ==== MÓDULOS v21 (fim) ==== */
+
+
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();
 </script>

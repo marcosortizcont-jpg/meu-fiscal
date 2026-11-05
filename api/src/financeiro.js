@@ -125,6 +125,7 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
   async function textoPagamento(esc, f) {
     if (f.boleto?.linkPagamento) return `Pague por boleto ou PIX: ${f.boleto.linkPagamento}`;
     if (f.boleto?.linhaDigitavel || f.boleto?.pixCopiaCola) return [f.boleto.pixCopiaCola ? `PIX copia e cola: ${f.boleto.pixCopiaCola}` : '', f.boleto.linhaDigitavel ? `Boleto (linha digitável): ${f.boleto.linhaDigitavel}` : ''].filter(Boolean).join('\n') + (f.boleto.arquivoId ? '\nO boleto em PDF segue anexado.' : '');
+    const cb = await cfgBanco(esc); if (temBanco(cb) && B.provedor(cb) !== 'manual') return 'O boleto com QR Code PIX está no Portal do Cliente, em Plano e faturas.';
     const cfg = await A.configEscritorio(esc); return cfg.pix ? `Chave PIX: ${cfg.pix}${cfg.pixNome ? ' (' + cfg.pixNome + ')' : ''}.` : 'O boleto está no Portal do Cliente, em Plano e faturas.';
   }
   async function enviarFatura(esc, faturaId, { etapa = 'manual', canais = ['whatsapp', 'email'], mensagem, quem } = {}) {
@@ -134,10 +135,11 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
     const cfg = await A.configEscritorio(esc); const conf = cfgFin(cfg); const hoje = agoraLocal().data; const dias = Math.max(0, diasEntre(f.venc, hoje));
     const chave = etapa === 'envio' ? 'envio' : etapa === 'antes' ? 'antes' : etapa === 'venc' ? 'venc' : dias >= 30 ? 'atraso30' : 'atraso';
     const modelo = mensagem || conf.mensagens?.[etapa] || conf.mensagens?.[chave] || MSGS[etapa === 'manual' ? (dias > 0 ? chave : 'envio') : chave] || MSGS.atraso;
+    if (!f.boleto?.id) { const cb = await cfgBanco(esc); if (temBanco(cb) && B.provedor(cb) !== 'manual') { try { Object.assign(f, await emitirBoleto(esc, f.id, quem || 'Automático')); } catch (er) { console.error('[financeiro] boleto antes do envio', er.message); } } }
     const pag = await textoPagamento(esc, f);
     const nome = String(e.socios?.[0]?.nome || e.fantasia || e.razao || '').split(' ')[0];
     const texto = String(modelo).replace(/\{(\w+)\}/g, (_, k) => ({ nome, empresa: e.fantasia || e.razao, competencia: fmtComp(f.comp), valor: brl(f.valor), vencimento: fmtData(f.venc), dias: String(dias),
-      pagamento: pag, link: f.boleto?.linkPagamento || '', linha: f.boleto?.linhaDigitavel || '', pix: f.boleto?.pixCopiaCola || cfg.pix || '', escritorio: marcaDe(cfg) }[k] ?? _)).trim();
+      pagamento: pag, link: f.boleto?.linkPagamento || '', linha: f.boleto?.linhaDigitavel || '', pix: f.boleto?.pixCopiaCola || (f.boleto?.id ? '' : cfg.pix) || '', escritorio: marcaDe(cfg) }[k] ?? _)).trim();
     let anexo = null;
     if (f.boleto?.id && !f.boleto.arquivoId && !(f.boleto.url || '').startsWith('/api/arquivos/')) {
       try { const pdf = await B.pdf(esc, f.boleto.provedor, f.boleto.id); if (pdf) { const a = await A.guardarArquivo(esc, f.empresaId, pdf, 'Boleto honorários ' + f.comp + '.pdf', 'application/pdf', 'boletos'); f.boleto = { ...f.boleto, arquivoId: a.id, url: a.url, nome: a.nome }; const at0 = await A.registro(esc, 'faturas', faturaId); await A.gravar(esc, 'faturas', faturaId, f.empresaId, { ...at0, boleto: f.boleto }); } } catch { }
@@ -342,6 +344,32 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
     }
     return { ok: true };
   }, { semCabecalhoSite: true, limite: 64 * 1024 });
+
+  /* ---------- portal: pagar a mensalidade pelo banco (gera o boleto com QR Code PIX na hora, se ainda não houver) ---------- */
+  r.post('/api/faturas/:id/cobranca', async ctx => {
+    const u = await exigir(ctx); const esc = u.escritorio_id;
+    let f = await A.registro(esc, 'faturas', String(ctx.params.id || '')); if (!f) throw new ErroHttp(404, 'Fatura não encontrada.');
+    if (u.ambiente === 'cliente' && !(u.empresas || []).some(x => String(x.id) === String(f.empresaId))) throw new ErroHttp(403, 'Sem acesso a esta empresa.');
+    if (f.status === 'paga') return { ok: true, pago: true };
+    if (f.status === 'cancelada') throw new ErroHttp(409, 'Esta fatura foi cancelada.');
+    const cb = await cfgBanco(esc); const banco = temBanco(cb) && B.provedor(cb) !== 'manual';
+    if (!f.boleto?.id) {
+      if (!banco) return { ok: true, banco: false };
+      if (limitar(`fatcob:${u.id}`, 20, 3600).bloqueado) throw new ErroHttp(429, 'Muitas tentativas. Aguarde um pouco.');
+      f = await emitirBoleto(esc, f.id, u.ambiente === 'cliente' ? 'Portal do cliente' : u.nome);
+    }
+    const bo = f.boleto || {};
+    return { ok: true, banco: true, falso: FALSO, boleto: { pix: bo.pixCopiaCola || '', linha: bo.linhaDigitavel || '', url: bo.url || '', nome: bo.nome || 'Boleto.pdf', venc: bo.venc || f.venc, valor: f.valor, provedor: bo.provedor || '' } };
+  }, { limite: 4 * 1024 });
+  r.post('/api/faturas/:id/verificar', async ctx => {
+    const u = await exigir(ctx); const f = await A.registro(u.escritorio_id, 'faturas', String(ctx.params.id || '')); if (!f) throw new ErroHttp(404, 'Fatura não encontrada.');
+    if (u.ambiente === 'cliente' && !(u.empresas || []).some(x => String(x.id) === String(f.empresaId))) throw new ErroHttp(403, 'Sem acesso a esta empresa.');
+    if (f.status === 'paga') return { ok: true, pago: true };
+    if (!f.boleto?.id) return { ok: true, pago: false };
+    const st = await B.consultar(u.escritorio_id, f.boleto.provedor, f.boleto.id).catch(() => null);
+    if (st?.pago) await pagamentoConfirmado(u.escritorio_id, f.id, st);
+    return { ok: true, pago: !!st?.pago };
+  });
 
   /* ---------- renovação do certificado digital: cobrança no banco (boleto + QR Code PIX) ---------- */
   async function ticketRenovacao(ctx) {
