@@ -120,6 +120,19 @@ if (configurar) {
   fs.writeFileSync(path.join(DIR, 'netlify.toml'), netlifyToml());
   fs.mkdirSync(path.join(DIR, 'functions', 'api'), { recursive: true });
   fs.writeFileSync(path.join(DIR, 'functions', 'api', '[[caminho]].js'), funcaoCloudflare());
+  // Cloudflare Workers (static assets): o Worker só roda em /api/*; o resto sai direto de dist/ com _redirects e _headers
+  fs.writeFileSync(path.join(DIR, 'worker.js'), funcaoCloudflare().replace('Cloudflare Pages Function', 'Cloudflare Worker')
+    + `\nexport default { fetch: (request, env) => new URL(request.url).pathname.startsWith('/api/') ? onRequest({ request, env }) : env.ASSETS.fetch(request) };\n`);
+  fs.writeFileSync(path.join(DIR, 'wrangler.jsonc'), `// Gerado por: node sites/build.mjs ${site} --configurar (Cloudflare Workers)
+{
+  "name": "meufiscal-${site}",
+  "main": "worker.js",
+  "compatibility_date": "2026-06-01",
+  "build": { "command": "node ../build.mjs ${site}" },
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": ["/api/*"], "not_found_handling": "none" },
+  "observability": { "enabled": true }
+}
+`);
   console.log(`sites/${site}/vercel.json, netlify.toml e functions/ (Cloudflare) atualizados para ${API}`);
   process.exit(0);
 }

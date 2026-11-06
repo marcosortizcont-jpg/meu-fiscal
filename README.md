@@ -233,7 +233,11 @@ O build tem uma trava: se o proxy do `vercel.json` apontar para uma API diferent
 - `SITE_URL` e `PAINEL_URL` em `sites/cliente/.env.production` já apontam para o domínio novo; o CORS do R2 (`api/r2-cors.json`) também, se o R2 estiver em uso.
 - Depois, se quiser, a API pode ganhar `api.omeufiscal.com.br` (Render › Settings › Custom Domains, `CNAME api` → endereço do Render); aí é preciso atualizar `URL_PUBLICA_API`, `API_URL` nos dois `.env.production`, rodar `--configurar` e clicar em Testar conexão do banco para recadastrar o aviso do Inter.
 
-## Sites na Cloudflare Pages (alternativa grátis à Vercel)
+## Sites na Cloudflare (alternativa grátis à Vercel)
+
+**Pelo caminho Workers (o que o painel da Cloudflare oferece hoje):** Workers & Pages → Create → importar `meu-fiscal`; Project name `meufiscal-cliente` ou `meufiscal-painel`; Build command `node ../build.mjs <site>`; Deploy command `npx wrangler deploy`; em *Advanced settings*, Path `sites/<site>`. A configuração está em `sites/<site>/wrangler.jsonc` e `worker.js` (gerados por `--configurar`).
+
+**Pelo caminho Pages:**
 
 O build já gera tudo o que a Cloudflare Pages precisa: `_redirects`, `_headers` e uma página por rota dentro de `dist/`,
 e a ponte `/api/*` em `sites/<site>/functions/api/[[caminho]].js` (Pages Function, regenerada por `node sites/build.mjs <site> --configurar`).
