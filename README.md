@@ -233,6 +233,26 @@ O build tem uma trava: se o proxy do `vercel.json` apontar para uma API diferent
 - `SITE_URL` e `PAINEL_URL` em `sites/cliente/.env.production` já apontam para o domínio novo; o CORS do R2 (`api/r2-cors.json`) também, se o R2 estiver em uso.
 - Depois, se quiser, a API pode ganhar `api.omeufiscal.com.br` (Render › Settings › Custom Domains, `CNAME api` → endereço do Render); aí é preciso atualizar `URL_PUBLICA_API`, `API_URL` nos dois `.env.production`, rodar `--configurar` e clicar em Testar conexão do banco para recadastrar o aviso do Inter.
 
+## Sites na Cloudflare Pages (alternativa grátis à Vercel)
+
+O build já gera tudo o que a Cloudflare Pages precisa: `_redirects`, `_headers` e uma página por rota dentro de `dist/`,
+e a ponte `/api/*` em `sites/<site>/functions/api/[[caminho]].js` (Pages Function, regenerada por `node sites/build.mjs <site> --configurar`).
+
+Para cada site (cliente e painel), em **Workers & Pages → Create → Pages → Connect to Git**:
+
+| Campo | Cliente | Painel |
+|---|---|---|
+| Repositório / branch | `meu-fiscal` / `main` | `meu-fiscal` / `main` |
+| Framework preset | None | None |
+| Build command | `node ../build.mjs cliente` | `node ../build.mjs painel` |
+| Build output directory | `dist` | `dist` |
+| Root directory | `sites/cliente` | `sites/painel` |
+| Variável `NODE_VERSION` | `22` | `22` |
+
+Opcional: variável `API_URL` (troca o endereço da API sem mexer no código — útil na mudança para a VPS).
+Depois, em **Custom domains**, adicione `www.omeufiscal.com.br` (cliente) e `painel.omeufiscal.com.br` (painel)
+e ajuste os registros CNAME no GoDaddy para os endereços `*.pages.dev` indicados. A Vercel continua funcionando em paralelo até a troca.
+
 ## Página comercial (o que fica em `/` no site do cliente)
 
 - **Preços, planos, números e depoimentos**: edite `app/landing.config.json` no GitHub (lápis ✏️ → *Commit changes*). A Vercel publica sozinha em ~1 minuto.

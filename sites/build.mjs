@@ -91,10 +91,36 @@ function netlifyToml() {
   return `# Gerado por: node sites/build.mjs ${site} --configurar\n# (Alternativa à Vercel. No Netlify, aponte o "Base directory" para sites/${site}.)\n\n` + r.join('\n');
 }
 
+// Cloudflare Pages: a ponte /api/* é uma Pages Function (o _redirects da Cloudflare não faz proxy para fora)
+function funcaoCloudflare() {
+  return `// Gerado por: node sites/build.mjs ${site} --configurar
+// Cloudflare Pages Function: repassa /api/* para a API, mantendo o cookie de sessão no domínio do site.
+// A variável API_URL (Settings → Variables) tem prioridade sobre o endereço abaixo.
+const API_PADRAO = '${API}';
+export async function onRequest({ request, env }) {
+  const api = String(env.API_URL || API_PADRAO).replace(/\\/$/, '');
+  const u = new URL(request.url);
+  const destino = api + u.pathname + u.search;
+  const h = new Headers(request.headers);
+  h.delete('host');
+  const ip = request.headers.get('cf-connecting-ip');
+  if (ip) h.set('x-forwarded-for', ip);   // a API usa o 1º IP para limitar tentativas de login
+  h.set('x-forwarded-host', u.host); h.set('x-forwarded-proto', 'https');
+  const comCorpo = !['GET', 'HEAD'].includes(request.method);
+  const r = await fetch(destino, { method: request.method, headers: h, body: comCorpo ? await request.arrayBuffer() : undefined, redirect: 'manual' });
+  const rh = new Headers(r.headers);
+  rh.set('Cache-Control', rh.get('Cache-Control') || 'no-store');
+  return new Response(r.body, { status: r.status, statusText: r.statusText, headers: rh });
+}
+`;
+}
+
 if (configurar) {
   fs.writeFileSync(path.join(DIR, 'vercel.json'), JSON.stringify(vercelJson(), null, 2) + '\n');
   fs.writeFileSync(path.join(DIR, 'netlify.toml'), netlifyToml());
-  console.log(`sites/${site}/vercel.json e netlify.toml atualizados para ${API}`);
+  fs.mkdirSync(path.join(DIR, 'functions', 'api'), { recursive: true });
+  fs.writeFileSync(path.join(DIR, 'functions', 'api', '[[caminho]].js'), funcaoCloudflare());
+  console.log(`sites/${site}/vercel.json, netlify.toml e functions/ (Cloudflare) atualizados para ${API}`);
   process.exit(0);
 }
 
@@ -151,4 +177,14 @@ if (site === 'cliente') {
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${SITE_URL}/</loc></url><url><loc>${SITE_URL}/termos</loc></url><url><loc>${SITE_URL}/privacidade</loc></url></urlset>\n`);
 }
 fs.writeFileSync(path.join(DIST, 'robots.txt'), site === 'painel' ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nDisallow: /dashboard\nDisallow: /login\nDisallow: /api/\nSitemap: ${String(env.SITE_URL || 'https://meufiscal-cliente.vercel.app').replace(/\/$/, '')}/sitemap.xml\n`);
+// Cloudflare Pages: cada rota vira um arquivo no próprio caminho (a Cloudflare serve /x a partir de x.html),
+// mais _redirects e _headers equivalentes ao vercel.json
+for (const [rota, arq] of ROTAS.paginas) {
+  const destino = path.join(DIST, rota.replace(/^\//, '') + '.html');
+  fs.mkdirSync(path.dirname(destino), { recursive: true });
+  fs.copyFileSync(path.join(DIST, arq.replace(/^\//, '')), destino);
+}
+fs.writeFileSync(path.join(DIST, '_redirects'), ROTAS.redirects.map(([de, para]) => `${de.replace(':caminho*', '*')} ${para} 302`).join('\n') + '\n');
+const semCache = ['/', ...ROTAS.paginas.map(([r]) => r)];
+fs.writeFileSync(path.join(DIST, '_headers'), `/*\n${SEGURANCA.map(h => `  ${h.key}: ${h.value}`).join('\n')}\n\n` + semCache.map(r => `${r}\n  Cache-Control: no-cache\n`).join('\n'));
 console.log(`Site "${site}" gerado em sites/${site}/dist (API: ${API})`);
