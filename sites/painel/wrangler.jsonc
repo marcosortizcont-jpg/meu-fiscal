@@ -1,6 +1,6 @@
 // Gerado por: node sites/build.mjs painel --configurar (Cloudflare Workers)
 {
-  "name": "meufiscal-painel",
+  "name": "meu-fiscal",
   "main": "worker.js",
   "compatibility_date": "2026-06-01",
   "build": { "command": "node ../build.mjs painel" },
