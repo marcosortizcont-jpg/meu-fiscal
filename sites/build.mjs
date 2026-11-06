@@ -125,7 +125,7 @@ if (configurar) {
     + `\nexport default { fetch: (request, env) => new URL(request.url).pathname.startsWith('/api/') ? onRequest({ request, env }) : env.ASSETS.fetch(request) };\n`);
   fs.writeFileSync(path.join(DIR, 'wrangler.jsonc'), `// Gerado por: node sites/build.mjs ${site} --configurar (Cloudflare Workers)
 {
-  "name": "${site === 'painel' ? 'meu-fiscal' : 'meufiscal-' + site}",
+  "name": "meufiscal-${site}",
   "main": "worker.js",
   "compatibility_date": "2026-06-01",
   "build": { "command": "node ../build.mjs ${site}" },
