@@ -1578,10 +1578,10 @@ async function perguntarIA(texto){
     const {text}=await CAP.sample(turns,{cache:false,signal:UI.iaCtl.signal,...(prep.imagens.length?{images:prep.imagens}:{}),onText:({text})=>{UI.iaDraft=limparIA(text);const el=$('#ia-draft');if(el)el.textContent=UI.iaDraft;const m=$('#msgs');if(m)m.scrollTop=m.scrollHeight}});
     const conf=((text.match(/CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)/i)||[])[1]||'media').toLowerCase().replace('é','e');
     const ids=((text.match(/ANEXAR:\s*(.+)/i)||[])[1]||'').split(/[,\s]+/).filter(Boolean);
-    const anexos=ids.filter(id=>S.guias.some(g=>g.id===id&&g.empresaId===e.id));
+    const anexos=ids.filter(id=>S.guias.some(g=>g.id===id&&g.empresaId===e.id&&!(typeof guiaVencidaTheo==='function'&&guiaVencidaTheo(g))));
     // documentos da empresa que o Théo pode entregar (Regras do atendimento): vão como arquivos da mensagem
     const catsOk=typeof catsDocTheo==='function'?catsDocTheo():[];
-    const docsEnv=ids.map(id=>S.documentos.find(d=>d.id===id&&d.empresaId===e.id&&d.arquivo&&d.arquivo.url&&catsOk.includes(d.categoria))).filter(Boolean).slice(0,3);
+    const docsEnv=ids.map(id=>S.documentos.find(d=>d.id===id&&d.empresaId===e.id&&d.arquivo&&d.arquivo.url&&catsOk.includes(d.categoria)&&!docVencidoTheo(d))).filter(Boolean).slice(0,3);
     UI.iaDraft=null; UI.iaCtl=null;
     mut('conversas',()=>{c.mensagens.push({de:'ia',texto:limparIA(text)||(docsEnv.length?'Segue o documento solicitado.':'Não consegui formular uma resposta.'),em:agora(),confianca:conf,anexos,...(docsEnv.length?{arquivos:docsEnv.map(d=>({id:d.arquivo.id,nome:d.arquivo.nome||d.nome,tipo:d.arquivo.tipo,tamanho:d.arquivo.tamanho,url:d.arquivo.url}))}:{})});
       if(conf==='baixa'){c.status='aguardando_humano';c.mensagens.push({de:'sistema',texto:'A equipe do escritório foi chamada e vai continuar este atendimento.',em:agora()})}},conf==='baixa'?['Atendimento','IA transferiu para humano',e.razao]:null);
@@ -5810,10 +5810,15 @@ FORM['atend-regras']=fd=>{const atendimento={...atendCfg(),triagemTheo:!!fd.get(
 /* ==== v22: o Théo entrega documentos da empresa quando o cliente pede (portal) ==== */
 const contextoIAV22=contextoIA;
 contextoIA=function(e){const d=contextoIAV22(e);const cats=catsDocTheo();
-  d.documentos_disponiveis=cats.length?S.documentos.filter(x=>x.empresaId===e.id&&x.arquivo&&x.arquivo.url&&!x.exemplo&&cats.includes(x.categoria)).sort((a,b)=>String(b.enviadoEm||'').localeCompare(String(a.enviadoEm||''))).slice(0,40).map(x=>({id:x.id,categoria:x.categoria,nome:x.nome,enviado_em:String(x.enviadoEm||'').slice(0,10),validade:x.validade||null})):[];
+  d.documentos_disponiveis=cats.length?S.documentos.filter(x=>x.empresaId===e.id&&x.arquivo&&x.arquivo.url&&!x.exemplo&&cats.includes(x.categoria)).sort((a,b)=>String(b.enviadoEm||'').localeCompare(String(a.enviadoEm||''))).slice(0,40).map(x=>docVencidoTheo(x)?{categoria:x.categoria,nome:x.nome,validade:x.validade,vencido:true}:{id:x.id,categoria:x.categoria,nome:x.nome,enviado_em:String(x.enviadoEm||'').slice(0,10),validade:x.validade||null}):[];
+  // guia vencida não é entregue: sem id, marcada como vencida
+  d.guias=(d.guias||[]).map(g=>{const o=S.guias.find(x=>x.id===g.id);return o&&guiaVencidaTheo(o)?{tipo:g.tipo,competencia:g.competencia,valor:g.valor,vencimento:g.vencimento,situacao:g.situacao,vencida:true}:g});
   return d};
+// o Théo nunca entrega guia vencida nem documento fora da validade
+function guiaVencidaTheo(g){return !!g&&g.status!=='paga'&&!!g.venc&&String(g.venc).slice(0,10)<hoje()}
+function docVencidoTheo(d){return !!d&&!!d.validade&&String(d.validade).slice(0,10)<hoje()}
 const regrasIAV22=regrasIA;
-regrasIA=function(e){return regrasIAV22(e).replace('- A última linha da resposta','- Documentos: se o cliente pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, inscrição, alvará, certidão, contrato de prestação de serviços) que esteja em "documentos_disponiveis", diga que está entregando e inclua a linha "ANEXAR: <id>" com o id do documento (até 3; prefira o mais recente da categoria). Se não estiver nos DADOS, diga que vai pedir à equipe e use CONFIANCA: baixa. Nunca diga que entregou algo sem a linha ANEXAR.\n- A última linha da resposta')};
+regrasIA=function(e){return regrasIAV22(e).replace('- A última linha da resposta','- Documentos: se o cliente pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, inscrição, alvará, certidão, contrato de prestação de serviços) que esteja em "documentos_disponiveis", diga que está entregando e inclua a linha "ANEXAR: <id>" com o id do documento (até 3; prefira o mais recente da categoria). Se não estiver nos DADOS, diga que vai pedir à equipe e use CONFIANCA: baixa. Nunca diga que entregou algo sem a linha ANEXAR.\n- Itens com "vencida": true ou "vencido": true (guia vencida, certidão, alvará ou documento fora da validade) nunca são entregues: explique que está vencido e que a equipe vai emitir ou providenciar um atualizado, com CONFIANCA: baixa.\n- A última linha da resposta')};
 
 /* ==== v16: obrigação mensal "Receita bruta da competência" — fonte do faturamento declarado (BI, Théo, RBT12) ==== */
 const RB_ID='receita-bruta';

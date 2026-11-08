@@ -308,8 +308,10 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     if (!e) return { dados: { contato_identificado: false }, refs: {} };
     const guias = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'guias' AND empresa_id = $2
       AND coalesce(dados->>'status','') NOT IN ('rascunho','paga') ORDER BY dados->>'venc' LIMIT 6`, [esc, empresaId]);
-    const refs = {}; const d = e.dados;
+    const refs = {}; const d = e.dados; const hoje = new Date(Date.now() - 4 * 3600e3).toISOString().slice(0, 10);   // dia em Campo Grande
+    // guia vencida ou documento com validade vencida nunca é enviado: fica sem "ref" e marcado como vencido
     const guiasCtx = guias.map((g, i) => { const x = g.dados; const item = { tipo: x.tipo, competencia: x.comp, valor: x.valor, vencimento: x.venc };
+      if (x.venc && String(x.venc).slice(0, 10) < hoje) { item.vencida = true; return item; }
       if (x.arquivo && x.arquivo.id) { item.ref = 'G' + (i + 1); refs[item.ref] = { arquivo: x.arquivo, nome: `${x.tipo || 'Guia'} ${x.comp || ''}`.trim(), rotulo: `guia ${x.tipo || ''} ${x.comp || ''}`.trim() }; }
       return item; });
     const cats = new Set(catsDocTheo(cfgAtend(cfg)));
@@ -317,10 +319,12 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     if (cats.size) docs = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'documentos' AND empresa_id = $2`, [esc, empresaId]))
       .map(x => x.dados).filter(x => x && x.arquivo && x.arquivo.id && cats.has(x.categoria) && !x.exemplo)
       .sort((a, b) => String(b.enviadoEm || '').localeCompare(String(a.enviadoEm || ''))).slice(0, 40);
-    const docsCtx = docs.map((x, i) => { const ref = 'D' + (i + 1); const ext = (String(x.arquivo.nome || '').match(/\.[a-z0-9]{2,4}$/i) || ['.pdf'])[0];
+    let n = 0;
+    const docsCtx = docs.map(x => { if (x.validade && String(x.validade).slice(0, 10) < hoje) return { categoria: x.categoria, nome: x.nome, validade: x.validade, vencido: true };
+      const ref = 'D' + (++n); const ext = (String(x.arquivo.nome || '').match(/\.[a-z0-9]{2,4}$/i) || ['.pdf'])[0];
       const nome = String(x.nome || x.categoria); refs[ref] = { arquivo: x.arquivo, nome: /\.[a-z0-9]{2,4}$/i.test(nome) ? nome : nome + ext, rotulo: x.categoria };
       return { ref, categoria: x.categoria, nome: x.nome, enviado_em: String(x.enviadoEm || '').slice(0, 10), validade: x.validade || null }; });
-    return { refs, dados: { contato_identificado: true, hoje: new Date().toISOString().slice(0, 10),
+    return { refs, dados: { contato_identificado: true, hoje,
       empresa: { nome: d.fantasia || d.razao, regime: d.regimeNome || ({ MEI: 'MEI', SN: 'Simples Nacional', LP: 'Lucro Presumido', LR: 'Lucro Real' }[d.regime] || d.regime || ''), municipio: d.municipio },
       guias_em_aberto: guiasCtx, documentos_disponiveis: docsCtx } };
   }
@@ -393,6 +397,7 @@ Regras:
 - Se "contato_identificado" for false: não fale de nenhuma empresa nem de valores. Cumprimente, pergunte o nome, a empresa (CNPJ) e o que a pessoa precisa, e diga que a equipe vai retornar. Use CONFIANCA: baixa quando a pessoa já tiver dito o que precisa.
 - Com contato identificado: use só os DADOS. Informe valor e vencimento das guias se estiverem nos DADOS; elas também ficam no Portal do Cliente (menu Guias e impostos).
 - Envio de documentos: se a pessoa pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, inscrição, alvará, certidão, contrato de prestação de serviços, recibo de obrigação) ou uma guia, e ele estiver em "documentos_disponiveis" ou em "guias_em_aberto" com "ref", diga em uma frase que está enviando e acrescente uma linha "ENVIAR: D1" (ou "ENVIAR: D1, G2"), no máximo 3 refs, só refs que existem nos DADOS. Se houver mais de um da mesma categoria, envie o mais recente (enviado_em), salvo se a pessoa pedir outro. Isso pode ser CONFIANCA: alta.
+- Itens com "vencida": true ou "vencido": true (guia com vencimento passado, certidão, alvará ou outro documento fora da validade) NUNCA são enviados e não têm ref: explique que está vencido e que a equipe vai emitir ou providenciar um atualizado, e use CONFIANCA: baixa.
 - Se o documento pedido não estiver nos DADOS, não invente: diga que vai pedir para a equipe providenciar e use CONFIANCA: baixa. Nunca diga que enviou algo sem a linha ENVIAR.
 - Valores calculados são estimativas. Nunca invente informação.
 - Assuntos que exigem análise humana (rescisão, autuação, intimação, parcelamento, mudança de regime, pedido para FAZER uma alteração contratual, divergência de valores, documentos que o cliente manda para análise) recebem orientação geral e CONFIANCA: baixa.
