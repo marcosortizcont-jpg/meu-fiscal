@@ -1577,9 +1577,13 @@ async function perguntarIA(texto){
   try{
     const {text}=await CAP.sample(turns,{cache:false,signal:UI.iaCtl.signal,...(prep.imagens.length?{images:prep.imagens}:{}),onText:({text})=>{UI.iaDraft=limparIA(text);const el=$('#ia-draft');if(el)el.textContent=UI.iaDraft;const m=$('#msgs');if(m)m.scrollTop=m.scrollHeight}});
     const conf=((text.match(/CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)/i)||[])[1]||'media').toLowerCase().replace('é','e');
-    const anexos=((text.match(/ANEXAR:\s*(.+)/i)||[])[1]||'').split(/[,\s]+/).filter(id=>S.guias.some(g=>g.id===id&&g.empresaId===e.id));
+    const ids=((text.match(/ANEXAR:\s*(.+)/i)||[])[1]||'').split(/[,\s]+/).filter(Boolean);
+    const anexos=ids.filter(id=>S.guias.some(g=>g.id===id&&g.empresaId===e.id));
+    // documentos da empresa que o Théo pode entregar (Regras do atendimento): vão como arquivos da mensagem
+    const catsOk=typeof catsDocTheo==='function'?catsDocTheo():[];
+    const docsEnv=ids.map(id=>S.documentos.find(d=>d.id===id&&d.empresaId===e.id&&d.arquivo&&d.arquivo.url&&catsOk.includes(d.categoria))).filter(Boolean).slice(0,3);
     UI.iaDraft=null; UI.iaCtl=null;
-    mut('conversas',()=>{c.mensagens.push({de:'ia',texto:limparIA(text)||'Não consegui formular uma resposta.',em:agora(),confianca:conf,anexos});
+    mut('conversas',()=>{c.mensagens.push({de:'ia',texto:limparIA(text)||(docsEnv.length?'Segue o documento solicitado.':'Não consegui formular uma resposta.'),em:agora(),confianca:conf,anexos,...(docsEnv.length?{arquivos:docsEnv.map(d=>({id:d.arquivo.id,nome:d.arquivo.nome||d.nome,tipo:d.arquivo.tipo,tamanho:d.arquivo.tamanho,url:d.arquivo.url}))}:{})});
       if(conf==='baixa'){c.status='aguardando_humano';c.mensagens.push({de:'sistema',texto:'A equipe do escritório foi chamada e vai continuar este atendimento.',em:agora()})}},conf==='baixa'?['Atendimento','IA transferiu para humano',e.razao]:null);
   }catch(err){
     UI.iaDraft=null; UI.iaCtl=null;
@@ -5739,7 +5743,9 @@ ACT['voucher-ativo']=async el=>{try{await MF.api('PUT','/api/vouchers/'+el.datas
 
 
 /* ==== v15: atendimento por setor, triagem pelo Théo, devolução por inatividade e etiquetas ==== */
-const ATEND_PADRAO={porSetor:true,triagemTheo:true,inatividadeMin:30,devolverPara:'setor'};
+const ATEND_PADRAO={porSetor:true,triagemTheo:true,inatividadeMin:30,devolverPara:'setor',theoDocs:true,theoDocsCats:null};
+const DOCS_THEO_PADRAO=CATEGORIAS_DOC.filter(c=>c!=='Outros');
+function catsDocTheo(a){a=a||atendCfg();return a.theoDocs===false?[]:(Array.isArray(a.theoDocsCats)?a.theoDocsCats.filter(c=>CATEGORIAS_DOC.includes(c)):DOCS_THEO_PADRAO)}
 function atendCfg(){return {...ATEND_PADRAO,...((S.config&&S.config[0]&&S.config[0].atendimento)||{})}}
 (function(){const st=document.createElement('style');st.textContent=`
 .tag-atend{font-size:10.5px;border-radius:99px;padding:1px 7px;font-weight:600;background:#0f172a0f;color:#334155;white-space:nowrap}
@@ -5794,10 +5800,20 @@ ACT['atend-regras']=()=>{const a=atendCfg();
    <label class="f"><span>Devolver para</span><select name="devolverPara"><option value="setor" ${a.devolverPara!=='triagem'?'selected':''}>Fila do mesmo setor</option><option value="triagem" ${a.devolverPara==='triagem'?'selected':''}>Triagem (recepção)</option></select></label>
    <p class="small muted full" style="margin:0">O tempo conta a partir da mensagem do cliente que ficou sem resposta (ou de quando o atendente assumiu, se for depois). 0 desliga. A conversa volta com todo o histórico e uma nota interna, que o cliente não vê.</p>
    <p class="small muted full" style="margin:0">Cada atendimento ganha etiquetas automáticas com os departamentos por onde passou e o nome de quem atendeu.</p>
+   <label class="chk full" style="margin-top:6px"><input type="checkbox" name="theoDocs" ${a.theoDocs!==false?'checked':''}> <span><b>O Théo envia documentos.</b> Quando o cliente pede pelo WhatsApp ou no portal (ex.: "me manda o contrato social"), o Théo envia na hora o arquivo guardado em Documentos da empresa, sem passar pelo atendente. Só para contatos já identificados da própria empresa. Se o documento não estiver no sistema, ele chama a equipe.</span></label>
+   <div class="full"><span class="small muted">Categorias que o Théo pode enviar:</span><div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px">${CATEGORIAS_DOC.map(c=>`<label class="chk"><input type="checkbox" name="theoDocsCat" value="${esc(c)}" ${(a.theoDocs===false?DOCS_THEO_PADRAO:catsDocTheo(a)).includes(c)?'checked':''}> <span>${esc(c)}</span></label>`).join('')}</div></div>
   </div></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar regras</button></div></form>`,true)};
-FORM['atend-regras']=fd=>{const atendimento={triagemTheo:!!fd.get('triagemTheo'),porSetor:!!fd.get('porSetor'),inatividadeMin:Math.max(0,Math.min(480,Math.round(Number(fd.get('inatividadeMin'))||0))),devolverPara:fd.get('devolverPara')==='triagem'?'triagem':'setor'};
-  mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].atendimento=atendimento},['Atendimento','Alterou as regras do atendimento',`triagem pelo Théo ${atendimento.triagemTheo?'ligada':'desligada'}; por setor ${atendimento.porSetor?'sim':'não'}; inatividade ${atendimento.inatividadeMin} min`]);
+FORM['atend-regras']=fd=>{const atendimento={...atendCfg(),triagemTheo:!!fd.get('triagemTheo'),porSetor:!!fd.get('porSetor'),inatividadeMin:Math.max(0,Math.min(480,Math.round(Number(fd.get('inatividadeMin'))||0))),devolverPara:fd.get('devolverPara')==='triagem'?'triagem':'setor',theoDocs:!!fd.get('theoDocs'),theoDocsCats:fd.getAll('theoDocsCat').filter(c=>CATEGORIAS_DOC.includes(c))};
+  mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].atendimento=atendimento},['Atendimento','Alterou as regras do atendimento',`triagem pelo Théo ${atendimento.triagemTheo?'ligada':'desligada'}; por setor ${atendimento.porSetor?'sim':'não'}; inatividade ${atendimento.inatividadeMin} min; Théo envia documentos ${atendimento.theoDocs?'sim ('+atendimento.theoDocsCats.length+' categorias)':'não'}`]);
   closeModal();toast('Regras salvas. A equipe passa a ver a nova divisão ao recarregar o painel.')};
+
+/* ==== v22: o Théo entrega documentos da empresa quando o cliente pede (portal) ==== */
+const contextoIAV22=contextoIA;
+contextoIA=function(e){const d=contextoIAV22(e);const cats=catsDocTheo();
+  d.documentos_disponiveis=cats.length?S.documentos.filter(x=>x.empresaId===e.id&&x.arquivo&&x.arquivo.url&&!x.exemplo&&cats.includes(x.categoria)).sort((a,b)=>String(b.enviadoEm||'').localeCompare(String(a.enviadoEm||''))).slice(0,40).map(x=>({id:x.id,categoria:x.categoria,nome:x.nome,enviado_em:String(x.enviadoEm||'').slice(0,10),validade:x.validade||null})):[];
+  return d};
+const regrasIAV22=regrasIA;
+regrasIA=function(e){return regrasIAV22(e).replace('- A última linha da resposta','- Documentos: se o cliente pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, inscrição, alvará, certidão, contrato de prestação de serviços) que esteja em "documentos_disponiveis", diga que está entregando e inclua a linha "ANEXAR: <id>" com o id do documento (até 3; prefira o mais recente da categoria). Se não estiver nos DADOS, diga que vai pedir à equipe e use CONFIANCA: baixa. Nunca diga que entregou algo sem a linha ANEXAR.\n- A última linha da resposta')};
 
 /* ==== v16: obrigação mensal "Receita bruta da competência" — fonte do faturamento declarado (BI, Théo, RBT12) ==== */
 const RB_ID='receita-bruta';

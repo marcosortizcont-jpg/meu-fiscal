@@ -9,7 +9,7 @@ import { CONFIG } from './config.js';
 import { identidade } from './apoio.js';
 import { ErroHttp } from './http.js';
 import { perguntarIA, iaDisponivel } from './externos.js';
-import { triar, deptoConv, cfgAtend, conversaVisivel } from './atendimento.js';
+import { triar, deptoConv, cfgAtend, conversaVisivel, catsDocTheo } from './atendimento.js';
 import { cfgTheo, OPTOUT } from './crm-theo.js';
 import fs from 'node:fs';
 import { urlEnvio, gravarDisco, caminhoDisco, urlDownload } from './arquivos.js';
@@ -19,7 +19,7 @@ const LOG = { level: 'silent', child: () => LOG, trace: nada, debug: nada, info:
 const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'video/mp4': 'mp4' };
 const foneDe = (k, jid) => { const pn = [k?.remoteJidAlt, k?.senderPn, k?.participantPn, jid].find(x => typeof x === 'string' && x.endsWith('@s.whatsapp.net')); return pn ? pn.split('@')[0].split(':')[0] : ''; };
 const chaveFone = f => { let d = String(f || '').replace(/\D/g, ''); if (d.length >= 12 && d.startsWith('55')) d = d.slice(2); return d.length >= 10 ? d.slice(0, 2) + d.slice(-8) : null; };
-const limpar = t => String(t || '').replace(/^\s*ANEXAR:.*$/gim, '').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi, '').replace(/\*\*/g, '*').trim();
+const limpar = t => String(t || '').replace(/^\s*(ANEXAR|ENVIAR):.*$/gim, '').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi, '').replace(/\*\*/g, '*').trim();
 const PEDE_HUMANO = /\b(atendente|humano|falar com (o |a |um |uma )?(contador|contadora|algu[eé]m|pessoa|atendente))\b/i;
 
 export function registrarWhatsApp(r, { db, exigir, log, pode }) {
@@ -301,16 +301,45 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
     const [c] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'config' LIMIT 1`, [esc]);
     return c?.dados || {};
   }
-  async function contexto(esc, empresaId) {
-    if (!empresaId) return { contato_identificado: false };
+  // contexto do Théo + arquivos que ele pode enviar (refs D1, G1… → arquivo), só da empresa do contato identificado
+  async function contexto(esc, empresaId, cfg) {
+    if (!empresaId) return { dados: { contato_identificado: false }, refs: {} };
     const [e] = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas' AND id = $2`, [esc, empresaId]);
-    if (!e) return { contato_identificado: false };
+    if (!e) return { dados: { contato_identificado: false }, refs: {} };
     const guias = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'guias' AND empresa_id = $2
       AND coalesce(dados->>'status','') NOT IN ('rascunho','paga') ORDER BY dados->>'venc' LIMIT 6`, [esc, empresaId]);
-    const d = e.dados;
-    return { contato_identificado: true, hoje: new Date().toISOString().slice(0, 10),
+    const refs = {}; const d = e.dados;
+    const guiasCtx = guias.map((g, i) => { const x = g.dados; const item = { tipo: x.tipo, competencia: x.comp, valor: x.valor, vencimento: x.venc };
+      if (x.arquivo && x.arquivo.id) { item.ref = 'G' + (i + 1); refs[item.ref] = { arquivo: x.arquivo, nome: `${x.tipo || 'Guia'} ${x.comp || ''}`.trim(), rotulo: `guia ${x.tipo || ''} ${x.comp || ''}`.trim() }; }
+      return item; });
+    const cats = new Set(catsDocTheo(cfgAtend(cfg)));
+    let docs = [];
+    if (cats.size) docs = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'documentos' AND empresa_id = $2`, [esc, empresaId]))
+      .map(x => x.dados).filter(x => x && x.arquivo && x.arquivo.id && cats.has(x.categoria) && !x.exemplo)
+      .sort((a, b) => String(b.enviadoEm || '').localeCompare(String(a.enviadoEm || ''))).slice(0, 40);
+    const docsCtx = docs.map((x, i) => { const ref = 'D' + (i + 1); const ext = (String(x.arquivo.nome || '').match(/\.[a-z0-9]{2,4}$/i) || ['.pdf'])[0];
+      const nome = String(x.nome || x.categoria); refs[ref] = { arquivo: x.arquivo, nome: /\.[a-z0-9]{2,4}$/i.test(nome) ? nome : nome + ext, rotulo: x.categoria };
+      return { ref, categoria: x.categoria, nome: x.nome, enviado_em: String(x.enviadoEm || '').slice(0, 10), validade: x.validade || null }; });
+    return { refs, dados: { contato_identificado: true, hoje: new Date().toISOString().slice(0, 10),
       empresa: { nome: d.fantasia || d.razao, regime: d.regimeNome || ({ MEI: 'MEI', SN: 'Simples Nacional', LP: 'Lucro Presumido', LR: 'Lucro Real' }[d.regime] || d.regime || ''), municipio: d.municipio },
-      guias_em_aberto: guias.map(g => ({ tipo: g.dados.tipo, competencia: g.dados.comp, valor: g.dados.valor, vencimento: g.dados.venc })) };
+      guias_em_aberto: guiasCtx, documentos_disponiveis: docsCtx } };
+  }
+  // envia ao cliente os arquivos que o Théo escolheu (linha ENVIAR); devolve o que foi enviado e o que falhou
+  async function enviarRefs(esc, empresaId, c, refs, escolhidos) {
+    const ok = [], falhas = [], waIds = [], arquivos = [];
+    for (const ref of escolhidos) {
+      const it = refs[ref]; if (!it) continue;
+      try {
+        const [arq] = await db.query('SELECT id, chave, tipo, tamanho, local, empresa_id FROM arquivos WHERE id = $1 AND escritorio_id = $2', [it.arquivo.id, esc]);
+        if (!arq || (arq.empresa_id && String(arq.empresa_id) !== String(empresaId))) throw new Error('arquivo não encontrado');
+        const buf = await lerArquivo(arq);
+        const nome = String(it.nome || it.arquivo.nome || 'documento').slice(0, 120); const tipo = arq.tipo || 'application/pdf';
+        const r = await W.sock.sendMessage(c.waJid, /^image\//.test(tipo) && !/gif/.test(tipo) ? { image: buf, caption: it.rotulo } : { document: buf, mimetype: tipo, fileName: nome });
+        if (r?.key?.id) { enviadas.set(r.key.id, r.message); waIds.push(r.key.id); }
+        arquivos.push({ id: arq.id, nome, tipo, tamanho: arq.tamanho, url: `/api/arquivos/${arq.id}` }); ok.push(it.rotulo);
+      } catch (e) { console.error('[whatsapp] Théo enviar', ref, e.message); falhas.push(it.rotulo); }
+    }
+    return { ok, falhas, waIds, arquivos };
   }
   async function enviarTexto(jid, texto, quoted) {
     if (!W.sock || W.status !== 'conectado') throw new ErroHttp(503, 'O WhatsApp do escritório está desconectado. Conecte pelo QR code em Atendimento.');
@@ -355,16 +384,18 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
         await salvarConversa(esc, c); return;
       }
     }
-    const dados = await contexto(esc, c.empresaId);
+    const { dados, refs } = await contexto(esc, c.empresaId, cfg);
     const idt = identidade(cfg);
     const regras = `Você é o Théo, assistente virtual da ${idt.marca}, e responde pelo WhatsApp. Apresente-se como "Théo, assistente da ${idt.marca}" na primeira resposta da conversa.
 ${idt.texto}
 Regras:
 - Português do Brasil, até 4 frases curtas, tom cordial, sem markdown, sem listas longas.
 - Se "contato_identificado" for false: não fale de nenhuma empresa nem de valores. Cumprimente, pergunte o nome, a empresa (CNPJ) e o que a pessoa precisa, e diga que a equipe vai retornar. Use CONFIANCA: baixa quando a pessoa já tiver dito o que precisa.
-- Com contato identificado: use só os DADOS. Guias e boletos ficam no Portal do Cliente (menu Guias e impostos); informe valor e vencimento se estiverem nos DADOS.
+- Com contato identificado: use só os DADOS. Informe valor e vencimento das guias se estiverem nos DADOS; elas também ficam no Portal do Cliente (menu Guias e impostos).
+- Envio de documentos: se a pessoa pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, inscrição, alvará, certidão, contrato de prestação de serviços, recibo de obrigação) ou uma guia, e ele estiver em "documentos_disponiveis" ou em "guias_em_aberto" com "ref", diga em uma frase que está enviando e acrescente uma linha "ENVIAR: D1" (ou "ENVIAR: D1, G2"), no máximo 3 refs, só refs que existem nos DADOS. Se houver mais de um da mesma categoria, envie o mais recente (enviado_em), salvo se a pessoa pedir outro. Isso pode ser CONFIANCA: alta.
+- Se o documento pedido não estiver nos DADOS, não invente: diga que vai pedir para a equipe providenciar e use CONFIANCA: baixa. Nunca diga que enviou algo sem a linha ENVIAR.
 - Valores calculados são estimativas. Nunca invente informação.
-- Assuntos que exigem análise humana (rescisão, autuação, intimação, parcelamento, mudança de regime, alteração contratual, divergência de valores, envio de documentos para análise) recebem orientação geral e CONFIANCA: baixa.
+- Assuntos que exigem análise humana (rescisão, autuação, intimação, parcelamento, mudança de regime, pedido para FAZER uma alteração contratual, divergência de valores, documentos que o cliente manda para análise) recebem orientação geral e CONFIANCA: baixa.
 - Se a pessoa pedir para falar com alguém, ou se você disser que vai solicitar algo à equipe, use CONFIANCA: baixa.
 - Imagens recebidas: diga o que é o documento e os dados principais; a equipe confere.
 - A última linha deve ser exatamente "CONFIANCA: alta", "CONFIANCA: media" ou "CONFIANCA: baixa".
@@ -374,10 +405,21 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
       await W.sock?.readMessages?.([chave]).catch?.(nada);
       const resp = await perguntarIA({ mensagens: [{ role: 'user', content: regras }, ...hist], imagens: imagemIA ? [imagemIA] : [] });
       const conf = ((resp.match(/CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)/i) || [])[1] || 'media').toLowerCase().replace('é', 'e');
-      const corpo = limpar(resp) || 'Recebi sua mensagem. A equipe do escritório vai responder em breve.';
-      await enviarTexto(c.waJid, corpo);
-      c.mensagens.push({ de: 'ia', texto: corpo, em: new Date().toISOString(), confianca: conf, canal: 'whatsapp' });
-      if (conf === 'baixa') { c.status = 'aguardando_humano'; await deptoDaFila(esc, c, cfg); c.mensagens.push({ de: 'sistema', texto: 'A IA chamou a equipe (' + c.depto + ') para continuar este atendimento.', em: new Date().toISOString() }); }
+      const escolhidos = [...new Set(((resp.match(/^\s*ENVIAR:\s*(.+)$/im) || [])[1] || '').toUpperCase().split(/[^A-Z0-9]+/).filter(x => refs[x]))].slice(0, 3);
+      const corpo = limpar(resp) || (escolhidos.length ? 'Segue o documento solicitado.' : 'Recebi sua mensagem. A equipe do escritório vai responder em breve.');
+      const rt = await enviarTexto(c.waJid, corpo);
+      const m = { de: 'ia', texto: corpo, em: new Date().toISOString(), confianca: conf, canal: 'whatsapp', waIds: rt?.key?.id ? [rt.key.id] : [] };
+      c.mensagens.push(m);
+      let confFinal = conf;
+      if (escolhidos.length) {
+        const ev = await enviarRefs(esc, c.empresaId, c, refs, escolhidos);
+        if (ev.arquivos.length) { m.arquivos = ev.arquivos; m.waIds.push(...ev.waIds); c.mensagens.push({ de: 'sistema', texto: 'O Théo enviou ao cliente: ' + ev.ok.join(', ') + '.', em: new Date().toISOString() }); }
+        if (ev.falhas.length) {
+          const aviso = 'Não consegui anexar ' + ev.falhas.join(', ') + ' agora. Já pedi para a equipe te enviar.';
+          await enviarTexto(c.waJid, aviso).catch(nada); c.mensagens.push({ de: 'ia', texto: aviso, em: new Date().toISOString(), canal: 'whatsapp' }); confFinal = 'baixa';
+        }
+      }
+      if (confFinal === 'baixa') { c.status = 'aguardando_humano'; await deptoDaFila(esc, c, cfg); c.mensagens.push({ de: 'sistema', texto: 'A IA chamou a equipe (' + c.depto + ') para continuar este atendimento.', em: new Date().toISOString() }); }
       await salvarConversa(esc, c);
     } catch (e) {
       console.error('[whatsapp] IA', e.message);
@@ -590,5 +632,6 @@ DADOS DO LEAD (JSON): ${JSON.stringify(dadosLead)}`;
     await log('whatsapp_atendimento_iniciado', { usuarioId: u.id, ip: ctx.ip, detalhe: '+' + jid.split('@')[0] });
     return { ok: true, conversaId: c.id };
   });
-  return { status: () => W.status, enviarArquivos, iniciarConversaLead, definirFluxoDas: fn => { fluxoDas = fn; } };
+  return { status: () => W.status, enviarArquivos, iniciarConversaLead, definirFluxoDas: fn => { fluxoDas = fn; },
+    _teste: { contexto, responderIA, usarSock: s => { W.sock = s; W.status = 'conectado'; } } };   // só para testes automatizados
 }
