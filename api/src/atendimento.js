@@ -11,9 +11,16 @@ import { perguntarIA, iaDisponivel } from './externos.js';
 
 export const ATEND_PADRAO = { porSetor: true, triagemTheo: true, inatividadeMin: 30, devolverPara: 'setor', theoDocs: true, theoDocsCats: null };
 // documentos que o Théo pode enviar sozinho quando o cliente pede (Atendimento › Regras do atendimento)
-export const CATEGORIAS_DOC = ['Obrigações entregues', 'Contrato de prestação de serviços', 'Contrato Social', 'Alterações Contratuais', 'Cartão CNPJ', 'Inscrição Estadual', 'Inscrição Municipal', 'Alvarás e Licenças', 'Certidões', 'Outros'];
+export const CATEGORIAS_DOC = ['Obrigações entregues', 'Contrato de prestação de serviços', 'Contrato Social', 'Alterações Contratuais', 'Cartão CNPJ', 'Certificado MEI (CCMEI)', 'Inscrição Estadual', 'Inscrição Municipal', 'Alvarás e Licenças', 'Certidões', 'Outros'];
 export const DOCS_THEO_PADRAO = CATEGORIAS_DOC.filter(c => c !== 'Outros');
-export const catsDocTheo = conf => (conf && conf.theoDocs === false) ? [] : (Array.isArray(conf && conf.theoDocsCats) ? conf.theoDocsCats.filter(c => CATEGORIAS_DOC.includes(c)) : DOCS_THEO_PADRAO);
+const CATS_DOC_ANTIGAS = ['Obrigações entregues', 'Contrato de prestação de serviços', 'Contrato Social', 'Alterações Contratuais', 'Cartão CNPJ', 'Inscrição Estadual', 'Inscrição Municipal', 'Alvarás e Licenças', 'Certidões', 'Outros'];
+// categorias criadas depois que a seleção foi salva entram ligadas (menos "Outros")
+export const catsDocTheo = conf => {
+  if (conf && conf.theoDocs === false) return [];
+  if (!Array.isArray(conf && conf.theoDocsCats)) return DOCS_THEO_PADRAO;
+  const vistas = Array.isArray(conf.theoDocsVistas) ? conf.theoDocsVistas : CATS_DOC_ANTIGAS;
+  return CATEGORIAS_DOC.filter(c => conf.theoDocsCats.includes(c) || (!vistas.includes(c) && c !== 'Outros'));
+};
 export const cfgAtend = cfg => ({ ...ATEND_PADRAO, ...((cfg && cfg.atendimento) || {}) });
 // departamentos padrão de cada função, para quem ainda não tem os departamentos marcados no cadastro
 export const FUNCAO_DEPTO = { 'Analista Fiscal': ['Fiscal'], 'Analista de DP': ['Pessoal'], 'Analista Contábil': ['Contábil'], 'Legalização': ['Legalização'], 'Comercial': ['Comercial'] };

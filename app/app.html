@@ -641,7 +641,7 @@ function gerarExemplo(){
 }
 /*SEED_END*/
 const TIPOS_TICKET={'Abertura de filial':15,'Alteração contratual':10,'Rescisão de funcionário':5,'Admissão de funcionário':3,'Emissão de certidão':3,'Renovação de certificado':5,'Parcelamento de débitos':5,'Pedido de titular (LGPD)':15,'Outros':5};
-const CATEGORIAS_DOC=['Obrigações entregues','Contrato de prestação de serviços','Contrato Social','Alterações Contratuais','Cartão CNPJ','Inscrição Estadual','Inscrição Municipal','Alvarás e Licenças','Certidões','Outros'];
+const CATEGORIAS_DOC=['Obrigações entregues','Contrato de prestação de serviços','Contrato Social','Alterações Contratuais','Cartão CNPJ','Certificado MEI (CCMEI)','Inscrição Estadual','Inscrição Municipal','Alvarás e Licenças','Certidões','Outros'];
 const ST_TICKET={aberto:'Aberto',em_andamento:'Em andamento',aguardando_cliente:'Aguardando você',concluido:'Concluído'};
 const DEPTOS_TICKET=['Fiscal','Pessoal','Contábil','Legalização','Financeiro'];
 const SLA_DEPTO={Fiscal:5,Pessoal:5,'Contábil':5,'Legalização':15,Financeiro:3};
@@ -3057,7 +3057,14 @@ ACT['conv-filtro']=el=>{UI.convFiltro=el.dataset.v;render()};
 ACT['conv-lead']=el=>{const c=S.conversas.find(x=>x.id===el.dataset.id);if(!c)return;const id='lead-'+uid();
   mut('leads',()=>{S.leads.push({id,nome:c.contatoNome||'Contato do WhatsApp',whatsapp:String(c.waFone||''),email:'',objetivo:'outro',objetivoNome:'Contato pelo WhatsApp',plano:'',cidade:'',mensagem:(c.mensagens.find(m=>m.de==='cliente')?.texto||'').slice(0,500),status:'contato',origem:'whatsapp',criadoEm:agora()})},['Carteira','Registrou interessado do WhatsApp',c.contatoNome||'']);toast('Registrado em Carteira › Interessados.')};
 document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset.change!=='conv-empresa')return;const c=S.conversas.find(x=>x.id===el.dataset.id);if(!c)return;
-  mut('conversas',()=>{c.empresaId=el.value||null},['Atendimento','Vinculou conversa do WhatsApp',emp(el.value)?.razao||'']);toast(el.value?'Conversa vinculada à empresa.':'Vínculo removido.')});
+  const eid=el.value||null;const tel=soDig(c.waFone);const foneReal=tel.length>=12&&tel.length<=13&&tel.startsWith('55');
+  let ct=foneReal?S.contatos.find(x=>chaveFoneC(x.telefone)===chaveFoneC(tel)):null;let novoCt=false;
+  mut(['conversas','contatos'],()=>{c.empresaId=eid;
+    if(eid&&foneReal){if(!ct){ct={id:'ct-'+uid(),nome:c.contatoNome||'Contato WhatsApp',cargo:'',telefone:tel,email:'',empresas:[eid],atendente:'',canal:'whatsapp',recebeWhatsApp:true,recebeEmail:false,ativo:true,obs:'Criado ao vincular uma conversa do WhatsApp',criadoEm:agora(),criadoPor:ME.id,atualizadoEm:agora()};S.contatos.push(ct);novoCt=true}
+      else if(!(ct.empresas||[]).includes(eid)){ct.empresas=[...(ct.empresas||[]),eid];ct.atualizadoEm=agora()}
+      c.contatoId=ct.id;}
+  },['Atendimento','Vinculou conversa do WhatsApp',emp(eid)?.razao||'']);
+  toast(!eid?'Vínculo removido.':foneReal?(novoCt?'Conversa vinculada. O número foi salvo como contato da empresa: o Théo já reconhece este cliente.':'Conversa vinculada. O Théo já reconhece este cliente.'):'Conversa vinculada. O WhatsApp não informou o número: cadastre o telefone em Atendimento › Contatos para as próximas conversas chegarem identificadas.')});
 const msgHumanoBase=FORM['msg-humano'];
 FORM['msg-humano']=async(fd,form)=>{
   const c=S.conversas.find(x=>x.id===form.dataset.id);if(!c)return;const inp=$('#hum-input');const t=(inp?.value||'').trim();if(!t)return;
@@ -5745,7 +5752,11 @@ ACT['voucher-ativo']=async el=>{try{await MF.api('PUT','/api/vouchers/'+el.datas
 /* ==== v15: atendimento por setor, triagem pelo Théo, devolução por inatividade e etiquetas ==== */
 const ATEND_PADRAO={porSetor:true,triagemTheo:true,inatividadeMin:30,devolverPara:'setor',theoDocs:true,theoDocsCats:null};
 const DOCS_THEO_PADRAO=CATEGORIAS_DOC.filter(c=>c!=='Outros');
-function catsDocTheo(a){a=a||atendCfg();return a.theoDocs===false?[]:(Array.isArray(a.theoDocsCats)?a.theoDocsCats.filter(c=>CATEGORIAS_DOC.includes(c)):DOCS_THEO_PADRAO)}
+function catsDocTheo(a){a=a||atendCfg();if(a.theoDocs===false)return[];if(!Array.isArray(a.theoDocsCats))return DOCS_THEO_PADRAO;
+  // categorias criadas depois que a seleção foi salva entram ligadas (menos "Outros")
+  const vistas=Array.isArray(a.theoDocsVistas)?a.theoDocsVistas:CATS_DOC_ANTIGAS;
+  return CATEGORIAS_DOC.filter(c=>a.theoDocsCats.includes(c)||(!vistas.includes(c)&&c!=='Outros'))}
+const CATS_DOC_ANTIGAS=['Obrigações entregues','Contrato de prestação de serviços','Contrato Social','Alterações Contratuais','Cartão CNPJ','Inscrição Estadual','Inscrição Municipal','Alvarás e Licenças','Certidões','Outros'];
 function atendCfg(){return {...ATEND_PADRAO,...((S.config&&S.config[0]&&S.config[0].atendimento)||{})}}
 (function(){const st=document.createElement('style');st.textContent=`
 .tag-atend{font-size:10.5px;border-radius:99px;padding:1px 7px;font-weight:600;background:#0f172a0f;color:#334155;white-space:nowrap}
@@ -5803,7 +5814,7 @@ ACT['atend-regras']=()=>{const a=atendCfg();
    <label class="chk full" style="margin-top:6px"><input type="checkbox" name="theoDocs" ${a.theoDocs!==false?'checked':''}> <span><b>O Théo envia documentos.</b> Quando o cliente pede pelo WhatsApp ou no portal (ex.: "me manda o contrato social"), o Théo envia na hora o arquivo guardado em Documentos da empresa, sem passar pelo atendente. Só para contatos já identificados da própria empresa. Se o documento não estiver no sistema, ele chama a equipe.</span></label>
    <div class="full"><span class="small muted">Categorias que o Théo pode enviar:</span><div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:6px">${CATEGORIAS_DOC.map(c=>`<label class="chk"><input type="checkbox" name="theoDocsCat" value="${esc(c)}" ${(a.theoDocs===false?DOCS_THEO_PADRAO:catsDocTheo(a)).includes(c)?'checked':''}> <span>${esc(c)}</span></label>`).join('')}</div></div>
   </div></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar regras</button></div></form>`,true)};
-FORM['atend-regras']=fd=>{const atendimento={...atendCfg(),triagemTheo:!!fd.get('triagemTheo'),porSetor:!!fd.get('porSetor'),inatividadeMin:Math.max(0,Math.min(480,Math.round(Number(fd.get('inatividadeMin'))||0))),devolverPara:fd.get('devolverPara')==='triagem'?'triagem':'setor',theoDocs:!!fd.get('theoDocs'),theoDocsCats:fd.getAll('theoDocsCat').filter(c=>CATEGORIAS_DOC.includes(c))};
+FORM['atend-regras']=fd=>{const atendimento={...atendCfg(),triagemTheo:!!fd.get('triagemTheo'),porSetor:!!fd.get('porSetor'),inatividadeMin:Math.max(0,Math.min(480,Math.round(Number(fd.get('inatividadeMin'))||0))),devolverPara:fd.get('devolverPara')==='triagem'?'triagem':'setor',theoDocs:!!fd.get('theoDocs'),theoDocsCats:fd.getAll('theoDocsCat').filter(c=>CATEGORIAS_DOC.includes(c)),theoDocsVistas:[...CATEGORIAS_DOC]};
   mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].atendimento=atendimento},['Atendimento','Alterou as regras do atendimento',`triagem pelo Théo ${atendimento.triagemTheo?'ligada':'desligada'}; por setor ${atendimento.porSetor?'sim':'não'}; inatividade ${atendimento.inatividadeMin} min; Théo envia documentos ${atendimento.theoDocs?'sim ('+atendimento.theoDocsCats.length+' categorias)':'não'}`]);
   closeModal();toast('Regras salvas. A equipe passa a ver a nova divisão ao recarregar o painel.')};
 
@@ -5818,7 +5829,7 @@ contextoIA=function(e){const d=contextoIAV22(e);const cats=catsDocTheo();
 function guiaVencidaTheo(g){return !!g&&g.status!=='paga'&&!!g.venc&&String(g.venc).slice(0,10)<hoje()}
 function docVencidoTheo(d){return !!d&&!!d.validade&&String(d.validade).slice(0,10)<hoje()}
 const regrasIAV22=regrasIA;
-regrasIA=function(e){return regrasIAV22(e).replace('- A última linha da resposta','- Documentos: se o cliente pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, inscrição, alvará, certidão, contrato de prestação de serviços) que esteja em "documentos_disponiveis", diga que está entregando e inclua a linha "ANEXAR: <id>" com o id do documento (até 3; prefira o mais recente da categoria). Se não estiver nos DADOS, diga que vai pedir à equipe e use CONFIANCA: baixa. Nunca diga que entregou algo sem a linha ANEXAR.\n- Itens com "vencida": true ou "vencido": true (guia vencida, certidão, alvará ou documento fora da validade) nunca são entregues: explique que está vencido e que a equipe vai emitir ou providenciar um atualizado, com CONFIANCA: baixa.\n- A última linha da resposta')};
+regrasIA=function(e){return regrasIAV22(e).replace('- A última linha da resposta','- Documentos: se o cliente pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, certificado MEI ou CCMEI, inscrição, alvará, certidão, contrato de prestação de serviços) que esteja em "documentos_disponiveis", diga que está entregando e inclua a linha "ANEXAR: <id>" com o id do documento (até 3; prefira o mais recente da categoria). Se não estiver nos DADOS, diga que vai pedir à equipe e use CONFIANCA: baixa. Nunca diga que entregou algo sem a linha ANEXAR.\n- Itens com "vencida": true ou "vencido": true (guia vencida, certidão, alvará ou documento fora da validade) nunca são entregues: explique que está vencido e que a equipe vai emitir ou providenciar um atualizado, com CONFIANCA: baixa.\n- A última linha da resposta')};
 
 /* ==== v16: obrigação mensal "Receita bruta da competência" — fonte do faturamento declarado (BI, Théo, RBT12) ==== */
 const RB_ID='receita-bruta';

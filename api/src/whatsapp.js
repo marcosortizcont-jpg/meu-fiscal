@@ -273,6 +273,12 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
       }
     }
     if (m.pushName && !c.contatoNome) c.contatoNome = m.pushName;
+    // conversa já aberta sem empresa: o número pode ter sido cadastrado depois (contato ou cadastro da empresa)
+    if (!nova && !c.empresaId && fone) {
+      const ct = await contatoPorFone(esc, fone); const eid = (ct && (ct.empresas || [])[0]) || await empresaPorFone(esc, fone);
+      if (eid) { c.empresaId = String(eid); if (ct) { c.contatoId = ct.id; c.contatoNome = ct.nome || c.contatoNome; } if (!c.waFone || String(c.waFone).length > 13) c.waFone = fone;
+        c.mensagens.push({ de: 'sistema', texto: 'Contato identificado pelo telefone cadastrado.', em: agora }); }
+    }
 
     const arquivos = []; let imagemIA = null;
     if (midia && midia[1] && W.sock) {
@@ -394,9 +400,9 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
 ${idt.texto}
 Regras:
 - Português do Brasil, até 4 frases curtas, tom cordial, sem markdown, sem listas longas.
-- Se "contato_identificado" for false: não fale de nenhuma empresa nem de valores. Cumprimente, pergunte o nome, a empresa (CNPJ) e o que a pessoa precisa, e diga que a equipe vai retornar. Use CONFIANCA: baixa quando a pessoa já tiver dito o que precisa.
+- Se "contato_identificado" for false: não fale de nenhuma empresa nem de valores. Cumprimente, pergunte o nome, a empresa (CNPJ) e o que a pessoa precisa, e diga que a equipe vai retornar. Use CONFIANCA: baixa quando a pessoa já tiver dito o que precisa. Se pedir documento ou guia, explique que, por segurança, documentos só são enviados ao WhatsApp cadastrado da empresa e que a equipe vai confirmar o cadastro e enviar (CONFIANCA: baixa).
 - Com contato identificado: use só os DADOS. Informe valor e vencimento das guias se estiverem nos DADOS; elas também ficam no Portal do Cliente (menu Guias e impostos).
-- Envio de documentos: se a pessoa pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, inscrição, alvará, certidão, contrato de prestação de serviços, recibo de obrigação) ou uma guia, e ele estiver em "documentos_disponiveis" ou em "guias_em_aberto" com "ref", diga em uma frase que está enviando e acrescente uma linha "ENVIAR: D1" (ou "ENVIAR: D1, G2"), no máximo 3 refs, só refs que existem nos DADOS. Se houver mais de um da mesma categoria, envie o mais recente (enviado_em), salvo se a pessoa pedir outro. Isso pode ser CONFIANCA: alta.
+- Envio de documentos: se a pessoa pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, certificado MEI ou CCMEI, inscrição, alvará, certidão, contrato de prestação de serviços, recibo de obrigação) ou uma guia, e ele estiver em "documentos_disponiveis" ou em "guias_em_aberto" com "ref", diga em uma frase que está enviando e acrescente uma linha "ENVIAR: D1" (ou "ENVIAR: D1, G2"), no máximo 3 refs, só refs que existem nos DADOS. Se houver mais de um da mesma categoria, envie o mais recente (enviado_em), salvo se a pessoa pedir outro. Isso pode ser CONFIANCA: alta.
 - Itens com "vencida": true ou "vencido": true (guia com vencimento passado, certidão, alvará ou outro documento fora da validade) NUNCA são enviados e não têm ref: explique que está vencido e que a equipe vai emitir ou providenciar um atualizado, e use CONFIANCA: baixa.
 - Se o documento pedido não estiver nos DADOS, não invente: diga que vai pedir para a equipe providenciar e use CONFIANCA: baixa. Nunca diga que enviou algo sem a linha ENVIAR.
 - Valores calculados são estimativas. Nunca invente informação.
@@ -638,5 +644,5 @@ DADOS DO LEAD (JSON): ${JSON.stringify(dadosLead)}`;
     return { ok: true, conversaId: c.id };
   });
   return { status: () => W.status, enviarArquivos, iniciarConversaLead, definirFluxoDas: fn => { fluxoDas = fn; },
-    _teste: { contexto, responderIA, usarSock: s => { W.sock = s; W.status = 'conectado'; } } };   // só para testes automatizados
+    _teste: { contexto, responderIA, receber, usarSock: s => { W.sock = s; W.status = 'conectado'; } } };   // só para testes automatizados
 }
