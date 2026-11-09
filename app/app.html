@@ -4000,7 +4000,7 @@ bolhas=function(c,lado){
     const soMidia=arqs&&/^(\[.*(recebid|áudio|imagem).*\]|🎤 Mensagem de voz)$/i.test(txt);
     return `<div class="msg ${mine?'me':'them'}"><span class="who">${esc(who)}${m.de==='ia'?' · assistente virtual':''}${m.de==='ia'&&m.confianca&&lado!=='cliente'?' · confiança '+esc(m.confianca):''}${m.canal==='whatsapp'&&lado!=='cliente'?' · WhatsApp':''}</span>${soMidia?'':esc(txt)}${arqs?`<div class="anx">${arqs}</div>`:''}${att.length?`<div class="att">${att.map(g=>g.arquivo&&g.arquivo.url?`<a class="btn sm" href="${esc(g.arquivo.url)}" target="_blank" rel="noopener">${esc(g.tipo)} ${fmtComp(g.comp)}</a>`:`<a class="btn sm" href="#c-guias">${esc(g.tipo)} ${fmtComp(g.comp)} · ${brl(g.valor)}</a>`).join('')}</div>`:''}</div>`}).join('');
 };
-limparIA=function(t){return String(t||'').replace(/^\s*ANEXAR:.*$/gim,'').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi,'').trim()};
+limparIA=function(t){return String(t||'').replace(/^\s*ANEXAR:.*$/gim,'').replace(/\s*\bANEXAR:\s*[\w-]+(\s*,\s*[\w-]+)*/gi,'').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi,'').trim()};
 const regrasIAV3=regrasIA;
 const marcaCfg=()=>String(cfg().marca||'').trim()||'Meu Fiscal Contabilidade Online';
 const rtCfg=()=>String(cfg().responsavelTecnico||cfg().escritorio||'').replace(/\s*([·|-]\s*)?contabilidade\s*$/i,'').trim();

@@ -19,7 +19,7 @@ const LOG = { level: 'silent', child: () => LOG, trace: nada, debug: nada, info:
 const EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'application/pdf': 'pdf', 'audio/ogg': 'ogg', 'audio/mpeg': 'mp3', 'video/mp4': 'mp4' };
 const foneDe = (k, jid) => { const pn = [k?.remoteJidAlt, k?.senderPn, k?.participantPn, jid].find(x => typeof x === 'string' && x.endsWith('@s.whatsapp.net')); return pn ? pn.split('@')[0].split(':')[0] : ''; };
 const chaveFone = f => { let d = String(f || '').replace(/\D/g, ''); if (d.length >= 12 && d.startsWith('55')) d = d.slice(2); return d.length >= 10 ? d.slice(0, 2) + d.slice(-8) : null; };
-const limpar = t => String(t || '').replace(/^\s*(ANEXAR|ENVIAR):.*$/gim, '').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi, '').replace(/\*\*/g, '*').trim();
+const limpar = t => String(t || '').replace(/^\s*(ANEXAR|ENVIAR):.*$/gim, '').replace(/\s*\b(ENVIAR|ANEXAR):\s*[A-Z]{1,2}\d+(\s*(,|e|;)\s*[A-Z]{1,2}\d+)*/gi, '').replace(/\s*CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)\.?/gi, '').replace(/\*\*/g, '*').trim();
 const PEDE_HUMANO = /\b(atendente|humano|falar com (o |a |um |uma )?(contador|contadora|algu[eé]m|pessoa|atendente))\b/i;
 
 export function registrarWhatsApp(r, { db, exigir, log, pode }) {
@@ -416,7 +416,8 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
       await W.sock?.readMessages?.([chave]).catch?.(nada);
       const resp = await perguntarIA({ mensagens: [{ role: 'user', content: regras }, ...hist], imagens: imagemIA ? [imagemIA] : [] });
       const conf = ((resp.match(/CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)/i) || [])[1] || 'media').toLowerCase().replace('é', 'e');
-      const escolhidos = [...new Set(((resp.match(/^\s*ENVIAR:\s*(.+)$/im) || [])[1] || '').toUpperCase().split(/[^A-Z0-9]+/).filter(x => refs[x]))].slice(0, 3);
+      // o modelo às vezes escreve "ENVIAR: D1" no meio do texto, não numa linha própria: aceita em qualquer posição
+      const escolhidos = [...new Set([...resp.matchAll(/\bENVIAR:\s*([A-Z]{1,2}\d+(?:\s*(?:,|e|;)\s*[A-Z]{1,2}\d+)*)/gi)].flatMap(x => x[1].toUpperCase().split(/[^A-Z0-9]+/)).filter(x => refs[x]))].slice(0, 3);
       const corpo = limpar(resp) || (escolhidos.length ? 'Segue o documento solicitado.' : 'Recebi sua mensagem. A equipe do escritório vai responder em breve.');
       const rt = await enviarTexto(c.waJid, corpo);
       const m = { de: 'ia', texto: corpo, em: new Date().toISOString(), confianca: conf, canal: 'whatsapp', waIds: rt?.key?.id ? [rt.key.id] : [] };
