@@ -3822,11 +3822,12 @@ const abaDocsV3=abaDocs;
 abaDocs=function(e){
   const h=abaDocsV3(e);const ed=podeMod('docs','editar');const exc=podeMod('docs','excluir');const fd=UI.docDepto||'';
   const L=S.docsinternos.filter(d=>d.empresaId===e.id&&(!fd||d.depto===fd||d.depto==='Todos os departamentos')).sort((a,b)=>String(b.em).localeCompare(String(a.em)));
-  const painel=`<div class="panel"><div class="panel-head"><div><h2>Documentos para a equipe</h2><p class="sub">Contratos, procurações, termos de parcelamento, senhas em PDF e o que cada departamento precisa consultar. O cliente não vê estes arquivos, a menos que você marque "mostrar no portal".</p></div>
+  const painel=`<div class="panel"><div class="panel-head"><div><h2>Documentos para a equipe</h2><p class="sub">Contratos, procurações, termos de parcelamento, senhas em PDF e o que cada departamento precisa consultar. O cliente não vê estes arquivos, a menos que você escolha uma categoria em "No portal do cliente": aí ele vê no portal e o Théo pode enviar quando ele pedir.</p></div>
     <label class="small muted" style="display:flex;gap:6px;align-items:center">Departamento<select data-doc-depto style="width:auto"><option value="">Todos</option>${DEPTOS_DOC.slice(1).map(d=>`<option ${fd===d?'selected':''}>${d}</option>`).join('')}</select></label></div>
    ${ed?`<form class="obr-docs-form" data-form="doc-interno" data-id="${e.id}"><label class="f"><span>Nome do documento *</span><input name="nome" required maxlength="100" placeholder="Ex.: Termo de parcelamento PGFN"></label>
      <label class="f"><span>Departamento que vai usar</span><select name="depto">${DEPTOS_DOC.map(d=>`<option>${d}</option>`).join('')}</select></label>
-     <label class="chk" style="align-self:center"><input type="checkbox" name="portal"> Mostrar também no portal do cliente</label>
+     <label class="f"><span>No portal do cliente</span><select name="portalCat"><option value="">Não mostrar (só a equipe)</option>${CATEGORIAS_DOC.map(c=>`<option value="${esc(c)}">Mostrar como: ${esc(c)}</option>`).join('')}</select></label>
+     <label class="f"><span>Validade (certidão, alvará…)</span><input type="date" name="validade"></label>
      <label class="btn primary">${svg('upload')}Escolher arquivo e salvar<input type="file" hidden accept=".pdf,.jpg,.jpeg,.png,.xml,.txt,.csv" data-up="doc-interno" data-id="${e.id}"></label></form>`:''}
    ${L.length?`<div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Documento</th><th>Departamento</th><th>Anexado</th><th></th></tr></thead><tbody>${L.map(d=>`<tr><td><b>${esc(d.nome)}</b><div class="sub">${esc(d.arquivo?.nome||'')}</div></td><td>${pill(d.depto,d.depto==='Todos os departamentos'?'info':'')}</td><td class="small">${fmtDH(d.em)}<div class="sub">${esc(d.nomeUsuario||'')}</div></td><td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${linkArq(d.arquivo)}${exc?`<button class="btn sm danger" data-act="doc-interno-rm" data-id="${d.id}">Excluir</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:`<p class="small muted" style="margin-top:10px">Nenhum documento${fd?' para '+esc(fd):''}.</p>`}</div>`;
   // fica logo depois da chave liga/desliga
@@ -3836,12 +3837,12 @@ document.addEventListener('change',ev=>{if(ev.target.hasAttribute&&ev.target.has
 FORM['doc-interno']=()=>toast('Escolha o arquivo pelo botão "Escolher arquivo e salvar".',true);
 async function uploadDocInterno(inp){
   const form=inp.closest('form');const e=emp(inp.dataset.id);const files=[...inp.files];inp.value='';if(!files.length||!e)return;
-  const nome=String(form.nome.value||'').trim()||files[0].name.replace(/\.[^.]+$/,'');const depto=form.depto.value;const portal=form.portal.checked;
+  const nome=String(form.nome.value||'').trim()||files[0].name.replace(/\.[^.]+$/,'');const depto=form.depto.value;const cat=form.portalCat?form.portalCat.value:'';const portal=!!cat;const validade=form.validade?form.validade.value:'';
   const antes=UI.empresaId;UI.empresaId=portal?e.id:null;
   try{const arq=await enviarArquivo(files[0]);
-    if(portal)mut('documentos',()=>S.documentos.push({id:uid(),empresaId:e.id,nome,categoria:'Outros',arquivo:arq,enviadoEm:agora(),depto,origem:'escritorio'}),['Documentos','Anexou '+nome+' (portal)',e.razao]);
+    if(portal)mut('documentos',()=>S.documentos.push({id:uid(),empresaId:e.id,nome,categoria:cat,...(validade?{validade}:{}),arquivo:arq,enviadoEm:agora(),depto,origem:'escritorio'}),['Documentos','Anexou '+nome+' no portal ('+cat+')',e.razao]);
     mut('docsinternos',()=>S.docsinternos.push({id:uid(),empresaId:e.id,nome,depto,arquivo:arq,em:agora(),uid:ME.id,nomeUsuario:ME.nome||'',noPortal:portal}),['Documentos','Anexou '+nome+' para '+depto,e.razao]);
-    form.nome.value='';toast('Documento "'+nome+'" anexado'+(portal?' e publicado no portal':'')+'.');
+    form.nome.value='';if(form.validade)form.validade.value='';toast('Documento "'+nome+'" anexado'+(portal?' e publicado no portal como '+cat+(catsDocTheo().includes(cat)?'. O Théo já pode enviar quando o cliente pedir':'')+'':'')+'.');
   }catch(er){toast(er.message,true)}finally{UI.empresaId=antes}
 }
 ACT['doc-interno-rm']=el=>{const d=S.docsinternos.find(x=>x.id===el.dataset.id);if(!d)return;confirmar('Excluir documento',`Excluir "${esc(d.nome)}"?`,'Excluir',()=>mut('docsinternos',()=>{S.docsinternos=S.docsinternos.filter(x=>x.id!==d.id)},['Documentos','Excluiu '+d.nome,emp(d.empresaId)?.razao]))};
@@ -3875,7 +3876,7 @@ abaDocs=function(e){
   S.checklist.filter(x=>x.empresaId===e.id&&x.arquivo).forEach(x=>{const it=(e.checklist||[]).find(i=>i.id===x.itemId);R.push({c:'checklist',id:x.id,tipo:'Envio mensal',nome:it?.nome||x.itemId,comp:x.comp,arq:x.arquivo,data:x.enviadoEm})});
   S.documentos.filter(d=>d.empresaId===e.id).forEach(d=>R.push({c:'documentos',id:d.id,tipo:d.categoria||'Documento',nome:d.nome,comp:'',arq:d.arquivo,data:d.enviadoEm}));
   R.sort((a,b)=>String(b.data||'').localeCompare(String(a.data||'')));
-  const painel=`<div class="panel"><h2>Arquivos da empresa</h2>${R.length?`<div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Documento</th><th>Competência</th><th>Recebido</th><th></th></tr></thead><tbody>${R.slice(0,300).map(r=>`<tr><td class="small">${esc(r.tipo)}</td><td>${esc(r.nome)}<div class="sub">${esc(r.arq?.nome||'')}</div></td><td class="small">${r.comp?fmtComp(r.comp):'—'}</td><td class="small">${r.data?fmtDH(r.data):'—'}</td><td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${linkArq(r.arq)}${exc?`<button class="btn sm danger" data-act="excluir-com-senha" data-c="${r.c}" data-id="${r.id}" data-nome="${esc(r.nome)}">Excluir</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:'<p class="small muted">Nenhum arquivo recebido ainda.</p>'}</div>`;
+  const painel=`<div class="panel"><h2>Arquivos da empresa</h2>${R.length?`<div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Documento</th><th>Competência</th><th>Recebido</th><th></th></tr></thead><tbody>${R.slice(0,300).map(r=>`<tr><td class="small">${r.c==='documentos'&&podeMod('docs','editar')?`<select data-doc-cat="${r.id}" aria-label="Categoria no portal" style="width:auto;max-width:200px;font-size:12px">${CATEGORIAS_DOC.map(c=>`<option ${c===r.tipo?'selected':''}>${esc(c)}</option>`).join('')}</select>`:esc(r.tipo)}</td><td>${esc(r.nome)}<div class="sub">${esc(r.arq?.nome||'')}</div></td><td class="small">${r.comp?fmtComp(r.comp):'—'}</td><td class="small">${r.data?fmtDH(r.data):'—'}</td><td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${linkArq(r.arq)}${exc?`<button class="btn sm danger" data-act="excluir-com-senha" data-c="${r.c}" data-id="${r.id}" data-nome="${esc(r.nome)}">Excluir</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:'<p class="small muted">Nenhum arquivo recebido ainda.</p>'}</div>`;
   return h.slice(0,i)+painel;
 };
 
@@ -5818,6 +5819,8 @@ FORM['atend-regras']=fd=>{const atendimento={...atendCfg(),triagemTheo:!!fd.get(
   mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});S.config[0].atendimento=atendimento},['Atendimento','Alterou as regras do atendimento',`triagem pelo Théo ${atendimento.triagemTheo?'ligada':'desligada'}; por setor ${atendimento.porSetor?'sim':'não'}; inatividade ${atendimento.inatividadeMin} min; Théo envia documentos ${atendimento.theoDocs?'sim ('+atendimento.theoDocsCats.length+' categorias)':'não'}`]);
   closeModal();toast('Regras salvas. A equipe passa a ver a nova divisão ao recarregar o painel.')};
 
+document.addEventListener('change',ev=>{const el=ev.target;if(!el.dataset||!el.dataset.docCat)return;const d=S.documentos.find(x=>x.id===el.dataset.docCat);if(!d||!CATEGORIAS_DOC.includes(el.value))return;
+  mut('documentos',()=>{d.categoria=el.value},['Documentos','Mudou a categoria de '+d.nome+' para '+el.value,emp(d.empresaId)?.razao||'']);toast('Categoria alterada para '+el.value+(catsDocTheo().includes(el.value)?'. O Théo já pode enviar este documento.':'.'))});
 /* ==== v22: o Théo entrega documentos da empresa quando o cliente pede (portal) ==== */
 const contextoIAV22=contextoIA;
 contextoIA=function(e){const d=contextoIAV22(e);const cats=catsDocTheo();
