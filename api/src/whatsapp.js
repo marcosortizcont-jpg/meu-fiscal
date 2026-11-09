@@ -430,7 +430,7 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
           await enviarTexto(c.waJid, aviso).catch(nada); c.mensagens.push({ de: 'ia', texto: aviso, em: new Date().toISOString(), canal: 'whatsapp' }); confFinal = 'baixa';
         }
       }
-      if (confFinal === 'baixa') { c.status = 'aguardando_humano'; await deptoDaFila(esc, c, cfg); c.mensagens.push({ de: 'sistema', texto: 'A IA chamou a equipe (' + c.depto + ') para continuar este atendimento.', em: new Date().toISOString() }); }
+      if (confFinal === 'baixa') { c.status = 'aguardando_humano'; await deptoDaFila(esc, c, cfg); c.mensagens.push({ de: 'sistema', texto: 'O Théo chamou a equipe' + (c.depto ? ' (' + c.depto + ')' : '') + ' para continuar este atendimento.', em: new Date().toISOString() }); }
       await salvarConversa(esc, c);
     } catch (e) {
       console.error('[whatsapp] IA', e.message);
