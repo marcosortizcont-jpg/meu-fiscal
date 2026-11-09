@@ -263,6 +263,7 @@ Quando o cliente pede um documento ("me manda o contrato social"), pelo WhatsApp
 o arquivo guardado em **Documentos da empresa**, sem passar pelo atendente. Também envia o PDF das guias em aberto.
 - Só para contatos identificados da própria empresa (telefone cadastrado em Atendimento › Contatos ou no cadastro).
 - Mais de um da mesma categoria: vai o mais recente. Documento que não está no sistema: o Théo chama a equipe.
+- Também envia as certidões registradas no **Monitor fiscal** (Federal, Estadual, Municipal, FGTS/CRF e Trabalhista/CNDT): a mais recente de cada esfera, só negativa ou positiva com efeito de negativa, com PDF e dentro da validade.
 - Nunca envia guia vencida nem documento fora da validade (certidão, alvará…): avisa que está vencido e chama a equipe para emitir um atualizado.
 - Liga/desliga e categorias permitidas em **Atendimento › Regras do atendimento** (padrão: todas menos "Outros").
 - Cada envio fica no histórico da conversa com uma nota interna ("O Théo enviou ao cliente: Contrato Social").

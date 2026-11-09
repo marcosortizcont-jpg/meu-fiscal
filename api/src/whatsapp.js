@@ -330,9 +330,24 @@ export function registrarWhatsApp(r, { db, exigir, log, pode }) {
       const ref = 'D' + (++n); const ext = (String(x.arquivo.nome || '').match(/\.[a-z0-9]{2,4}$/i) || ['.pdf'])[0];
       const nome = String(x.nome || x.categoria); refs[ref] = { arquivo: x.arquivo, nome: /\.[a-z0-9]{2,4}$/i.test(nome) ? nome : nome + ext, rotulo: x.categoria };
       return { ref, categoria: x.categoria, nome: x.nome, enviado_em: String(x.enviadoEm || '').slice(0, 10), validade: x.validade || null }; });
+    // certidões do Monitor fiscal: a mais recente de cada esfera; só negativa (ou positiva com efeito de negativa), na validade e com PDF
+    const NOME_ESF = { Trabalhista: 'Trabalhista (CNDT)', FGTS: 'FGTS (CRF)' };
+    let certCtx = [];
+    if (cats.has('Certidões')) {
+      const ult = {};
+      for (const { dados: x } of await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'cnds' AND empresa_id = $2`, [esc, empresaId]))
+        if (x && !x.exemplo && x.esfera && (!ult[x.esfera] || String(x.emitidaEm || '') > String(ult[x.esfera].emitidaEm || ''))) ult[x.esfera] = x;
+      let k = 0;
+      certCtx = Object.values(ult).map(x => { const it = { esfera: NOME_ESF[x.esfera] || x.esfera, situacao: x.situacao, emitida_em: x.emitidaEm, validade: x.validade };
+        if (x.validade && String(x.validade).slice(0, 10) < hoje) return { ...it, vencido: true };
+        if (x.situacao === 'positiva') return { ...it, positiva: true };
+        if (!x.arquivo || !x.arquivo.id) return { ...it, sem_pdf: true };
+        const ref = 'C' + (++k); refs[ref] = { arquivo: x.arquivo, nome: `CND ${NOME_ESF[x.esfera] || x.esfera}.pdf`, rotulo: 'Certidão ' + (NOME_ESF[x.esfera] || x.esfera) };
+        return { ref, ...it }; });
+    }
     return { refs, dados: { contato_identificado: true, hoje,
       empresa: { nome: d.fantasia || d.razao, regime: d.regimeNome || ({ MEI: 'MEI', SN: 'Simples Nacional', LP: 'Lucro Presumido', LR: 'Lucro Real' }[d.regime] || d.regime || ''), municipio: d.municipio },
-      guias_em_aberto: guiasCtx, documentos_disponiveis: docsCtx } };
+      guias_em_aberto: guiasCtx, documentos_disponiveis: docsCtx, certidoes_disponiveis: certCtx } };
   }
   // envia ao cliente os arquivos que o Théo escolheu (linha ENVIAR); devolve o que foi enviado e o que falhou
   async function enviarRefs(esc, empresaId, c, refs, escolhidos) {
@@ -404,6 +419,7 @@ Regras:
 - Com contato identificado: use só os DADOS. Informe valor e vencimento das guias se estiverem nos DADOS; elas também ficam no Portal do Cliente (menu Guias e impostos).
 - Envio de documentos: se a pessoa pedir um documento da empresa (contrato social, alteração contratual, cartão CNPJ, certificado MEI ou CCMEI, inscrição, alvará, certidão, contrato de prestação de serviços, recibo de obrigação) ou uma guia, e ele estiver em "documentos_disponiveis" ou em "guias_em_aberto" com "ref", diga em uma frase que está enviando e acrescente uma linha "ENVIAR: D1" (ou "ENVIAR: D1, G2"), no máximo 3 refs, só refs que existem nos DADOS. Se houver mais de um da mesma categoria, envie o mais recente (enviado_em), salvo se a pessoa pedir outro. Isso pode ser CONFIANCA: alta.
 - Itens com "vencida": true ou "vencido": true (guia com vencimento passado, certidão, alvará ou outro documento fora da validade) NUNCA são enviados e não têm ref: explique que está vencido e que a equipe vai emitir ou providenciar um atualizado, e use CONFIANCA: baixa.
+- Certidões (CND federal, estadual, municipal, FGTS/CRF, trabalhista/CNDT): se a pessoa pedir e a certidão estiver em "certidoes_disponiveis" com "ref", envie com a linha ENVIAR (se pedir "as certidões", envie todas as que têm ref, até 5). Certidão positiva, vencida ou sem PDF não é enviada: diga que a equipe vai emitir uma atualizada (CONFIANCA: baixa).
 - Nunca ofereça nem cite documentos ou guias por conta própria (nem no cumprimento): a lista "documentos_disponiveis" serve só para atender quando a pessoa PEDIR. Num "oi", apenas cumprimente e pergunte como pode ajudar.
 - Se o documento pedido não estiver nos DADOS, não invente: diga que vai pedir para a equipe providenciar e use CONFIANCA: baixa. Nunca diga que enviou algo sem a linha ENVIAR.
 - Valores calculados são estimativas. Nunca invente informação.
@@ -418,7 +434,7 @@ DADOS (JSON): ${JSON.stringify(dados)}`;
       const resp = await perguntarIA({ mensagens: [{ role: 'user', content: regras }, ...hist], imagens: imagemIA ? [imagemIA] : [] });
       const conf = ((resp.match(/CONFIAN[CÇ]A:\s*(alta|m[eé]dia|baixa)/i) || [])[1] || 'media').toLowerCase().replace('é', 'e');
       // o modelo às vezes escreve "ENVIAR: D1" no meio do texto, não numa linha própria: aceita em qualquer posição
-      const escolhidos = [...new Set([...resp.matchAll(/\bENVIAR:\s*([A-Z]{1,2}\d+(?:\s*(?:,|e|;)\s*[A-Z]{1,2}\d+)*)/gi)].flatMap(x => x[1].toUpperCase().split(/[^A-Z0-9]+/)).filter(x => refs[x]))].slice(0, 3);
+      const escolhidos = [...new Set([...resp.matchAll(/\bENVIAR:\s*([A-Z]{1,2}\d+(?:\s*(?:,|e|;)\s*[A-Z]{1,2}\d+)*)/gi)].flatMap(x => x[1].toUpperCase().split(/[^A-Z0-9]+/)).filter(x => refs[x]))].slice(0, 5);
       const corpo = limpar(resp) || (escolhidos.length ? 'Segue o documento solicitado.' : 'Recebi sua mensagem. A equipe do escritório vai responder em breve.');
       const rt = await enviarTexto(c.waJid, corpo);
       const m = { de: 'ia', texto: corpo, em: new Date().toISOString(), confianca: conf, canal: 'whatsapp', waIds: rt?.key?.id ? [rt.key.id] : [] };
