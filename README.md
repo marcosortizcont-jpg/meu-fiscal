@@ -268,6 +268,20 @@ o arquivo guardado em **Documentos da empresa**, sem passar pelo atendente. Tamb
 - Liga/desliga e categorias permitidas em **Atendimento › Regras do atendimento** (padrão: todas menos "Outros").
 - Cada envio fica no histórico da conversa com uma nota interna ("O Théo enviou ao cliente: Contrato Social").
 
+## Notas de entrada (NF-e dos fornecedores, direto da SEFAZ)
+
+Menu **Notas de entrada** no painel. Para cada empresa com **certificado A1** cadastrado, o sistema consulta de hora em hora o
+serviço oficial e gratuito **NFeDistribuicaoDFe** do Ambiente Nacional e grava as NF-e emitidas contra o CNPJ do cliente
+(coleção `nfentrada`, id = chave de acesso; XML em `arquivos`).
+- Primeiro chega o **resumo**; o sistema registra a **ciência da operação** (evento 210210, assinado com o A1) e o **XML completo**
+  chega na consulta seguinte. Ciência e busca automáticas podem ser desligadas na própria tela.
+- Respeita as regras da SEFAZ: 1 hora de espera ao chegar ao fim da fila (cStat 137/maxNSU) e no bloqueio por consumo indevido (656).
+  O controle de NSU fica na tabela `nfe_entrada_estado`.
+- A SEFAZ só entrega notas dos últimos ~90 dias, e só com o certificado da própria empresa (mesma raiz de CNPJ).
+- Cancelamentos feitos pelo emissor marcam a nota como cancelada. Exportação em planilha (CSV) pela tela.
+- Variáveis: `NFE_ENTRADA_AMBIENTE=homologacao` (opcional, padrão produção); `NFE_CA_ARQUIVO` (opcional, .pem com a cadeia ICP-Brasil,
+  se a SEFAZ recusar a conexão por certificado desconhecido); `NFE_ENTRADA_FALSO=1` só para teste local.
+
 ## Página comercial (o que fica em `/` no site do cliente)
 
 - **Preços, planos, números e depoimentos**: edite `app/landing.config.json` no GitHub (lápis ✏️ → *Commit changes*). A Vercel publica sozinha em ~1 minuto.

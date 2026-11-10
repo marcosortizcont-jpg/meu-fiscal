@@ -6,7 +6,7 @@
 
 export const COLECOES = ['config', 'operadores', 'empresas', 'faturamento', 'despesas', 'guias', 'documentos', 'checklist', 'obrigacoes',
   'fechamentos', 'funcionarios', 'folhas', 'admissoes', 'notas', 'tomadores', 'servicos', 'certificados', 'tickets', 'conversas', 'cnds',
-  'ecac', 'faturas', 'consentimentos', 'auditoria', 'catalogo', 'regimes', 'leads', 'lancamentos', 'docsinternos', 'contatos', 'parceiros'];
+  'ecac', 'faturas', 'consentimentos', 'auditoria', 'catalogo', 'regimes', 'leads', 'lancamentos', 'docsinternos', 'contatos', 'parceiros', 'nfentrada'];
 import { MODULO_DA_COLECAO, SEMPRE_LEGIVEIS, pode } from './permissoes.js';
 
 // Coleções que existem para o escritório inteiro (sem empresa)

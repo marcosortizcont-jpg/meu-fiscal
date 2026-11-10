@@ -317,3 +317,17 @@ CREATE TABLE IF NOT EXISTS comissoes (
   UNIQUE (escritorio_id, empresa_id, referencia)
 );
 CREATE INDEX IF NOT EXISTS comissoes_usuario ON comissoes (escritorio_id, usuario_id);
+
+-- Notas de entrada (NF-e contra o CNPJ do cliente) pela Distribuição DF-e da SEFAZ: controle de NSU e da espera de 1 hora
+CREATE TABLE IF NOT EXISTS nfe_entrada_estado (
+  escritorio_id  UUID NOT NULL REFERENCES escritorios(id) ON DELETE CASCADE,
+  empresa_id     TEXT NOT NULL,
+  ult_nsu        TEXT NOT NULL DEFAULT '0',
+  max_nsu        TEXT NOT NULL DEFAULT '0',
+  proxima_em     TIMESTAMPTZ,
+  ultima_em      TIMESTAMPTZ,
+  c_stat         TEXT,
+  mensagem       TEXT,
+  notas_novas    INT NOT NULL DEFAULT 0,
+  PRIMARY KEY (escritorio_id, empresa_id)
+);

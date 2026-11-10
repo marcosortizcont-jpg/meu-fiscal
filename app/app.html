@@ -491,7 +491,7 @@ function obrigacoesDevidasFixas(e,comp,funcs){
 }
 
 /* ===================== Estado e persistência ===================== */
-const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos','docsinternos','contatos','parceiros'];
+const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos','docsinternos','contatos','parceiros','nfentrada'];
 const S={}; COLS.forEach(c=>S[c]=[]);
 const CAP={db:null,user:null,sample:null,assets:null,downloads:null};
 const ME={id:null,nome:'',canEdit:true};
@@ -5828,6 +5828,65 @@ document.addEventListener('change',ev=>{const el=ev.target;if(!el.dataset||!el.d
 const VALIDADE_CND={Federal:180,Trabalhista:180,FGTS:30};
 document.addEventListener('change',ev=>{const el=ev.target;if(!(el.hasAttribute&&(el.hasAttribute('data-cnd-esfera')||(el.name==='emitidaEm'&&el.closest('form[data-form=cnd]')))))return;const f=el.closest('form');const d=VALIDADE_CND[f.esfera.value];
   if(d&&f.emitidaEm.value)f.validade.value=addDias(f.emitidaEm.value,d)});
+/* ==== v24: notas fiscais de entrada (NF-e contra o CNPJ do cliente, pela Distribuição DF-e da SEFAZ) ==== */
+if(!S.nfentrada)S.nfentrada=[];
+if(!NAV_A.some(n=>n[0]==='a-nfe')){const i=NAV_A.findIndex(n=>n[0]==='a-guias');NAV_A.splice(i>=0?i+1:NAV_A.length-1,0,['a-nfe','Notas de entrada'])}
+MOD_DA_VIEW['a-nfe']='guias';NAV_ICON['a-nfe']='filetext';
+const nfeCfg=()=>({ativo:cfg().nfeEntrada?.ativo!==false,cienciaAuto:cfg().nfeEntrada?.cienciaAuto!==false});
+const mesDe=d=>String(d||'').slice(0,7);
+function nfeFiltradas(){const f=UI.fnfe||(UI.fnfe={emp:'',mes:'',q:'',st:''});const q=normP(f.q||'');
+  return S.nfentrada.filter(n=>(!f.emp||n.empresaId===f.emp)&&(!f.mes||mesDe(n.emissao)===f.mes)&&(!f.st||(f.st==='resumo'?!n.completa&&n.situacao!=='cancelada':f.st==='cancelada'?n.situacao==='cancelada':n.completa&&n.situacao!=='cancelada'))
+    &&(!q||normP([n.emitente?.nome,n.emitente?.fantasia,n.emitente?.cnpj,n.chave,n.numero,emp(n.empresaId)?.razao,emp(n.empresaId)?.fantasia].join(' ')).includes(q)))
+    .sort((a,b)=>String(b.emissao||'').localeCompare(String(a.emissao||'')))}
+function aNfeEntrada(){
+  if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui Apuração, guias e notas.');
+  const ed=podeMod('guias','editar');const d=MODO==='api'?apiDado('nfentrada','/api/nfentrada/status'):{indisponivel:true};const x=d.dados||{};const c=nfeCfg();
+  const f=UI.fnfe||(UI.fnfe={emp:'',mes:'',q:'',st:''});const L=nfeFiltradas();const vis=L.slice(0,300);
+  const meses=[...new Set(S.nfentrada.map(n=>mesDe(n.emissao)).filter(Boolean))].sort().reverse();
+  const tot=L.filter(n=>n.situacao!=='cancelada').reduce((a,n)=>a+(+n.valor||0),0);
+  const es=S.empresas.filter(e=>e.status!=='inativo'&&soDig(e.cnpj).length===14);
+  const sit=n=>n.situacao==='cancelada'?pill('Cancelada','crit'):n.situacao==='denegada'?pill('Denegada','warn'):n.completa?pill('XML completo','ok'):n.manifestacao?.em?pill('Ciência dada','')+'<div class="small muted">XML chega em até 1 h</div>':pill('Só resumo','warn');
+  const empRow=e=>{const ce=x.certificados?.[e.id];const st=x.estados?.[e.id];const vencido=ce?.validoAte&&String(ce.validoAte).slice(0,10)<hoje();const qtd=S.nfentrada.filter(n=>n.empresaId===e.id).length;
+    return `<tr><td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted mono">${fmtCNPJ(e.cnpj||'')}</div></td>
+     <td>${!ce?pill('Sem certificado A1','warn'):vencido?pill('A1 vencido','crit'):pill('A1 até '+fmtData(String(ce.validoAte).slice(0,10)),'ok')}</td>
+     <td class="small">${st?.ultimaEm?fmtDH(st.ultimaEm)+`<div class="muted">${esc(st.cStat==='656'?'SEFAZ bloqueou por 1 h (consumo indevido)':st.cStat==='137'?'Nenhuma nota nova':st.cStat==='138'?(st.novas?st.novas+' nota(s) nova(s)':'Fila em dia'):String(st.mensagem||'').slice(0,90))}</div>`:'Ainda não buscou'}</td>
+     <td class="small">${st?.proximaEm?fmtDH(st.proximaEm):ce&&!vencido?'Na próxima rodada':'—'}</td><td class="num">${qtd}</td>
+     <td>${ed&&MODO==='api'&&ce&&!vencido?`<button class="btn sm" data-act="nfe-buscar" data-id="${e.id}">Buscar agora</button>`:''}</td></tr>`};
+  return `<div class="page-head"><div><span class="eyebrow">Operação contábil</span><h1>Notas de entrada</h1><p class="sub">NF-e que os fornecedores emitem contra o CNPJ dos clientes, buscadas direto na SEFAZ (Distribuição DF-e) com o certificado A1 de cada empresa, de hora em hora e sem custo.</p></div>
+   <div class="actions"><button class="btn" data-act="nfe-csv" ${L.length?'':'disabled'}>${svg('download')}Exportar planilha</button></div></div>
+   ${x.falso?'<div class="banner warn" style="display:block;margin-bottom:12px">Modo de teste local: as respostas da SEFAZ são simuladas.</div>':''}
+   <div class="crm-kpis">${[['','Notas no filtro',L.length],['','Valor (sem canceladas)',brl(tot)],['resumo','Só resumo (sem XML)',S.nfentrada.filter(n=>!n.completa&&n.situacao!=='cancelada').length],['cancelada','Canceladas pelo emissor',S.nfentrada.filter(n=>n.situacao==='cancelada').length]].map(([k,r,v],i)=>`<button class="kpi" style="text-align:left;cursor:${i>1?'pointer':'default'};${k&&f.st===k?'outline:2px solid var(--brand)':''}" ${i>1?`data-act="nfe-filtro" data-v="${f.st===k?'':k}"`:''}><span class="eyebrow">${r}</span><b>${v}</b></button>`).join('')}</div>
+   <div class="panel"><div class="panel-head" style="flex-wrap:wrap;gap:8px"><h2>Notas recebidas</h2>
+     <div class="actions" style="flex-wrap:wrap"><select data-nfe-f="emp" style="width:auto"><option value="">Todas as empresas</option>${S.empresas.map(e=>`<option value="${e.id}" ${f.emp===e.id?'selected':''}>${esc(e.fantasia||e.razao)}</option>`).join('')}</select>
+     <select data-nfe-f="mes" style="width:auto"><option value="">Todos os meses</option>${meses.map(m=>`<option value="${m}" ${f.mes===m?'selected':''}>${m.slice(5)}/${m.slice(0,4)}</option>`).join('')}</select>
+     <input type="search" data-nfe-busca placeholder="Fornecedor, CNPJ, número ou chave" value="${esc(f.q||'')}" style="max-width:260px"></div></div>
+   ${vis.length?`<div class="table-wrap"><table><thead><tr><th>Emissão</th><th>Cliente</th><th>Fornecedor</th><th>Nota</th><th class="num">Valor</th><th>Situação</th><th></th></tr></thead><tbody>${vis.map(n=>`<tr>
+     <td class="num">${n.emissao?fmtData(String(n.emissao).slice(0,10)):'—'}</td><td class="small">${esc(emp(n.empresaId)?.fantasia||emp(n.empresaId)?.razao||'')}</td>
+     <td><b>${esc(n.emitente?.nome||'')}</b><div class="small muted mono">${fmtCNPJ(n.emitente?.cnpj||'')}</div></td>
+     <td class="small">Nº ${esc(n.numero||'—')} · série ${esc(n.serie||'—')}${n.natOp?`<div class="muted">${esc(n.natOp)}</div>`:''}</td>
+     <td class="num">${brl(n.valor||0)}</td><td>${sit(n)}</td>
+     <td><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap">${n.xml?.url?`<a class="btn sm" href="${esc(n.xml.url)}" target="_blank" rel="noopener">${svg('download')}XML</a>`:''}
+      ${ed&&MODO==='api'&&!n.completa&&n.situacao==='autorizada'&&!n.manifestacao?.em?`<button class="btn sm" data-act="nfe-ciencia" data-id="${n.id}" data-e="${n.empresaId}">Dar ciência</button>`:''}
+      <button class="btn sm ghost" data-act="copiar" data-t="${n.chave}" title="Copiar a chave de acesso">Chave</button></div></td></tr>`).join('')}</tbody></table></div>${L.length>vis.length?`<p class="small muted">Mostrando as 300 mais recentes de ${L.length}. Use os filtros ou exporte a planilha.</p>`:''}`
+     :vazio(S.nfentrada.length?'Nenhuma nota neste filtro.':'Nenhuma nota de entrada ainda. Elas aparecem aqui sozinhas assim que a busca rodar para as empresas com certificado A1.')}</div>
+   <div class="panel"><div class="panel-head"><h2>Empresas e busca na SEFAZ</h2>${ed?`<div class="actions"><label class="chk"><input type="checkbox" data-nfe-cfg="ativo" ${c.ativo?'checked':''}> Busca automática</label><label class="chk"><input type="checkbox" data-nfe-cfg="cienciaAuto" ${c.cienciaAuto?'checked':''}> Ciência automática</label></div>`:''}</div>
+    <p class="small muted" style="margin-top:0">A SEFAZ entrega as notas dos últimos 90 dias. Primeiro chega o resumo; com a <b>ciência da operação</b> (evento que só informa que a empresa sabe da nota, sem confirmar nem recusar) ela libera o XML completo na consulta seguinte. Entre buscas sem notas novas a SEFAZ exige 1 hora de intervalo.</p>
+    ${MODO!=='api'?vazio('Disponível com o sistema conectado ao servidor.'):d.carregando?'<p class="small muted">Carregando…</p>':`<div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Certificado</th><th>Última busca</th><th>Próxima</th><th class="num">Notas</th><th></th></tr></thead><tbody>${es.map(empRow).join('')}</tbody></table></div>`}</div>`}
+const conteudoV24=conteudo;conteudo=function(){if(UI.modo==='painel'&&UI.view==='a-nfe')return aNfeEntrada();return conteudoV24()};
+ACT['nfe-filtro']=el=>{(UI.fnfe||(UI.fnfe={})).st=el.dataset.v;render()};
+document.addEventListener('change',ev=>{const el=ev.target;if(!el.dataset)return;
+  if(el.dataset.nfeF){(UI.fnfe||(UI.fnfe={}))[el.dataset.nfeF]=el.value;render()}
+  if(el.dataset.nfeCfg){const k=el.dataset.nfeCfg,v=el.checked;mut('config',()=>{const c=S.config[0];c.nfeEntrada={...(c.nfeEntrada||{}),[k]:v}},['Notas de entrada',(k==='ativo'?'Busca automática ':'Ciência automática ')+(v?'ligada':'desligada'),'']);toast((k==='ativo'?'Busca automática ':'Ciência automática ')+(v?'ligada.':'desligada.'))}});
+document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-nfe-busca]')){(UI.fnfe||(UI.fnfe={})).q=s.value;clearTimeout(UI._nfeT);UI._nfeT=setTimeout(()=>{render();const i=document.querySelector('[data-nfe-busca]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)}});
+ACT['nfe-buscar']=async el=>{el.disabled=true;el.textContent='Buscando…';
+  try{const r=await MF.api('POST',`/api/nfentrada/${encodeURIComponent(el.dataset.id)}/buscar`,{});toast(r.pulou?'Busca já feita há pouco.':r.cStat==='656'?'A SEFAZ bloqueou novas consultas desta empresa por 1 hora.':`${r.novas} nota(s) nova(s)${r.ciencias?' · ciência dada em '+r.ciencias:''}.`,r.cStat==='656')}
+  catch(er){toast(er.message,true)}invalidar('nfentrada')};
+ACT['nfe-ciencia']=async el=>{el.disabled=true;try{const r=await MF.api('POST',`/api/nfentrada/${encodeURIComponent(el.dataset.e)}/${encodeURIComponent(el.dataset.id)}/ciencia`,{});toast(r.mensagem)}catch(er){toast(er.message,true);el.disabled=false}};
+ACT['nfe-csv']=()=>{const L=nfeFiltradas();const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
+  const linhas=[['Emissão','Cliente','CNPJ cliente','Fornecedor','CNPJ fornecedor','Número','Série','Natureza','Valor','Situação','XML completo','Chave de acesso'].map(q).join(';'),
+    ...L.map(n=>{const e=emp(n.empresaId)||{};return [String(n.emissao||'').slice(0,10),e.razao,fmtCNPJ(e.cnpj||''),n.emitente?.nome,fmtCNPJ(n.emitente?.cnpj||''),n.numero,n.serie,n.natOp,String((+n.valor||0).toFixed(2)).replace('.',','),n.situacao,n.completa?'sim':'não',"'"+n.chave].map(q).join(';')})];
+  baixar('notas-de-entrada.csv','﻿'+linhas.join('\r\n'),'text/csv;charset=utf-8')};
+
 /* ==== v22: o Théo entrega documentos da empresa quando o cliente pede (portal) ==== */
 const contextoIAV22=contextoIA;
 contextoIA=function(e){const d=contextoIAV22(e);const cats=catsDocTheo();
