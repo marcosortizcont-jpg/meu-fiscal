@@ -7436,7 +7436,7 @@ const PLANO_PADRAO=[
  ['3.2','DEDUÇÕES DA RECEITA'],['3.2.1','Deduções'],['3.2.1.01','Devoluções de vendas'],['3.2.1.02','Simples Nacional (DAS)'],['3.2.1.03','Outros impostos sobre vendas'],
  ['3.3','OUTRAS RECEITAS'],['3.3.1','Receitas financeiras e outras'],['3.3.1.01','Receitas financeiras'],['3.3.1.02','Outras receitas'],
  ['4','CUSTOS E DESPESAS'],['4.1','CUSTOS'],['4.1.1','Custos'],['4.1.1.01','Custo das mercadorias vendidas'],['4.1.1.02','Custo dos serviços prestados'],
- ['4.2','DESPESAS COM PESSOAL'],['4.2.1','Pessoal'],['4.2.1.01','Salários e ordenados'],['4.2.1.02','Pró-labore'],['4.2.1.03','FGTS'],['4.2.1.04','INSS patronal'],['4.2.1.05','Vale-transporte'],['4.2.1.06','Férias e 13º salário'],
+ ['4.2','DESPESAS COM PESSOAL'],['4.2.1','Pessoal'],['4.2.1.01','Salários e ordenados'],['4.2.1.02','Pró-labore'],['4.2.1.03','FGTS'],['4.2.1.04','INSS patronal'],['4.2.1.05','Vale-transporte'],['4.2.1.06','Férias e 13º salário'],['4.2.1.07','Vale-alimentação / refeição'],
  ['4.3','DESPESAS ADMINISTRATIVAS'],['4.3.1','Administrativas'],['4.3.1.01','Aluguel'],['4.3.1.02','Energia elétrica'],['4.3.1.03','Água e esgoto'],['4.3.1.04','Telefone e internet'],['4.3.1.05','Honorários contábeis'],['4.3.1.06','Material de uso e consumo'],['4.3.1.07','Serviços de terceiros'],['4.3.1.08','Fretes e carretos'],['4.3.1.09','Depreciação'],['4.3.1.99','Outras despesas administrativas'],
  ['4.4','DESPESAS FINANCEIRAS'],['4.4.1','Financeiras'],['4.4.1.01','Tarifas bancárias'],['4.4.1.02','Juros e multas pagos'],
  ['4.5','DESPESAS TRIBUTÁRIAS'],['4.5.1','Tributárias'],['4.5.1.01','Impostos e taxas diversas'],
@@ -7481,13 +7481,17 @@ function cbIntegracao(e,comp){const P=[];const data=dpFimMes(comp);const add=(de
   // folha fechada
   const fr=dpFolhaRec(e.id,comp);if(fr?.status==='fechada'&&fr.calc){const C=fr.calc;
     // por grupo (empregados e sócios): a despesa é debitada contra cada destino do bruto (líquido, INSS, IRRF, VT, adiantamento, outros)
+    const FALTA=['210','211','213'],FIXO=['201','202','203','220','230','248'];
     const grupo=(L,desp,liqConta,rot)=>{if(!L.length)return;const r=(x,k)=>x.rubricas.filter(y=>y.cod===k).reduce((a,y)=>a+y.valor,0);const s=f=>L.reduce((a,x)=>a+f(x),0);
+      const outros=x=>x.rubricas.filter(y=>y.tipo==='D'&&!FALTA.includes(y.cod)&&!FIXO.includes(y.cod)).reduce((a,y)=>a+y.valor,0);
       add(desp,liqConta,s(x=>x.liquido),rot+' líquido de '+fmtComp(comp),'folha');add(desp,'2.1.2.04',s(x=>x.inss),'INSS descontado ('+rot.toLowerCase()+') de '+fmtComp(comp),'folha');
       add(desp,'2.1.2.05',s(x=>x.irrf),'IRRF descontado ('+rot.toLowerCase()+') de '+fmtComp(comp),'folha');add(desp,'4.2.1.05',s(x=>r(x,'220')),'Desconto de vale-transporte de '+fmtComp(comp),'folha');
-      add(desp,'1.1.2.03',s(x=>r(x,'230')),'Desconto de adiantamentos de '+fmtComp(comp),'folha');add(desp,'2.1.5.01',s(x=>r(x,'250')),'Outros descontos em folha de '+fmtComp(comp),'folha');
+      add(desp,'4.2.1.07',s(x=>r(x,'248')),'Desconto de vale-alimentação de '+fmtComp(comp),'folha');
+      add(desp,'1.1.2.03',s(x=>r(x,'230')),'Desconto de adiantamentos de '+fmtComp(comp),'folha');add(desp,'2.1.5.01',s(outros),'Pensões, consignados e outros descontos em folha de '+fmtComp(comp),'folha');
       add('2.1.2.04',desp,s(x=>x.salFamilia),'Salário-família compensado no INSS de '+fmtComp(comp),'folha')};
     grupo(C.L.filter(x=>x.vinculo!=='socio'),'4.2.1.01','2.1.2.01','Salários');grupo(C.L.filter(x=>x.vinculo==='socio'),'4.2.1.02','2.1.2.02','Pró-labore');
-    add('4.2.1.03','2.1.2.03',C.fgts,'FGTS de '+fmtComp(comp),'folha');add('4.2.1.04','2.1.2.04',C.patronal?.total||0,'INSS patronal de '+fmtComp(comp),'folha')}
+    add('4.2.1.03','2.1.2.03',C.fgts,'FGTS de '+fmtComp(comp),'folha');add('4.2.1.04','2.1.2.04',C.patronal?.total||0,'INSS patronal de '+fmtComp(comp),'folha');
+    add('4.2.1.05','2.1.5.01',C.beneficios?.vtCusto||0,'Compra de vale-transporte de '+fmtComp(comp),'folha');add('4.2.1.07','2.1.5.01',C.beneficios?.vaCusto||0,'Compra de vale-alimentação de '+fmtComp(comp),'folha')}
   return P.map(p=>({...p,data}))}
 function cbStatus(e,comp){const lote='int:'+comp;const L=S.lanccontabeis.filter(l=>l.empresaId===e.id&&l.lote===lote);const prev=cbIntegracao(e,comp);
   const sig=x=>x.map(p=>p.deb+p.cred+r2(p.valor)).sort().join('|');const man=S.lanccontabeis.filter(l=>l.empresaId===e.id&&l.data.slice(0,7)===comp&&l.lote!==lote).length;
@@ -7642,6 +7646,101 @@ ACT['cb-rel-pdf']=el=>{const e=emp(UI.fsn.emp);const d=cbRelTabela(e,el.dataset.
    <table><thead><tr>${d.cab.map((c,i)=>`<th class="${i&&typeof d.l[0]?.[i]==='number'?'r':''}">${esc(c)}</th>`).join('')}</tr></thead><tbody>${d.l.map(r=>`<tr${/^[A-Z=]/.test(String(r[0]))&&!/^\d/.test(String(r[0]))&&d.cab.length===2?' class="tot"':''}>${r.map(v=>typeof v==='number'?`<td class="r">${brl(v)}</td>`:`<td>${esc(String(v)).replace(/^ +/,m=>'&nbsp;'.repeat(m.length*2))}</td>`).join('')}</tr>`).join('')}</tbody></table>
    ${['balanco','dre','balancete'].includes(el.dataset.k)?`<div class="ass"><div>${esc(e.razao)}<br>Representante legal</div><div>${esc(resp)}<br>Contador${cfg().crc?' · '+esc(cfg().crc):''}</div></div>`:''}`)};
 /* ==== v30 (fim) ==== */
+/* ==== v32a: motor da folha revisado — feriados, DSR perdido, atestado, eventos com incidências, adicional noturno, pensão no IRRF, VT/VA, outro vínculo, histórico salarial ==== */
+/* ---------- feriados ---------- */
+function pascoa(y){const a=y%19,b=Math.floor(y/100),c=y%100,d=Math.floor(b/4),e=b%4,f=Math.floor((b+8)/25),g=Math.floor((b-f+1)/3),h=(19*a+b-d-g+15)%30,i=Math.floor(c/4),k=c%4,l=(32+2*e+2*i-h-k)%7,m=Math.floor((a+11*h+22*l)/451),mes=Math.floor((h+l-7*m+114)/31),dia=(h+l-7*m+114)%31+1;return new Date(Date.UTC(y,mes-1,dia))}
+// feriados nacionais (Lei 662/1949, 6.802/1980, 14.759/2023) + Sexta-feira Santa
+function feriadosNacionais(y){const F={[y+'-01-01']:'Confraternização Universal',[y+'-04-21']:'Tiradentes',[y+'-05-01']:'Dia do Trabalho',[y+'-09-07']:'Independência',[y+'-10-12']:'Nossa Senhora Aparecida',[y+'-11-02']:'Finados',[y+'-11-15']:'Proclamação da República',[y+'-11-20']:'Dia Nacional de Zumbi e da Consciência Negra',[y+'-12-25']:'Natal'};
+  const p=pascoa(y);p.setUTCDate(p.getUTCDate()-2);F[p.toISOString().slice(0,10)]='Sexta-feira Santa';return F}
+// feriados locais da empresa (estaduais e municipais): "MM-DD" todo ano ou "AAAA-MM-DD"
+function feriadosDe(eid,comp){const y=+comp.slice(0,4);const F={...feriadosNacionais(y)};const e=emp(eid);(e?.dp?.feriados||[]).forEach(x=>{const k=x.data.length===5?y+'-'+x.data:x.data;F[k]=x.nome||'Feriado local'});
+  return Object.entries(F).filter(([d])=>d.slice(0,7)===comp).sort().map(([data,nome])=>({data,nome}))}
+dpCalDsr=function(comp,eid){const fer=new Set(feriadosDe(eid,comp).map(x=>x.data));let u=0,d=0;const n=new Date(+comp.slice(0,4),+comp.slice(5,7),0).getDate();
+  for(let i=1;i<=n;i++){const dd=comp+'-'+String(i).padStart(2,'0');const w=new Date(+comp.slice(0,4),+comp.slice(5,7)-1,i).getDay();if(w===0||fer.has(dd))d++;else u++}return {uteis:u,dsr:d}};
+dpParam=function(eid,comp){const p=dpMov(eid,comp,'_param')||{};const c=dpCalDsr(comp,eid);return {uteis:+p.diasUteis||c.uteis,dsr:+p.diasDsr||c.dsr,manual:!!(p.diasUteis||p.diasDsr),feriados:feriadosDe(eid,comp)}};
+/* ---------- cadastro de eventos (rubricas) com incidências ---------- */
+// modo: valor (R$), he (horas com adicional), noturno (horas relógio → hora reduzida 52'30"), sobreaviso (horas a 1/3), pctsal (% do salário), pensao (% de bruto − INSS ou valor)
+const EVT={
+ '060':{d:'Adicional noturno (20%)',t:'P',m:'noturno',i:'isfd'},'013':{d:'Horas extras 60%',t:'P',m:'he',p:.6,i:'isfd'},'014':{d:'Horas extras 70%',t:'P',m:'he',p:.7,i:'isfd'},'015':{d:'Horas extras 75%',t:'P',m:'he',p:.75,i:'isfd'},'016':{d:'Horas extras 80%',t:'P',m:'he',p:.8,i:'isfd'},
+ '061':{d:'Hora extra noturna 50%',t:'P',m:'henot',p:.5,i:'isfd'},'062':{d:'Sobreaviso (1/3 da hora)',t:'P',m:'sobreaviso',i:'isfd'},
+ '031':{d:'Gratificação',t:'P',m:'valor',i:'isf'},'032':{d:'Prêmio / bonificação',t:'P',m:'valor',i:'isf'},'033':{d:'Gratificação de função',t:'P',m:'valor',i:'isf'},'034':{d:'Quebra de caixa',t:'P',m:'valor',i:'isf'},
+ '035':{d:'Ajuda de custo',t:'P',m:'valor',i:''},'036':{d:'Reembolso de despesas / diárias',t:'P',m:'valor',i:''},'037':{d:'Salário-maternidade (reembolsável)',t:'P',m:'valor',i:'isf'},'038':{d:'Auxílio-creche / babá',t:'P',m:'valor',i:''},
+ '090':{d:'Diferenças salariais retroativas',t:'P',m:'valor',i:'isf'},'050':{d:'Outros proventos',t:'P',m:'valor',i:'isf'},
+ '240':{d:'Pensão alimentícia',t:'D',m:'pensao',i:''},'241':{d:'Plano de saúde',t:'D',m:'valor',i:''},'242':{d:'Plano odontológico',t:'D',m:'valor',i:''},'243':{d:'Empréstimo consignado',t:'D',m:'valor',i:''},
+ '244':{d:'Contribuição assistencial',t:'D',m:'valor',i:''},'245':{d:'Mensalidade sindical',t:'D',m:'valor',i:''},'246':{d:'Seguro de vida',t:'D',m:'valor',i:''},'247':{d:'Farmácia / convênio',t:'D',m:'valor',i:''},'249':{d:'Desconto por danos (art. 462)',t:'D',m:'valor',i:''},'250':{d:'Outros descontos',t:'D',m:'valor',i:''}};
+const evDef=ev=>EVT[ev.cod]||{d:ev.desc||'Evento',t:ev.tipo||'P',m:'valor',i:ev.inc??(ev.tipo==='D'?'':'isf')};
+const salarioEm=(f,comp)=>{const H=(f.salarios||[]).filter(h=>h.desde<=comp).sort((a,b)=>a.desde.localeCompare(b.desde));return H.length?+H[H.length-1].valor:+f.salario||0};
+const fixosDoMes=(f,comp)=>(f.fixos||[]).filter(x=>(!x.desde||x.desde<=comp)&&(!x.ate||x.ate>=comp));
+const semanaDe=d=>{const x=dt(d);x.setDate(x.getDate()-x.getDay());return iso(x)};
+dpIrrf=function(trib,inss,deps,pensao=0){
+  const legal=r2(trib-inss-deps*DP26.dep-pensao), simpl=r2(trib-DP26.simplificado);
+  const L=dpIrrfTabela(legal), Sm=dpIrrfTabela(simpl);const usaSimpl=Sm.imp<L.imp;const e_=usaSimpl?Sm:L;let imp=e_.imp;
+  let red=0;if(trib<=DP26.red.ate)red=Math.min(DP26.red.max,imp);else if(trib<=DP26.red.lim)red=Math.max(0,r2(DP26.red.a-DP26.red.b*trib));
+  red=Math.min(red,imp);imp=r2(imp-red);if(imp<DP26.irrfMin)imp=0;
+  return {valor:imp,base:usaSimpl?simpl:legal,simplificado:usaSimpl,aliq:e_.aliq,reducao:r2(red),deducaoDep:usaSimpl?0:r2(deps*DP26.dep),pensao:usaSimpl?0:r2(pensao)}};
+/* ---------- cálculo por empregado ---------- */
+dpCalcFunc=function(e,f0,comp){
+  const vin=f0.vinculo||'empregado';const sal=salarioEm(f0,comp);const f={...f0,salario:sal};const dias=dpDias(f0,comp);const prop=dias/30;const m=dpMov(e.id,comp,f0.id)||{};const P=dpParam(e.id,comp);
+  const R=[];const avisos=[];const add=(cod,desc,ref,valor,tipo,inc)=>{valor=r2(valor);if(!valor)return null;const x={cod,desc,ref,valor,tipo,inss:!!inc?.inss,irrf:!!inc?.irrf,fgts:!!inc?.fgts,dsr:!!inc?.dsr};R.push(x);return x};
+  const clt=vin==='empregado'||vin==='aprendiz';const I={inss:true,irrf:true,fgts:clt};const ID={...I,dsr:true};const inc=s=>({inss:s.includes('i'),irrf:s.includes('s'),fgts:clt&&s.includes('f'),dsr:s.includes('d')});
+  if(vin==='socio')add('100','Pró-labore',dias+' dias',sal*prop,'P',{inss:true,irrf:true});
+  else if(vin==='estagiario')add('110','Bolsa-auxílio',dias+' dias',sal*prop,'P',{irrf:true});
+  else add('001','Salário',dias+' dias',sal*prop,'P',I);
+  let adic=0;if(clt&&f.adicional){adic=dpAdic(f);add(f.adicional==='peric'?'021':'020',f.adicional==='peric'?'Adicional de periculosidade':'Adicional de insalubridade',f.adicional==='peric'?'30%':ADICIONAIS[f.adicional].match(/\d+%/)[0],adic*prop,'P',I)}
+  const divisor=(+f.jornada||44)*5;const vh=(sal+adic)/divisor;const op=vin!=='socio'&&vin!=='estagiario';
+  if(op){add('010','Horas extras 50%',(+m.he50||0)+' h',vh*1.5*(+m.he50||0),'P',ID);add('011','Horas extras 100%',(+m.he100||0)+' h',vh*2*(+m.he100||0),'P',ID)}
+  if(vin!=='socio')add('030','Comissões','',+m.comissoes||0,'P',ID);
+  // legados da grade antiga
+  add('031','Gratificação','',+m.gratif||0,'P',vin==='estagiario'?{irrf:true}:I);add('050',m.outrosProvDesc||'Outros proventos','',+m.outrosProv||0,'P',vin==='estagiario'?{irrf:true}:I);
+  // eventos do mês + fixos do cadastro
+  const evs=[...fixosDoMes(f0,comp).map(x=>({...x,fixo:true})),...(m.eventos||[])];const pens=[];
+  for(const ev of evs){const D=evDef(ev);const q=+ev.qtd||0,v=+ev.valor||0;const nome=ev.desc||D.d;const ic=inc(ev.inc??D.i);
+    if(D.m==='pensao'){pens.push({ev,nome});continue}
+    if(D.m==='he'&&op)add(ev.cod,nome,q+' h',vh*(1+D.p)*q,'P',ic);
+    else if(D.m==='noturno'&&op){const hr=q*60/52.5;add(ev.cod,nome,q+' h ('+r2(hr)+' red.)',vh*.2*hr,'P',ic)}
+    else if(D.m==='henot'&&op){const hr=q*60/52.5;add(ev.cod,nome,q+' h ('+r2(hr)+' red.)',vh*1.2*(1+D.p)*hr,'P',ic)}
+    else if(D.m==='sobreaviso'&&op)add(ev.cod,nome,q+' h',vh/3*q,'P',ic);
+    else if(D.m==='pctsal')add(ev.cod,nome,q+'%',sal*q/100,D.t,ic);
+    else if(D.m==='valor')add(ev.cod,nome,ev.parcela||'',v,D.t,ic)}
+  // DSR sobre variáveis habituais (HE, adicional noturno, comissões…) com os dias do calendário com feriados
+  const baseDsr=R.filter(x=>x.dsr).reduce((a,x)=>a+x.valor,0);if(baseDsr>0&&P.uteis)add('012','DSR sobre variáveis (HE, adic. noturno, comissões)',P.dsr+'/'+P.uteis,baseDsr/P.uteis*P.dsr,'P',I);
+  // faltas injustificadas, DSR perdido e atestados
+  const faltas=+m.faltas||0;const datas=String(m.faltasDatas||'').split(/[,; ]+/).map(x=>x.trim()).filter(Boolean).map(x=>/^\d{1,2}$/.test(x)?comp+'-'+x.padStart(2,'0'):x).filter(x=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&x.slice(0,7)===comp);
+  const nDsr=m.dsrPerdido!==undefined&&m.dsrPerdido!==''?+m.dsrPerdido:datas.length?new Set(datas.map(semanaDe)).size:Math.min(faltas,P.dsr);
+  if(faltas&&vin!=='socio'){add('210','Faltas injustificadas',faltas+' dias',(sal+adic)/30*faltas,'D',I);if(clt&&nDsr)add('213','DSR perdido (semana com falta)',nDsr+' dia(s)',(sal+adic)/30*nDsr,'D',I)}
+  const atr=+m.atrasos||0;if(atr&&op)add('211','Atrasos',atr+' h',vh*atr,'D',I);
+  const soma=(t,k)=>R.filter(x=>x.tipo===t&&(!k||x[k])).reduce((a,x)=>a+x.valor,0);
+  const baseInss=r2(soma('P','inss')-soma('D','inss')),trib=r2(soma('P','irrf')-soma('D','irrf')),baseFgts=r2(soma('P','fgts')-soma('D','fgts'));
+  if(clt&&(+f.depSF||0)>0){const rem=r2(soma('P')-soma('D'));if(rem<=DP26.sf.lim)add('040','Salário-família',(+f.depSF)+' cota(s)',DP26.sf.cota*(+f.depSF)*prop,'P',{})}
+  // INSS com outro vínculo (o empregado informa a base da outra empresa)
+  let inss=dpInss(baseInss,vin);const outra=+f.inssOutraBase||0;
+  if(outra>0&&vin!=='estagiario'){inss=outra>=DP26.teto?0:r2(Math.max(0,dpInss(baseInss+outra,vin)-dpInss(outra,vin)));avisos.push(['info',f.nome+': INSS considera R$ '+brl(outra).replace('R$','').trim()+' de base em outro vínculo.'])}
+  add('201',vin==='socio'?'INSS contribuinte individual (11%)':'INSS',vin==='socio'?'11%':baseInss?pct(inss/baseInss):'',inss,'D',{});
+  // pensão alimentícia: % de (bruto − INSS) ou valor fixo; deduz da base do IRRF
+  let pensao=0;for(const {ev,nome} of pens){const v=+ev.pct>0?r2((soma('P','inss')-soma('D','inss')-inss)*(+ev.pct)/100):+ev.valor||0;pensao+=v;add('240',nome+(ev.benef?' · '+ev.benef:''),+ev.pct>0?ev.pct+'%':'',v,'D',{})}
+  const ir=dpIrrf(trib,inss,+f.depIR||0,pensao);add('202','IRRF',ir.valor?pct(ir.aliq):'',ir.valor,'D',{});
+  // benefícios: VT (6% limitado ao custo) e vale-alimentação
+  const ferDias=typeof feriasNoMes==='function'?feriasNoMes(f0,comp).reduce((a,x)=>a+x.calc.porMes[comp],0):0;
+  const diasTrab=Math.max(0,Math.round(P.uteis*prop)-faltas-(+m.atestado||0)-Math.round(ferDias*P.uteis/30));
+  let vtCusto=0,vtDesc=0;if(f.vt&&clt){vtCusto=m.vt!=null&&m.vt!==''?+m.vt:+f.vtDiario>0?r2(+f.vtDiario*diasTrab):null;const lim=sal*prop*DP26.vt;vtDesc=r2(vtCusto==null?lim:Math.min(lim,vtCusto));if(vtCusto==null)vtCusto=0;add('220','Vale-transporte (6%)',vtCusto?diasTrab+' dias':'6%',vtDesc,'D',{})}
+  let vaCusto=0,vaDesc=0;if((+f.vaDia>0||+f.vaMensal>0)&&vin!=='socio'){vaCusto=r2(+f.vaMensal>0?+f.vaMensal*prop:+f.vaDia*diasTrab);vaDesc=r2(vaCusto*(+f.vaDescPct||0)/100);add('248','Vale-alimentação ('+(+f.vaDescPct||0)+'%)',+f.vaMensal>0?'':diasTrab+' dias',vaDesc,'D',{})}
+  add('230','Adiantamento salarial (vale)','',+m.adiant||0,'D',{});add('250',m.outrosDescDesc||'Outros descontos','',+m.outrosDesc||0,'D',{});
+  const prov=r2(soma('P')),desc=r2(soma('D'));const fgts=clt?r2(baseFgts*(vin==='aprendiz'?DP26.fgtsAprendiz:DP26.fgts)):0;const liquido=r2(prov-desc);
+  // conferências do analista
+  const minJ=r2(DP26.minimo*(+f.jornada||44)/44);if(clt&&sal<minJ-0.01)avisos.push(['crit',f.nome+': salário de '+brl(sal)+' abaixo do mínimo de '+brl(minJ)+' para '+(+f.jornada||44)+'h semanais.']);
+  if(liquido<0)avisos.push(['crit',f.nome+': líquido negativo ('+brl(liquido)+'). Reveja vale, faltas e descontos.']);
+  const vale=+m.adiant||0;if(vale>0&&vale>r2(liquido+vale)*.6)avisos.push(['warn',f.nome+': vale de '+brl(vale)+' acima de 60% do líquido do mês.']);
+  const cons=R.filter(x=>x.cod==='243').reduce((a,x)=>a+x.valor,0);const margem=r2((prov-inss-ir.valor)*.35);if(cons>margem)avisos.push(['warn',f.nome+': consignado de '+brl(cons)+' acima da margem de 35% ('+brl(margem)+').']);
+  if(clt&&!f.pis)avisos.push(['info',f.nome+': sem PIS/NIT no cadastro (necessário para o eSocial).']);
+  if(faltas&&!datas.length&&m.dsrPerdido===undefined&&nDsr)avisos.push(['info',f.nome+': DSR perdido estimado em '+nDsr+' dia(s); informe as datas das faltas para o cálculo exato por semana.']);
+  const sf=R.find(x=>x.cod==='040')?.valor||0;
+  return {funcId:f0.id,nome:f0.nome,cpf:f0.cpf,cargo:f0.cargo||'',cbo:f0.cbo||'',matricula:f0.matricula||'',admissao:f0.admissao,vinculo:vin,dias,salario:sal,rubricas:R.sort((a,b)=>a.cod.localeCompare(b.cod)),
+    proventos:prov,descontos:desc,liquido,baseInss,inss,baseIrrf:ir.base,irrf:ir.valor,irrfInfo:ir,trib,baseFgts,fgts,salFamilia:sf,pensao,banco:[f0.banco,f0.agencia,f0.conta].filter(Boolean).join(' · '),pix:f0.pix||'',
+    beneficios:{vtCusto:r2(vtCusto||0),vtDesc,vaCusto,vaDesc,diasTrab},avisosF:avisos}};
+const calcFolhaV32=calcFolha;calcFolha=function(e,comp){const c=calcFolhaV32(e,comp);const av=c.L.flatMap(x=>x.avisosF||[]);
+  const B=k=>r2(c.L.reduce((a,x)=>a+(x.beneficios?.[k]||0),0));
+  return {...c,avisos:c.avisos.filter(t=>!/sem salário|CPF inválido/.test(t)||true),conferencia:[...c.avisos.map(t=>['crit',t]),...av],beneficios:{vtCusto:B('vtCusto'),vtDesc:B('vtDesc'),vaCusto:B('vaCusto'),vaDesc:B('vaDesc')},pensao:r2(c.L.reduce((a,x)=>a+(x.pensao||0),0))}};
+/* ==== v32a (fim) ==== */
 /* ==== v31: DP — Férias, 13º salário e Rescisões ==== */
 if(!COLS.includes('dpeventos'))COLS.push('dpeventos');if(!Array.isArray(S.dpeventos))S.dpeventos=[];
 NAV_DP.splice(3,0,['Eventos',[['d-ferias','Férias','calc','Períodos aquisitivos, programação, abono e recibo'],['d-13','13º salário','receipt','1ª e 2ª parcelas com avos e médias'],['d-resc','Rescisões','userplus','Cálculo das verbas rescisórias por motivo e termo de rescisão']]]);
@@ -7833,10 +7932,157 @@ const calcFolhaV31=calcFolha;calcFolha=function(e,comp){const c=calcFolhaV31(e,c
 const dpFolhaPgV31=dpFolhaPg;dpFolhaPg=function(e,comp){let h=dpFolhaPgV31(e,comp);const F=calcFolha(e,comp);if(!F.eventos.length)return h;
   const nome={ferias:'Férias','13-1':'13º 1ª parcela','13-2':'13º 2ª parcela',rescisao:'Rescisão'};
   return h+`<div class="panel"><div class="panel-head"><h2>Férias, 13º e rescisões pagos em ${fmtComp(comp)}</h2></div><div class="table-wrap"><table><thead><tr><th>Evento</th><th>Empregado</th><th class="r">Líquido</th></tr></thead><tbody>${F.eventos.map(x=>`<tr><td>${nome[x.tipo]}</td><td>${esc(x.nome)}</td><td class="r num">${brl(x.liquido)}</td></tr>`).join('')}</tbody></table></div>
-   <p class="small muted">Somar às guias do mês: FGTS ${brl(F.fgtsEventos)} · INSS ${brl(F.inssEventos)} · IRRF ${brl(F.irrfEventos)} (recibos em separado da folha).</p></div>`};
+   <p class="small muted">Já somados às guias do mês acima: FGTS ${brl(F.fgtsEventos)} · INSS ${brl(F.inssEventos)} · IRRF ${brl(F.irrfEventos)} (recibos em separado da folha).</p></div>`};
 const dpConteudoV31=dpConteudo;dpConteudo=function(){const V={'d-ferias':dpFerias,'d-13':dp13,'d-resc':dpResc}[UI.view];if(!V)return dpConteudoV31();
   if(!podeMod('dem','ver'))return dpConteudoV31();const e=emp(UI.fsn?.emp);if(!e)return dpConteudoV31();return V(e,UI.fsn.comp||compAtual())};
 /* ==== v31 (fim) ==== */
+/* ==== v32b: facilidades do analista de DP ==== */
+const evOps=t=>Object.entries(EVT).filter(([,d])=>!t||d.t===t).map(([c,d])=>`<option value="${c}">${c} · ${esc(d.d)}</option>`).join('');
+const dpCfg=e=>({valePct:40,valeDia:20,...(e.dp||{})});
+/* ---------- lançamentos do mês (grade nova) ---------- */
+const GRADE=[['he50','HE 50%','h'],['he100','HE 100%','h'],['faltas','Faltas','dias'],['faltasDatas','Dias das faltas','ex.: 10, 17'],['atestado','Atestado','dias'],['atrasos','Atrasos','h'],['comissoes','Comissões','R$'],['adiant','Vale','R$'],['vt','Custo VT','R$']];
+dpMovs=function(e,comp){const fs=S.funcionarios.filter(f=>f.empresaId===e.id&&dpAtivoNoMes(f,comp)).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
+  const fech=dpFolhaRec(e.id,comp)?.status==='fechada';const ed=dpEd()&&!fech;const P=dpParam(e.id,comp);const C=dpCfg(e);
+  const cel=(f,k,un)=>{const m=dpMov(e.id,comp,f.id)||{};const soc=f.vinculo==='socio',est=f.vinculo==='estagiario';
+    const nada=(soc&&!['adiant'].includes(k))||(est&&['he50','he100','atrasos','vt','faltasDatas'].includes(k))||(k==='vt'&&!f.vt);
+    if(nada)return '<td class="r"><span class="muted small">—</span></td>';
+    const txt=k==='faltasDatas';const ph=k==='vt'&&+f.vtDiario>0?'auto':k==='adiant'&&f.vale!==false&&ehClt(f)?'':'';
+    return `<td class="r"><input ${txt?'type="text"':'type="number" min="0" step="'+(un==='R$'?'0.01':'0.5')+'"'} name="${f.id}.${k}" value="${esc(m[k]??'')}" placeholder="${ph}" style="width:${txt?92:un==='R$'?84:56}px;text-align:right" ${ed?'':'disabled'}></td>`};
+  const nEv=f=>(dpMov(e.id,comp,f.id)?.eventos||[]).length+fixosDoMes(f,comp).length;
+  return `${head('Lançamentos do mês',`Eventos de ${fmtComp(comp)}. O calendário já traz os feriados nacionais e os locais da empresa para o DSR. Faltas injustificadas descontam o DSR da semana (informe os dias para o cálculo exato). Atestado não desconta, mas reduz VT e VA.`,
+    ed&&fs.length?`<button class="btn" data-act="dp-vale">Gerar vale (${C.valePct}%)</button><button class="btn" data-act="dp-importar">Importar planilha</button><button class="btn" data-act="dp-feriados">Feriados</button>`:`<button class="btn" data-act="dp-feriados">Feriados</button>`)}
+   ${fech?`<div class="banner info" style="display:block">A folha de ${fmtComp(comp)} está fechada. Reabra em "Cálculo da folha" para alterar.</div>`:''}
+   <div class="panel" style="padding:10px 16px"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="eyebrow">Feriados do mês</span>${P.feriados.length?P.feriados.map(x=>pill(fmtData(x.data).slice(0,5)+' · '+x.nome,'info')).join(''):'<span class="small muted">nenhum</span>'}</div></div>
+   <form class="panel" data-form="dp-mov" data-preservar><div class="panel-head" style="flex-wrap:wrap;gap:10px"><h2>${fs.length} pessoa(s) na competência</h2>
+    <div class="actions" style="align-items:flex-end"><label class="f" style="min-width:0"><span class="small">Dias úteis</span><input type="number" name="_param.diasUteis" min="1" max="31" value="${P.uteis}" style="width:70px" ${ed?'':'disabled'}></label><label class="f" style="min-width:0"><span class="small">Domingos e feriados</span><input type="number" name="_param.diasDsr" min="0" max="15" value="${P.dsr}" style="width:70px" ${ed?'':'disabled'}></label>${ed&&fs.length?'<button class="btn primary">Salvar lançamentos</button>':''}</div></div>
+   ${fs.length?`<div class="table-wrap"><table><thead><tr><th>Colaborador</th>${GRADE.map(([k,t,un])=>`<th class="r">${t}<div class="small muted" style="font-weight:400;text-transform:none">${un}</div></th>`).join('')}<th>Outros eventos</th></tr></thead><tbody>${fs.map(f=>`<tr><td><b>${esc(f.nome)}</b><div class="small muted">${VINCULOS[f.vinculo||'empregado']}</div></td>${GRADE.map(([k,t,un])=>cel(f,k,un)).join('')}
+     <td><button type="button" class="btn sm" data-act="dp-ev" data-id="${f.id}">${nEv(f)?nEv(f)+' evento(s)':'Adicionar'}</button></td></tr>`).join('')}</tbody></table></div>
+    <p class="small muted">Custo VT: em branco, usa a tarifa diária do cadastro × dias trabalhados (úteis − faltas − atestados − férias); sem tarifa, desconta 6% do salário. Outros eventos: adicional noturno (hora reduzida), HE 60/70/75/80%, sobreaviso, gratificações, prêmios, ajuda de custo, pensão, plano de saúde, consignado e mais, com as incidências certas.</p>`
+    :vazio('Ninguém ativo nesta competência.',`<a class="btn" href="#d-colab">Cadastrar colaboradores</a>`)}</form>`};
+FORM['dp-mov']=(fd)=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const por={};for(const [k,v] of fd.entries()){const i=k.lastIndexOf('.');const fid=k.slice(0,i),campo=k.slice(i+1);(por[fid]=por[fid]||{})[campo]=campo==='faltasDatas'?String(v).trim():v===''?'':+v}
+  mut('dpmov',()=>{Object.entries(por).forEach(([fid,vals])=>{let m=dpMov(e.id,comp,fid);const vaz=Object.values(vals).every(v=>v===''||v===0);
+    if(fid==='_param'){const c=dpCalDsr(comp,e.id);if(+vals.diasUteis===c.uteis)vals.diasUteis='';if(+vals.diasDsr===c.dsr)vals.diasDsr=''}
+    if(!m&&vaz)return;if(!m){m={id:uid(),empresaId:e.id,comp,funcId:fid};S.dpmov.push(m)}Object.assign(m,vals,{atualizadoEm:agora()})})},['Pessoal','Lançamentos da folha '+fmtComp(comp),e.razao]);toast('Lançamentos salvos. A folha já foi recalculada.')};
+/* ---------- outros eventos do mês (por pessoa) ---------- */
+function evLinha(ev,i,fixo){const D=evDef(ev);const q=D.m==='valor'?brl(+ev.valor||0):D.m==='pensao'?(+ev.pct>0?ev.pct+'% de (bruto − INSS)':brl(+ev.valor||0)):(+ev.qtd||0)+' h';
+  return `<tr><td class="num">${esc(ev.cod)}</td><td>${esc(ev.desc||D.d)}${ev.benef?`<div class="small muted">beneficiário: ${esc(ev.benef)}</div>`:''}${fixo?`<div class="small muted">fixo do cadastro${ev.ate?' até '+fmtComp(ev.ate):''}</div>`:''}</td><td>${pill(D.t==='P'?'provento':'desconto',D.t==='P'?'ok':'warn')}</td><td class="r">${q}</td><td>${fixo?'':`<button type="button" class="btn sm ghost" data-act="dp-ev-del" data-i="${i}">Remover</button>`}</td></tr>`}
+function evForm(f){const e=emp(f.empresaId),comp=UI.fsn.comp;const m=dpMov(e.id,comp,f.id)||{};const L=m.eventos||[];const fx=fixosDoMes(f,comp);
+  return mHead('Eventos de '+f.nome+' · '+fmtComp(comp))+`<div class="modal-body">${L.length||fx.length?`<div class="table-wrap"><table><tbody>${fx.map(x=>evLinha(x,-1,true)).join('')}${L.map((x,i)=>evLinha(x,i,false)).join('')}</tbody></table></div>`:'<p class="small muted">Nenhum evento além da grade.</p>'}
+   ${dpEd()?`<form data-form="dp-ev" data-id="${f.id}" style="margin-top:14px"><h3>Adicionar evento</h3><div class="grid-f">
+    <label class="f" style="grid-column:span 2"><span>Evento</span><select name="cod" data-ev-cod><optgroup label="Proventos">${evOps('P')}</optgroup><optgroup label="Descontos">${evOps('D')}</optgroup><option value="X">Evento personalizado…</option></select></label>
+    <label class="f"><span>Horas / quantidade</span><input type="number" step="0.01" min="0" name="qtd"></label><label class="f"><span>Valor (R$)</span><input type="number" step="0.01" min="0" name="valor"></label>
+    <label class="f"><span>% (pensão)</span><input type="number" step="0.01" min="0" max="100" name="pct"></label><label class="f"><span>Beneficiário (pensão)</span><input name="benef"></label>
+    <label class="f" style="grid-column:span 2"><span>Descrição (opcional)</span><input name="desc" maxlength="80"></label>
+    <div class="f full" data-ev-custom hidden><span>Personalizado: tipo e incidências</span><div class="actions"><select name="tipo" style="width:auto"><option value="P">Provento</option><option value="D">Desconto</option></select>${[['i','INSS'],['s','IRRF'],['f','FGTS'],['d','DSR']].map(([k,t])=>`<label class="chk"><input type="checkbox" name="inc_${k}"> ${t}</label>`).join('')}</div></div></div>
+    <p class="small muted">Adicional noturno e HE noturna: informe as horas do relógio (o sistema converte para a hora reduzida de 52'30"). Pensão: % sobre (bruto − INSS) ou valor fixo; entra como dedução no IRRF.</p>
+    <div class="actions"><button class="btn primary">Adicionar</button></div></form>`:''}</div><div class="modal-foot"><button class="btn" data-act="close-modal">Fechar</button></div>`}
+ACT['dp-ev']=el=>{const f=S.funcionarios.find(x=>x.id===el.dataset.id);if(f){UI.evFunc=f.id;openModal(evForm(f),true)}};
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-ev-cod]')){const c=s.form.querySelector('[data-ev-custom]');if(c)c.hidden=s.value!=='X'}});
+FORM['dp-ev']=(fd,form)=>{const f=S.funcionarios.find(x=>x.id===form.dataset.id);const e=emp(f.empresaId),comp=UI.fsn.comp;let cod=fd.get('cod');
+  const ev={cod,qtd:+fd.get('qtd')||0,valor:+fd.get('valor')||0,pct:+fd.get('pct')||0,desc:String(fd.get('desc')||'').trim(),benef:String(fd.get('benef')||'').trim()};
+  if(cod==='X'){ev.cod=fd.get('tipo')==='D'?'259':'059';ev.tipo=fd.get('tipo');ev.inc=['i','s','f','d'].filter(k=>fd.get('inc_'+k)).join('');if(!ev.desc){toast('Dê uma descrição ao evento personalizado.',true);return}}
+  const D=evDef(ev);if(D.m==='valor'&&!ev.valor||['he','noturno','henot','sobreaviso'].includes(D.m)&&!ev.qtd||D.m==='pensao'&&!ev.valor&&!ev.pct){toast('Informe '+(D.m==='valor'?'o valor':D.m==='pensao'?'o % ou o valor':'as horas')+'.',true);return}
+  mut('dpmov',()=>{let m=dpMov(e.id,comp,f.id);if(!m){m={id:uid(),empresaId:e.id,comp,funcId:f.id};S.dpmov.push(m)}m.eventos=[...(m.eventos||[]),ev];m.atualizadoEm=agora()},['Pessoal','Evento '+(ev.desc||D.d)+' para '+f.nome,e.razao]);
+  UI.modal=null;openModal(evForm(f),true)};
+ACT['dp-ev-del']=el=>{const f=S.funcionarios.find(x=>x.id===UI.evFunc);const e=emp(f.empresaId),comp=UI.fsn.comp;const m=dpMov(e.id,comp,f.id);if(!m)return;
+  mut('dpmov',()=>{m.eventos=(m.eventos||[]).filter((x,i)=>i!==+el.dataset.i)},['Pessoal','Removeu evento de '+f.nome,e.razao]);UI.modal=null;openModal(evForm(f),true)};
+/* ---------- eventos fixos do cadastro (plano de saúde, consignado em parcelas, pensão…) ---------- */
+function fixosForm(f){const L=f.fixos||[];
+  return mHead('Eventos fixos de '+f.nome)+`<div class="modal-body"><p class="small muted" style="margin-top:0">Entram sozinhos em todo mês dentro da vigência: plano de saúde, consignado (com parcelas), pensão, contribuição, gratificação fixa…</p>
+   ${L.length?`<div class="table-wrap"><table><tbody>${L.map((x,i)=>{const D=evDef(x);return `<tr><td class="num">${esc(x.cod)}</td><td>${esc(x.desc||D.d)}${x.benef?' · '+esc(x.benef):''}</td><td class="r">${x.pct?x.pct+'%':D.m==='valor'||D.m==='pensao'?brl(x.valor):(x.qtd||0)+' h'}</td><td class="small">${x.desde?fmtComp(x.desde):'—'} a ${x.ate?fmtComp(x.ate):'sem fim'}</td><td>${dpEd()?`<button type="button" class="btn sm ghost" data-act="fx-del" data-id="${f.id}" data-i="${i}">Remover</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`:'<p class="small muted">Nenhum evento fixo.</p>'}
+   ${dpEd()?`<form data-form="fx" data-id="${f.id}" style="margin-top:14px"><div class="grid-f"><label class="f" style="grid-column:span 2"><span>Evento</span><select name="cod"><optgroup label="Descontos">${evOps('D')}</optgroup><optgroup label="Proventos">${evOps('P')}</optgroup></select></label>
+    <label class="f"><span>Valor (R$)</span><input type="number" step="0.01" min="0" name="valor"></label><label class="f"><span>% (pensão)</span><input type="number" step="0.01" min="0" max="100" name="pct"></label><label class="f"><span>Horas</span><input type="number" step="0.5" min="0" name="qtd"></label>
+    <label class="f"><span>A partir de</span><input type="month" name="desde" value="${UI.fsn.comp}"></label><label class="f"><span>Nº de parcelas (vazio = sem fim)</span><input type="number" min="1" max="120" name="parcelas"></label>
+    <label class="f"><span>Beneficiário (pensão)</span><input name="benef"></label><label class="f" style="grid-column:span 2"><span>Descrição</span><input name="desc" maxlength="80"></label></div><div class="actions"><button class="btn primary">Adicionar fixo</button></div></form>`:''}</div><div class="modal-foot"><button class="btn" data-act="close-modal">Fechar</button></div>`}
+ACT['dp-fixos']=el=>{const f=S.funcionarios.find(x=>x.id===el.dataset.id);if(f)openModal(fixosForm(f),true)};
+FORM['fx']=(fd,form)=>{const f=S.funcionarios.find(x=>x.id===form.dataset.id);const n=+fd.get('parcelas')||0;const desde=fd.get('desde')||UI.fsn.comp;
+  const x={cod:fd.get('cod'),valor:+fd.get('valor')||0,pct:+fd.get('pct')||0,qtd:+fd.get('qtd')||0,desde,ate:n?addMes(desde,n-1):'',desc:String(fd.get('desc')||'').trim(),benef:String(fd.get('benef')||'').trim(),parcela:n?n+' parc.':''};
+  if(!x.valor&&!x.pct&&!x.qtd){toast('Informe valor, % ou horas.',true);return}
+  mut('funcionarios',()=>{f.fixos=[...(f.fixos||[]),x]},['Pessoal','Evento fixo '+(x.desc||evDef(x).d)+' para '+f.nome,emp(f.empresaId)?.razao||'']);UI.modal=null;openModal(fixosForm(f),true)};
+ACT['fx-del']=el=>{const f=S.funcionarios.find(x=>x.id===el.dataset.id);mut('funcionarios',()=>{f.fixos=(f.fixos||[]).filter((x,i)=>i!==+el.dataset.i)},['Pessoal','Removeu evento fixo de '+f.nome,emp(f.empresaId)?.razao||'']);UI.modal=null;openModal(fixosForm(f),true)};
+/* ---------- feriados da empresa ---------- */
+function ferForm2(e){const y=+UI.fsn.comp.slice(0,4);const nac=Object.entries(feriadosNacionais(y)).sort();const loc=e.dp?.feriados||[];
+  return mHead('Feriados · '+(e.fantasia||e.razao))+`<div class="modal-body"><div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><div><h3>Nacionais ${y}</h3><ul class="small" style="padding-left:18px">${nac.map(([d,n])=>`<li>${fmtData(d)} · ${esc(n)}</li>`).join('')}</ul></div>
+   <div><h3>Locais (estado e município)</h3>${loc.length?`<ul class="small" style="padding-left:18px">${loc.map((x,i)=>`<li>${x.data.length===5?x.data.split('-').reverse().join('/')+' (todo ano)':fmtData(x.data)} · ${esc(x.nome)} ${dpEd()?`<button type="button" class="btn sm ghost" data-act="fer-del" data-i="${i}">remover</button>`:''}</li>`).join('')}</ul>`:'<p class="small muted">Nenhum. Ex.: aniversário da cidade, Corpus Christi se for feriado municipal, data magna do estado.</p>'}
+   ${dpEd()?`<form data-form="fer-loc" class="grid-f" style="margin-top:8px"><label class="f"><span>Data</span><input type="date" name="data" required></label><label class="f"><span>Nome</span><input name="nome" required maxlength="60"></label><label class="f chk"><input type="checkbox" name="anual" checked> Repete todo ano</label><div class="actions"><button class="btn primary">Adicionar</button></div></form>`:''}</div></div>
+   <p class="small muted">Carnaval e Corpus Christi são pontos facultativos nacionais: inclua só se forem feriado no município ou se a empresa não trabalhar.</p></div><div class="modal-foot"><button class="btn" data-act="close-modal">Fechar</button></div>`}
+ACT['dp-feriados']=()=>openModal(ferForm2(emp(UI.fsn.emp)),true);
+FORM['fer-loc']=fd=>{const e=emp(UI.fsn.emp);const d=fd.get('data');const x={data:fd.get('anual')?d.slice(5):d,nome:String(fd.get('nome')||'').trim()};mut('empresas',()=>{e.dp={...(e.dp||{}),feriados:[...(e.dp?.feriados||[]),x]}},['Pessoal','Feriado local '+x.nome,e.razao]);UI.modal=null;openModal(ferForm2(e),true)};
+ACT['fer-del']=el=>{const e=emp(UI.fsn.emp);mut('empresas',()=>{e.dp={...(e.dp||{}),feriados:(e.dp?.feriados||[]).filter((x,i)=>i!==+el.dataset.i)}},['Pessoal','Removeu feriado local',e.razao]);UI.modal=null;openModal(ferForm2(e),true)};
+/* ---------- vale quinzenal em lote ---------- */
+function valesDoMes(e,comp){const C=dpCfg(e);const lim=comp+'-15';return S.funcionarios.filter(f=>f.empresaId===e.id&&dpAtivoNoMes(f,comp)&&ehClt(f)&&f.vale!==false&&f.admissao<=lim)
+  .map(f=>{const dias=Math.max(0,Math.min(30,dpDias(f,comp)));const v=r2(salarioEm(f,comp)*C.valePct/100*Math.min(1,dias/30*2>1?1:dias/15));return {f,valor:v}}).filter(x=>x.valor>0)}
+ACT['dp-vale']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const C=dpCfg(e);const L=valesDoMes(e,comp);if(!L.length){toast('Ninguém com vale nesta competência.',true);return}
+  openModal(mHead('Vale quinzenal · '+fmtComp(comp))+`<form data-form="vale"><div class="modal-body"><div class="grid-f"><label class="f"><span>Percentual do salário</span><input type="number" name="pct" min="1" max="60" value="${C.valePct}"></label><label class="f"><span>Dia do pagamento</span><input type="number" name="dia" min="1" max="28" value="${C.valeDia}"></label></div>
+   <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Empregado</th><th class="r">Salário</th><th class="r">Vale</th></tr></thead><tbody>${L.map(x=>`<tr><td>${esc(x.f.nome)}</td><td class="r num">${brl(salarioEm(x.f,comp))}</td><td class="r num">${brl(x.valor)}</td></tr>`).join('')}</tbody></table></div>
+   <p class="small muted">Lança o vale como "Adiantamento" de cada um (substitui o que já estiver lançado). Quem foi admitido depois do dia 15 fica de fora; admitidos na 1ª quinzena recebem proporcional. Para tirar alguém, desmarque "Recebe vale" no cadastro.</p></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button type="button" class="btn" data-act="vale-pdf">Recibos (PDF)</button><button class="btn primary">Lançar vales</button></div></form>`,true)};
+FORM['vale']=fd=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const pct=+fd.get('pct')||40,dia=+fd.get('dia')||20;
+  mut(['empresas','dpmov'],()=>{e.dp={...(e.dp||{}),valePct:pct,valeDia:dia};valesDoMes(e,comp).forEach(({f,valor})=>{let m=dpMov(e.id,comp,f.id);if(!m){m={id:uid(),empresaId:e.id,comp,funcId:f.id};S.dpmov.push(m)}m.adiant=valor;m.valeEm=comp+'-'+String(dia).padStart(2,'0')})},['Pessoal','Gerou vale quinzenal de '+fmtComp(comp)+' ('+pct+'%)',e.razao]);closeModal();toast('Vales lançados.')};
+ACT['vale-pdf']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const C=dpCfg(e);const L=valesDoMes(e,comp).map(x=>({...x,valor:+(dpMov(e.id,comp,x.f.id)?.adiant)||x.valor}));
+  janelaPdf('Vales '+fmtComp(comp),L.map(({f,valor})=>`<div style="page-break-inside:avoid;margin-bottom:26px"><h1>Recibo de adiantamento salarial</h1><p class="sub">${esc(e.razao)} · CNPJ ${fmtCNPJ(e.cnpj||'')} · competência ${fmtComp(comp)}</p>
+   <p>Recebi de ${esc(e.razao)} a importância de <b>${brl(valor)}</b>, a título de adiantamento salarial (vale) de ${fmtComp(comp)}, que será descontada na folha do mês.</p><p class="sub">${esc(f.nome)} · CPF ${fmtCPF(f.cpf||'')} · ${f.pix?'PIX '+esc(f.pix):[f.banco,f.agencia,f.conta].filter(Boolean).join(' · ')}</p>
+   <div class="ass"><div>Local e data: ____/____/______</div><div>${esc(f.nome)}</div></div></div>`).join(''))};
+/* ---------- importação de planilha (ponto / controle interno) ---------- */
+ACT['dp-importar']=()=>openModal(mHead('Importar lançamentos')+`<form data-form="dp-imp"><div class="modal-body"><p class="small muted" style="margin-top:0">Cole aqui as linhas da planilha (CSV com ponto e vírgula ou copiado do Excel). Primeira linha com os títulos. Colunas aceitas: <code>cpf; he50; he100; faltas; faltasDatas; atestado; atrasos; comissoes; vale; vt; noturno</code>. Só o CPF é obrigatório; colunas vazias não mudam nada.</p>
+  <textarea name="txt" rows="10" style="width:100%;font-family:var(--f-code);font-size:12px" placeholder="cpf;he50;faltas;faltasDatas;vale&#10;529.982.247-25;8;1;10;740"></textarea></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Importar</button></div></form>`,true);
+FORM['dp-imp']=fd=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const lin=String(fd.get('txt')||'').trim().split(/\r?\n/).filter(Boolean);if(lin.length<2){toast('Cole a linha de títulos e pelo menos uma linha de dados.',true);return}
+  const sep=lin[0].includes(';')?';':lin[0].includes('\t')?'\t':',';const cab=lin[0].split(sep).map(x=>normP(x).replace(/[^a-z0-9]/g,''));const mapa={cpf:'cpf',he50:'he50',he100:'he100',faltas:'faltas',faltasdatas:'faltasDatas',diasfaltas:'faltasDatas',atestado:'atestado',atrasos:'atrasos',comissoes:'comissoes',vale:'adiant',adiantamento:'adiant',vt:'vt',noturno:'noturno',adicionalnoturno:'noturno'};
+  if(!cab.includes('cpf')){toast('A planilha precisa de uma coluna "cpf".',true);return}let ok=0;const sem=[];
+  mut('dpmov',()=>{lin.slice(1).forEach(l=>{const c=l.split(sep);const row={};cab.forEach((h,i)=>{if(mapa[h])row[mapa[h]]=(c[i]||'').trim()});const f=S.funcionarios.find(x=>x.empresaId===e.id&&soDig(x.cpf)===soDig(row.cpf)&&dpAtivoNoMes(x,comp));if(!f){sem.push(row.cpf);return}
+    let m=dpMov(e.id,comp,f.id);if(!m){m={id:uid(),empresaId:e.id,comp,funcId:f.id};S.dpmov.push(m)}const num=v=>+String(v).replace(/\./g,'').replace(',','.');
+    ['he50','he100','faltas','atestado','atrasos','comissoes','adiant','vt'].forEach(k=>{if(row[k]!==undefined&&row[k]!=='')m[k]=num(row[k])});if(row.faltasDatas)m.faltasDatas=row.faltasDatas.replace(/\s+/g,'');
+    if(row.noturno){m.eventos=(m.eventos||[]).filter(x=>x.cod!=='060');m.eventos.push({cod:'060',qtd:num(row.noturno)})}ok++})},['Pessoal','Importou '+lin.length+' linha(s) de lançamentos',e.razao]);
+  closeModal();toast(ok+' pessoa(s) atualizada(s)'+(sem.length?'. Sem cadastro nesta empresa: '+sem.join(', '):'.'),!!sem.length&&!ok)};
+/* ---------- cadastro: benefícios, vale, outro vínculo e vigência do salário ---------- */
+const dpFormV32=dpForm;dpForm=function(f,adm){const h=dpFormV32(f,adm);const g=k=>esc(f?.[k]??'');const ro=dpEd()?'':'disabled';
+  const sec=`<div class="form-sec"><h3>Benefícios e descontos</h3><div class="grid-f">
+   <label class="f"><span>Vale-transporte: custo por dia (R$)</span><input type="number" step="0.01" min="0" name="vtDiario" value="${g('vtDiario')}" placeholder="tarifa × viagens" ${ro}></label>
+   <label class="f"><span>Vale-alimentação/refeição por dia (R$)</span><input type="number" step="0.01" min="0" name="vaDia" value="${g('vaDia')}" ${ro}></label>
+   <label class="f"><span>ou valor mensal fixo (R$)</span><input type="number" step="0.01" min="0" name="vaMensal" value="${g('vaMensal')}" ${ro}></label>
+   <label class="f"><span>Desconto do VA (% · PAT até 20%)</span><input type="number" step="0.1" min="0" max="20" name="vaDescPct" value="${g('vaDescPct')}" ${ro}></label>
+   <label class="f"><span>Base de INSS em outro emprego (R$)</span><input type="number" step="0.01" min="0" name="inssOutraBase" value="${g('inssOutraBase')}" ${ro}></label>
+   <label class="f chk"><input type="checkbox" name="vale" ${f?.vale===false?'':'checked'} ${ro}> Recebe vale quinzenal</label></div></div>
+   ${f?.id?`<div class="form-sec"><h3>Reajuste de salário</h3><div class="grid-f"><label class="f"><span>Novo salário vale a partir de</span><input type="month" name="salVig" value="${UI.fsn.comp}" ${ro}></label><p class="small muted" style="grid-column:span 3;align-self:end">Se a vigência for de um mês com folha já fechada, o sistema lança as diferenças salariais retroativas na competência atual. ${(f.salarios||[]).length?'Histórico: '+f.salarios.map(x=>fmtComp(x.desde)+' '+brl(x.valor)).join(' → '):''}</p></div></div>`:''}`;
+  return h.replace('<div class="form-sec"><h3>Pagamento</h3>',sec+'<div class="form-sec"><h3>Pagamento</h3>')};
+const formDpFuncV32=FORM['dp-func'];FORM['dp-func']=(fd,form)=>{const id=form.dataset.id;const comp=UI.fsn.comp;const antes=id&&S.funcionarios.find(x=>x.id===id);const salAnt=antes?salarioEm(antes,fd.get('salVig')||comp):null;const histAnt=antes?.salarios?antes.salarios.slice():null;const n0=S.funcionarios.length;
+  formDpFuncV32(fd,form);if(UI.modal)return;   // a validação original recusou: nada a complementar
+  const f=id?S.funcionarios.find(x=>x.id===id):S.funcionarios.length>n0?S.funcionarios[S.funcionarios.length-1]:null;if(!f)return;const e=emp(f.empresaId);
+  const num=k=>{const v=fd.get(k);return v===''||v==null?null:+v};let retro=[];
+  mut(['funcionarios','dpmov'],()=>{f.vtDiario=num('vtDiario');f.vaDia=num('vaDia');f.vaMensal=num('vaMensal');f.vaDescPct=num('vaDescPct');f.inssOutraBase=num('inssOutraBase');f.vale=!!fd.get('vale');
+    if(!f.salarios?.length)f.salarios=[{desde:String(f.admissao||comp).slice(0,7),valor:salAnt??f.salario}];
+    const vig=fd.get('salVig')||comp;if(salAnt!=null&&Math.abs(salAnt-f.salario)>0.004){f.salarios=(histAnt||f.salarios).filter(x=>x.desde!==vig).concat([{desde:vig,valor:f.salario}]).sort((a,b)=>a.desde.localeCompare(b.desde));
+      // diferenças retroativas das folhas já fechadas a partir da vigência
+      S.dpfolhas.filter(r=>r.empresaId===e.id&&r.status==='fechada'&&r.comp>=vig&&r.comp<comp&&r.calc).forEach(r=>{const x=r.calc.L.find(y=>y.funcId===f.id);if(!x)return;const novo=dpCalcFunc(e,f,r.comp);
+        const dif=r2(novo.rubricas.filter(y=>y.tipo==='P'&&y.inss).reduce((a,y)=>a+y.valor,0)-x.rubricas.filter(y=>y.tipo==='P'&&y.inss).reduce((a,y)=>a+y.valor,0));if(dif>0.004)retro.push([r.comp,dif])});
+      if(retro.length){let m=dpMov(e.id,comp,f.id);if(!m){m={id:uid(),empresaId:e.id,comp,funcId:f.id};S.dpmov.push(m)}m.eventos=(m.eventos||[]).filter(x=>!(x.cod==='090'&&x.retroDe>=vig));retro.forEach(([c,v])=>m.eventos.push({cod:'090',valor:v,desc:'Diferenças salariais de '+fmtComp(c),retroDe:c}))}}},
+    ['Pessoal','Atualizou benefícios/salário de '+f.nome,e.razao]);
+  if(retro.length)toast('Reajuste retroativo: diferenças de '+retro.map(([c,v])=>fmtComp(c)+' ('+brl(v)+')').join(', ')+' lançadas em '+fmtComp(comp)+'.')};
+const dpColabsV32=dpColabs;dpColabs=function(e){return dpColabsV32(e).replace(/<button class="btn sm" data-act="dp-editar" data-id="([^"]+)">(Editar|Ver)<\/button>/g,(m0,id,t)=>`<button class="btn sm" data-act="dp-editar" data-id="${id}">${t}</button><button class="btn sm ghost" data-act="dp-fixos" data-id="${id}">Fixos${(S.funcionarios.find(x=>x.id===id)?.fixos||[]).length?' ('+S.funcionarios.find(x=>x.id===id).fixos.length+')':''}</button>`)};
+/* ---------- folha: conferência, checklist, benefícios e guias com férias/13º/rescisão ---------- */
+const dpFolhaPgV32=dpFolhaPg;dpFolhaPg=function(e,comp){let h=dpFolhaPgV32(e,comp);const F=dpFolhaDe(e,comp);const conf=F.fechada?[]:(calcFolha(e,comp).conferencia||[]);const cor={crit:'crit',warn:'warn',info:'info'};
+  const nCrit=conf.filter(x=>x[0]==='crit').length;const movs=S.dpmov.filter(m=>m.empresaId===e.id&&m.comp===comp&&m.funcId!=='_param').length;const vale=S.dpmov.some(m=>m.empresaId===e.id&&m.comp===comp&&+m.adiant>0);
+  const passos=[['Feriados conferidos',!!dpMov(e.id,comp,'_param')||feriadosDe(e.id,comp).length>=0],['Lançamentos do mês',movs>0],['Vale quinzenal',vale],['Conferência sem pendências críticas',!nCrit],['Folha fechada',!!F.fechada],['Holerites no portal',!!F.rec?.publicadaEm]];
+  const chk=`<div class="panel" style="padding:10px 16px"><div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center"><span class="eyebrow">Roteiro do mês</span>${passos.map(([t,ok])=>`<span class="small" style="display:flex;gap:5px;align-items:center;color:${ok?'var(--ok)':'var(--muted)'}">${ok?'●':'○'} ${t}</span>`).join('')}</div></div>`;
+  const cf=conf.length?`<div class="panel"><div class="panel-head"><h2>Conferência antes de fechar</h2><span class="small muted">${nCrit} crítica(s) · ${conf.length-nCrit} aviso(s)</span></div><ul class="small" style="margin:0;padding-left:18px;display:flex;flex-direction:column;gap:4px">${conf.map(([n,t])=>`<li style="color:var(--${n==='crit'?'crit':n==='warn'?'warn':'ink'})">${esc(t)}</li>`).join('')}</ul></div>`:'';
+  const B=F.beneficios||{};const ben=(B.vtCusto||B.vaCusto)?`<div class="panel"><div class="panel-head"><h2>Benefícios do mês</h2></div><div class="table-wrap"><table><thead><tr><th>Benefício</th><th class="r">Custo total</th><th class="r">Descontado dos empregados</th><th class="r">Custo da empresa</th></tr></thead><tbody>
+   ${B.vtCusto?`<tr><td>Vale-transporte</td><td class="r num">${brl(B.vtCusto)}</td><td class="r num">${brl(B.vtDesc)}</td><td class="r num">${brl(r2(B.vtCusto-B.vtDesc))}</td></tr>`:''}${B.vaCusto?`<tr><td>Vale-alimentação / refeição</td><td class="r num">${brl(B.vaCusto)}</td><td class="r num">${brl(B.vaDesc)}</td><td class="r num">${brl(r2(B.vaCusto-B.vaDesc))}</td></tr>`:''}</tbody></table></div><p class="small muted">Use o relatório "Benefícios" para a compra de VT/VA de cada um.</p></div>`:'';
+  h=h.replace(/<div class="crm-kpis">/,chk+cf+'<div class="crm-kpis">');
+  // guias somam férias, 13º e rescisões pagos no mês
+  const fe=F.fgtsEventos||0,ie=F.inssEventos||0,re=F.irrfEventos||0;if(fe||ie||re){h=h.replace('<b>'+brl(F.fgts)+'</b></td></tr>','<b>'+brl(r2(F.fgts+fe))+'</b>'+(fe?'<div class="small muted">inclui '+brl(fe)+' de férias/13º/rescisão</div>':'')+'</td></tr>')
+    .replace('<b>'+brl(r2(F.inss+F.patronal.total-F.salFamilia))+'</b>','<b>'+brl(r2(F.inss+ie+F.patronal.total-F.salFamilia))+'</b>'+(ie?'<div class="small muted">inclui '+brl(ie)+' de férias/13º/rescisão</div>':''))
+    .replace('<td class="r num"><b>'+brl(F.irrf)+'</b></td></tr></tbody>','<td class="r num"><b>'+brl(r2(F.irrf+re))+'</b>'+(re?'<div class="small muted">inclui '+brl(re)+' de férias/13º/rescisão</div>':'')+'</td></tr></tbody>')}
+  return h.replace('<div class="panel"><div class="panel-head"><h2>Encargos e guias do mês</h2>',ben+'<div class="panel"><div class="panel-head"><h2>Encargos e guias do mês</h2>')};
+const fecharV32=ACT['dp-fechar'];ACT['dp-fechar']=el=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const crit=(calcFolha(e,comp).conferencia||[]).filter(x=>x[0]==='crit');
+  if(crit.length)confirmar('Há '+crit.length+' pendência(s) crítica(s)',`<ul>${crit.map(x=>'<li>'+esc(x[1])+'</li>').join('')}</ul><p>Fechar a folha mesmo assim?</p>`,'Revisar depois e fechar',()=>{setTimeout(()=>fecharV32(el),50)},true);else fecharV32(el)};
+/* ---------- relatórios novos: benefícios, pensões e vales ---------- */
+Object.assign(DP_RELS,{beneficios:'Benefícios (VT e VA)',pensao:'Pensões alimentícias',vale:'Vales (adiantamentos) para pagamento'});
+const dpRelDadosV32=dpRelDados;dpRelDados=function(k,F){const L=F.L;
+  if(k==='beneficios'){const X=L.filter(x=>x.beneficios&&(x.beneficios.vtCusto||x.beneficios.vaCusto));const B=F.beneficios||{};return {cab:['Colaborador','Dias trabalhados','VT custo','VT descontado','VA custo','VA descontado'],num:[2,3,4,5],linhas:X.map(x=>[x.nome,x.beneficios.diasTrab,x.beneficios.vtCusto,x.beneficios.vtDesc,x.beneficios.vaCusto,x.beneficios.vaDesc]),total:['Total','',B.vtCusto||0,B.vtDesc||0,B.vaCusto||0,B.vaDesc||0]}}
+  if(k==='pensao'){const X=L.flatMap(x=>x.rubricas.filter(r=>r.cod==='240').map(r=>[x.nome,r.desc.replace(/^Pensão alimentícia( · )?/,'')||'—',r.ref||'valor fixo',r.valor]));return {cab:['Empregado','Beneficiário','Base','Valor'],num:[3],linhas:X,total:['Total','','',r2(X.reduce((a,x)=>a+x[3],0))]}}
+  if(k==='vale'){const X=L.map(x=>[x.nome,fmtCPF(x.cpf),x.banco,x.pix,x.rubricas.filter(r=>r.cod==='230').reduce((a,r)=>a+r.valor,0)]).filter(x=>x[4]);return {cab:['Empregado','CPF','Banco','PIX','Vale'],num:[4],linhas:X,total:['Total','','','',r2(X.reduce((a,x)=>a+x[4],0))]}}
+  return dpRelDadosV32(k,F)};
+/* ==== v32b (fim) ==== */
 
 
 
@@ -7892,7 +8138,7 @@ if(APP_SIS){
       ${per?`<div class="ctb-campo"><span>Período</span><div class="ctb-per"><em>de</em><b class="ctb-val" style="padding:0 4px">${fmtComp(F.comp)}</b><em>até</em>${selMes('data-nf="ate"',UI.fnf.ate)}</div></div>`:''}
     </div>`}
   function ctbMenu(){return `<aside class="ctb-nav" aria-label="${APP_DP?'Folha de Pagamento':APP_CONTABIL?'Contabilidade':'Escrita Fiscal'}">${ctbCardComp()}${NAV_F.map(([g,its])=>`<div class="ctb-grp"><span>${g}</span>${its.map(([v,t,ic,dica])=>`<a href="#${v}" title="${esc(dica)}" ${UI.view===v?'aria-current="page"':''}>${svg(ic)}<span>${t}</span></a>`).join('')}</div>`).join('')}
-    <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>${APP_DP?'Férias, 13º salário, rescisões e eSocial/DCTFWeb entram aqui, uma de cada vez.':APP_CONTABIL?'ECD, ECF, DMPL e notas explicativas entram aqui, uma de cada vez.':'EFD ICMS/IPI, EFD-Reinf e DCTFWeb entram aqui, uma de cada vez.'}</p></div></aside>`}
+    <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>${APP_DP?'Envio ao eSocial (S-1200, S-1210, S-2299) e DCTFWeb, e importação de ponto eletrônico (AFD).':APP_CONTABIL?'ECD, ECF, DMPL e notas explicativas entram aqui, uma de cada vez.':'EFD ICMS/IPI, EFD-Reinf e DCTFWeb entram aqui, uma de cada vez.'}</p></div></aside>`}
   function ctbStatus(){const F=UI.fsn||{};const e=emp(F.emp);
     const txt=MODO!=='api'?'Modo local':MF.estado==='online'?'Tempo real · conectado':MF.estado==='reconectando'?'Reconectando…':'Conectando…';
     return `<footer class="ctb-status"><span class="conn ${MODO!=='api'||MF.estado==='online'?'ok':''}" id="mf-selo"><i></i>${txt}</span><span>${esc(cfg().escritorio||'')}</span>${e?`<span>${esc(e.fantasia||e.razao)}</span>`:''}${F.comp?`<span>Competência ${fmtComp(F.comp)}</span>`:''}<span class="grow"></span><span class="ctb-atalhos">F8 trocar empresa · PgUp/PgDn competência</span>${cfg().crc?`<span>${esc(cfg().crc)}</span>`:''}</footer>`}

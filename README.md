@@ -389,7 +389,23 @@ O DP é o quarto site e usa o mesmo casco do sistema contábil: módulos no topo
   - INSS e IRRF do saldo e do 13º em separado; aviso e férias indenizadas sem IRRF.
   - FGTS do mês, multa de 40% ou 20% sobre o saldo informado, prazo de 10 dias e termo de rescisão em PDF.
   - Ao salvar, o empregado é desligado e sai da folha do mês.
-- O FGTS, o INSS e o IRRF desses recibos aparecem na tela da folha do mês de pagamento, para somar às guias (coleção `dpeventos`).
+- O FGTS, o INSS e o IRRF desses recibos já entram somados nas guias da folha do mês de pagamento (coleção `dpeventos`).
+
+### Folha: motor de cálculo e facilidades do analista (DP)
+
+- **Calendário:** feriados nacionais (inclui Sexta-feira Santa e 20/11) e locais da empresa (botão "Feriados"; guardados em `empresas.dp.feriados`) entram no DSR. Nov/2026 = 23 úteis / 7 DSR.
+- **DSR** sobre todas as variáveis com incidência (HE, adicional noturno, comissões, eventos marcados). **DSR perdido** (rubrica 213) pela semana de cada falta injustificada (campo "Dias das faltas").
+- **Atestado:** não desconta, mas reduz os dias de VT e VA.
+- **Catálogo de eventos** (botão "Outros eventos" por pessoa): adicional noturno e HE noturna com hora reduzida, HE 60–80%, sobreaviso, gratificação, prêmio, ajuda de custo, pensão (% de bruto − INSS ou valor, deduzida no IRRF), plano de saúde, consignado, sindical, eventos personalizados com incidências.
+- **Eventos fixos** no cadastro (`f.fixos`, com vigência e parcelas): entram sozinhos todo mês.
+- **Benefícios:** VT por tarifa diária × dias trabalhados (desconto até 6%, limitado ao custo); VA por dia ou mensal com desconto % (rubrica 248). Totais de compra na folha e relatório "Benefícios".
+- **Vale quinzenal em lote** (% configurável, proporcional para admitidos na 1ª quinzena) com recibos em PDF.
+- **Importar planilha** (CSV ou colado do Excel) por CPF: he50, he100, faltas, faltasDatas, atestado, atrasos, comissoes, vale, vt, noturno.
+- **Reajuste com vigência:** histórico em `f.salarios`; se a vigência cai em folha já fechada, as diferenças (rubrica 090) são lançadas no mês atual.
+- **INSS com outro vínculo** (`f.inssOutraBase`) respeita o teto.
+- **Conferência antes de fechar:** salário abaixo do mínimo e líquido negativo são críticos (pedem confirmação); vale > 60%, consignado > 35% e PIS ausente são avisos. Roteiro do mês no topo da folha.
+- **Contabilidade:** a integração da folha agora lança a compra de VT (4.2.1.05) e VA (4.2.1.07) e credita pensões, consignados e outros descontos em 2.1.5.01; faltas reduzem a despesa.
+
 - O IRRF usa a redução da Lei 15.270/2025 sobre a base de cada pagamento. Confira a orientação da Receita para férias e rescisões.
 - **Fora do cálculo:** indenizações dos arts. 479/480, estabilidades e verbas de convenção.
 
