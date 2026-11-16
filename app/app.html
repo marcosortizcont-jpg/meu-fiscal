@@ -491,7 +491,7 @@ function obrigacoesDevidasFixas(e,comp,funcs){
 }
 
 /* ===================== Estado e persistência ===================== */
-const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos','docsinternos','contatos','parceiros','nfentrada','receitas'];
+const COLS=['config','operadores','empresas','faturamento','despesas','guias','documentos','checklist','obrigacoes','fechamentos','funcionarios','folhas','admissoes','notas','tomadores','servicos','certificados','tickets','conversas','cnds','ecac','faturas','consentimentos','auditoria','catalogo','regimes','leads','lancamentos','docsinternos','contatos','parceiros','nfentrada','receitas','docsaida'];
 const S={}; COLS.forEach(c=>S[c]=[]);
 const CAP={db:null,user:null,sample:null,assets:null,downloads:null};
 const ME={id:null,nome:'',canEdit:true};
@@ -5927,7 +5927,8 @@ function apurarSN(e,comp){
   if(!lancado){const r=receitaMes(e.id,comp);L=r?[{id:'_fat',valor:r,anexo:e.fatorR?'R':(e.anexo||'III'),descricao:'Receita do mês (sem lançamentos)'}]:[]}
   const anoComp=comp.slice(0,4);const receitaAno=S.faturamento.filter(f=>f.empresaId===e.id&&f.comp.startsWith(anoComp)&&f.comp<=comp).reduce((a,f)=>a+(+f.receita||0),0);
   const foraSub=rb.valor>SUBLIMITE;const grupos={};const tot=Object.fromEntries(TRIB.map(t=>[t,0]));const ded=Object.fromEntries(TRIB.map(t=>[t,0]));
-  for(const l of L){const an=l.anexo==='R'?(fr>=FATOR_R?'III':'V'):(ANEXOS[l.anexo]?l.anexo:'III');
+  let naoOpt=0;
+  for(const l of L){if(l.naoOptante){naoOpt+=+l.valor||0;continue}const an=(l.anexo==='R'||l.fatorR)?(fr>=FATOR_R?'III':'V'):(ANEXOS[l.anexo]?l.anexo:'III');
     const g=grupos[an]||(grupos[an]={anexo:an,receita:0,linhas:0,fx:faixaDe(rb.valor,an),aliq:aliqEfetiva(rb.valor,an),trib:Object.fromEntries(TRIB.map(t=>[t,0])),ded:Object.fromEntries(TRIB.map(t=>[t,0]))});
     if(!g.p)g.p=repartir(an,g.fx,g.aliq,foraSub);
     const v=+l.valor||0;g.receita+=v;g.linhas++;const sai=new Set(Object.keys(SEGREG).filter(k=>l[k]).flatMap(k=>SEGREG[k].sai));
@@ -5940,9 +5941,9 @@ function apurarSN(e,comp){
   else if(foraSub)avisos.push(['warn','RBT12 acima do sublimite de R$ 3,6 milhões: ICMS e ISS saem do DAS e são apurados pelas regras normais do estado e do município.']);
   if(receitaAno>SUBLIMITE*1.2)avisos.push(['crit',`Receita acumulada em ${anoComp} (${brl(receitaAno)}) passou 20% do sublimite: ICMS e ISS fora do DAS já a partir do mês seguinte ao excesso.`]);
   else if(receitaAno>SUBLIMITE)avisos.push(['warn',`Receita acumulada em ${anoComp} (${brl(receitaAno)}) passou o sublimite: ICMS e ISS fora do DAS a partir de janeiro do ano seguinte.`]);
-  if(L.some(l=>l.anexo==='R')&&!fs.manual)avisos.push(['','Fator R calculado com a folha atual × 12 (salários + 8% de FGTS + pró-labore). Para usar a folha real dos últimos 12 meses (FS12), informe o valor no campo ao lado.']);
+  if(L.some(l=>(l.anexo==='R'||l.fatorR)&&!l.naoOptante)&&!fs.manual)avisos.push(['','Fator R calculado com a folha atual × 12 (salários + 8% de FGTS + pró-labore). Para usar a folha real dos últimos 12 meses (FS12), informe o valor no campo ao lado.']);
   if(rb.proporcional)avisos.push(['','RBT12 proporcionalizada: a empresa tem menos de 12 meses de atividade (LC 123, art. 18, §§ 1º e 2º).']);
-  return {rbt12:rb.valor,proporcional:rb.proporcional,folha12:fs.valor,folhaManual:fs.manual,fatorR:fr,usaFatorR:L.some(l=>l.anexo==='R'),grupos:Object.values(grupos).sort((a,b)=>a.anexo.localeCompare(b.anexo)),tot,ded,total,receita,lancado,linhas:L,avisos,foraSub,receitaAno}}
+  return {rbt12:rb.valor,proporcional:rb.proporcional,folha12:fs.valor,folhaManual:fs.manual,fatorR:fr,usaFatorR:L.some(l=>(l.anexo==='R'||l.fatorR)&&!l.naoOptante),receitaNaoOptante:r2(naoOpt),grupos:Object.values(grupos).sort((a,b)=>a.anexo.localeCompare(b.anexo)),tot,ded,total,receita,lancado,linhas:L,avisos,foraSub,receitaAno}}
 // a tela "Apuração e guias" e a geração da guia passam a usar a apuração por lançamentos
 const apurarV25=apurar;
 apurar=function(e,comp){const b=apurarV25(e,comp);if(!e||e.regime!=='SN')return b;const a=apurarSN(e,comp);if(!a.linhas.length)return b;
@@ -5960,15 +5961,15 @@ function aSimples(){
   const mei=e.regime==='MEI';
   const flags=l=>Object.keys(SEGREG).filter(k=>l[k]).map(k=>pill(SEGREG[k].rot,'')).join(' ');
   const linhas=L.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>${mei?'Tipo':'Anexo'}</th>${mei?'<th>Com nota?</th>':'<th>Segregação</th>'}<th class="r">Valor</th><th></th></tr></thead><tbody>${L.map(l=>`<tr>
-      <td class="num small">${l.data?fmtData(l.data):'—'}</td><td>${esc(l.descricao||'')}${l.origem==='nfse'?' <span class="small muted">· NFS-e</span>':''}</td>
-      <td class="small">${mei?esc(MEI_CAT[l.meiCat]||'—'):esc(ANEXO_LANC[l.anexo]||l.anexo)}</td><td>${mei?(l.comNota?'Sim':'Não'):flags(l)||'<span class="small muted">—</span>'}</td>
+      <td class="num small">${l.data?fmtData(l.data):'—'}</td><td>${esc(l.descricao||'')}${l.origem==='nfse'?' <span class="small muted">· NFS-e</span>':l.origem==='xml'?' <span class="small muted">· XML</span>':''}</td>
+      <td class="small">${mei?esc(MEI_CAT[l.meiCat]||'—'):l.naoOptante?'<b>Não optante</b>'+(l.anexo?' · '+esc(l.anexo):''):esc((l.anexo==='R'||l.fatorR)?'Fator R (III/V)':ANEXO_LANC[l.anexo]||l.anexo)}</td><td>${mei?(l.comNota?'Sim':'Não'):flags(l)||'<span class="small muted">—</span>'}</td>
       <td class="r num">${brl(l.valor)}</td><td>${ed?`<div class="actions" style="flex-wrap:nowrap"><button class="btn sm ghost" data-act="sn-editar" data-id="${l.id}">Editar</button><button class="btn sm ghost" data-act="sn-excluir" data-id="${l.id}" aria-label="Excluir">Excluir</button></div>`:''}</td></tr>`).join('')}
       <tr><td></td><td><b>Total do mês</b></td><td></td><td></td><td class="r num"><b>${brl(L.reduce((a,l)=>a+(+l.valor||0),0))}</b></td><td></td></tr></tbody></table></div>`
     :vazio(receitaMes(e.id,comp)!=null?`Sem lançamentos: a apuração usa a receita total informada (${brl(receitaMes(e.id,comp))}) no anexo do cadastro. Lance as receitas por anexo para segregar.`:'Nenhuma receita lançada neste mês.');
-  const painelLanc=`<div class="panel"><div class="panel-head"><h2>Receitas de ${fmtComp(comp)}</h2><div class="actions">${ed&&nfse.length?`<button class="btn" data-act="sn-importar">Importar ${nfse.length} NFS-e emitida(s)</button>`:''}${ed?`<button class="btn primary" data-act="sn-novo">${svg('plus')}Lançar receita</button>`:''}</div></div>
+  const painelLanc=`<div class="panel"><div class="panel-head"><h2>Receitas de ${fmtComp(comp)}</h2><div class="actions">${ed&&nfse.length?`<button class="btn" data-act="sn-importar">Importar ${nfse.length} NFS-e emitida(s)</button>`:''}${ed?`<label class="btn">${svg('upload')}Importar XML<input type="file" hidden multiple accept=".xml,.zip" data-up="xml-fiscal"></label><button class="btn primary" data-act="sn-novo">${svg('plus')}Lançar manualmente</button>`:''}</div></div>
     ${!ed&&snFechada(e.id,comp)?'<p class="small muted">Competência snFechada: lançamentos só para consulta.</p>':''}${linhas}</div>`;
   if(mei){const ano=comp.slice(0,4);const lim=typeof limiteMEIAno==='function'?limiteMEIAno(e,ano):LIMITE_MEI;const rAno=S.faturamento.filter(f=>f.empresaId===e.id&&f.comp.startsWith(ano)).reduce((a,f)=>a+(+f.receita||0),0);
-    return `${head('Apuração do Simples','Lançamentos de receita, cálculo do DAS com RBT12, anexos e segregação, memória de cálculo e relatórios em PDF.',seletor)}
+    return `${head('Apuração do Simples','Lançamentos de receita, cálculo do DAS com RBT12, anexos e segregação, memória de cálculo e relatórios em PDF.',seletor)}${snAbas()}
      <div class="crm-kpis"><div class="kpi"><span class="eyebrow">DAS-MEI do mês</span><b>${brl(DAS_MEI[e.meiAtividade||'servicos'])}</b></div><div class="kpi"><span class="eyebrow">Faturado em ${ano}</span><b>${brl(rAno)}</b></div><div class="kpi"><span class="eyebrow">Limite do ano</span><b>${brl(lim)}</b></div><div class="kpi"><span class="eyebrow">Usado</span><b>${pct(lim?rAno/lim:0)}</b></div></div>
      ${painelLanc}<div class="panel"><div class="panel-head"><h2>Relatório mensal de receitas brutas</h2><div class="actions"><button class="btn" data-act="sn-rel-mei">${svg('download')}Relatório do mês (PDF)</button></div></div><p class="small muted" style="margin:0">Modelo exigido do MEI (Res. CGSN 140/2018), com as receitas separadas em revenda, industrialização e serviços, com e sem nota fiscal. Fica assinado e guardado com as notas do mês.</p></div>`}
   const a=apurarSN(e,comp);const g0=a.grupos;const temISS=a.tot.ISS>0||a.ded.ISS>0;
@@ -5976,7 +5977,7 @@ function aSimples(){
     <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Tributo</th>${g0.map(g=>`<th class="r">Anexo ${g.anexo}</th>`).join('')}<th class="r">Deduzido</th><th class="r">Total no DAS</th></tr></thead><tbody>${TRIB.filter(t=>a.tot[t]||a.ded[t]).map(t=>`<tr><td>${t==='CPP'?'CPP (INSS patronal)':t}</td>${g0.map(g=>`<td class="r num">${brl(g.trib[t])}</td>`).join('')}<td class="r num">${a.ded[t]?brl(a.ded[t]):'—'}</td><td class="r num"><b>${brl(a.tot[t])}</b></td></tr>`).join('')}
     <tr><td><b>Total</b></td>${g0.map(g=>`<td class="r num"><b>${brl(g.total)}</b></td>`).join('')}<td class="r num">${brl(TRIB.reduce((x,t)=>x+a.ded[t],0))}</td><td class="r num"><b>${brl(a.total)}</b></td></tr></tbody></table></div>`:vazio('Lance a receita do mês para calcular.');
   const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo==='DAS');
-  return `${head('Apuração do Simples','Lançamentos de receita por anexo, cálculo do DAS com RBT12, Fator R e segregação, memória de cálculo e relatórios em PDF.',seletor)}
+  return `${head('Apuração do Simples','Lançamentos de receita por anexo, cálculo do DAS com RBT12, Fator R e segregação, memória de cálculo e relatórios em PDF.',seletor)}${snAbas()}
    ${a.avisos.map(([c,t])=>`<div class="banner ${c||'info'}" style="display:block;margin-bottom:10px">${esc(t)}</div>`).join('')}
    <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Receita do mês</span><b>${brl(a.receita)}</b></div><div class="kpi"><span class="eyebrow">RBT12${a.proporcional?' (proporcional)':''}</span><b>${brl(a.rbt12)}</b></div>
     <div class="kpi"><span class="eyebrow">DAS calculado</span><b>${brl(a.total)}</b></div><div class="kpi"><span class="eyebrow">Alíquota final</span><b>${pct(a.receita?a.total/a.receita:0)}</b></div></div>
@@ -5986,6 +5987,7 @@ function aSimples(){
     ${UI.snRbt?`<dt></dt><dd><div class="table-wrap"><table><tbody>${Array.from({length:12},(_,i)=>addMes(comp,-(12-i))).map(c=>`<tr><td>${fmtComp(c)}</td><td class="r num">${receitaMes(e.id,c)!=null?brl(receitaMes(e.id,c)):'<span class="muted">sem receita</span>'}</td></tr>`).join('')}</tbody></table></div></dd>`:''}
     ${a.usaFatorR||e.fatorR?`<dt>Folha 12 meses (FS12)</dt><dd><input type="number" step="0.01" min="0" data-sn-folha value="${a.folhaManual?a.folha12:''}" placeholder="${brl(a.folha12)} (estimada)" style="width:200px" ${ed?'':'disabled'}> <span class="small muted">salários, 13º, FGTS, INSS patronal e pró-labore</span></dd>
     <dt>Fator R</dt><dd><b class="num">${pct(a.fatorR)}</b> ${a.fatorR>=FATOR_R?pill('28% ou mais: Anexo III','ok'):pill('Abaixo de 28%: Anexo V','warn')}</dd>`:''}
+    ${a.receitaNaoOptante?`<dt>Receitas não optantes</dt><dd class="num">${brl(a.receitaNaoOptante)} <span class="small muted">· fora do DAS, somadas à RBT12</span></dd>`:''}
     <dt>Receita acumulada em ${comp.slice(0,4)}</dt><dd class="num">${brl(a.receitaAno)} <span class="small muted">· sublimite ${brl(SUBLIMITE)} · limite ${brl(LIMITE_SN)}</span></dd>
     ${g?`<dt>Guia DAS</dt><dd>${pill(statusGuia(g).t,statusGuia(g).c)} ${brl(g.valor)}${Math.abs((+g.valor||0)-a.total)>0.009?' '+pill('diferente do cálculo','warn'):''}</dd>`:''}</div>
     ${memoria}
@@ -5996,22 +5998,27 @@ document.addEventListener('change',ev=>{const el=ev.target;if(!el.dataset)return
   if(el.hasAttribute&&el.hasAttribute('data-sn-folha')){const F=UI.fsn;const e=emp(F.emp);const v=el.value===''?null:r2(+el.value);
     mut('faturamento',()=>{let f=snFat(e.id,F.comp);if(!f){f={id:uid(),empresaId:e.id,comp:F.comp,receita:receitaMes(e.id,F.comp)??0,origem:'declarado'};S.faturamento.push(f)}f.folha12=v},['Apuração','FS12 '+fmtComp(F.comp)+' = '+(v==null?'estimada':brl(v)),e.razao])}});
 ACT['sn-rbt']=()=>{UI.snRbt=!UI.snRbt;render()};
-function formReceita(l){const F=UI.fsn;const e=emp(F.emp);const mei=e.regime==='MEI';const ult=F.comp+'-'+String(new Date(+F.comp.slice(0,4),+F.comp.slice(5,7),0).getDate()).padStart(2,'0');l=l||{data:ult,anexo:e.fatorR?'R':(e.anexo||'III'),meiCat:e.meiAtividade==='comercio'?'com':'serv',comNota:true};
-  openModal(`${mHead(l.id?'Editar receita':'Lançar receita')}<form data-form="sn-receita" data-id="${l.id||''}"><div class="modal-body"><div class="grid-f">
+function formReceita(l){const F=UI.fsn;const e=emp(F.emp);const mei=e.regime==='MEI';const ult=F.comp+'-'+String(new Date(+F.comp.slice(0,4),+F.comp.slice(5,7),0).getDate()).padStart(2,'0');
+  l=l?{...l}:{data:ult,anexo:['I','II','III','IV','V'].includes(e.anexo)?e.anexo:'III',fatorR:!!e.fatorR,meiCat:e.meiAtividade==='comercio'?'com':'serv',comNota:true};
+  if(l.anexo==='R'){l.anexo='III';l.fatorR=true}
+  openModal(`${mHead(l.id?'Editar receita':'Lançar receita manualmente')}<form data-form="sn-receita" data-id="${l.id||''}"><div class="modal-body"><div class="grid-f">
     <label class="f"><span>Data</span><input type="date" name="data" value="${esc(l.data||'')}" min="${F.comp}-01" max="${ult}" required></label>
-    <label class="f"><span>Valor (R$)</span><input type="number" name="valor" step="0.01" min="0.01" value="${l.valor??''}" required></label>
-    <label class="f full"><span>Descrição</span><input name="descricao" maxlength="160" value="${esc(l.descricao||'')}" placeholder="Ex.: NF 123 · venda de mercadorias · serviços de consultoria"></label>
+    <label class="f"><span>Valor (R$)</span><input type="number" name="valor" step="0.01" value="${l.valor??''}" required></label>
+    <label class="f full"><span>Descrição / documento</span><input name="descricao" maxlength="160" value="${esc(l.descricao||'')}" placeholder="Ex.: NF 123 · venda de mercadorias · serviços de consultoria"></label>
     ${mei?`<label class="f"><span>Tipo de receita</span><select name="meiCat">${Object.entries(MEI_CAT).map(([k,v])=>`<option value="${k}" ${l.meiCat===k?'selected':''}>${v}</option>`).join('')}</select></label>
       <label class="chk" style="align-self:end"><input type="checkbox" name="comNota" ${l.comNota!==false?'checked':''}> Com nota fiscal emitida</label>`
-    :`<label class="f full"><span>Anexo da atividade</span><select name="anexo">${Object.entries(ANEXO_LANC).map(([k,v])=>`<option value="${k}" ${l.anexo===k?'selected':''}>${v}</option>`).join('')}</select></label>
-      <div class="full"><span class="small muted">Segregação (o tributo marcado sai do cálculo deste lançamento):</span><div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px">${Object.entries(SEGREG).map(([k,v])=>`<label class="chk"><input type="checkbox" name="${k}" ${l[k]?'checked':''}> ${v.rot}</label>`).join('')}</div></div>`}
+    :`<label class="f"><span>Regime da receita</span><select name="regime"><option value="SN" ${!l.naoOptante?'selected':''}>Simples Nacional</option><option value="NO" ${l.naoOptante?'selected':''}>Não optante (outro regime)</option></select></label>
+      <label class="f"><span>Anexo</span><select name="anexo">${['I','II','III','IV','V'].map(k=>`<option value="${k}" ${l.anexo===k?'selected':''}>${esc(ANEXO_NOME[k])}</option>`).join('')}</select></label>
+      <label class="chk full"><input type="checkbox" name="fatorR" ${l.fatorR?'checked':''}> Atividade sujeita ao Fator R (vai para o Anexo III com folha de 28% ou mais, senão Anexo V)</label>
+      <div class="full"><span class="small muted">Segregação: o tributo marcado sai do cálculo deste lançamento.</span><div style="display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:6px">${Object.entries(SEGREG).map(([k,v])=>`<label class="chk"><input type="checkbox" name="${k}" ${l[k]?'checked':''}> ${v.rot}</label>`).join('')}</div></div>
+      <p class="small muted full" style="margin:0">Receita negativa (ex.: devolução de venda) reduz a receita do mês. Lançamentos "não optante" ficam fora do DAS, mas entram na RBT12.</p>`}
     </div></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar</button></div></form>`)}
 ACT['sn-novo']=()=>formReceita();
 ACT['sn-editar']=el=>formReceita(S.receitas.find(r=>r.id===el.dataset.id));
-FORM['sn-receita']=(fd,form)=>{const F=UI.fsn;const e=emp(F.emp);const id=form.dataset.id;const v=r2(+fd.get('valor'));if(!(v>0)){toast('Informe o valor.',true);return}
+FORM['sn-receita']=(fd,form)=>{const F=UI.fsn;const e=emp(F.emp);const id=form.dataset.id;const v=r2(+fd.get('valor'));if(!v){toast('Informe o valor.',true);return}
   const d=String(fd.get('data')||'');if(!d.startsWith(F.comp)){toast('A data precisa estar dentro de '+fmtComp(F.comp)+'.',true);return}
   const dados={data:d,valor:v,descricao:String(fd.get('descricao')||'').trim()};
-  if(e.regime==='MEI'){dados.meiCat=fd.get('meiCat');dados.comNota=!!fd.get('comNota')}else{dados.anexo=fd.get('anexo');Object.keys(SEGREG).forEach(k=>dados[k]=!!fd.get(k))}
+  if(e.regime==='MEI'){dados.meiCat=fd.get('meiCat');dados.comNota=!!fd.get('comNota')}else{dados.anexo=fd.get('anexo');dados.fatorR=!!fd.get('fatorR')&&['III','V'].includes(dados.anexo);dados.naoOptante=fd.get('regime')==='NO';Object.keys(SEGREG).forEach(k=>dados[k]=!!fd.get(k))}
   mut(['receitas','faturamento'],()=>{if(id){const r=S.receitas.find(x=>x.id===id);Object.assign(r,dados,{atualizadoEm:agora()})}else S.receitas.push({id:uid(),empresaId:e.id,comp:F.comp,origem:'manual',criadoEm:agora(),criadoPor:ME.id,...dados});sincFat(e.id,F.comp)},
     ['Apuração',(id?'Editou':'Lançou')+' receita '+brl(v)+' em '+fmtComp(F.comp),e.razao]);closeModal();toast('Receita '+(id?'atualizada':'lançada')+'.')};
 ACT['sn-excluir']=el=>{const r=S.receitas.find(x=>x.id===el.dataset.id);if(!r||!confirm('Excluir o lançamento de '+brl(r.valor)+'?'))return;
@@ -6060,6 +6067,223 @@ ACT['sn-rel-mei']=()=>{const F=UI.fsn;const e=emp(F.emp);const L=snRec(e.id,F.co
    <table><tr class="tot"><td>IV · Total geral das receitas brutas no mês (I + II + III)</td><td class="r">${brl(tot)}</td></tr></table>
    <p style="margin-top:18px">Local e data: ____________________________________</p><div class="ass"><div>Assinatura do empresário</div></div>
    <p class="nota">Anexar ao relatório os documentos fiscais de compras de mercadorias e insumos e as notas fiscais emitidas no período (Res. CGSN 140/2018, art. 106).</p>`)};
+
+/* ==== v26: escrita fiscal de saída (XML de NF-e, NFC-e, NFS-e Nacional e ABRASF), receitas automáticas, filtros e relatórios ==== */
+if(!S.docsaida)S.docsaida=[];
+const MOD_NOME={'55':'NF-e','65':'NFC-e',NFSE:'NFS-e'};
+const XQ=(el,t)=>{if(!el)return null;const n=el.getElementsByTagNameNS('*',t);return n.length?n[0]:null};
+const XT=(el,t)=>{const n=XQ(el,t);return n?n.textContent.trim():''};
+const XN=(el,t)=>{const v=XT(el,t);const n=+String(v).replace(',','.');return Number.isFinite(n)?n:0};
+const XFilhos=(el,t)=>el?[...el.getElementsByTagNameNS('*',t)]:[];
+const primeiroFilho=el=>el?[...el.children][0]||null:null;
+const xDia=v=>String(v||'').slice(0,10);
+/* ----- regras de CFOP (finalidade do documento) ----- */
+const cfopG=c=>(+c)%1000;
+// gera receita bruta: vendas (101-125), vendas com ST (401-405), energia/comunicação/transporte (251-258, 301-307, 351-360), serviços com ISS (932, 933)
+const cfopReceita=c=>{const g=cfopG(c);return (g>=101&&g<=125)||(g>=401&&g<=405)||(g>=251&&g<=258)||(g>=301&&g<=307)||(g>=351&&g<=360)||g===932||g===933};
+// devolução de venda (abate a receita do mês): entradas 1/2/3.201-204 e 410-411; ou NF-e de devolução de compra do cliente (5/6.201-202, 410-411)
+const cfopDevolucao=(c,entradaPropria)=>{const g=cfopG(c),d=String(c)[0];return entradaPropria?['1','2','3'].includes(d)&&((g>=201&&g<=204)||g===410||g===411):['5','6'].includes(d)&&(g===201||g===202||g===410||g===411)};
+const cfopProducao=c=>[101,103,105,107,109,111,113,116,118,122,124,125,401,402,201,203,410].includes(cfopG(c));
+const cfopServico=c=>[932,933].includes(cfopG(c));
+const stItem=it=>it.csosn==='500'||it.cst==='60'||[405,411].includes(cfopG(it.cfop));
+const monoItem=it=>['04','05'].includes(it.cstPis)||['04','05'].includes(it.cstCofins);
+/* ----- leitura dos XML ----- */
+function lerNFe(d){const inf=XQ(d,'infNFe');const ide=XQ(inf,'ide'),emit=XQ(inf,'emit'),dest=XQ(inf,'dest'),tot=XQ(inf,'ICMSTot'),prot=XQ(d,'infProt'),iss=XQ(inf,'ISSQNtot');
+  const chave=(inf.getAttribute('Id')||'').replace(/^NFe/,'')||XT(prot,'chNFe');const cStat=XT(prot,'cStat');
+  const itens=XFilhos(inf,'det').map(det=>{const prod=XQ(det,'prod'),imp=XQ(det,'imposto');const icms=primeiroFilho(XQ(imp,'ICMS'));const pis=primeiroFilho(XQ(imp,'PIS')),cof=primeiroFilho(XQ(imp,'COFINS')),ipi=XQ(imp,'IPI');
+    return {n:+det.getAttribute('nItem'),cod:XT(prod,'cProd'),desc:XT(prod,'xProd'),ncm:XT(prod,'NCM'),cest:XT(prod,'CEST'),cfop:XT(prod,'CFOP'),un:XT(prod,'uCom'),qtd:XN(prod,'qCom'),vUn:XN(prod,'vUnCom'),
+      vProd:XN(prod,'vProd'),vDesc:XN(prod,'vDesc'),vFrete:XN(prod,'vFrete'),vSeg:XN(prod,'vSeg'),vOutro:XN(prod,'vOutro'),
+      orig:XT(icms,'orig'),cst:XT(icms,'CST'),csosn:XT(icms,'CSOSN'),vBC:XN(icms,'vBC'),pICMS:XN(icms,'pICMS'),vICMS:XN(icms,'vICMS'),vBCST:XN(icms,'vBCST'),vST:XN(icms,'vICMSST'),vCredSN:XN(icms,'vCredICMSSN'),
+      vIPI:XN(ipi,'vIPI'),cstPis:XT(pis,'CST'),vPIS:XN(pis,'vPIS'),cstCofins:XT(cof,'CST'),vCOFINS:XN(cof,'vCOFINS')}});
+  return {tipo:'nfe',id:chave,chave,modelo:XT(ide,'mod')||'55',numero:XT(ide,'nNF'),serie:XT(ide,'serie'),emissao:xDia(XT(ide,'dhEmi')||XT(ide,'dEmi')),tpNF:XT(ide,'tpNF'),natOp:XT(ide,'natOp'),finNFe:XT(ide,'finNFe'),
+    emitente:{doc:XT(emit,'CNPJ')||XT(emit,'CPF'),nome:XT(emit,'xNome'),uf:XT(XQ(emit,'enderEmit'),'UF'),crt:XT(emit,'CRT')},
+    destinatario:{doc:XT(dest,'CNPJ')||XT(dest,'CPF')||XT(dest,'idEstrangeiro'),nome:XT(dest,'xNome')||'Consumidor final',uf:XT(XQ(dest,'enderDest'),'UF')},
+    situacao:['101','135','151','155'].includes(cStat)?'cancelada':['110','301','302','303'].includes(cStat)?'denegada':cStat&&!['100','150'].includes(cStat)?'outra':'autorizada',protocolo:XT(prot,'nProt'),
+    totais:{vProd:XN(tot,'vProd'),vDesc:XN(tot,'vDesc'),vFrete:XN(tot,'vFrete'),vSeg:XN(tot,'vSeg'),vOutro:XN(tot,'vOutro'),vNF:XN(tot,'vNF'),vBC:XN(tot,'vBC'),vICMS:XN(tot,'vICMS'),vBCST:XN(tot,'vBCST'),vST:XN(tot,'vST'),vIPI:XN(tot,'vIPI'),vPIS:XN(tot,'vPIS'),vCOFINS:XN(tot,'vCOFINS'),vServ:XN(iss,'vServ'),vISS:XN(iss,'vISS')},itens}}
+function lerNFSeNacional(d){const inf=XQ(d,'infNFSe');const dps=XQ(d,'infDPS');const prest=XQ(dps,'prest'),toma=XQ(dps,'toma'),serv=XQ(dps,'serv'),val=XQ(dps,'valores'),trib=XQ(dps,'tribMun'),vIn=XQ(inf,'valores');
+  const vServ=XN(XQ(val,'vServPrest'),'vServ');const desc=XN(XQ(val,'vDescCondIncond'),'vDescIncond');const ret=XT(trib,'tpRetISSQN');
+  const prestDoc=XT(prest,'CNPJ')||XT(prest,'CPF')||XT(XQ(inf,'emit'),'CNPJ');const num=XT(inf,'nNFSe');const mun=XT(inf,'cLocIncid')||XT(XQ(serv,'locPrest'),'cLocPrestacao');
+  return {tipo:'nfse',padrao:'Nacional',id:'nfse-'+soDig(prestDoc)+'-'+(XT(inf,'cLocEmi')||'')+'-'+num,chave:(inf.getAttribute('Id')||'').replace(/^NFS/,''),modelo:'NFSE',numero:num,serie:XT(dps,'serie'),
+    emissao:xDia(XT(dps,'dhEmi')||XT(inf,'dhProc')),competencia:XT(dps,'dCompet'),natOp:XT(XQ(serv,'cServ'),'xDescServ').slice(0,120),
+    emitente:{doc:prestDoc,nome:XT(XQ(inf,'emit'),'xNome')},destinatario:{doc:XT(toma,'CNPJ')||XT(toma,'CPF'),nome:XT(toma,'xNome')||'Tomador não identificado'},
+    situacao:'autorizada',servico:{codigo:XT(XQ(serv,'cServ'),'cTribNac'),municipioIncidencia:mun},
+    iss:{retido:ret==='2'||ret==='3',valor:XN(vIn,'vISSQN'),aliquota:XN(vIn,'pAliqAplic'),base:XN(vIn,'vBC')},
+    totais:{vServ,vDesc:desc,vNF:r2(vServ-desc),vLiq:XN(vIn,'vLiq')},itens:[]}}
+function lerNFSeAbrasf(el){// el = CompNfse ou Nfse
+  const inf=XQ(el,'InfNfse');const decl=XQ(inf,'InfDeclaracaoPrestacaoServico')||XQ(el,'InfDeclaracaoPrestacaoServico')||inf;const serv=XQ(decl,'Servico')||XQ(inf,'Servico');const val=XQ(serv,'Valores');
+  const prest=XQ(decl,'Prestador')||XQ(inf,'PrestadorServico')||XQ(inf,'IdentificacaoPrestador');const toma=XQ(decl,'TomadorServico')||XQ(decl,'Tomador')||XQ(inf,'TomadorServico');
+  const ret=XT(val,'IssRetido')||XT(serv,'IssRetido');const num=XT(inf,'Numero');const prestDoc=XT(prest,'Cnpj')||XT(prest,'Cpf');const canc=!!XQ(el,'NfseCancelamento')||!!XQ(el,'Cancelamento');
+  const vServ=XN(val,'ValorServicos');const desc=XN(val,'DescontoIncondicionado');
+  return {tipo:'nfse',padrao:'ABRASF',id:'nfse-'+soDig(prestDoc)+'-'+(XT(XQ(inf,'OrgaoGerador'),'CodigoMunicipio')||'')+'-'+num,chave:XT(inf,'CodigoVerificacao'),modelo:'NFSE',numero:num,serie:XT(decl,'Serie'),
+    emissao:xDia(XT(inf,'DataEmissao')),competencia:xDia(XT(decl,'Competencia')||XT(inf,'Competencia')),natOp:XT(serv,'Discriminacao').slice(0,120),
+    emitente:{doc:prestDoc,nome:XT(XQ(inf,'PrestadorServico'),'RazaoSocial')},destinatario:{doc:XT(toma,'Cnpj')||XT(toma,'Cpf'),nome:XT(toma,'RazaoSocial')||'Tomador não identificado'},
+    situacao:canc?'cancelada':'autorizada',servico:{codigo:XT(serv,'ItemListaServico')||XT(serv,'CodigoTributacaoMunicipio'),cnae:XT(serv,'CodigoCnae'),municipioIncidencia:XT(serv,'MunicipioIncidencia')||XT(serv,'CodigoMunicipio')},
+    iss:{retido:ret==='1',valor:XN(val,'ValorIss'),aliquota:XN(val,'Aliquota'),base:XN(val,'BaseCalculo')},totais:{vServ,vDesc:desc,vNF:r2(vServ-desc),vLiq:XN(val,'ValorLiquidoNfse')},itens:[]}}
+function lerXmlFiscal(texto){const d=new DOMParser().parseFromString(texto,'application/xml');if(d.getElementsByTagName('parsererror').length)return [{erro:'XML inválido'}];
+  const ev=XQ(d,'infEvento');if(ev&&['110111','110112'].includes(XT(ev,'tpEvento')))return [{tipo:'cancelamento',chave:XT(ev,'chNFe')}];
+  if(XQ(d,'infNFe'))return [lerNFe(d)];
+  if(XQ(d,'infNFSe'))return [lerNFSeNacional(d)];
+  const comps=XFilhos(d,'CompNfse');if(comps.length)return comps.map(lerNFSeAbrasf);
+  if(XQ(d,'InfNfse'))return [lerNFSeAbrasf(d.documentElement)];
+  return [{erro:'Tipo de XML não reconhecido (aceita NF-e, NFC-e, NFS-e Nacional e ABRASF)'}]}
+const textoXml=bytes=>{const ini=new TextDecoder('latin1').decode(bytes.slice(0,200));return new TextDecoder(/encoding=["']ISO-8859-1|windows-1252/i.test(ini)?'latin1':'utf-8').decode(bytes)};
+async function lerZip(buf){const dv=new DataView(buf);let i=buf.byteLength-22;while(i>=0&&dv.getUint32(i,true)!==0x06054b50)i--;if(i<0)throw new Error('ZIP inválido.');
+  const n=dv.getUint16(i+10,true);let p=dv.getUint32(i+16,true);const out=[];
+  for(let k=0;k<n;k++){if(dv.getUint32(p,true)!==0x02014b50)break;const met=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+    const nome=new TextDecoder().decode(new Uint8Array(buf,p+46,nl));p+=46+nl+xl+cl;if(!/\.xml$/i.test(nome))continue;
+    const ini=off+30+dv.getUint16(off+26,true)+dv.getUint16(off+28,true);const dados=new Uint8Array(buf,ini,cs);
+    if(met===0)out.push({nome,bytes:dados});else if(met===8)out.push({nome,bytes:new Uint8Array(await new Response(new Blob([dados]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer())})}
+  return out}
+/* ----- receitas a partir do documento ----- */
+function anexoServico(e){return ['III','IV','V'].includes(e.anexo)?e.anexo:'III'}
+function linhasDoDoc(doc,e){
+  if(doc.situacao!=='autorizada'||doc.ignorarReceita)return [];
+  const mei=e.regime==='MEI';const cnpj=soDig(e.cnpj);const L={};
+  const add=(chave,base,valor)=>{const k=JSON.stringify(chave);(L[k]||(L[k]={...base,valor:0})).valor+=valor};
+  if(doc.modelo==='NFSE'){if(soDig(doc.emitente.doc)!==cnpj)return [];const v=doc.totais.vNF||0;if(!v)return [];
+    if(mei)return [{meiCat:'serv',comNota:true,valor:r2(v)}];
+    const an=doc.anexo||anexoServico(e);const fr=doc.fatorR??!!e.fatorR;return [{anexo:an,fatorR:fr&&['III','V'].includes(an),issRetido:!!doc.iss?.retido,valor:r2(v)}]}
+  const emitida=soDig(doc.emitente.doc)===cnpj;const entradaPropria=emitida&&doc.tpNF==='0';
+  for(const it of doc.itens){const base=(it.vProd||0)-(it.vDesc||0)+(it.vFrete||0)+(it.vSeg||0)+(it.vOutro||0);let sinal=0;
+    if(emitida&&doc.tpNF==='1'&&cfopReceita(it.cfop))sinal=1;else if(cfopDevolucao(it.cfop,entradaPropria)&&(entradaPropria||!emitida))sinal=-1;if(!sinal)continue;
+    const serv=cfopServico(it.cfop);
+    if(mei){add([it.cfop.slice(1)],{meiCat:serv?'serv':cfopProducao(it.cfop)?'ind':'com',comNota:true},sinal*base);continue}
+    const an=doc.anexoItens||(serv?anexoServico(e):cfopProducao(it.cfop)?'II':'I');
+    const f={anexo:an,fatorR:serv&&!!e.fatorR&&['III','V'].includes(an),st:!serv&&stItem(it),monofasico:monoItem(it),exportacao:String(it.cfop)[0]==='7'||String(it.cfop)[0]==='3'};
+    add([f.anexo,f.fatorR,f.st,f.monofasico,f.exportacao],f,sinal*base)}
+  return Object.values(L).map(x=>({...x,valor:r2(x.valor)})).filter(x=>x.valor)}
+function sincDoc(doc){const e=emp(doc.empresaId);if(!e)return;const comp=String(doc.competencia||doc.emissao).slice(0,7);
+  const antes=S.receitas.filter(r=>r.docId===doc.id);const comps=new Set(antes.map(r=>r.comp));
+  S.receitas=S.receitas.filter(r=>r.docId!==doc.id);
+  const tipo=doc.modelo==='NFSE'?'NFS-e':MOD_NOME[doc.modelo]||'NF-e';const dev=doc.itens?.some(it=>cfopDevolucao(it.cfop,true)||cfopDevolucao(it.cfop,false));
+  for(const l of linhasDoDoc(doc,e))S.receitas.push({id:uid(),empresaId:e.id,comp,data:doc.emissao,descricao:`${tipo} ${doc.numero}${doc.serie?'/'+doc.serie:''} · ${doc.destinatario?.nome||''}${dev&&l.valor<0?' (devolução)':''}`.slice(0,160),origem:'xml',docId:doc.id,...l,criadoEm:agora()});
+  comps.add(comp);comps.forEach(c=>sincFat(e.id,c))}
+/* ----- importação ----- */
+async function importarXmlFiscal(files){const F=UI.fsn;const e=emp(F.emp);const cnpj=soDig(e.cnpj);
+  const res={novas:0,atualizadas:0,entradas:0,canceladas:0,outras:0,erros:[]};const arquivos=[];
+  for(const f of files){try{if(/\.zip$/i.test(f.name))arquivos.push(...await lerZip(await f.arrayBuffer()));else arquivos.push({nome:f.name,bytes:new Uint8Array(await f.arrayBuffer())})}catch(er){res.erros.push(f.name+': '+er.message)}}
+  const docs=[];for(const a of arquivos){for(const d of lerXmlFiscal(textoXml(a.bytes))){if(d.erro)res.erros.push(a.nome+': '+d.erro);else docs.push({...d,arqNome:a.nome})}}
+  mut(['docsaida','receitas','faturamento','nfentrada'],()=>{
+    for(const d of docs){
+      if(d.tipo==='cancelamento'){const x=S.docsaida.find(z=>z.chave===d.chave&&z.empresaId===e.id);if(x){x.situacao='cancelada';x.canceladaEm=agora();sincDoc(x);res.canceladas++}continue}
+      const emit=soDig(d.emitente.doc)===cnpj,destino=soDig(d.destinatario.doc)===cnpj;
+      if(!emit&&!destino){res.outras++;continue}
+      // NF-e de fornecedor (empresa é destinatária) que não é devolução: vai para as notas de entrada
+      if(!emit&&d.modelo!=='NFSE'&&!d.itens.some(it=>cfopDevolucao(it.cfop,false))){const x=S.nfentrada.find(z=>z.id===d.chave);
+        const n={...(x||{}),id:d.chave,empresaId:e.id,chave:d.chave,numero:d.numero,serie:d.serie,natOp:d.natOp,emitente:{cnpj:d.emitente.doc,nome:d.emitente.nome,uf:d.emitente.uf},emissao:d.emissao,valor:d.totais.vNF,situacao:d.situacao,completa:true,itens:d.itens,totais:d.totais,origem:x?.origem||'xml',recebidaEm:x?.recebidaEm||agora()};
+        if(x)Object.assign(x,n);else S.nfentrada.push(n);res.entradas++;continue}
+      if(!emit&&d.modelo==='NFSE'){res.outras++;continue}
+      const x=S.docsaida.find(z=>z.id===d.id&&z.empresaId===e.id);
+      const doc={...(x||{}),...d,id:d.id,empresaId:e.id,importadoEm:x?.importadoEm||agora(),importadoPor:x?.importadoPor||ME.nome||'',atualizadoEm:agora()};delete doc.tipo;
+      if(x){Object.assign(x,doc);res.atualizadas++}else{S.docsaida.push(doc);res.novas++}
+      sincDoc(S.docsaida.find(z=>z.id===d.id&&z.empresaId===e.id))}
+  },['Escrita fiscal',`Importou ${docs.length} XML (${res.novas} nova(s), ${res.entradas} de entrada)`,e.razao]);
+  toast(([res.novas?res.novas+' nota(s) de saída importada(s)':'',res.atualizadas?res.atualizadas+' atualizada(s)':'',res.entradas?res.entradas+' de entrada':'',res.canceladas?res.canceladas+' cancelamento(s) aplicado(s)':'',res.outras?res.outras+' de outro CNPJ ignorada(s)':'',res.erros.length?res.erros.length+' com erro':''].filter(Boolean).join(' · ')||'Nenhuma nota nova nos arquivos')+'.',!!res.erros.length&&!res.novas);
+  if(res.erros.length)console.warn('XML com erro:',res.erros)}
+const onUploadV26=onUpload;onUpload=async function(inp){if(inp.dataset.up==='xml-fiscal'){const files=[...inp.files];inp.value='';if(files.length)await importarXmlFiscal(files);return}return onUploadV26(inp)};
+/* ----- abas do módulo ----- */
+function snAbas(){const a=UI.snAba||'apur';return `<div class="tabs" role="tablist" style="margin-bottom:14px">${[['apur','Apuração'],['notas','Notas fiscais de saída'],['rel','Relatórios']].map(([k,t])=>`<button class="tab ${a===k?'on':''}" role="tab" aria-selected="${a===k}" data-act="sn-aba" data-v="${k}">${t}</button>`).join('')}</div>`}
+ACT['sn-aba']=el=>{UI.snAba=el.dataset.v;render()};
+const conteudoV26=conteudo;conteudo=function(){if(UI.modo==='painel'&&UI.view==='a-simples'&&(UI.snAba||'apur')!=='apur')return aSimplesAba();return conteudoV26()};
+function nfCab(titulo){const es=S.empresas.filter(e=>e.status!=='inativo'&&(e.regime==='SN'||e.regime==='MEI'));const F=UI.fsn||(UI.fsn={emp:es[0]?.id,comp:addMes(compAtual(),-1)});if(!es.some(e=>e.id===F.emp))F.emp=es[0]?.id;
+  const meses=[];for(let i=0;i<24;i++)meses.push(addMes(compAtual(),-i));const F2=UI.fnf||(UI.fnf={ate:F.comp});
+  const sel=`<select data-sn="emp" style="width:auto;max-width:280px">${es.map(x=>`<option value="${x.id}" ${x.id===F.emp?'selected':''}>${esc(x.fantasia||x.razao)}${x.regime==='MEI'?' (MEI)':''}</option>`).join('')}</select>
+    <label class="small muted" style="display:flex;align-items:center;gap:6px">de <select data-sn="comp" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===F.comp?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>
+    <label class="small muted" style="display:flex;align-items:center;gap:6px">até <select data-nf="ate" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===(F2.ate<F.comp?F.comp:F2.ate)?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>`;
+  return {es,html:head(titulo,'Escrita fiscal do Simples Nacional e do MEI: notas de saída por XML, receitas automáticas, filtros por CFOP e CST e relatórios.',sel)+snAbas()}}
+const periodoNf=()=>{const F=UI.fsn,F2=UI.fnf||(UI.fnf={});const de=F.comp,ate=F2.ate&&F2.ate>=F.comp?F2.ate:F.comp;return {de,ate}};
+function docsFiltrados(){const F=UI.fsn,f=UI.fnf||(UI.fnf={});const {de,ate}=periodoNf();const q=normP(f.q||'');
+  return S.docsaida.filter(d=>{const c=String(d.competencia||d.emissao).slice(0,7);if(d.empresaId!==F.emp||c<de||c>ate)return false;
+    if(f.mod&&d.modelo!==f.mod)return false;if(f.sit&&d.situacao!==f.sit)return false;
+    if(f.cfop&&!d.itens.some(it=>it.cfop===f.cfop))return false;if(f.cst&&!d.itens.some(it=>(it.csosn||it.cst)===f.cst))return false;
+    if(f.dest==='icms'&&!(d.totais.vICMS>0))return false;if(f.dest==='st'&&!(d.totais.vST>0||d.itens.some(stItem)))return false;if(f.dest==='ipi'&&!(d.totais.vIPI>0))return false;
+    if(f.dest==='mono'&&!d.itens.some(monoItem))return false;if(f.dest==='issret'&&!d.iss?.retido)return false;if(f.dest==='dev'&&!d.itens.some(it=>cfopDevolucao(it.cfop,true)||cfopDevolucao(it.cfop,false)))return false;
+    if(q&&!normP([d.numero,d.destinatario?.nome,d.destinatario?.doc,d.chave,d.natOp].join(' ')).includes(q))return false;return true})
+   .sort((a,b)=>String(a.emissao).localeCompare(String(b.emissao))||String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}))}
+const recDoc=d=>S.receitas.filter(r=>r.docId===d.id).reduce((a,r)=>a+(+r.valor||0),0);
+function aSimplesAba(){if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui Apuração, guias e notas.');
+  const {es,html}=nfCab('Apuração do Simples');if(!es.length)return html+vazio('Nenhuma empresa do Simples Nacional ou MEI na carteira.');
+  return html+((UI.snAba==='notas')?abaNotas():abaRelatorios())}
+function abaNotas(){const F=UI.fsn,f=UI.fnf;const e=emp(F.emp);const ed=podeMod('guias','editar');const L=docsFiltrados();const vis=L.slice(0,400);
+  const base=S.docsaida.filter(d=>d.empresaId===F.emp);const cfops=[...new Set(base.flatMap(d=>d.itens.map(it=>it.cfop)))].filter(Boolean).sort();const csts=[...new Set(base.flatMap(d=>d.itens.map(it=>it.csosn||it.cst)))].filter(Boolean).sort();
+  const sel=(k,rot,ops)=>`<select data-nf="${k}" style="width:auto"><option value="">${rot}</option>${ops.map(([v,t])=>`<option value="${esc(v)}" ${f[k]===v?'selected':''}>${esc(t)}</option>`).join('')}</select>`;
+  const T=k=>L.filter(d=>d.situacao==='autorizada').reduce((a,d)=>a+(+d.totais?.[k]||0),0);const receita=L.filter(d=>d.situacao==='autorizada').reduce((a,d)=>a+recDoc(d),0);
+  return `<div class="crm-kpis"><div class="kpi"><span class="eyebrow">Notas no filtro</span><b>${L.length}</b></div><div class="kpi"><span class="eyebrow">Valor contábil</span><b>${brl(T('vNF'))}</b></div><div class="kpi"><span class="eyebrow">Receita considerada</span><b>${brl(receita)}</b></div><div class="kpi"><span class="eyebrow">ICMS destacado · ST</span><b>${brl(T('vICMS'))} · ${brl(T('vST'))}</b></div></div>
+   <div class="panel"><div class="panel-head" style="flex-wrap:wrap;gap:8px"><h2>Notas fiscais de saída</h2><div class="actions">${ed?`<label class="btn primary">${svg('upload')}Importar XML ou ZIP<input type="file" hidden multiple accept=".xml,.zip" data-up="xml-fiscal"></label>`:''}</div></div>
+    <div class="actions" style="flex-wrap:wrap;margin-bottom:10px">${sel('mod','Todos os modelos',[['55','NF-e'],['65','NFC-e'],['NFSE','NFS-e']])}${sel('cfop','Todos os CFOP',cfops.map(c=>[c,c]))}${sel('cst','Todos os CST/CSOSN',csts.map(c=>[c,c]))}
+     ${sel('dest','Qualquer destaque',[['icms','Com ICMS destacado'],['st','Com substituição tributária'],['ipi','Com IPI'],['mono','Com PIS/Cofins monofásico'],['issret','Com ISS retido'],['dev','Devoluções']])}${sel('sit','Todas as situações',[['autorizada','Autorizadas'],['cancelada','Canceladas'],['denegada','Denegadas']])}
+     <input type="search" data-nf-busca placeholder="Número, cliente, CNPJ ou chave" value="${esc(f.q||'')}" style="max-width:240px"></div>
+    <p class="small muted" style="margin-top:0">Aceita XML de NF-e e NFC-e (com o protocolo), NFS-e do padrão nacional e ABRASF, eventos de cancelamento e arquivos ZIP com vários XML. Notas emitidas por fornecedores para a empresa vão para <b>Notas de entrada</b>. A receita é gerada pelos CFOP de venda e serviço (devoluções abatem); remessas, transferências e bonificações não geram receita.</p>
+    ${vis.length?`<div class="table-wrap"><table><thead><tr><th>Emissão</th><th>Doc.</th><th>Cliente</th><th>CFOP</th><th class="r">Valor</th><th class="r">ICMS</th><th class="r">ST</th><th class="r">Receita</th><th>Situação</th><th></th></tr></thead><tbody>${vis.map(d=>{const r=recDoc(d);return `<tr>
+      <td class="num small">${fmtData(d.emissao)}</td><td class="small">${MOD_NOME[d.modelo]||d.modelo} ${esc(d.numero)}${d.serie?'/'+esc(d.serie):''}</td>
+      <td><b>${esc(d.destinatario?.nome||'')}</b><div class="small muted mono">${d.destinatario?.doc?fmtDoc(d.destinatario.doc):''}</div></td>
+      <td class="small mono">${esc([...new Set(d.itens.map(it=>it.cfop))].join(', ')||(d.modelo==='NFSE'?(d.iss?.retido?'ISS retido':'Serviço'):''))}</td>
+      <td class="r num">${brl(d.totais.vNF)}</td><td class="r num">${d.totais.vICMS?brl(d.totais.vICMS):'—'}</td><td class="r num">${d.totais.vST?brl(d.totais.vST):'—'}</td>
+      <td class="r num">${d.ignorarReceita?'<span class="small muted">desconsiderada</span>':brl(r)}</td>
+      <td>${d.situacao==='autorizada'?pill('Autorizada','ok'):d.situacao==='cancelada'?pill('Cancelada','crit'):pill(d.situacao,'warn')}</td>
+      <td><button class="btn sm ghost" data-act="nf-ver" data-id="${esc(d.id)}">Detalhes</button></td></tr>`}).join('')}</tbody></table></div>${L.length>vis.length?`<p class="small muted">Mostrando ${vis.length} de ${L.length}. Use os filtros ou os relatórios.</p>`:''}`
+    :vazio(base.length?'Nenhuma nota neste filtro.':'Importe os XML das notas de saída da empresa (NF-e, NFC-e ou NFS-e).')}</div>`}
+document.addEventListener('change',ev=>{const el=ev.target;if(el.dataset&&el.dataset.nf){(UI.fnf||(UI.fnf={}))[el.dataset.nf]=el.value;render()}});
+document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-nf-busca]')){(UI.fnf||(UI.fnf={})).q=s.value;clearTimeout(UI._nfT);UI._nfT=setTimeout(()=>{render();const i=document.querySelector('[data-nf-busca]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)}});
+ACT['nf-ver']=el=>{const d=S.docsaida.find(x=>x.id===el.dataset.id);if(!d)return;const e=emp(d.empresaId);const ed=podeMod('guias','editar');const rs=S.receitas.filter(r=>r.docId===d.id);
+  openModal(`${mHead((MOD_NOME[d.modelo]||'Nota')+' '+d.numero+(d.serie?'/'+d.serie:''))}<div class="modal-body">
+   <div class="dl"><dt>Emissão</dt><dd>${fmtData(d.emissao)}${d.competencia&&d.competencia.slice(0,7)!==d.emissao.slice(0,7)?' · competência '+fmtComp(d.competencia.slice(0,7)):''}</dd><dt>Cliente</dt><dd>${esc(d.destinatario?.nome||'')} ${d.destinatario?.doc?'· '+fmtDoc(d.destinatario.doc):''}</dd>
+    ${d.natOp?`<dt>${d.modelo==='NFSE'?'Serviço':'Natureza'}</dt><dd>${esc(d.natOp)}</dd>`:''}${d.chave?`<dt>Chave</dt><dd class="mono small">${esc(d.chave)}</dd>`:''}
+    ${d.modelo==='NFSE'?`<dt>ISS</dt><dd>${d.iss?.retido?pill('Retido pelo tomador','warn'):'Não retido'} · ${brl(d.iss?.valor||0)} (${(+d.iss?.aliquota||0).toLocaleString('pt-BR')}%)${d.servico?.codigo?' · código '+esc(d.servico.codigo):''}</dd>`:''}
+    <dt>Receita gerada</dt><dd>${rs.length?rs.map(r=>`${brl(r.valor)} · ${r.meiCat?MEI_CAT[r.meiCat]:'Anexo '+(r.fatorR?'III/V (Fator R)':r.anexo)}${Object.keys(SEGREG).filter(k=>r[k]).map(k=>' · '+SEGREG[k].rot).join('')}`).join('<br>'):'<span class="muted">Nenhuma</span>'}</dd></div>
+   ${d.itens?.length?`<div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>#</th><th>Produto</th><th>NCM</th><th>CFOP</th><th>CST</th><th class="r">Valor</th><th class="r">ICMS</th><th class="r">ST</th><th>PIS/Cof</th></tr></thead><tbody>${d.itens.map(it=>`<tr><td>${it.n}</td><td class="small">${esc(it.desc)}</td><td class="mono small">${esc(it.ncm)}</td><td class="mono">${esc(it.cfop)}</td><td class="mono">${esc(it.csosn||it.cst)}</td><td class="r num">${brl(it.vProd-(it.vDesc||0))}</td><td class="r num">${it.vICMS?brl(it.vICMS):'—'}</td><td class="r num">${it.vST?brl(it.vST):'—'}</td><td class="mono small">${esc(it.cstPis||'')}/${esc(it.cstCofins||'')}</td></tr>`).join('')}</tbody></table></div>`:''}
+   ${ed?`<div class="grid-f" style="margin-top:12px">${d.modelo==='NFSE'&&e.regime!=='MEI'?`<label class="f"><span>Anexo do serviço</span><select data-nf-anexo="${esc(d.id)}">${['III','IV','V'].map(k=>`<option value="${k}" ${(d.anexo||anexoServico(e))===k?'selected':''}>${esc(ANEXO_NOME[k])}</option>`).join('')}</select></label><label class="chk" style="align-self:end"><input type="checkbox" data-nf-fr="${esc(d.id)}" ${(d.fatorR??!!e.fatorR)?'checked':''}> Sujeito ao Fator R</label>`:''}
+     <label class="chk full"><input type="checkbox" data-nf-ign="${esc(d.id)}" ${d.ignorarReceita?'checked':''}> Não considerar esta nota como receita</label></div>`:''}
+  </div><div class="modal-foot">${ed?`<button class="btn ghost" data-act="nf-excluir" data-id="${esc(d.id)}">Excluir nota</button>`:''}<button class="btn" data-act="close-modal">Fechar</button></div>`,true)};
+document.addEventListener('change',ev=>{const el=ev.target;if(!el.dataset)return;const id=el.dataset.nfAnexo||el.dataset.nfFr||el.dataset.nfIgn;if(!id)return;const d=S.docsaida.find(x=>x.id===id);if(!d)return;
+  mut(['docsaida','receitas','faturamento'],()=>{if(el.dataset.nfAnexo)d.anexo=el.value;if(el.dataset.nfFr)d.fatorR=el.checked;if(el.dataset.nfIgn)d.ignorarReceita=el.checked;sincDoc(d)},['Escrita fiscal','Ajustou a nota '+d.numero,emp(d.empresaId)?.razao||'']);toast('Nota ajustada e receita recalculada.')});
+ACT['nf-excluir']=el=>{const d=S.docsaida.find(x=>x.id===el.dataset.id);if(!d||!confirm('Excluir a nota '+d.numero+' e a receita gerada por ela?'))return;
+  mut(['docsaida','receitas','faturamento'],()=>{d.situacao='excluida';sincDoc(d);S.docsaida=S.docsaida.filter(x=>x!==d)},['Escrita fiscal','Excluiu a nota '+d.numero,emp(d.empresaId)?.razao||'']);closeModal()};
+/* ----- relatórios ----- */
+const RELS={
+  cfop:{t:'Resumo por CFOP',g:it=>it.cfop},cst:{t:'Resumo por CST/CSOSN',g:it=>it.csosn||it.cst||'—'},ncm:{t:'Resumo por NCM',g:it=>it.ncm||'—'},
+  cliente:{t:'Resumo por cliente',doc:true,g:d=>(d.destinatario?.nome||'—')+(d.destinatario?.doc?' · '+fmtDoc(d.destinatario.doc):'')},dia:{t:'Resumo por dia',doc:true,g:d=>fmtData(d.emissao)},
+  modelo:{t:'Resumo por modelo',doc:true,g:d=>MOD_NOME[d.modelo]||d.modelo},anexo:{t:'Base do PGDAS-D (receita por anexo e segregação)',rec:true},
+  saidas:{t:'Livro Registro de Saídas',livro:'saida'},entradas:{t:'Livro Registro de Entradas',livro:'entrada'},itens:{t:'Listagem de itens',lista:true}};
+function dadosRelatorio(k){const F=UI.fsn;const {de,ate}=periodoNf();const L=docsFiltrados().filter(d=>d.situacao==='autorizada');const R=RELS[k];
+  const valIt=it=>(it.vProd||0)-(it.vDesc||0)+(it.vFrete||0)+(it.vSeg||0)+(it.vOutro||0);
+  if(R.rec){const rs=S.receitas.filter(r=>r.empresaId===F.emp&&r.comp>=de&&r.comp<=ate);const m={};
+    rs.forEach(r=>{const k2=r.meiCat?MEI_CAT[r.meiCat]+(r.comNota?' · com nota':' · sem nota'):(r.naoOptante?'Não optante · ':'')+'Anexo '+((r.anexo==='R'||r.fatorR)?'III/V (Fator R)':r.anexo)+(Object.keys(SEGREG).filter(x=>r[x]).map(x=>' · '+SEGREG[x].rot).join('')||' · sem segregação');
+      (m[k2]||(m[k2]={grupo:k2,qtd:0,valor:0})).qtd++;m[k2].valor+=+r.valor||0});
+    return {cols:['Atividade / segregação','Lançamentos','Receita'],linhas:Object.values(m).sort((a,b)=>b.valor-a.valor).map(x=>[x.grupo,x.qtd,brl(x.valor)]),total:['Total',rs.length,brl(rs.reduce((a,r)=>a+(+r.valor||0),0))],csv:Object.values(m).map(x=>[x.grupo,x.qtd,x.valor])}}
+  if(R.livro==='saida'){const lin=[];L.filter(d=>d.tpNF!=='0').forEach(d=>{const cf={};(d.itens.length?d.itens:[{cfop:'',vProd:d.totais.vNF,vBC:0,vICMS:0}]).forEach(it=>{const c=cf[it.cfop]||(cf[it.cfop]={v:0,bc:0,icms:0,ipi:0});c.v+=valIt(it)+(it.vST||0)+(it.vIPI||0);c.bc+=it.vBC||0;c.icms+=it.vICMS||0;c.ipi+=it.vIPI||0});
+      Object.entries(cf).forEach(([c,x])=>lin.push([fmtData(d.emissao),MOD_NOME[d.modelo]||d.modelo,d.serie||'',d.numero,d.destinatario?.uf||'',c||(d.modelo==='NFSE'?'Serviço':''),brl(x.v),brl(x.bc),brl(x.icms),brl(x.ipi),x._csv=[xDia(d.emissao),MOD_NOME[d.modelo],d.serie,d.numero,c,x.v,x.bc,x.icms,x.ipi]]))});
+    return {cols:['Data','Espécie','Série','Número','UF','CFOP','Valor contábil','Base ICMS','ICMS','IPI'],linhas:lin.map(l=>l.slice(0,10)),csv:lin.map(l=>l[10]),total:['Total','','','','','',brl(lin.reduce((a,l)=>a+l[10][5],0)),brl(lin.reduce((a,l)=>a+l[10][6],0)),brl(lin.reduce((a,l)=>a+l[10][7],0)),brl(lin.reduce((a,l)=>a+l[10][8],0))]}}
+  if(R.livro==='entrada'){const N=S.nfentrada.filter(n=>n.empresaId===F.emp&&n.situacao!=='cancelada'&&String(n.emissao).slice(0,7)>=de&&String(n.emissao).slice(0,7)<=ate).sort((a,b)=>String(a.emissao).localeCompare(String(b.emissao)));
+    const cfEnt=c=>c?({5:'1',6:'2',7:'3'}[String(c)[0]]||String(c)[0])+String(c).slice(1):'';const lin=[];
+    // notas de entrada emitidas pela própria empresa (ex.: devolução de venda) também entram no livro, com o CFOP original
+    const proprias=S.docsaida.filter(d=>d.empresaId===F.emp&&d.tpNF==='0'&&d.situacao==='autorizada'&&String(d.emissao).slice(0,7)>=de&&String(d.emissao).slice(0,7)<=ate)
+      .map(d=>({emissao:d.emissao,serie:d.serie,numero:d.numero,emitente:{nome:'Emissão própria · '+(d.destinatario?.nome||'')},itens:d.itens.map(it=>({...it,cfop:it.cfop})),propria:true}));
+    N.push(...proprias);N.sort((a,b)=>String(a.emissao).localeCompare(String(b.emissao)));
+    N.forEach(n=>{const cf={};(n.itens?.length?n.itens:[{cfop:'',vProd:n.valor}]).forEach(it=>{const c=n.propria?it.cfop:cfEnt(it.cfop);const x=cf[c]||(cf[c]={v:0,bc:0,icms:0});x.v+=valIt(it)+(it.vST||0)+(it.vIPI||0);x.bc+=it.vBC||0;x.icms+=it.vICMS||0});
+      Object.entries(cf).forEach(([c,x])=>lin.push([fmtData(String(n.emissao).slice(0,10)),'NF-e',n.serie||'',n.numero||'',(n.emitente?.nome||'').slice(0,40),c||'—',brl(x.v),brl(x.bc),brl(x.icms),[xDia(n.emissao),n.serie,n.numero,n.emitente?.nome,c,x.v,x.bc,x.icms]]))});
+    return {cols:['Data','Espécie','Série','Número','Fornecedor','CFOP','Valor contábil','Base ICMS','ICMS'],linhas:lin.map(l=>l.slice(0,9)),csv:lin.map(l=>l[9]),total:['Total','','','','','',brl(lin.reduce((a,l)=>a+l[9][5],0)),brl(lin.reduce((a,l)=>a+l[9][6],0)),brl(lin.reduce((a,l)=>a+l[9][7],0))],
+      obs:'CFOP de entrada convertido do CFOP do fornecedor (5→1, 6→2, 7→3). Notas só com resumo entram pelo valor total.'}}
+  if(R.lista){const lin=L.flatMap(d=>d.itens.map(it=>[fmtData(d.emissao),d.numero,it.desc.slice(0,50),it.ncm,it.cfop,it.csosn||it.cst,(+it.qtd||0).toLocaleString('pt-BR'),brl(valIt(it)),brl(it.vICMS||0),brl(it.vST||0),[xDia(d.emissao),d.numero,it.cod,it.desc,it.ncm,it.cfop,it.csosn||it.cst,it.qtd,valIt(it),it.vICMS||0,it.vST||0,it.cstPis,it.cstCofins]]));
+    return {cols:['Data','Nota','Produto','NCM','CFOP','CST','Qtd','Valor','ICMS','ST'],linhas:lin.map(l=>l.slice(0,10)),csv:lin.map(l=>l[10])}}
+  const m={};if(R.doc)L.forEach(d=>{const g=R.g(d);const x=m[g]||(m[g]={grupo:g,notas:new Set(),v:0,bc:0,icms:0,st:0,ipi:0,rec:0});x.notas.add(d.id);x.v+=d.totais.vNF||0;x.bc+=d.totais.vBC||0;x.icms+=d.totais.vICMS||0;x.st+=d.totais.vST||0;x.ipi+=d.totais.vIPI||0;x.rec+=recDoc(d)});
+  else L.forEach(d=>d.itens.forEach(it=>{const g=R.g(it);const x=m[g]||(m[g]={grupo:g,notas:new Set(),v:0,bc:0,icms:0,st:0,ipi:0});x.notas.add(d.id);x.v+=valIt(it);x.bc+=it.vBC||0;x.icms+=it.vICMS||0;x.st+=it.vST||0;x.ipi+=it.vIPI||0}));
+  const xs=Object.values(m).sort((a,b)=>b.v-a.v);const sum=k=>xs.reduce((a,x)=>a+x[k],0);
+  return {cols:[R.t.replace('Resumo por ',''),'Notas','Valor','Base ICMS','ICMS','ST','IPI'].concat(R.doc?['Receita']:[]),linhas:xs.map(x=>[x.grupo,x.notas.size,brl(x.v),brl(x.bc),brl(x.icms),brl(x.st),brl(x.ipi)].concat(R.doc?[brl(x.rec)]:[])),
+    total:['Total',new Set(xs.flatMap(x=>[...x.notas])).size,brl(sum('v')),brl(sum('bc')),brl(sum('icms')),brl(sum('st')),brl(sum('ipi'))].concat(R.doc?[brl(sum('rec'))]:[]),csv:xs.map(x=>[x.grupo,x.notas.size,x.v,x.bc,x.icms,x.st,x.ipi].concat(R.doc?[x.rec]:[]))}}
+function abaRelatorios(){const k=UI.snRel||'cfop';const R=RELS[k];const d=dadosRelatorio(k);const {de,ate}=periodoNf();
+  return `<div class="panel"><div class="panel-head" style="flex-wrap:wrap;gap:8px"><h2>${esc(R.t)}</h2><div class="actions"><select data-snrel style="width:auto">${Object.entries(RELS).map(([x,r])=>`<option value="${x}" ${x===k?'selected':''}>${esc(r.t)}</option>`).join('')}</select>
+    <button class="btn" data-act="rel-csv">${svg('download')}Planilha</button><button class="btn" data-act="rel-pdf">${svg('download')}PDF</button></div></div>
+   <p class="small muted" style="margin-top:0">Período ${fmtComp(de)}${ate!==de?' a '+fmtComp(ate):''}. ${R.rec||R.livro==='entrada'?'':'Os filtros da aba Notas fiscais de saída (modelo, CFOP, CST, destaques, cliente) também valem aqui. '}Somente notas autorizadas.</p>
+   ${d.linhas.length?`<div class="table-wrap"><table><thead><tr>${d.cols.map((c,i)=>`<th class="${i&&!/Espécie|Série|Número|CFOP|CST|NCM|UF|Fornecedor|Produto|Nota|Data/.test(c)?'r':''}">${esc(c)}</th>`).join('')}</tr></thead><tbody>${d.linhas.slice(0,500).map(l=>`<tr>${l.map((v,i)=>`<td class="${i&&/^R\$|^-R\$|^\d+$/.test(String(v))?'r num':''}">${esc(String(v))}</td>`).join('')}</tr>`).join('')}${d.total?`<tr>${d.total.map((v,i)=>`<td class="${i?'r num':''}"><b>${esc(String(v))}</b></td>`).join('')}</tr>`:''}</tbody></table></div>${d.linhas.length>500?`<p class="small muted">Tela mostra 500 linhas; a planilha e o PDF levam todas.</p>`:''}${d.obs?`<p class="small muted">${esc(d.obs)}</p>`:''}`:vazio('Sem dados no período e filtros escolhidos.')}</div>`}
+document.addEventListener('change',ev=>{const el=ev.target;if(el.hasAttribute&&el.hasAttribute('data-snrel')){UI.snRel=el.value;render()}});
+ACT['rel-csv']=()=>{const k=UI.snRel||'cfop';const d=dadosRelatorio(k);const e=emp(UI.fsn.emp);const q=v=>typeof v==='number'?String(r2(v)).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"';
+  const cab=k==='itens'?['Data','Nota','Código','Produto','NCM','CFOP','CST/CSOSN','Quantidade','Valor','ICMS','ST','CST PIS','CST Cofins']:k==='saidas'?['Data','Espécie','Série','Número','CFOP','Valor contábil','Base ICMS','ICMS','IPI']:k==='entradas'?['Data','Série','Número','Fornecedor','CFOP','Valor contábil','Base ICMS','ICMS']:d.cols;
+  baixar(`${RELS[k].t.toLowerCase().replace(/[^a-z0-9]+/gi,'-')}-${soDig(e.cnpj)}.csv`,'﻿'+[cab.map(q).join(';'),...d.csv.map(l=>l.map(q).join(';'))].join('\r\n'),'text/csv;charset=utf-8')};
+ACT['rel-pdf']=()=>{const k=UI.snRel||'cfop';const d=dadosRelatorio(k);const e=emp(UI.fsn.emp);const {de,ate}=periodoNf();
+  janelaPdf(RELS[k].t,`<h1>${esc(RELS[k].t)}</h1><p class="sub">${esc(e.razao)} · CNPJ ${fmtCNPJ(e.cnpj||'')} · Período ${fmtComp(de)}${ate!==de?' a '+fmtComp(ate):''}</p>
+   <table><tr>${d.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr>${d.linhas.map(l=>`<tr>${l.map((v,i)=>`<td class="${i&&/^-?R\$/.test(String(v))?'r':''}">${esc(String(v))}</td>`).join('')}</tr>`).join('')}${d.total?`<tr class="tot">${d.total.map(v=>`<td class="r">${esc(String(v))}</td>`).join('')}</tr>`:''}</table>${d.obs?`<p class="nota">${esc(d.obs)}</p>`:''}
+   ${RELS[k].livro?`<div class="ass"><div>${esc(e.razao)}</div><div>Contador responsável</div></div>`:''}`)};
 
 /* ==== v22: o Théo entrega documentos da empresa quando o cliente pede (portal) ==== */
 const contextoIAV22=contextoIA;

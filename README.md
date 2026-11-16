@@ -282,6 +282,28 @@ Menu **Apuração do Simples** no painel (permissão do módulo "Apuração, gui
 - A tela "Apuração e guias" passa a usar esse cálculo quando há lançamentos. Conferir com o PGDAS-D antes de transmitir.
 - Tabelas valem até 2026; a partir de 2027 entram as regras da reforma tributária (IBS/CBS) no Simples.
 
+## Escrita fiscal de saída (dentro da Apuração do Simples)
+
+A página **Apuração do Simples** tem três abas: Apuração, Notas fiscais de saída e Relatórios.
+
+- **Importar XML ou ZIP:** NF-e e NFC-e (com protocolo), NFS-e do padrão nacional e ABRASF, eventos de cancelamento (110111) e ZIPs com vários XML. A nota de um fornecedor para a empresa vai para Notas de entrada. A nota de outro CNPJ é ignorada.
+- **Receita automática:** sai dos CFOP de venda e serviço. Produção vai para o Anexo II, revenda para o Anexo I e serviço para o anexo da empresa.
+  - ST: CSOSN 500, CST 60 ou CFOP 405/411.
+  - Monofásico: PIS/COFINS CST 04/05.
+  - Exportação: CFOP 7.
+  - ISS retido: lido do XML da NFS-e.
+  - Devoluções abatem a receita.
+  - Remessas, transferências e bonificações não geram receita.
+  - No detalhe da nota dá para trocar o anexo, marcar Fator R ou não considerar a nota como receita.
+- **Lançamento manual:** regime (Simples ou não optante), anexo, Fator R, ISS retido, ST, monofásico, exportação e valor negativo para devolução. A receita de não optante fica fora do DAS.
+- **Filtros:** modelo, CFOP, CST/CSOSN, destaque (ICMS, ST, IPI, monofásico, ISS retido, devolução), situação e texto.
+- **Relatórios** (tela, CSV e PDF):
+  - por CFOP, CST, NCM, cliente, dia, modelo e anexo (base do PGDAS-D);
+  - Livro Registro de Saídas;
+  - Livro Registro de Entradas;
+  - itens.
+- **Ainda não trata:** ISS devido a outro município, as regras da reforma tributária de 2027 e exceções de CFOP fora das regras acima. Essas exceções se ajustam nota a nota.
+
 ## Notas de entrada (NF-e dos fornecedores, direto da SEFAZ)
 
 Menu **Notas de entrada** no painel. Para cada empresa com **certificado A1** cadastrado, o sistema consulta de hora em hora o
