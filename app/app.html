@@ -2722,6 +2722,7 @@ FORM['empresa360']=async(fd,form)=>{const antes=S.empresas.length;await formEmpr
 @media (max-width:820px){.inbox{grid-template-columns:1fr}}
 `;document.head.appendChild(st)})();
 const SITE_PAINEL=!!(window.MF&&window.MF.site==='painel');
+const APP_CONTABIL=!!(window.MF&&window.MF.app==='contabil');   // contabil.omeufiscal.com.br: o sistema de escrituração (v27)
 
 /* ---------- menu do painel: documentos e certificados passam para o cadastro do cliente ---------- */
 for(const v of ['a-docs','a-cert']){const i=NAV_A.findIndex(n=>n[0]===v);if(i>=0)NAV_A.splice(i,1)}
@@ -5844,7 +5845,7 @@ function aNfeEntrada(){
   const f=UI.fnfe||(UI.fnfe={emp:'',mes:'',q:'',st:''});const L=nfeFiltradas();const vis=L.slice(0,300);
   const meses=[...new Set(S.nfentrada.map(n=>mesDe(n.emissao)).filter(Boolean))].sort().reverse();
   const tot=L.filter(n=>n.situacao!=='cancelada').reduce((a,n)=>a+(+n.valor||0),0);
-  const es=S.empresas.filter(e=>e.status!=='inativo'&&soDig(e.cnpj).length===14);
+  const es=S.empresas.filter(e=>e.status!=='inativo'&&soDig(e.cnpj).length===14&&(!APP_CONTABIL||e.id===UI.fsn?.emp));
   const sit=n=>n.situacao==='cancelada'?pill('Cancelada','crit'):n.situacao==='denegada'?pill('Denegada','warn'):n.completa?pill('XML completo','ok'):n.manifestacao?.em?pill('Ciência dada','')+'<div class="small muted">XML chega em até 1 h</div>':pill('Só resumo','warn');
   const empRow=e=>{const ce=x.certificados?.[e.id];const st=x.estados?.[e.id];const vencido=ce?.validoAte&&String(ce.validoAte).slice(0,10)<hoje();const qtd=S.nfentrada.filter(n=>n.empresaId===e.id).length;
     return `<tr><td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted mono">${fmtCNPJ(e.cnpj||'')}</div></td>
@@ -5953,10 +5954,10 @@ function aSimples(){
   if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui Apuração, guias e notas.');
   const es=S.empresas.filter(e=>e.status!=='inativo'&&(e.regime==='SN'||e.regime==='MEI'));
   if(!es.length)return head('Apuração do Simples','')+vazio('Nenhuma empresa do Simples Nacional ou MEI na carteira.');
-  const F=UI.fsn||(UI.fsn={emp:es[0].id,comp:addMes(compAtual(),-1)});if(!es.some(e=>e.id===F.emp))F.emp=es[0].id;
+  const F=UI.fsn||(UI.fsn={emp:es[0].id,comp:addMes(compAtual(),-1)});if(!APP_CONTABIL&&!es.some(e=>e.id===F.emp))F.emp=es[0].id;
   const e=emp(F.emp);const comp=F.comp;const ed=podeMod('guias','editar')&&!snFechada(e.id,comp);const L=snRec(e.id,comp);
   const meses=[];for(let i=0;i<18;i++)meses.push(addMes(compAtual(),-i));
-  const seletor=`<select data-sn="emp" style="width:auto;max-width:280px">${es.map(x=>`<option value="${x.id}" ${x.id===e.id?'selected':''}>${esc(x.fantasia||x.razao)}${x.regime==='MEI'?' (MEI)':''}</option>`).join('')}</select><select data-sn="comp" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===comp?'selected':''}>${fmtComp(c)}</option>`).join('')}</select>`;
+  const seletor=APP_CONTABIL?'':`<select data-sn="emp" style="width:auto;max-width:280px">${es.map(x=>`<option value="${x.id}" ${x.id===e.id?'selected':''}>${esc(x.fantasia||x.razao)}${x.regime==='MEI'?' (MEI)':''}</option>`).join('')}</select><select data-sn="comp" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===comp?'selected':''}>${fmtComp(c)}</option>`).join('')}</select>`;
   const nfse=S.notas.filter(n=>n.empresaId===e.id&&n.comp===comp&&n.status==='autorizada'&&!L.some(l=>l.notaId===n.id));
   const mei=e.regime==='MEI';
   const flags=l=>Object.keys(SEGREG).filter(k=>l[k]).map(k=>pill(SEGREG[k].rot,'')).join(' ');
@@ -5977,7 +5978,7 @@ function aSimples(){
     <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Tributo</th>${g0.map(g=>`<th class="r">Anexo ${g.anexo}</th>`).join('')}<th class="r">Deduzido</th><th class="r">Total no DAS</th></tr></thead><tbody>${TRIB.filter(t=>a.tot[t]||a.ded[t]).map(t=>`<tr><td>${t==='CPP'?'CPP (INSS patronal)':t}</td>${g0.map(g=>`<td class="r num">${brl(g.trib[t])}</td>`).join('')}<td class="r num">${a.ded[t]?brl(a.ded[t]):'—'}</td><td class="r num"><b>${brl(a.tot[t])}</b></td></tr>`).join('')}
     <tr><td><b>Total</b></td>${g0.map(g=>`<td class="r num"><b>${brl(g.total)}</b></td>`).join('')}<td class="r num">${brl(TRIB.reduce((x,t)=>x+a.ded[t],0))}</td><td class="r num"><b>${brl(a.total)}</b></td></tr></tbody></table></div>`:vazio('Lance a receita do mês para calcular.');
   const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo==='DAS');
-  return `${head('Apuração do Simples','Lançamentos de receita por anexo, cálculo do DAS com RBT12, Fator R e segregação, memória de cálculo e relatórios em PDF.',seletor)}${snAbas()}
+  return `${head(APP_CONTABIL?'Apuração do Simples Nacional':'Apuração do Simples','Lançamentos de receita por anexo, cálculo do DAS com RBT12, Fator R e segregação, memória de cálculo e relatórios em PDF.',seletor)}${snAbas()}
    ${a.avisos.map(([c,t])=>`<div class="banner ${c||'info'}" style="display:block;margin-bottom:10px">${esc(t)}</div>`).join('')}
    <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Receita do mês</span><b>${brl(a.receita)}</b></div><div class="kpi"><span class="eyebrow">RBT12${a.proporcional?' (proporcional)':''}</span><b>${brl(a.rbt12)}</b></div>
     <div class="kpi"><span class="eyebrow">DAS calculado</span><b>${brl(a.total)}</b></div><div class="kpi"><span class="eyebrow">Alíquota final</span><b>${pct(a.receita?a.total/a.receita:0)}</b></div></div>
@@ -6182,14 +6183,15 @@ async function importarXmlFiscal(files){const F=UI.fsn;const e=emp(F.emp);const 
   if(res.erros.length)console.warn('XML com erro:',res.erros)}
 const onUploadV26=onUpload;onUpload=async function(inp){if(inp.dataset.up==='xml-fiscal'){const files=[...inp.files];inp.value='';if(files.length)await importarXmlFiscal(files);return}return onUploadV26(inp)};
 /* ----- abas do módulo ----- */
-function snAbas(){const a=UI.snAba||'apur';return `<div class="tabs" role="tablist" style="margin-bottom:14px">${[['apur','Apuração'],['notas','Notas fiscais de saída'],['rel','Relatórios']].map(([k,t])=>`<button class="tab ${a===k?'on':''}" role="tab" aria-selected="${a===k}" data-act="sn-aba" data-v="${k}">${t}</button>`).join('')}</div>`}
+function snAbas(){if(APP_CONTABIL)return '';const a=UI.snAba||'apur';return `<div class="tabs" role="tablist" style="margin-bottom:14px">${[['apur','Apuração'],['notas','Notas fiscais de saída'],['rel','Relatórios']].map(([k,t])=>`<button class="tab ${a===k?'on':''}" role="tab" aria-selected="${a===k}" data-act="sn-aba" data-v="${k}">${t}</button>`).join('')}</div>`}
 ACT['sn-aba']=el=>{UI.snAba=el.dataset.v;render()};
 const conteudoV26=conteudo;conteudo=function(){if(UI.modo==='painel'&&UI.view==='a-simples'&&(UI.snAba||'apur')!=='apur')return aSimplesAba();return conteudoV26()};
-function nfCab(titulo){const es=S.empresas.filter(e=>e.status!=='inativo'&&(e.regime==='SN'||e.regime==='MEI'));const F=UI.fsn||(UI.fsn={emp:es[0]?.id,comp:addMes(compAtual(),-1)});if(!es.some(e=>e.id===F.emp))F.emp=es[0]?.id;
+function nfCab(titulo){const es=S.empresas.filter(e=>e.status!=='inativo'&&(e.regime==='SN'||e.regime==='MEI'));const F=UI.fsn||(UI.fsn={emp:es[0]?.id,comp:addMes(compAtual(),-1)});if(!APP_CONTABIL&&!es.some(e=>e.id===F.emp))F.emp=es[0]?.id;
   const meses=[];for(let i=0;i<24;i++)meses.push(addMes(compAtual(),-i));const F2=UI.fnf||(UI.fnf={ate:F.comp});
-  const sel=`<select data-sn="emp" style="width:auto;max-width:280px">${es.map(x=>`<option value="${x.id}" ${x.id===F.emp?'selected':''}>${esc(x.fantasia||x.razao)}${x.regime==='MEI'?' (MEI)':''}</option>`).join('')}</select>
+  const sel=APP_CONTABIL?'':`<select data-sn="emp" style="width:auto;max-width:280px">${es.map(x=>`<option value="${x.id}" ${x.id===F.emp?'selected':''}>${esc(x.fantasia||x.razao)}${x.regime==='MEI'?' (MEI)':''}</option>`).join('')}</select>
     <label class="small muted" style="display:flex;align-items:center;gap:6px">de <select data-sn="comp" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===F.comp?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>
     <label class="small muted" style="display:flex;align-items:center;gap:6px">até <select data-nf="ate" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===(F2.ate<F.comp?F.comp:F2.ate)?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>`;
+  if(APP_CONTABIL)return {es,html:UI.snAba==='notas'?head('Notas fiscais de saída','Importação de XML de NF-e, NFC-e e NFS-e (nacional e ABRASF), receita por CFOP e CST, filtros por destaque.'):head('Livros e relatórios','Livros Registro de Saídas e de Entradas, resumos por CFOP, CST, NCM, cliente e dia, e a base do PGDAS-D. Tudo em tela, CSV ou PDF.')};
   return {es,html:head(titulo,'Escrita fiscal do Simples Nacional e do MEI: notas de saída por XML, receitas automáticas, filtros por CFOP e CST e relatórios.',sel)+snAbas()}}
 const periodoNf=()=>{const F=UI.fsn,F2=UI.fnf||(UI.fnf={});const de=F.comp,ate=F2.ate&&F2.ate>=F.comp?F2.ate:F.comp;return {de,ate}};
 function docsFiltrados(){const F=UI.fsn,f=UI.fnf||(UI.fnf={});const {de,ate}=periodoNf();const q=normP(f.q||'');
@@ -6894,6 +6896,163 @@ aConfig=function(){let h=aConfigV21();if(MODO!=='api'||!podeMod('hon','ver'))ret
   return h};
 /* ==== MÓDULOS v21 (fim) ==== */
 
+
+/* ==== v27: Meu Fiscal Contábil (contabil.omeufiscal.com.br) — escrituração separada do painel, mesmo login e mesmo banco ==== */
+const URL_CONTABIL=String((window.MF&&MF.contabilUrl)||'https://contabil.omeufiscal.com.br').replace(/\/$/,'');
+const URL_PAINEL=String((window.MF&&MF.painelUrl)||'https://painel.omeufiscal.com.br').replace(/\/$/,'');
+if(!APP_CONTABIL){
+  /* painel: Apuração do Simples, notas de saída e notas de entrada passam a existir só no sistema contábil */
+  for(const v of ['a-simples','a-nfe']){const i=NAV_A.findIndex(n=>n[0]===v);if(i>=0)NAV_A.splice(i,1)}
+  const sidebarV27=sidebar;
+  sidebar=function(){const h=sidebarV27();if(UI.modo!=='painel'||!podeMod('guias','ver'))return h;
+    return h.replace('</nav>',`<a href="${esc(URL_CONTABIL)}" target="_blank" rel="noopener" class="nav-ext">${svg('calc')}<span class="lbl">Sistema contábil</span><span class="ext" aria-hidden="true">↗</span></a></nav>`)};
+  (()=>{const st=document.createElement('style');st.textContent=`.nav-ext{margin-top:10px;border-top:1px solid rgba(148,163,184,.16);padding-top:12px!important}.nav-ext .ext{margin-left:auto;opacity:.6;font-size:.85em}`;document.head.appendChild(st)})();
+}
+if(APP_CONTABIL){
+  const MODS=[['fiscal','Escrita Fiscal',true],['contabil','Contabilidade',false],['folha','Folha de Pagamento',false],['anuais','Obrigações anuais',false]];
+  const NAV_F=[
+    ['Movimento',[['f-saidas','Notas fiscais de saída','upload','Importação de XML (NF-e, NFC-e, NFS-e), receita por CFOP e CST'],['f-entradas','Notas fiscais de entrada','filetext','Busca automática na SEFAZ e XML dos fornecedores']]],
+    ['Apuração',[['f-apur','Simples Nacional e MEI','calc','Receitas por anexo, RBT12, Fator R e DAS']]],
+    ['Relatórios',[['f-rel','Livros e relatórios','chart','Livros de saídas e entradas, resumos e base do PGDAS-D']]],
+  ];
+  const F_VIEWS=NAV_F.flatMap(g=>g[1].map(i=>i[0]));
+  const COM_PERIODO=['f-saidas','f-entradas','f-rel'];
+  const empsCtb=()=>empresasVisiveis().slice().sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
+  function ctbEstado(){const es=empsCtb();const F=UI.fsn||(UI.fsn={emp:null,comp:addMes(compAtual(),-1)});
+    if(!F.comp)F.comp=addMes(compAtual(),-1);
+    if(!es.some(e=>e.id===F.emp)){const lemb=(()=>{try{return localStorage.getItem('mf-ctb-emp')}catch(e){return null}})();F.emp=(es.find(e=>e.id===lemb)||es.find(e=>e.regime==='SN'||e.regime==='MEI')||es[0])?.id||null}
+    const F2=UI.fnf||(UI.fnf={});if(!F2.ate||F2.ate<F.comp)F2.ate=F.comp;return F}
+  const lembrarEmp=id=>{try{localStorage.setItem('mf-ctb-emp',id)}catch(e){}};
+
+  lerHash=function(){const h=(location.hash||'').slice(1);UI.modo='painel';if(F_VIEWS.includes(h)||h==='a-perfil')UI.view=h;else if(!F_VIEWS.includes(UI.view)&&UI.view!=='a-perfil')UI.view='f-saidas'};
+  if(!F_VIEWS.includes((location.hash||'').slice(1))&&location.hash!=='#a-perfil')history.replaceState(null,'','#f-saidas');
+
+  function ctbTopo(){return `<header class="ctb-top">
+    <a class="ctb-marca" href="#f-saidas"><span class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></span><b><span class="wm-meu">meu</span>fiscal</b><span class="ctb-sis">Contábil</span></a>
+    <nav class="ctb-mods" aria-label="Módulos">${MODS.map(([k,t,on])=>on?`<a href="#f-saidas" class="on" aria-current="true">${t}</a>`:`<span class="off" title="Em desenvolvimento">${t}<small>em breve</small></span>`).join('')}</nav>
+    <div class="ctb-usr"><a href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Painel ↗</a><a href="#a-perfil">${esc(ME.nome||'Meu perfil')}</a><a href="#" data-act="mf-sair">Sair</a></div></header>`}
+  function ctbContexto(){const F=ctbEstado();const e=emp(F.emp);const meses=[];for(let i=-1;i<36;i++)meses.push(addMes(compAtual(),-i));
+    const per=COM_PERIODO.includes(UI.view);
+    const selMes=(attr,v)=>`<select ${attr} aria-label="Competência">${meses.map(c=>`<option value="${c}" ${c===v?'selected':''}>${fmtComp(c)}</option>`).join('')}</select>`;
+    return `<div class="ctb-ctx">
+      <div class="ctb-campo ctb-emp"><span>Empresa <kbd>F8</kbd></span><button type="button" class="ctb-emp-btn" data-act="ctb-trocar" title="Trocar empresa (F8)">${e?`<b>${esc(e.fantasia||e.razao)}</b><small>${esc(e.razao&&e.fantasia&&e.razao!==e.fantasia?e.razao+' · ':'')}${fmtCNPJ(e.cnpj||'')}</small>`:'<b>Selecione a empresa</b>'}</button></div>
+      ${e?`<div class="ctb-campo"><span>Regime</span><b class="ctb-val">${esc(nomeRegime(e))}${e.fatorR?' · Fator R':''}</b></div>`:''}
+      <div class="ctb-campo"><span>${per?'Período':'Competência'} <kbd>PgUp</kbd><kbd>PgDn</kbd></span><div class="ctb-per"><button type="button" class="ctb-seta" data-act="ctb-comp" data-d="-1" aria-label="Competência anterior">‹</button>${selMes('data-sn="comp"',F.comp)}${per?`<em>até</em>${selMes('data-nf="ate"',UI.fnf.ate)}`:''}<button type="button" class="ctb-seta" data-act="ctb-comp" data-d="1" aria-label="Próxima competência">›</button></div></div>
+    </div>`}
+  function ctbMenu(){return `<aside class="ctb-nav" aria-label="Escrita Fiscal">${NAV_F.map(([g,its])=>`<div class="ctb-grp"><span>${g}</span>${its.map(([v,t,ic,dica])=>`<a href="#${v}" title="${esc(dica)}" ${UI.view===v?'aria-current="page"':''}>${svg(ic)}<span>${t}</span></a>`).join('')}</div>`).join('')}
+    <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>Contabilidade, folha de pagamento e obrigações anuais entram aqui, uma de cada vez.</p></div></aside>`}
+  function ctbStatus(){const F=UI.fsn||{};const e=emp(F.emp);
+    const txt=MODO!=='api'?'Modo local':MF.estado==='online'?'Tempo real · conectado':MF.estado==='reconectando'?'Reconectando…':'Conectando…';
+    return `<footer class="ctb-status"><span class="conn ${MODO!=='api'||MF.estado==='online'?'ok':''}" id="mf-selo"><i></i>${txt}</span><span>${esc(cfg().escritorio||'')}</span>${e?`<span>${esc(e.fantasia||e.razao)}</span>`:''}${F.comp?`<span>Competência ${fmtComp(F.comp)}</span>`:''}<span class="grow"></span><span class="ctb-atalhos">F8 trocar empresa · PgUp/PgDn competência</span>${cfg().crc?`<span>${esc(cfg().crc)}</span>`:''}</footer>`}
+
+  renderInterno=function(){
+    if(ocupado()||UI.modal){pendRender=true;return}
+    pendRender=false;const root=$('#root');
+    if(!S.empresas.length&&!S.config.length){root.innerHTML=telaVazia();return}
+    UI.modo='painel';ctbEstado();
+    const html=`<div class="ctb">${ctbTopo()}${ctbContexto()}<div class="ctb-corpo">${ctbMenu()}<main class="content" id="main">${conteudo()}</main></div>${ctbStatus()}</div>`;
+    const vivos=[...document.querySelectorAll('[data-live][id]')].map(el=>({id:el.id,v:el.value,f:document.activeElement===el,s:el.selectionStart}));
+    const chaveF=f=>f.dataset.form+'|'+(f.dataset.id||'')+'|'+(f.dataset.emp||'');
+    const emEdicao=new Map([...document.querySelectorAll('form[data-preservar]')].map(f=>[chaveF(f),f]));
+    const sy=window.scrollY;root.innerHTML=html;window.scrollTo(0,sy);
+    if(emEdicao.size)document.querySelectorAll('form[data-preservar]').forEach(nf=>{const v=emEdicao.get(chaveF(nf));if(v)nf.replaceWith(v)});
+    vivos.forEach(x=>{const el=document.getElementById(x.id);if(!el||el.disabled)return;if(x.v&&!el.value)el.value=x.v;if(x.f){el.focus();try{el.setSelectionRange(x.s,x.s)}catch(e){}}});
+    pos();
+  };
+
+  /* entradas: só a empresa e o período escolhidos no topo */
+  const nfeFiltradasV27=nfeFiltradas;
+  nfeFiltradas=function(){const {de,ate}=periodoNf();return nfeFiltradasV27().filter(n=>{const m=mesDe(n.emissao);return m>=de&&m<=ate})};
+  const ctbEntradas=()=>aNfeEntrada()
+    .replace(/<select data-nfe-f="emp"[\s\S]*?<\/select>/,'').replace(/<select data-nfe-f="mes"[\s\S]*?<\/select>/,'')
+    .replace('<span class="eyebrow">Operação contábil</span>','<span class="eyebrow">Escrita fiscal · Movimento</span>');
+
+  const conteudoV27=conteudo;
+  conteudo=function(){
+    if(UI.view==='a-perfil')return conteudoV27();
+    if(!F_VIEWS.includes(UI.view))UI.view='f-saidas';
+    if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui a escrita fiscal. Peça ao administrador do escritório para liberar o módulo "Apuração, guias e notas".');
+    const F=ctbEstado();const e=emp(F.emp);
+    if(!e)return vazio('Nenhuma empresa ativa na carteira. As empresas são cadastradas no painel contábil.',`<a class="btn primary" href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Abrir o painel</a>`);
+    const simples=e.regime==='SN'||e.regime==='MEI';
+    const foraSN=t=>head(t,'')+vazio(`${esc(e.fantasia||e.razao)} está no regime ${esc(nomeRegime(e))}. Esta rotina vale para empresas do Simples Nacional e MEI; os demais regimes entram nas próximas etapas.`,`<button class="btn" data-act="ctb-trocar">Trocar empresa</button>`);
+    if(UI.view==='f-apur'){UI.snAba='apur';return simples?aSimples():foraSN('Apuração do Simples Nacional')}
+    if(UI.view==='f-saidas'){UI.snAba='notas';return simples?aSimplesAba():foraSN('Notas fiscais de saída')}
+    if(UI.view==='f-rel'){UI.snAba='rel';return simples?aSimplesAba():foraSN('Livros e relatórios')}
+    if(UI.view==='f-entradas'){const f=UI.fnfe||(UI.fnfe={});f.emp=e.id;f.mes='';return ctbEntradas()}
+    return conteudoV27();
+  };
+  ACT['sn-aba']=el=>{const v={apur:'f-apur',notas:'f-saidas',rel:'f-rel'}[el.dataset.v];if(v)location.hash=v};
+
+  /* troca de empresa (F8), como nos sistemas contábeis de mesa */
+  function linhasTroca(q){const n=normP(q||'');return empsCtb().filter(e=>!n||normP([e.fantasia,e.razao,e.cnpj,soDig(e.cnpj),nomeRegime(e)].join(' ')).includes(n))}
+  function htmlTroca(q){const L=linhasTroca(q);const F=UI.fsn||{};
+    return L.length?L.slice(0,200).map((e,i)=>`<button type="button" class="ctb-op ${e.id===F.emp?'atual':''}" data-act="ctb-emp" data-id="${e.id}" ${i===0?'data-primeira':''}><b>${esc(e.fantasia||e.razao)}</b><span class="mono">${fmtCNPJ(e.cnpj||'')}</span><span>${esc(nomeRegime(e))}</span></button>`).join(''):'<p class="small muted" style="padding:12px">Nenhuma empresa encontrada.</p>'}
+  ACT['ctb-trocar']=()=>{openModal(mHead('Trocar empresa')+`<div class="modal-body"><input type="search" id="ctb-busca" data-ctb-busca placeholder="Nome, razão social, CNPJ ou regime" autocomplete="off"><div class="ctb-lista" id="ctb-lista">${htmlTroca('')}</div><p class="small muted" style="margin:8px 0 0">Digite para filtrar e tecle Enter para abrir a primeira da lista.</p></div>`);
+    setTimeout(()=>{const i=document.getElementById('ctb-busca');if(i)i.focus()},30)};
+  ACT['ctb-emp']=el=>{const F=ctbEstado();F.emp=el.dataset.id;lembrarEmp(F.emp);UI.fnf=Object.assign(UI.fnf||{},{cfop:'',cst:'',q:''});closeModal();render()};
+  document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-ctb-busca]')){const l=document.getElementById('ctb-lista');if(l)l.innerHTML=htmlTroca(s.value)}});
+  document.addEventListener('keydown',ev=>{
+    if(ev.target.matches&&ev.target.matches('[data-ctb-busca]')&&ev.key==='Enter'){ev.preventDefault();const b=document.querySelector('#ctb-lista [data-primeira]');if(b)ACT['ctb-emp'](b);return}
+    if(ev.key==='F8'){ev.preventDefault();if(!UI.modal)ACT['ctb-trocar']();return}
+    const t=ev.target;const digitando=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable);
+    if(!digitando&&!UI.modal&&(ev.key==='PageUp'||ev.key==='PageDown')){ev.preventDefault();ACT['ctb-comp']({dataset:{d:ev.key==='PageUp'?'-1':'1'}})}
+  });
+  ACT['ctb-comp']=el=>{const F=ctbEstado();const d=+el.dataset.d;const um=UI.fnf.ate===F.comp;F.comp=addMes(F.comp,d);UI.fnf.ate=um?F.comp:(UI.fnf.ate<F.comp?F.comp:UI.fnf.ate);render()};
+  // a competência "de" anda junto com o "até" quando o período é de um mês só
+  document.addEventListener('change',ev=>{const el=ev.target;if(el.matches&&el.matches('.ctb-ctx [data-sn="comp"]')){const F2=UI.fnf||(UI.fnf={});if(!F2.ate||F2.ate<el.value)F2.ate=el.value}},true);
+
+  document.title='Contábil · Meu Fiscal';
+  (()=>{const st=document.createElement('style');st.textContent=`
+body{background:#EEF2F6;font-size:13.5px}
+.ctb{min-height:100vh;display:grid;grid-template-rows:auto auto 1fr auto}
+.ctb-top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:20px;background:var(--navy);color:#E2E8F0;padding:0 16px;height:48px}
+.ctb-marca{display:flex;align-items:center;gap:8px;color:#fff;text-decoration:none;font-family:var(--f-display);font-size:15px;letter-spacing:-.03em;flex-shrink:0}
+.ctb-marca .brand-mark{width:28px;height:28px;border-radius:8px;background:#1E293B;box-shadow:inset 0 0 0 1px #334155;display:grid;place-items:center}.ctb-marca .brand-mark svg{width:22px;height:22px}
+.ctb-sis{font-family:var(--f-body);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#34D399;border:1px solid rgba(52,211,153,.4);border-radius:5px;padding:1px 6px;margin-left:2px}
+.ctb-mods{display:flex;align-self:stretch;gap:2px;overflow-x:auto;scrollbar-width:none}
+.ctb-mods a,.ctb-mods span{display:flex;align-items:center;gap:6px;padding:0 14px;font-size:13px;font-weight:500;color:#94A3B8;text-decoration:none;white-space:nowrap;border-bottom:2px solid transparent}
+.ctb-mods a.on{color:#fff;border-bottom-color:#34D399;background:rgba(255,255,255,.04)}
+.ctb-mods .off{cursor:default;opacity:.6}.ctb-mods small{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#64748B}
+.ctb-usr{margin-left:auto;display:flex;gap:16px;font-size:12.5px;flex-shrink:0}.ctb-usr a{color:#CBD5E1;text-decoration:none}.ctb-usr a:hover{color:#fff}
+.ctb-ctx{position:sticky;top:48px;z-index:19;display:flex;flex-wrap:wrap;align-items:flex-end;gap:10px 22px;background:#fff;border-bottom:1px solid var(--line-strong);padding:8px 16px 10px;box-shadow:0 1px 0 rgba(15,23,42,.03)}
+.ctb-campo{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ctb-campo>span{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;display:flex;gap:4px;align-items:center}
+kbd{font-family:var(--f-code);font-size:9.5px;font-weight:400;letter-spacing:0;text-transform:none;border:1px solid var(--line-strong);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:var(--muted);background:var(--surface-2)}
+.ctb-emp-btn{display:flex;flex-direction:column;align-items:flex-start;gap:0;text-align:left;border:1px solid var(--line-strong);border-radius:8px;background:var(--surface-2);padding:5px 34px 5px 10px;min-width:300px;max-width:520px;cursor:pointer;position:relative}
+.ctb-emp-btn:after{content:"";position:absolute;right:12px;top:50%;width:7px;height:7px;border-right:1.6px solid var(--muted);border-bottom:1.6px solid var(--muted);transform:translateY(-70%) rotate(45deg)}
+.ctb-emp-btn:hover{border-color:var(--accent)}.ctb-emp-btn b{font-size:13.5px;color:var(--navy);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}.ctb-emp-btn small{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.ctb-val{font-size:13.5px;color:var(--navy);padding:9px 0 8px;font-weight:600}
+.ctb-per{display:flex;align-items:center;gap:6px}.ctb-per select{width:auto;padding-block:6px}.ctb-per em{font-style:normal;color:var(--muted);font-size:12px}
+.ctb-seta{width:30px;height:32px;border:1px solid var(--line-strong);border-radius:7px;background:#fff;font-size:18px;line-height:1;cursor:pointer;color:var(--ink)}.ctb-seta:hover{border-color:var(--accent);color:var(--accent)}
+.ctb-corpo{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:0}
+.ctb-nav{background:#fff;border-right:1px solid var(--line);padding:14px 10px 24px;display:flex;flex-direction:column;gap:16px}
+.ctb-grp{display:flex;flex-direction:column;gap:2px}.ctb-grp>span{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding:0 10px 4px}
+.ctb-grp a{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;color:var(--ink);text-decoration:none;font-size:13px;font-weight:500}
+.ctb-grp a svg{width:17px;height:17px;color:var(--muted);flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.ctb-grp a:hover{background:var(--surface-2)}
+.ctb-grp a[aria-current]{background:var(--accent-soft);color:#065F46}.ctb-grp a[aria-current] svg{color:var(--accent)}
+.ctb-breve{margin-top:8px;padding-top:14px;border-top:1px solid var(--line)}.ctb-breve p{font-size:12px;color:var(--muted);padding:0 10px;line-height:1.45}
+.ctb .content{max-width:none;padding:18px 20px 40px;gap:14px}
+.ctb .page-head h1{font-size:1.3rem}.ctb .page-head p{font-size:.85rem}
+.ctb .panel{padding:14px 16px;border-radius:10px}.ctb .panel-head h2{font-size:1rem}
+.ctb .kpi{padding:12px 14px}.ctb .kpi b{font-size:1.15rem}
+.ctb table{font-size:12.75px}.ctb th{font-size:10.5px;padding-block:7px}.ctb td{padding-block:6px}
+.ctb tbody tr:nth-child(even) td{background:#FAFBFC}.ctb tbody tr:hover td{background:#F0FDF4}
+.ctb-status{position:sticky;bottom:0;z-index:18;display:flex;align-items:center;gap:16px;height:30px;padding:0 16px;background:#E2E8F0;border-top:1px solid var(--line-strong);font-size:11.5px;color:#334155;white-space:nowrap;overflow:hidden}
+.ctb-status .conn{color:#334155}.ctb-status .grow{flex:1}.ctb-atalhos{color:var(--muted)}
+.ctb-lista{display:flex;flex-direction:column;gap:2px;margin-top:10px;max-height:52vh;overflow-y:auto}
+.ctb-op{display:grid;grid-template-columns:minmax(0,1fr) 150px 140px;gap:10px;align-items:center;text-align:left;border:0;background:none;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:13px}
+.ctb-op:hover,.ctb-op[data-primeira]{background:var(--surface-2)}.ctb-op.atual b{color:var(--accent)}.ctb-op span{font-size:12px;color:var(--muted)}
+@media (max-width:900px){
+  .ctb-corpo{grid-template-columns:minmax(0,1fr)}
+  .ctb-nav{position:static;height:auto;flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px;gap:4px}
+  .ctb-grp{flex-direction:row;gap:4px}.ctb-grp>span,.ctb-breve{display:none}.ctb-grp a{white-space:nowrap}
+  .ctb-ctx{position:static}.ctb-emp-btn{min-width:0;width:100%}.ctb-emp{flex:1 1 100%}
+  .ctb-mods{display:none}.ctb-atalhos{display:none}.ctb-usr a[href='#a-perfil']{display:none}.ctb-top{gap:12px;padding:0 12px}.ctb-status>span:not(.conn){display:none}.ctb .content{padding:14px 16px 40px}
+  .ctb-op{grid-template-columns:minmax(0,1fr) auto}.ctb-op span:last-child{display:none}
+}`;document.head.appendChild(st)})();
+}
+/* ==== v27 (fim) ==== */
 
 lerHash();
 (window.MF&&window.MF.site)?MF.iniciar():iniciar();

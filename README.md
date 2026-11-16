@@ -282,9 +282,42 @@ Menu **Apuração do Simples** no painel (permissão do módulo "Apuração, gui
 - A tela "Apuração e guias" passa a usar esse cálculo quando há lançamentos. Conferir com o PGDAS-D antes de transmitir.
 - Tabelas valem até 2026; a partir de 2027 entram as regras da reforma tributária (IBS/CBS) no Simples.
 
-## Escrita fiscal de saída (dentro da Apuração do Simples)
+## Sistema contábil (`contabil.omeufiscal.com.br`)
 
-A página **Apuração do Simples** tem três abas: Apuração, Notas fiscais de saída e Relatórios.
+A escrituração fica num terceiro site, separado do painel. Ele usa o mesmo login da equipe, o mesmo banco e as mesmas permissões, e fala com a API como "painel". A guia do DAS gerada lá cai direto no portal do cliente.
+
+- **Layout de sistema contábil:**
+  - módulos no topo: Escrita Fiscal (ativo) e, nas próximas etapas, Contabilidade, Folha e Obrigações anuais;
+  - empresa e competência fixas logo abaixo;
+  - menu da rotina à esquerda;
+  - barra de status embaixo.
+- **Atalhos:** **F8** troca de empresa (com busca e Enter). **PgUp/PgDn** muda a competência.
+- **Rotinas da Escrita Fiscal:**
+  - Notas fiscais de saída;
+  - Notas fiscais de entrada;
+  - Simples Nacional e MEI;
+  - Livros e relatórios.
+- No painel, esses módulos saíram do menu e foram trocados por um link **Sistema contábil ↗**.
+- **Build:** `node sites/build.mjs contabil`, com saída em `sites/contabil/dist`.
+  - Rotas: `/login` e `/escrita`.
+  - `PAINEL_URL`, em `sites/contabil/.env.production`, é o link de volta ao painel.
+  - `CONTABIL_URL`, no build do painel, é o link do painel para cá. O padrão é `https://contabil.omeufiscal.com.br`.
+
+### Publicar na Cloudflare
+
+1. **Workers & Pages → Create → Import a repository**, no mesmo repositório:
+   - nome `meufiscal-contabil`;
+   - **Root directory** `sites/contabil`;
+   - **Build command** `node ../build.mjs contabil`;
+   - **Deploy command** `npx wrangler deploy`;
+   - variável `NODE_VERSION` = `22`.
+2. No Render, acrescente em `ORIGENS_PAINEL`, separados por vírgula: `https://contabil.omeufiscal.com.br` e o endereço `https://meufiscal-contabil.<sua-conta>.workers.dev`.
+3. Com o domínio ativo na Cloudflare, abra **Worker → Settings → Domains & Routes → Add → Custom domain** e informe `contabil.omeufiscal.com.br`.
+4. O login é por domínio. Entre uma vez com o mesmo e-mail e senha do painel.
+
+## Escrita fiscal de saída (no sistema contábil)
+
+A escrita fiscal fica no sistema contábil, nas rotinas Notas fiscais de saída, Simples Nacional e MEI, e Livros e relatórios.
 
 - **Importar XML ou ZIP:** NF-e e NFC-e (com protocolo), NFS-e do padrão nacional e ABRASF, eventos de cancelamento (110111) e ZIPs com vários XML. A nota de um fornecedor para a empresa vai para Notas de entrada. A nota de outro CNPJ é ignorada.
 - **Receita automática:** sai dos CFOP de venda e serviço. Produção vai para o Anexo II, revenda para o Anexo I e serviço para o anexo da empresa.

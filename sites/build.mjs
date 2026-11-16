@@ -1,6 +1,7 @@
 // Gera um dos dois sites a partir do app compartilhado (../app).
 //   node sites/build.mjs cliente               → sites/cliente/dist
 //   node sites/build.mjs painel                → sites/painel/dist
+//   node sites/build.mjs contabil              → sites/contabil/dist (sistema de escrituração: mesmo login e banco do painel)
 //   node sites/build.mjs cliente --configurar  → regrava vercel.json e netlify.toml com a URL da API do .env.production
 // Sem dependências: roda na Vercel, Netlify ou Cloudflare com Node 20+.
 import fs from 'node:fs';
@@ -12,7 +13,10 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(AQUI, '../app');
 const site = process.argv[2];
 const configurar = process.argv.includes('--configurar');
-if (!['cliente', 'painel'].includes(site)) { console.error('Uso: node sites/build.mjs <cliente|painel> [--configurar]'); process.exit(1); }
+if (!['cliente', 'painel', 'contabil'].includes(site)) { console.error('Uso: node sites/build.mjs <cliente|painel|contabil> [--configurar]'); process.exit(1); }
+// o sistema contábil fala com a API como "painel" (mesma equipe, mesmas permissões); só a interface muda
+const SITE_API = site === 'contabil' ? 'painel' : site;
+const RESTRITO = site !== 'cliente';
 const DIR = path.join(AQUI, site), DIST = path.join(DIR, 'dist');
 
 /* ---------- variáveis: .env.production do site, sobrescritas pelas do painel da hospedagem ---------- */
@@ -21,7 +25,7 @@ for (const arq of ['.env.production', '.env.local']) {
   const p = path.join(DIR, arq); if (!fs.existsSync(p)) continue;
   for (const l of fs.readFileSync(p, 'utf8').split(/\r?\n/)) { const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/); if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, ''); }
 }
-for (const k of ['API_URL', 'ARQUIVOS_HOST', 'SITE_URL', 'PAINEL_URL']) if (process.env[k]) env[k] = process.env[k];
+for (const k of ['API_URL', 'ARQUIVOS_HOST', 'SITE_URL', 'PAINEL_URL', 'CONTABIL_URL']) if (process.env[k]) env[k] = process.env[k];
 const API = String(env.API_URL || '').replace(/\/$/, '');
 const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(API);
 if (!/^https:\/\/[^/]+$/.test(API) && !LOCAL) { console.error(`API_URL inválida em sites/${site}/.env.production: "${API}". Ex.: API_URL=https://meufiscal-api.onrender.com`); process.exit(1); }
@@ -46,7 +50,7 @@ const SEGURANCA = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'Permissions-Policy', value: 'camera=(), microphone=(self), geolocation=(), payment=()' },
-  ...(site === 'painel' ? [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] : []),
+  ...(RESTRITO ? [{ key: 'X-Robots-Tag', value: 'noindex, nofollow' }] : []),
 ];
 const ROTAS = site === 'cliente' ? {
   // "/" é a página comercial (index.html); o portal fica em /dashboard
@@ -55,6 +59,9 @@ const ROTAS = site === 'cliente' ? {
     ['/cadastro', '/#comecar'], ['/primeiro-acesso', '/login?primeiro-acesso'],
   ],
   paginas: [['/login', '/login.html'], ['/definir-senha', '/login.html'], ['/dashboard', '/app.html'], ['/termos', '/legal.html'], ['/privacidade', '/legal.html']],
+} : site === 'contabil' ? {
+  redirects: [['/', '/escrita'], ['/admin', '/escrita'], ['/admin/:caminho*', '/escrita'], ['/dashboard', '/escrita']],
+  paginas: [['/login', '/login.html'], ['/escrita', '/app.html']],
 } : {
   redirects: [['/', '/admin/dashboard'], ['/admin', '/admin/dashboard'], ['/login', '/admin/login'], ['/dashboard', '/admin/dashboard']],
   paginas: [['/admin/login', '/login.html'], ['/admin/definir-senha', '/login.html'], ['/admin/dashboard', '/app.html'], ['/admin/cadastro', '/acessos.html']],
@@ -147,8 +154,11 @@ if (fs.existsSync(vj) && process.env.VERCEL) {
 /* ---------- build ---------- */
 fs.rmSync(DIST, { recursive: true, force: true });
 fs.mkdirSync(DIST, { recursive: true });
-const cfg = `<script>window.MF=${JSON.stringify({ site, api: API })};</script>`;
-const titulo = site === 'cliente' ? 'Portal do Cliente · Meu Fiscal' : 'Painel Contábil · Meu Fiscal';
+const PAINEL_URL = String(env.PAINEL_URL || 'https://painel.omeufiscal.com.br').replace(/\/$/, '');
+const CONTABIL_URL = String(env.CONTABIL_URL || 'https://contabil.omeufiscal.com.br').replace(/\/$/, '');
+const MFCFG = site === 'contabil' ? { site: SITE_API, app: 'contabil', api: API, painelUrl: PAINEL_URL } : site === 'painel' ? { site, api: API, contabilUrl: CONTABIL_URL } : { site, api: API };
+const cfg = `<script>window.MF=${JSON.stringify(MFCFG)};</script>`;
+const titulo = site === 'cliente' ? 'Portal do Cliente · Meu Fiscal' : site === 'contabil' ? 'Contábil · Meu Fiscal' : 'Painel Contábil · Meu Fiscal';
 const app = fs.readFileSync(path.join(APP, 'app.html'), 'utf8');
 fs.writeFileSync(path.join(DIST, 'app.html'), `<!doctype html>
 <html lang="pt-BR">
@@ -156,7 +166,7 @@ fs.writeFileSync(path.join(DIST, 'app.html'), `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0F172A">
-${site === 'painel' ? '<meta name="robots" content="noindex,nofollow">\n' : ''}<title>${titulo}</title>
+${RESTRITO ? '<meta name="robots" content="noindex,nofollow">\n' : ''}<title>${titulo}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="alternate icon" href="/favicon.ico" sizes="any">
 <link rel="apple-touch-icon" href="/apple-touch-icon-180.png">
@@ -175,7 +185,7 @@ fs.copyFileSync(path.join(APP, 'mf-api.js'), path.join(DIST, 'mf-api.js'));
 // marca: favicon, ícones de celular e logos (app/marca)
 for (const f of ['favicon.svg', 'favicon.ico', 'apple-touch-icon-180.png', 'icon-192.png', 'icon-512.png', 'logo-horizontal.svg', 'logo-horizontal-negativa.svg'])
   fs.copyFileSync(path.join(APP, 'marca', f), path.join(DIST, f));
-fs.writeFileSync(path.join(DIST, 'manifest.webmanifest'), JSON.stringify({ name: titulo, short_name: 'Meu Fiscal', start_url: site === 'cliente' ? '/dashboard' : '/admin/dashboard', display: 'standalone', background_color: '#F8FAFC', theme_color: '#0F172A', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }, null, 2));
+fs.writeFileSync(path.join(DIST, 'manifest.webmanifest'), JSON.stringify({ name: titulo, short_name: site === 'contabil' ? 'MF Contábil' : 'Meu Fiscal', start_url: site === 'cliente' ? '/dashboard' : site === 'contabil' ? '/escrita' : '/admin/dashboard', display: 'standalone', background_color: '#F8FAFC', theme_color: '#0F172A', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }, null, 2));
 const MF_OG = '<g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7" transform="translate(32 32) scale(0.72) translate(-32 -31)"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g>';
 if (site === 'cliente') {
   // página comercial em "/" + termos/privacidade, montadas a partir de app/landing.config.json
@@ -189,7 +199,7 @@ if (site === 'cliente') {
   fs.writeFileSync(path.join(DIST, 'og.svg'), `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630"><rect width="1200" height="630" fill="#0F172A"/><g transform="translate(80 80) scale(1.5)"><rect x="1" y="1" width="62" height="62" rx="15" fill="#1E293B" stroke="#334155" stroke-width="2"/>${MF_OG}</g><text x="80" y="330" font-family="Arial,sans-serif" font-size="78" font-weight="700" fill="#fff">Meu Fiscal</text><text x="80" y="420" font-family="Arial,sans-serif" font-size="40" fill="#94A3B8">Contabilidade online para MEI e Simples Nacional</text><text x="80" y="520" font-family="Arial,sans-serif" font-size="32" fill="#34D399">Impostos calculados · NFS-e · IA 24h · Contador responsável</text></svg>`);
   fs.writeFileSync(path.join(DIST, 'sitemap.xml'), `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"><url><loc>${SITE_URL}/</loc></url><url><loc>${SITE_URL}/termos</loc></url><url><loc>${SITE_URL}/privacidade</loc></url></urlset>\n`);
 }
-fs.writeFileSync(path.join(DIST, 'robots.txt'), site === 'painel' ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nDisallow: /dashboard\nDisallow: /login\nDisallow: /api/\nSitemap: ${String(env.SITE_URL || 'https://meufiscal-cliente.vercel.app').replace(/\/$/, '')}/sitemap.xml\n`);
+fs.writeFileSync(path.join(DIST, 'robots.txt'), RESTRITO ? 'User-agent: *\nDisallow: /\n' : `User-agent: *\nDisallow: /dashboard\nDisallow: /login\nDisallow: /api/\nSitemap: ${String(env.SITE_URL || 'https://meufiscal-cliente.vercel.app').replace(/\/$/, '')}/sitemap.xml\n`);
 // Cloudflare Pages: cada rota vira um arquivo no próprio caminho (a Cloudflare serve /x a partir de x.html),
 // mais _redirects e _headers equivalentes ao vercel.json
 for (const [rota, arq] of ROTAS.paginas) {

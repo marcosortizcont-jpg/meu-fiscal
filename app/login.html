@@ -68,9 +68,10 @@ body.painel .rodape,body.painel p.sub{color:#94A3B8}
 <script>
 (function(){
   const SITE=(window.MF&&window.MF.site)||'cliente', PAINEL=SITE==='painel';
-  const HOME=PAINEL?'/admin/dashboard':'/dashboard', LOGIN=PAINEL?'/admin/login':'/login';
+  const CONTABIL=!!(window.MF&&window.MF.app==='contabil');
+  const HOME=CONTABIL?'/escrita':PAINEL?'/admin/dashboard':'/dashboard', LOGIN=CONTABIL?'/login':PAINEL?'/admin/login':'/login';
   const SENHA=/^[A-Za-z0-9]{8}$/;
-  if(PAINEL){document.body.classList.add('painel');document.title='Painel Contábil · Meu Fiscal'}
+  if(PAINEL){document.body.classList.add('painel');document.title=CONTABIL?'Contábil · Meu Fiscal':'Painel Contábil · Meu Fiscal'}
   const $=s=>document.querySelector(s), caixa=$('#caixa');
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const q=new URLSearchParams(location.search);
@@ -81,12 +82,12 @@ body.painel .rodape,body.painel p.sub{color:#94A3B8}
     return {status:r.status,ok:r.ok,j};
   }
   const aviso=(t,m)=>m?`<div class="aviso ${t}">${m}</div>`:'';
-  const topo=(t,s)=>`<div class="selo-painel"><span class="marca" style="font-size:15px;color:#fff;text-transform:none;letter-spacing:0"><i style="width:30px;height:30px;font-size:12px"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></i><span><span class="wm-meu">meu</span>fiscal</span></span><span>· Painel Contábil</span></div><div><h2>${t}</h2>${s?`<p class="sub">${s}</p>`:''}</div>`;
+  const topo=(t,s)=>`<div class="selo-painel"><span class="marca" style="font-size:15px;color:#fff;text-transform:none;letter-spacing:0"><i style="width:30px;height:30px;font-size:12px"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></i><span><span class="wm-meu">meu</span>fiscal</span></span><span>· ${CONTABIL?'Sistema Contábil':'Painel Contábil'}</span></div><div><h2>${t}</h2>${s?`<p class="sub">${s}</p>`:''}</div>`;
   const campoSenha=(id,rot,ac)=>`<label>${rot}<span class="campo"><input type="password" id="${id}" maxlength="8" autocomplete="${ac}" required><button type="button" class="olho" data-olho="${id}" aria-label="Mostrar senha">${olhoSvg}</button></span><span class="dica"><span>8 letras ou números</span><span id="${id}-n">0/8</span></span></label>`;
   let estado={msg:null};
 
   function telaEntrar(){
-    caixa.innerHTML=`${topo(PAINEL?'Entrar no painel':'Entrar no Portal do Cliente',PAINEL?'Acesso da equipe do escritório com e-mail corporativo.':'Use o e-mail cadastrado pelo escritório.')}
+    caixa.innerHTML=`${topo(CONTABIL?'Entrar no sistema contábil':PAINEL?'Entrar no painel':'Entrar no Portal do Cliente',CONTABIL?'Escrituração fiscal, contábil e folha. Use o mesmo acesso do painel.':PAINEL?'Acesso da equipe do escritório com e-mail corporativo.':'Use o e-mail cadastrado pelo escritório.')}
     ${estado.msg?aviso(estado.msg[0],estado.msg[1]):''}
     <form id="f-entrar" novalidate style="display:flex;flex-direction:column;gap:16px">
       <label>E-mail${PAINEL?' corporativo':''}<input type="email" id="email" autocomplete="username" required value="${esc(estado.email||'')}"></label>

@@ -9,7 +9,7 @@
 (function () {
   const M = window.MF = window.MF || {};
   const BASE = {};                  // coleção → Map(id → JSON do último estado confirmado pelo servidor)
-  const LOGIN = M.site === 'painel' ? '/admin/login' : '/login';
+  const LOGIN = M.app === 'contabil' ? '/login' : M.site === 'painel' ? '/admin/login' : '/login';
   let es = null, espera = 1000, filaTr = [], timerTr = null;
   M.estado = 'conectando';
 

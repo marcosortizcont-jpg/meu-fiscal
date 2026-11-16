@@ -1,0 +1,9 @@
+// Gerado por: node sites/build.mjs contabil --configurar (Cloudflare Workers)
+{
+  "name": "meufiscal-contabil",
+  "main": "worker.js",
+  "compatibility_date": "2026-06-01",
+  "build": { "command": "node ../build.mjs contabil" },
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": ["/api/*"], "not_found_handling": "none" },
+  "observability": { "enabled": true }
+}
