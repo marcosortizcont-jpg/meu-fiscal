@@ -282,7 +282,7 @@ Menu **Apuração do Simples** no painel (permissão do módulo "Apuração, gui
 - A tela "Apuração e guias" passa a usar esse cálculo quando há lançamentos. Conferir com o PGDAS-D antes de transmitir.
 - Tabelas valem até 2026; a partir de 2027 entram as regras da reforma tributária (IBS/CBS) no Simples.
 
-## Sistema contábil (`contabil.omeufiscal.com.br`)
+## Sistema fiscal (`fiscal.omeufiscal.com.br`)
 
 A escrituração fica num terceiro site, separado do painel. Ele usa o mesmo login da equipe, o mesmo banco e as mesmas permissões, e fala com a API como "painel". A guia do DAS gerada lá cai direto no portal do cliente.
 
@@ -298,7 +298,7 @@ A escrituração fica num terceiro site, separado do painel. Ele usa o mesmo log
   - Simples Nacional e MEI;
   - Livros e relatórios.
 - No painel, esses módulos saíram do menu e foram trocados por um link **Sistema contábil ↗**.
-- **Build:** `node sites/build.mjs contabil`, com saída em `sites/contabil/dist`.
+- **Build:** `node sites/build.mjs fiscal`, com saída em `sites/fiscal/dist`.
   - Rotas: `/login` e `/escrita`.
   - `PAINEL_URL`, em `sites/contabil/.env.production`, é o link de volta ao painel.
   - `CONTABIL_URL`, no build do painel, é o link do painel para cá. O padrão é `https://contabil.omeufiscal.com.br`.
@@ -315,7 +315,32 @@ A escrituração fica num terceiro site, separado do painel. Ele usa o mesmo log
 3. Com o domínio ativo na Cloudflare, abra **Worker → Settings → Domains & Routes → Add → Custom domain** e informe `contabil.omeufiscal.com.br`.
 4. O login é por domínio. Entre uma vez com o mesmo e-mail e senha do painel.
 
-### Competência, apuração e lançamentos (sistema contábil)
+## Sistema contábil (`contabil.omeufiscal.com.br`)
+
+São três sistemas de departamento com o mesmo casco, o mesmo login e o mesmo banco: **Fiscal** (`fiscal.`), **Contábil** (`contabil.`) e **DP** (`dp.`). O menu do topo leva de um para o outro.
+
+- **Plano de contas:** plano padrão simplificado para ME/EPP. As contas analíticas têm 4 níveis. Cada empresa pode criar contas próprias; na primeira alteração, o plano padrão é copiado para ela (coleção `planocontas`).
+- **Lançamentos contábeis** (coleção `lanccontabeis`): partidas dobradas manuais, mais as geradas pela integração e pela conciliação.
+- **Gerar integração** (no cartão da competência): transforma o fiscal e a folha do mês em lançamentos, num lote que pode ser refeito.
+  - Fiscal:
+    - receitas por anexo (D Clientes / C Vendas ou Serviços);
+    - devoluções;
+    - DAS (D Simples / C Simples a recolher);
+    - notas de entrada por CFOP e lançamentos fiscais por acumulador (D custo, despesa ou imobilizado / C Fornecedores);
+    - retenções de serviços tomados.
+  - Folha fechada: salários e pró-labore desdobrados em líquido, INSS, IRRF, VT, adiantamentos e outros descontos; salário-família compensado no INSS; FGTS e INSS patronal.
+  - O cartão avisa quando a integração fica desatualizada.
+- **Conciliação bancária:** importa o OFX (coleção `extratos`, sem duplicar linhas pelo FITID). Sugere a contrapartida pela regra memorizada, pelo texto (tarifa, DAS, FGTS, INSS, aluguel, energia…) ou por um padrão (Clientes ou Fornecedores). Há conciliação em lote e opção de desfazer.
+- **Demonstrações:**
+  - Balancete, que confere se débitos e créditos batem.
+  - DRE.
+  - Balanço patrimonial, com o resultado ainda não encerrado no PL e conferência ativo = passivo + PL.
+  - Fluxo de caixa pelo método direto (contas 1.1.1), separado em operacional, investimento e financiamento.
+  - Diário e Razão.
+  - Tudo sai em PDF, com assinatura do representante e do contador, ou em planilha.
+- **Build:** `node sites/build.mjs contabil` (rotas `/login` e `/contabil`; `/escrita` redireciona para o fiscal).
+
+### Competência, apuração e lançamentos (sistema fiscal)
 
 - **Competência na lateral:** um cartão mostra o mês (‹ › ou PgUp/PgDn), a situação e o botão **Gerar apuração**.
   - Situações: sem movimento, receitas lançadas, apurada, desatualizada, guia liberada ou paga.

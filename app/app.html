@@ -2722,7 +2722,8 @@ FORM['empresa360']=async(fd,form)=>{const antes=S.empresas.length;await formEmpr
 @media (max-width:820px){.inbox{grid-template-columns:1fr}}
 `;document.head.appendChild(st)})();
 const SITE_PAINEL=!!(window.MF&&window.MF.site==='painel');
-const APP_CONTABIL=!!(window.MF&&window.MF.app==='contabil');
+const APP_FISCAL=!!(window.MF&&window.MF.app==='fiscal');      // fiscal.omeufiscal.com.br: escrita fiscal (v27)
+const APP_CONTABIL=!!(window.MF&&window.MF.app==='contabil');  // contabil.omeufiscal.com.br: contabilidade (v30)
 const APP_DP=!!(window.MF&&window.MF.app==='dp');   // dp.omeufiscal.com.br: departamento pessoal (v28)   // contabil.omeufiscal.com.br: o sistema de escrituração (v27)
 
 /* ---------- menu do painel: documentos e certificados passam para o cadastro do cliente ---------- */
@@ -5846,7 +5847,7 @@ function aNfeEntrada(){
   const f=UI.fnfe||(UI.fnfe={emp:'',mes:'',q:'',st:''});const L=nfeFiltradas();const vis=L.slice(0,300);
   const meses=[...new Set(S.nfentrada.map(n=>mesDe(n.emissao)).filter(Boolean))].sort().reverse();
   const tot=L.filter(n=>n.situacao!=='cancelada').reduce((a,n)=>a+(+n.valor||0),0);
-  const es=S.empresas.filter(e=>e.status!=='inativo'&&soDig(e.cnpj).length===14&&(!APP_CONTABIL||e.id===UI.fsn?.emp));
+  const es=S.empresas.filter(e=>e.status!=='inativo'&&soDig(e.cnpj).length===14&&(!APP_FISCAL||e.id===UI.fsn?.emp));
   const sit=n=>n.situacao==='cancelada'?pill('Cancelada','crit'):n.situacao==='denegada'?pill('Denegada','warn'):n.completa?pill('XML completo','ok'):n.manifestacao?.em?pill('Ciência dada','')+'<div class="small muted">XML chega em até 1 h</div>':pill('Só resumo','warn');
   const empRow=e=>{const ce=x.certificados?.[e.id];const st=x.estados?.[e.id];const vencido=ce?.validoAte&&String(ce.validoAte).slice(0,10)<hoje();const qtd=S.nfentrada.filter(n=>n.empresaId===e.id).length;
     return `<tr><td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted mono">${fmtCNPJ(e.cnpj||'')}</div></td>
@@ -5955,10 +5956,10 @@ function aSimples(){
   if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui Apuração, guias e notas.');
   const es=S.empresas.filter(e=>e.status!=='inativo'&&(e.regime==='SN'||e.regime==='MEI'));
   if(!es.length)return head('Apuração do Simples','')+vazio('Nenhuma empresa do Simples Nacional ou MEI na carteira.');
-  const F=UI.fsn||(UI.fsn={emp:es[0].id,comp:addMes(compAtual(),-1)});if(!APP_CONTABIL&&!es.some(e=>e.id===F.emp))F.emp=es[0].id;
+  const F=UI.fsn||(UI.fsn={emp:es[0].id,comp:addMes(compAtual(),-1)});if(!APP_FISCAL&&!es.some(e=>e.id===F.emp))F.emp=es[0].id;
   const e=emp(F.emp);const comp=F.comp;const ed=podeMod('guias','editar')&&!snFechada(e.id,comp);const L=snRec(e.id,comp);
   const meses=[];for(let i=0;i<18;i++)meses.push(addMes(compAtual(),-i));
-  const seletor=APP_CONTABIL?'':`<select data-sn="emp" style="width:auto;max-width:280px">${es.map(x=>`<option value="${x.id}" ${x.id===e.id?'selected':''}>${esc(x.fantasia||x.razao)}${x.regime==='MEI'?' (MEI)':''}</option>`).join('')}</select><select data-sn="comp" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===comp?'selected':''}>${fmtComp(c)}</option>`).join('')}</select>`;
+  const seletor=APP_FISCAL?'':`<select data-sn="emp" style="width:auto;max-width:280px">${es.map(x=>`<option value="${x.id}" ${x.id===e.id?'selected':''}>${esc(x.fantasia||x.razao)}${x.regime==='MEI'?' (MEI)':''}</option>`).join('')}</select><select data-sn="comp" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===comp?'selected':''}>${fmtComp(c)}</option>`).join('')}</select>`;
   const nfse=S.notas.filter(n=>n.empresaId===e.id&&n.comp===comp&&n.status==='autorizada'&&!L.some(l=>l.notaId===n.id));
   const mei=e.regime==='MEI';
   const flags=l=>Object.keys(SEGREG).filter(k=>l[k]).map(k=>pill(SEGREG[k].rot,'')).join(' ');
@@ -5979,7 +5980,7 @@ function aSimples(){
     <div class="table-wrap" style="margin-top:12px"><table><thead><tr><th>Tributo</th>${g0.map(g=>`<th class="r">Anexo ${g.anexo}</th>`).join('')}<th class="r">Deduzido</th><th class="r">Total no DAS</th></tr></thead><tbody>${TRIB.filter(t=>a.tot[t]||a.ded[t]).map(t=>`<tr><td>${t==='CPP'?'CPP (INSS patronal)':t}</td>${g0.map(g=>`<td class="r num">${brl(g.trib[t])}</td>`).join('')}<td class="r num">${a.ded[t]?brl(a.ded[t]):'—'}</td><td class="r num"><b>${brl(a.tot[t])}</b></td></tr>`).join('')}
     <tr><td><b>Total</b></td>${g0.map(g=>`<td class="r num"><b>${brl(g.total)}</b></td>`).join('')}<td class="r num">${brl(TRIB.reduce((x,t)=>x+a.ded[t],0))}</td><td class="r num"><b>${brl(a.total)}</b></td></tr></tbody></table></div>`:vazio('Lance a receita do mês para calcular.');
   const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo==='DAS');
-  return `${head(APP_CONTABIL?'Apuração do Simples Nacional':'Apuração do Simples','Lançamentos de receita por anexo, cálculo do DAS com RBT12, Fator R e segregação, memória de cálculo e relatórios em PDF.',seletor)}${snAbas()}
+  return `${head(APP_FISCAL?'Apuração do Simples Nacional':'Apuração do Simples','Lançamentos de receita por anexo, cálculo do DAS com RBT12, Fator R e segregação, memória de cálculo e relatórios em PDF.',seletor)}${snAbas()}
    ${a.avisos.map(([c,t])=>`<div class="banner ${c||'info'}" style="display:block;margin-bottom:10px">${esc(t)}</div>`).join('')}
    <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Receita do mês</span><b>${brl(a.receita)}</b></div><div class="kpi"><span class="eyebrow">RBT12${a.proporcional?' (proporcional)':''}</span><b>${brl(a.rbt12)}</b></div>
     <div class="kpi"><span class="eyebrow">DAS calculado</span><b>${brl(a.total)}</b></div><div class="kpi"><span class="eyebrow">Alíquota final</span><b>${pct(a.receita?a.total/a.receita:0)}</b></div></div>
@@ -6184,15 +6185,15 @@ async function importarXmlFiscal(files){const F=UI.fsn;const e=emp(F.emp);const 
   if(res.erros.length)console.warn('XML com erro:',res.erros)}
 const onUploadV26=onUpload;onUpload=async function(inp){if(inp.dataset.up==='xml-fiscal'){const files=[...inp.files];inp.value='';if(files.length)await importarXmlFiscal(files);return}return onUploadV26(inp)};
 /* ----- abas do módulo ----- */
-function snAbas(){if(APP_CONTABIL)return '';const a=UI.snAba||'apur';return `<div class="tabs" role="tablist" style="margin-bottom:14px">${[['apur','Apuração'],['notas','Notas fiscais de saída'],['rel','Relatórios']].map(([k,t])=>`<button class="tab ${a===k?'on':''}" role="tab" aria-selected="${a===k}" data-act="sn-aba" data-v="${k}">${t}</button>`).join('')}</div>`}
+function snAbas(){if(APP_FISCAL)return '';const a=UI.snAba||'apur';return `<div class="tabs" role="tablist" style="margin-bottom:14px">${[['apur','Apuração'],['notas','Notas fiscais de saída'],['rel','Relatórios']].map(([k,t])=>`<button class="tab ${a===k?'on':''}" role="tab" aria-selected="${a===k}" data-act="sn-aba" data-v="${k}">${t}</button>`).join('')}</div>`}
 ACT['sn-aba']=el=>{UI.snAba=el.dataset.v;render()};
 const conteudoV26=conteudo;conteudo=function(){if(UI.modo==='painel'&&UI.view==='a-simples'&&(UI.snAba||'apur')!=='apur')return aSimplesAba();return conteudoV26()};
-function nfCab(titulo){const es=S.empresas.filter(e=>e.status!=='inativo'&&(e.regime==='SN'||e.regime==='MEI'));const F=UI.fsn||(UI.fsn={emp:es[0]?.id,comp:addMes(compAtual(),-1)});if(!APP_CONTABIL&&!es.some(e=>e.id===F.emp))F.emp=es[0]?.id;
+function nfCab(titulo){const es=S.empresas.filter(e=>e.status!=='inativo'&&(e.regime==='SN'||e.regime==='MEI'));const F=UI.fsn||(UI.fsn={emp:es[0]?.id,comp:addMes(compAtual(),-1)});if(!APP_FISCAL&&!es.some(e=>e.id===F.emp))F.emp=es[0]?.id;
   const meses=[];for(let i=0;i<24;i++)meses.push(addMes(compAtual(),-i));const F2=UI.fnf||(UI.fnf={ate:F.comp});
-  const sel=APP_CONTABIL?'':`<select data-sn="emp" style="width:auto;max-width:280px">${es.map(x=>`<option value="${x.id}" ${x.id===F.emp?'selected':''}>${esc(x.fantasia||x.razao)}${x.regime==='MEI'?' (MEI)':''}</option>`).join('')}</select>
+  const sel=APP_FISCAL?'':`<select data-sn="emp" style="width:auto;max-width:280px">${es.map(x=>`<option value="${x.id}" ${x.id===F.emp?'selected':''}>${esc(x.fantasia||x.razao)}${x.regime==='MEI'?' (MEI)':''}</option>`).join('')}</select>
     <label class="small muted" style="display:flex;align-items:center;gap:6px">de <select data-sn="comp" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===F.comp?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>
     <label class="small muted" style="display:flex;align-items:center;gap:6px">até <select data-nf="ate" style="width:auto">${meses.map(c=>`<option value="${c}" ${c===(F2.ate<F.comp?F.comp:F2.ate)?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>`;
-  if(APP_CONTABIL)return {es,html:UI.snAba==='notas'?head('Notas fiscais de saída','Importação de XML de NF-e, NFC-e e NFS-e (nacional e ABRASF), receita por CFOP e CST, filtros por destaque.'):head('Livros e relatórios','Livros Registro de Saídas e de Entradas, resumos por CFOP, CST, NCM, cliente e dia, e a base do PGDAS-D. Tudo em tela, CSV ou PDF.')};
+  if(APP_FISCAL)return {es,html:UI.snAba==='notas'?head('Notas fiscais de saída','Importação de XML de NF-e, NFC-e e NFS-e (nacional e ABRASF), receita por CFOP e CST, filtros por destaque.'):head('Livros e relatórios','Livros Registro de Saídas e de Entradas, resumos por CFOP, CST, NCM, cliente e dia, e a base do PGDAS-D. Tudo em tela, CSV ou PDF.')};
   return {es,html:head(titulo,'Escrita fiscal do Simples Nacional e do MEI: notas de saída por XML, receitas automáticas, filtros por CFOP e CST e relatórios.',sel)+snAbas()}}
 const periodoNf=()=>{const F=UI.fsn,F2=UI.fnf||(UI.fnf={});const de=F.comp,ate=F2.ate&&F2.ate>=F.comp?F2.ate:F.comp;return {de,ate}};
 function docsFiltrados(){const F=UI.fsn,f=UI.fnf||(UI.fnf={});const {de,ate}=periodoNf();const q=normP(f.q||'');
@@ -7293,7 +7294,8 @@ ACT['ctb-apurar']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;if(!e)return;con
 function ctbCardComp(){const F=UI.fsn||{};const comp=F.comp||compAtual();const meses=[];for(let i=-1;i<36;i++)meses.push(addMes(compAtual(),-i));
   const sel=`<select data-sn="comp" aria-label="Competência">${meses.map(c=>`<option value="${c}" ${c===comp?'selected':''}>${fmtComp(c)}</option>`).join('')}</select>`;
   const e=emp(F.emp);let st='',acao='';
-  if(APP_DP&&e){const r=dpFolhaRec(e.id,comp);st=r?.status==='fechada'?pill('Folha fechada','ok'):pill('Folha aberta','warn');acao=`<a class="btn sm primary" href="#d-folha">Calcular folha</a>`}
+  if(APP_CONTABIL&&e){const c=cbCardStatus(e,comp);st=c.pill;acao=c.acao}
+  else if(APP_DP&&e){const r=dpFolhaRec(e.id,comp);st=r?.status==='fechada'?pill('Folha fechada','ok'):pill('Folha aberta','warn');acao=`<a class="btn sm primary" href="#d-folha">Calcular folha</a>`}
   else if(e){const s=stComp(e,comp);st=pill(s.t,s.c);const pode=podeMod('guias','editar')&&e.regime==='SN'&&!['paga','fora'].includes(s.k);
     acao=pode?`<button class="btn sm primary" data-act="ctb-apurar">${s.k==='apurada'?'Gerar de novo':'Gerar apuração'}</button>`:''}
   return `<div class="ctb-comp"><span>Competência <kbd>PgUp</kbd><kbd>PgDn</kbd></span><div class="ctb-comp-sel"><button type="button" class="ctb-seta" data-act="ctb-comp" data-d="-1" aria-label="Anterior">‹</button>${sel}<button type="button" class="ctb-seta" data-act="ctb-comp" data-d="1" aria-label="Próxima">›</button></div>
@@ -7416,47 +7418,273 @@ dadosRelatorio=function(k){const R=RELS[k];const F=UI.fsn;const {de,ate}=periodo
     return {...d,linhas:tudo.map(x=>x.l),csv:tudo.map(x=>x.c),total:['Total','','','','','',brl(s(5)),brl(s(6)),brl(s(7))]}}
   return d};
 /* ==== v29 (fim) ==== */
+/* ==== v30: Contabilidade (contabil.omeufiscal.com.br) — plano de contas, lançamentos, integração fiscal/folha, conciliação OFX e demonstrações ==== */
+['planocontas','lanccontabeis','extratos'].forEach(c=>{if(!COLS.includes(c))COLS.push(c);if(!Array.isArray(S[c]))S[c]=[]});
+// Plano de contas padrão (simplificado, compatível com o referencial para ME/EPP). Analíticas: código com 4 níveis.
+const PLANO_PADRAO=[
+ ['1','ATIVO'],['1.1','ATIVO CIRCULANTE'],['1.1.1','Disponível'],['1.1.1.01','Caixa'],['1.1.1.02','Bancos conta movimento'],['1.1.1.03','Aplicações financeiras de liquidez imediata'],
+ ['1.1.2','Créditos'],['1.1.2.01','Clientes'],['1.1.2.02','Impostos a recuperar'],['1.1.2.03','Adiantamentos a funcionários'],['1.1.2.04','Adiantamentos a fornecedores'],
+ ['1.1.3','Estoques'],['1.1.3.01','Mercadorias para revenda'],['1.1.3.02','Matérias-primas'],
+ ['1.2','ATIVO NÃO CIRCULANTE'],['1.2.1','Imobilizado'],['1.2.1.01','Máquinas e equipamentos'],['1.2.1.02','Móveis e utensílios'],['1.2.1.03','Veículos'],['1.2.1.04','Computadores e periféricos'],['1.2.1.90','(-) Depreciação acumulada'],
+ ['2','PASSIVO'],['2.1','PASSIVO CIRCULANTE'],['2.1.1','Fornecedores'],['2.1.1.01','Fornecedores nacionais'],
+ ['2.1.2','Obrigações trabalhistas'],['2.1.2.01','Salários a pagar'],['2.1.2.02','Pró-labore a pagar'],['2.1.2.03','FGTS a recolher'],['2.1.2.04','INSS a recolher'],['2.1.2.05','IRRF sobre salários a recolher'],
+ ['2.1.3','Obrigações tributárias'],['2.1.3.01','Simples Nacional a recolher'],['2.1.3.02','Impostos retidos de terceiros a recolher'],['2.1.3.03','Outros impostos a recolher'],
+ ['2.1.4','Empréstimos e financiamentos'],['2.1.4.01','Empréstimos bancários'],['2.1.5','Outras obrigações'],['2.1.5.01','Contas a pagar'],['2.1.5.02','Lucros a distribuir'],
+ ['2.2','PASSIVO NÃO CIRCULANTE'],['2.2.1','Exigível a longo prazo'],['2.2.1.01','Empréstimos de longo prazo'],['2.2.1.02','Empréstimos de sócios'],
+ ['2.3','PATRIMÔNIO LÍQUIDO'],['2.3.1','Capital social'],['2.3.1.01','Capital social integralizado'],['2.3.2','Lucros ou prejuízos'],['2.3.2.01','Lucros ou prejuízos acumulados'],
+ ['3','RECEITAS'],['3.1','RECEITA BRUTA'],['3.1.1','Vendas e serviços'],['3.1.1.01','Venda de mercadorias'],['3.1.1.02','Venda de produtos'],['3.1.1.03','Prestação de serviços'],
+ ['3.2','DEDUÇÕES DA RECEITA'],['3.2.1','Deduções'],['3.2.1.01','Devoluções de vendas'],['3.2.1.02','Simples Nacional (DAS)'],['3.2.1.03','Outros impostos sobre vendas'],
+ ['3.3','OUTRAS RECEITAS'],['3.3.1','Receitas financeiras e outras'],['3.3.1.01','Receitas financeiras'],['3.3.1.02','Outras receitas'],
+ ['4','CUSTOS E DESPESAS'],['4.1','CUSTOS'],['4.1.1','Custos'],['4.1.1.01','Custo das mercadorias vendidas'],['4.1.1.02','Custo dos serviços prestados'],
+ ['4.2','DESPESAS COM PESSOAL'],['4.2.1','Pessoal'],['4.2.1.01','Salários e ordenados'],['4.2.1.02','Pró-labore'],['4.2.1.03','FGTS'],['4.2.1.04','INSS patronal'],['4.2.1.05','Vale-transporte'],['4.2.1.06','Férias e 13º salário'],
+ ['4.3','DESPESAS ADMINISTRATIVAS'],['4.3.1','Administrativas'],['4.3.1.01','Aluguel'],['4.3.1.02','Energia elétrica'],['4.3.1.03','Água e esgoto'],['4.3.1.04','Telefone e internet'],['4.3.1.05','Honorários contábeis'],['4.3.1.06','Material de uso e consumo'],['4.3.1.07','Serviços de terceiros'],['4.3.1.08','Fretes e carretos'],['4.3.1.09','Depreciação'],['4.3.1.99','Outras despesas administrativas'],
+ ['4.4','DESPESAS FINANCEIRAS'],['4.4.1','Financeiras'],['4.4.1.01','Tarifas bancárias'],['4.4.1.02','Juros e multas pagos'],
+ ['4.5','DESPESAS TRIBUTÁRIAS'],['4.5.1','Tributárias'],['4.5.1.01','Impostos e taxas diversas'],
+];
+const CTB_PERIODO=['c-lanc','c-banco','c-balancete','c-dre','c-fluxo','c-razao','c-balanco'];
+const NAV_CTB=[
+ ['Cadastros',[['c-plano','Plano de contas','checksq','Plano padrão pronto, com contas próprias por empresa']]],
+ ['Movimento',[['c-lanc','Lançamentos contábeis','receipt','Partidas dobradas manuais e as geradas pela integração'],['c-banco','Conciliação bancária','bank','Importa o OFX do banco e contabiliza cada linha com contrapartida sugerida']]],
+ ['Demonstrações',[['c-balancete','Balancete','chart','Saldo anterior, débitos, créditos e saldo atual'],['c-dre','DRE','chart','Demonstração do resultado do período'],['c-balanco','Balanço patrimonial','chart','Ativo, passivo e patrimônio líquido na data'],['c-fluxo','Fluxo de caixa','chart','Método direto, pelas contas de caixa e bancos'],['c-razao','Diário e razão','filetext','Lançamentos em ordem e razão por conta']]],
+];
+const planoRec=eid=>S.planocontas.find(p=>p.empresaId===eid);
+function planoDe(eid){const r=planoRec(eid);return (r?.contas?.length?r.contas:PLANO_PADRAO.map(([cod,nome])=>({cod,nome}))).slice().sort((a,b)=>a.cod.localeCompare(b.cod,undefined,{numeric:true}))}
+const analitica=cod=>String(cod).split('.').length>=4;
+const natD=cod=>/^(1|4|3\.2)/.test(cod)||cod==='2.1.2.04x';
+const contasA=eid=>planoDe(eid).filter(c=>analitica(c.cod));
+function nomeConta(eid,cod){const c=planoDe(eid).find(x=>x.cod===cod)||PLANO_PADRAO.find(x=>x[0]===cod)&&{nome:PLANO_PADRAO.find(x=>x[0]===cod)[1]};return c?c.nome:'(conta '+cod+')'}
+const contaTxt=(eid,cod)=>cod?cod+' · '+nomeConta(eid,cod):'—';
+const cbPeriodo=()=>{const F=UI.fsn,F2=UI.fnf||(UI.fnf={});const de=F.comp,ate=F2.ate&&F2.ate>=F.comp?F2.ate:F.comp;return {de,ate,dIni:de+'-01',dFim:dpFimMes(ate)}};
+const lancsDe=(eid,ate)=>S.lanccontabeis.filter(l=>l.empresaId===eid&&(!ate||l.data<=ate));
+// saldos: movimento por conta (devedor positivo) num intervalo de datas
+function cbMov(eid,ini,fim){const m={};for(const l of S.lanccontabeis){if(l.empresaId!==eid||(ini&&l.data<ini)||(fim&&l.data>fim))continue;const v=+l.valor||0;(m[l.deb]||(m[l.deb]={d:0,c:0})).d+=v;(m[l.cred]||(m[l.cred]={d:0,c:0})).c+=v}return m}
+const somaGrupo=(m,pref)=>Object.entries(m).filter(([k])=>k===pref||k.startsWith(pref+'.')).reduce((a,[,x])=>({d:a.d+x.d,c:a.c+x.c}),{d:0,c:0});
+const saldoNat=(cod,x)=>r2(natD(cod)?x.d-x.c:x.c-x.d);
+
+/* ---------- integração: fiscal e folha viram lançamentos ---------- */
+const ACUM_CONTA={101:'4.1.1.01',102:'4.1.1.01',103:'4.3.1.06',104:'1.2.1.02',106:'4.1.1.01',201:'4.3.1.07',202:'4.3.1.07',203:'4.3.1.07',301:'4.3.1.02',302:'4.3.1.04',303:'4.3.1.03',304:'4.3.1.08',305:'4.3.1.01',306:'4.3.1.99'};
+function contaCfopEntrada(cfop){const c=String(cfop||'').slice(1);if(['102','403','101','401','113','122'].includes(c))return '4.1.1.01';if(['556','407','653'].includes(c))return '4.3.1.06';if(['551','406'].includes(c))return '1.2.1.02';if(['252','253'].includes(c))return '4.3.1.02';if(['302','303'].includes(c))return '4.3.1.04';if(['352','353'].includes(c))return '4.3.1.08';return '4.3.1.99'}
+function cbIntegracao(e,comp){const P=[];const data=dpFimMes(comp);const add=(deb,cred,valor,hist,fonte)=>{valor=r2(valor);if(valor>0.004)P.push({deb,cred,valor,hist,fonte})};
+  // receitas do Simples (notas, lançamentos fiscais e receitas manuais)
+  const rc={};S.receitas.filter(r=>r.empresaId===e.id&&r.comp===comp).forEach(r=>{const conta=r.meiCat?({com:'3.1.1.01',ind:'3.1.1.02',serv:'3.1.1.03'}[r.meiCat]||'3.1.1.01'):r.anexo==='I'?'3.1.1.01':r.anexo==='II'?'3.1.1.02':'3.1.1.03';const v=+r.valor||0;
+    if(v>=0)rc[conta]=(rc[conta]||0)+v;else rc['dev']=(rc['dev']||0)-v});
+  Object.entries(rc).forEach(([c,v])=>c==='dev'?add('3.2.1.01','1.1.2.01',v,'Devoluções de vendas de '+fmtComp(comp),'fiscal'):add('1.1.2.01',c,v,nomeConta(e.id,c)+' de '+fmtComp(comp),'fiscal'));
+  if(!Object.keys(rc).length){const f=receitaMes(e.id,comp);if(f)add('1.1.2.01',e.regime==='SN'&&['III','IV','V'].includes(e.anexo)?'3.1.1.03':'3.1.1.01',f,'Receita bruta informada de '+fmtComp(comp),'fiscal')}
+  // DAS
+  S.guias.filter(g=>g.empresaId===e.id&&g.comp===comp&&/^DAS/.test(g.tipo)&&+g.valor>0).forEach(g=>add('3.2.1.02','2.1.3.01',+g.valor,'Simples Nacional ('+g.tipo+') de '+fmtComp(comp),'fiscal'));
+  // compras e despesas com nota (XML/SEFAZ) e lançamentos fiscais
+  const en={};S.nfentrada.filter(n=>n.empresaId===e.id&&n.situacao!=='cancelada'&&String(n.emissao).slice(0,7)===comp).forEach(n=>{const its=n.itens?.length?n.itens:[{cfop:'',vProd:+n.valor||0}];
+    its.forEach(it=>{const c=it.cfop?contaCfopEntrada(it.cfop):'4.1.1.01';const v=(it.vProd||0)-(it.vDesc||0)+(it.vFrete||0)+(it.vSeg||0)+(it.vOutro||0)+(it.vST||0)+(it.vIPI||0);en[c]=(en[c]||0)+v})});
+  let ret=0;S.lancfiscais.filter(l=>l.empresaId===e.id&&String(l.competencia||l.data).slice(0,7)===comp&&['entrada','outro','tomado'].includes(l.tipo)).forEach(l=>{const c=ACUM_CONTA[l.acum];if(!c)return;en[c]=(en[c]||0)+(+l.valor||0);if(l.tipo==='tomado')ret+=Object.values(l.ret||{}).reduce((a,x)=>a+(+x||0),0)});
+  const totEn=Object.values(en).reduce((a,v)=>a+v,0);Object.entries(en).forEach(([c,v])=>add(c,'2.1.1.01',v,nomeConta(e.id,c)+' (notas de entrada) de '+fmtComp(comp),'fiscal'));
+  if(ret>0&&totEn>0)add('2.1.1.01','2.1.3.02',ret,'Retenções sobre serviços tomados de '+fmtComp(comp),'fiscal');
+  // folha fechada
+  const fr=dpFolhaRec(e.id,comp);if(fr?.status==='fechada'&&fr.calc){const C=fr.calc;
+    // por grupo (empregados e sócios): a despesa é debitada contra cada destino do bruto (líquido, INSS, IRRF, VT, adiantamento, outros)
+    const grupo=(L,desp,liqConta,rot)=>{if(!L.length)return;const r=(x,k)=>x.rubricas.filter(y=>y.cod===k).reduce((a,y)=>a+y.valor,0);const s=f=>L.reduce((a,x)=>a+f(x),0);
+      add(desp,liqConta,s(x=>x.liquido),rot+' líquido de '+fmtComp(comp),'folha');add(desp,'2.1.2.04',s(x=>x.inss),'INSS descontado ('+rot.toLowerCase()+') de '+fmtComp(comp),'folha');
+      add(desp,'2.1.2.05',s(x=>x.irrf),'IRRF descontado ('+rot.toLowerCase()+') de '+fmtComp(comp),'folha');add(desp,'4.2.1.05',s(x=>r(x,'220')),'Desconto de vale-transporte de '+fmtComp(comp),'folha');
+      add(desp,'1.1.2.03',s(x=>r(x,'230')),'Desconto de adiantamentos de '+fmtComp(comp),'folha');add(desp,'2.1.5.01',s(x=>r(x,'250')),'Outros descontos em folha de '+fmtComp(comp),'folha');
+      add('2.1.2.04',desp,s(x=>x.salFamilia),'Salário-família compensado no INSS de '+fmtComp(comp),'folha')};
+    grupo(C.L.filter(x=>x.vinculo!=='socio'),'4.2.1.01','2.1.2.01','Salários');grupo(C.L.filter(x=>x.vinculo==='socio'),'4.2.1.02','2.1.2.02','Pró-labore');
+    add('4.2.1.03','2.1.2.03',C.fgts,'FGTS de '+fmtComp(comp),'folha');add('4.2.1.04','2.1.2.04',C.patronal?.total||0,'INSS patronal de '+fmtComp(comp),'folha')}
+  return P.map(p=>({...p,data}))}
+function cbStatus(e,comp){const lote='int:'+comp;const L=S.lanccontabeis.filter(l=>l.empresaId===e.id&&l.lote===lote);const prev=cbIntegracao(e,comp);
+  const sig=x=>x.map(p=>p.deb+p.cred+r2(p.valor)).sort().join('|');const man=S.lanccontabeis.filter(l=>l.empresaId===e.id&&l.data.slice(0,7)===comp&&l.lote!==lote).length;
+  if(!L.length)return prev.length?{k:'pendente',t:'Integração pendente',c:'warn',n:man,prev}:{k:'vazia',t:man?'Só lançamentos manuais':'Sem movimento',c:man?'':'crit',n:man,prev};
+  return sig(L)===sig(prev)?{k:'ok',t:'Integração em dia',c:'ok',n:man+L.length,prev}:{k:'desat',t:'Integração desatualizada',c:'warn',n:man+L.length,prev}}
+ACT['cb-integrar']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;if(!e)return;const P=cbIntegracao(e,comp);const lote='int:'+comp;
+  if(!P.length){toast('Nada a integrar em '+fmtComp(comp)+': sem receitas, guias, notas de entrada ou folha fechada.',true);return}
+  mut('lanccontabeis',()=>{S.lanccontabeis=S.lanccontabeis.filter(l=>!(l.empresaId===e.id&&l.lote===lote));P.forEach(p=>S.lanccontabeis.push({id:uid(),empresaId:e.id,data:p.data,deb:p.deb,cred:p.cred,valor:p.valor,hist:p.hist,origem:'integracao',fonte:p.fonte,lote,criadoEm:agora()}))},
+    ['Contabilidade','Integrou '+P.length+' lançamento(s) de '+fmtComp(comp),e.razao]);toast(P.length+' lançamento(s) gerado(s) a partir do fiscal e da folha de '+fmtComp(comp)+'.')};
+
+/* ---------- telas ---------- */
+const cbEd=()=>podeMod('guias','editar');
+function cbConteudo(){if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui a contabilidade. Peça ao administrador para liberar o módulo "Apuração, guias e notas".');
+  const e=emp(UI.fsn?.emp);if(!e)return vazio('Nenhuma empresa ativa na carteira. As empresas são cadastradas no painel contábil.',`<a class="btn primary" href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Abrir o painel</a>`);
+  return ({'c-plano':cbPlano,'c-lanc':cbLanc,'c-banco':cbBanco,'c-balancete':cbBalancete,'c-dre':cbDre,'c-balanco':cbBalanco,'c-fluxo':cbFluxo,'c-razao':cbRazao}[UI.view]||cbLanc)(e)}
+function cbCardStatus(e,comp){const s=cbStatus(e,comp);return {pill:pill(s.t,s.c),acao:cbEd()&&s.k!=='vazia'?`<button class="btn sm primary" data-act="cb-integrar">${s.k==='ok'?'Integrar de novo':'Gerar integração'}</button>`:''}}
+// plano de contas
+function cbPlano(e){const P=planoDe(e.id);const proprio=!!planoRec(e.id)?.contas?.length;const usadas=new Set(S.lanccontabeis.filter(l=>l.empresaId===e.id).flatMap(l=>[l.deb,l.cred]));
+  return `${head('Plano de contas',proprio?'Plano próprio desta empresa. As contas analíticas (4 níveis) recebem lançamentos; as sintéticas somam as de baixo.':'Esta empresa usa o plano padrão do escritório, simplificado para ME/EPP e pronto para o referencial. Crie contas novas quando precisar.',cbEd()?`<button class="btn primary" data-act="cb-conta-nova">${svg('plus')}Nova conta</button>`:'')}
+   <div class="panel"><div class="table-wrap"><table><thead><tr><th>Código</th><th>Conta</th><th>Tipo</th><th>Natureza</th><th>Uso</th><th></th></tr></thead><tbody>${P.map(c=>{const a=analitica(c.cod);const nv=c.cod.split('.').length;return `<tr>
+    <td class="num ${a?'':'b'}" style="padding-left:${8+(nv-1)*14}px">${esc(c.cod)}</td><td style="${a?'':'font-weight:600'}">${esc(c.nome)}</td><td class="small">${a?'Analítica':'Sintética'}</td><td class="small">${natD(c.cod)?'Devedora':'Credora'}</td>
+    <td class="small">${a&&usadas.has(c.cod)?pill('com lançamentos','info'):''}</td><td>${cbEd()&&a&&!usadas.has(c.cod)?`<button class="btn sm ghost" data-act="cb-conta-excluir" data-cod="${esc(c.cod)}">Excluir</button>`:''}</td></tr>`}).join('')}</tbody></table></div></div>`}
+function cbSalvarPlano(e,fn,log){mut('planocontas',()=>{let r=planoRec(e.id);if(!r){r={id:uid(),empresaId:e.id,contas:[],regras:[]};S.planocontas.push(r)}if(!r.contas?.length)r.contas=PLANO_PADRAO.map(([cod,nome])=>({cod,nome}));if(!r.regras)r.regras=[];fn(r)},log)}
+ACT['cb-conta-nova']=()=>{const e=emp(UI.fsn.emp);const sint=planoDe(e.id).filter(c=>c.cod.split('.').length===3);
+  openModal(mHead('Nova conta analítica')+`<form data-form="cb-conta"><div class="modal-body"><div class="grid-f"><label class="f full"><span>Grupo (conta sintética) *</span><select name="pai">${sint.map(c=>`<option value="${c.cod}">${c.cod} · ${esc(c.nome)}</option>`).join('')}</select></label>
+   <label class="f full"><span>Nome da conta *</span><input name="nome" required maxlength="80" placeholder="Ex.: Banco Inter, Cliente XPTO, Aluguel do depósito"></label></div><p class="small muted">O código é criado em sequência dentro do grupo.</p></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Criar conta</button></div></form>`)};
+FORM['cb-conta']=fd=>{const e=emp(UI.fsn.emp);const pai=fd.get('pai'),nome=String(fd.get('nome')||'').trim();if(!nome)return;
+  const filhas=planoDe(e.id).filter(c=>c.cod.startsWith(pai+'.')&&analitica(c.cod)).map(c=>+c.cod.split('.')[3]).filter(n=>n<90);const cod=pai+'.'+String(Math.max(0,...filhas)+1).padStart(2,'0');
+  cbSalvarPlano(e,r=>r.contas.push({cod,nome}),['Contabilidade','Criou a conta '+cod+' '+nome,e.razao]);closeModal();toast('Conta '+cod+' criada.')};
+ACT['cb-conta-excluir']=el=>{const e=emp(UI.fsn.emp);const cod=el.dataset.cod;confirmar('Excluir conta','Excluir a conta '+esc(cod+' · '+nomeConta(e.id,cod))+' do plano desta empresa?','Excluir',()=>cbSalvarPlano(e,r=>{r.contas=r.contas.filter(c=>c.cod!==cod)},['Contabilidade','Excluiu a conta '+cod,e.razao]),true)};
+// lançamentos
+const ORIGEM_CB={manual:'Manual',integracao:'Integração',banco:'Conciliação'};
+function selConta(e,nome,val,attr=''){return `<select name="${nome}" ${attr}><option value="">Selecione</option>${planoDe(e.id).map(c=>analitica(c.cod)?`<option value="${c.cod}" ${c.cod===val?'selected':''}>${c.cod} · ${esc(c.nome)}</option>`:`<optgroup label="${esc(c.cod+' '+c.nome)}"></optgroup>`).join('')}</select>`}
+function cbLanc(e){const {dIni,dFim}=cbPeriodo();const f=UI.fcb||(UI.fcb={q:'',origem:''});const q=normP(f.q);
+  const L=S.lanccontabeis.filter(l=>l.empresaId===e.id&&l.data>=dIni&&l.data<=dFim&&(!f.origem||l.origem===f.origem)&&(!q||normP([l.hist,l.deb,l.cred,nomeConta(e.id,l.deb),nomeConta(e.id,l.cred),l.valor].join(' ')).includes(q))).sort((a,b)=>a.data.localeCompare(b.data)||String(a.criadoEm).localeCompare(String(b.criadoEm)));
+  const tot=L.reduce((a,l)=>a+(+l.valor||0),0);
+  return `${head('Lançamentos contábeis','Partidas dobradas: cada lançamento debita uma conta e credita outra. Os da integração vêm do fiscal e da folha; os da conciliação, do extrato bancário.',cbEd()?`<button class="btn primary" data-act="cb-lanc-novo">${svg('plus')}Novo lançamento</button>`:'')}
+   <div class="panel"><div class="actions" style="flex-wrap:wrap;margin-bottom:10px"><input type="search" data-cb-busca placeholder="Histórico, conta ou valor" value="${esc(f.q)}" style="max-width:260px">
+    <select data-cb-f="origem" style="width:auto"><option value="">Todas as origens</option>${Object.entries(ORIGEM_CB).map(([k,t])=>`<option value="${k}" ${f.origem===k?'selected':''}>${t}</option>`).join('')}</select><span class="small muted">${L.length} lançamento(s) · ${brl(tot)}</span></div>
+   ${L.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Débito</th><th>Crédito</th><th>Histórico</th><th class="r">Valor</th><th>Origem</th><th></th></tr></thead><tbody>${L.slice(0,600).map(l=>`<tr>
+    <td class="num">${fmtData(l.data)}</td><td class="small">${esc(contaTxt(e.id,l.deb))}</td><td class="small">${esc(contaTxt(e.id,l.cred))}</td><td class="small">${esc(l.hist||'')}</td><td class="r num">${brl(l.valor)}</td><td class="small">${ORIGEM_CB[l.origem]||l.origem}</td>
+    <td>${cbEd()&&l.origem==='manual'?`<div class="actions" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn sm" data-act="cb-lanc-editar" data-id="${l.id}">Editar</button><button class="btn sm ghost" data-act="cb-lanc-excluir" data-id="${l.id}">Excluir</button></div>`:''}</td></tr>`).join('')}</tbody></table></div>`
+    :vazio('Nenhum lançamento no período. Use "Gerar integração" na competência para trazer o fiscal e a folha, ou lance manualmente.')}</div>`}
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-cb-f]')){(UI.fcb||(UI.fcb={}))[s.dataset.cbF]=s.value;render()}});
+document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-cb-busca]')){(UI.fcb||(UI.fcb={})).q=s.value;clearTimeout(UI._cbT);UI._cbT=setTimeout(()=>{render();const i=document.querySelector('[data-cb-busca]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)}});
+function cbLancForm(l){const e=emp(UI.fsn.emp);const d=l?.data||(UI.fsn.comp===compAtual()?hoje():dpFimMes(UI.fsn.comp));
+  return mHead(l?'Editar lançamento':'Novo lançamento contábil')+`<form data-form="cb-lanc" data-id="${l?.id||''}" data-preservar><div class="modal-body"><div class="grid-f">
+   <label class="f"><span>Data *</span><input type="date" name="data" value="${esc(d)}" required></label><label class="f"><span>Valor (R$) *</span><input type="number" step="0.01" min="0.01" name="valor" value="${esc(l?.valor??'')}" required></label>
+   <label class="f full"><span>Conta a débito *</span>${selConta(e,'deb',l?.deb,'required')}</label><label class="f full"><span>Conta a crédito *</span>${selConta(e,'cred',l?.cred,'required')}</label>
+   <label class="f full"><span>Histórico *</span><input name="hist" value="${esc(l?.hist||'')}" required maxlength="200" placeholder="Ex.: Pagamento do aluguel de outubro"></label></div></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar</button></div></form>`}
+ACT['cb-lanc-novo']=()=>openModal(cbLancForm(null),true);ACT['cb-lanc-editar']=el=>{const l=S.lanccontabeis.find(x=>x.id===el.dataset.id);if(l)openModal(cbLancForm(l),true)};
+FORM['cb-lanc']=(fd,form)=>{const e=emp(UI.fsn.emp);const id=form.dataset.id;const d={data:fd.get('data'),valor:r2(+fd.get('valor')),deb:fd.get('deb'),cred:fd.get('cred'),hist:String(fd.get('hist')||'').trim()};
+  if(!d.deb||!d.cred||d.deb===d.cred){toast('Escolha contas diferentes para débito e crédito.',true);return}if(!(d.valor>0)){toast('Informe o valor.',true);return}
+  mut('lanccontabeis',()=>{const l=id&&S.lanccontabeis.find(x=>x.id===id);if(l)Object.assign(l,d,{atualizadoEm:agora()});else S.lanccontabeis.push({id:uid(),empresaId:e.id,...d,origem:'manual',criadoEm:agora(),por:ME.nome||''})},['Contabilidade',(id?'Editou':'Lançou')+' '+brl(d.valor)+' · '+d.hist,e.razao]);closeModal()};
+ACT['cb-lanc-excluir']=el=>{const l=S.lanccontabeis.find(x=>x.id===el.dataset.id);if(!l)return;confirmar('Excluir lançamento','Excluir o lançamento de '+brl(l.valor)+' ('+esc(l.hist||'')+')?','Excluir',()=>mut('lanccontabeis',()=>{S.lanccontabeis=S.lanccontabeis.filter(x=>x!==l)},['Contabilidade','Excluiu lançamento de '+brl(l.valor),emp(l.empresaId)?.razao||'']),true)};
+
+/* ---------- conciliação bancária (OFX) ---------- */
+function lerOfx(txt){const out=[];const pega=(b,t)=>{const m=b.match(new RegExp('<'+t+'>([^<\\r\\n]*)','i'));return m?m[1].trim():''};
+  const blocos=txt.split(/<STMTTRN>/i).slice(1);for(const b0 of blocos){const b=b0.split(/<\/STMTTRN>/i)[0];const dt=pega(b,'DTPOSTED');const v=parseFloat(pega(b,'TRNAMT').replace(',','.'));if(!dt||isNaN(v))continue;
+    out.push({data:dt.slice(0,4)+'-'+dt.slice(4,6)+'-'+dt.slice(6,8),valor:r2(v),fitid:pega(b,'FITID')||(dt+v+pega(b,'MEMO')),memo:(pega(b,'MEMO')||pega(b,'NAME')||'').replace(/\s+/g,' ').slice(0,140),doc:pega(b,'CHECKNUM')||pega(b,'REFNUM')})}
+  const banco=(txt.match(/<BANKID>([^<\r\n]+)/i)||[])[1]||'';const conta=(txt.match(/<ACCTID>([^<\r\n]+)/i)||[])[1]||'';return {itens:out,banco:banco.trim(),conta:conta.trim()}}
+function sugereConta(e,x){const r=planoRec(e.id)?.regras||[];const m=normP(x.memo);const reg=r.find(k=>k.texto&&m.includes(k.texto)&&(k.sinal==null||k.sinal===(x.valor<0?-1:1)));if(reg)return {conta:reg.conta,por:'regra'};
+  const H=[[/tarifa|tar\b|pacote de servicos|manutencao de conta|cesta/, '4.4.1.01'],[/juros|multa|iof/, '4.4.1.02'],[/\bdas\b|simples nacional|pgdas/, '2.1.3.01'],[/fgts/, '2.1.2.03'],[/inss|gps|dctfweb|darf previd/, '2.1.2.04'],[/salario|folha|pagto func/, '2.1.2.01'],[/pro.?labore/, '2.1.2.02'],[/aluguel/, '4.3.1.01'],[/energia|luz|cemig|energisa|enel|copel/, '4.3.1.02'],[/agua|saneamento|sanesul|sabesp/, '4.3.1.03'],[/telefon|internet|vivo|claro|tim\b|oi\b/, '4.3.1.04'],[/honorario|contabil/, '4.3.1.05'],[/rendimento|aplicac|resgate/, '3.3.1.01']];
+  for(const [re,c] of H)if(re.test(m))return {conta:c,por:'texto'};return {conta:x.valor>0?'1.1.2.01':'2.1.1.01',por:'padrão'}}
+function cbBanco(e){const {dIni,dFim}=cbPeriodo();const bancos=contasA(e.id).filter(c=>c.cod.startsWith('1.1.1'));const cb=UI.cbBanco&&bancos.some(b=>b.cod===UI.cbBanco)?UI.cbBanco:(bancos.find(b=>b.cod==='1.1.1.02')||bancos[0])?.cod;UI.cbBanco=cb;
+  const X=S.extratos.filter(x=>x.empresaId===e.id&&x.conta===cb&&x.data>=dIni&&x.data<=dFim).sort((a,b)=>a.data.localeCompare(b.data));const pend=X.filter(x=>!x.lancId);
+  const saldoCont=(()=>{const m=cbMov(e.id,null,dFim)[cb]||{d:0,c:0};return r2(m.d-m.c)})();
+  return `${head('Conciliação bancária','Importe o extrato OFX do internet banking. Cada linha vira um lançamento contra a conta do banco, com a contrapartida sugerida pelo histórico; o que você escolher fica memorizado para os próximos meses.',cbEd()?`<label class="btn primary">${svg('upload')}Importar OFX<input type="file" hidden accept=".ofx,.OFX" data-up="ofx" multiple></label>`:'')}
+   <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Linhas no período</span><b>${X.length}</b></div><div class="kpi"><span class="eyebrow">A conciliar</span><b>${pend.length}</b></div><div class="kpi"><span class="eyebrow">Entradas · Saídas</span><b>${brl(X.filter(x=>x.valor>0).reduce((a,x)=>a+x.valor,0))} · ${brl(-X.filter(x=>x.valor<0).reduce((a,x)=>a+x.valor,0))}</b></div><div class="kpi"><span class="eyebrow">Saldo contábil em ${fmtData(dFim)}</span><b>${brl(saldoCont)}</b></div></div>
+   <div class="panel"><div class="panel-head" style="flex-wrap:wrap;gap:8px"><label class="small muted" style="display:flex;gap:8px;align-items:center">Conta do banco <select data-cb-banco style="width:auto">${bancos.map(b=>`<option value="${b.cod}" ${b.cod===cb?'selected':''}>${b.cod} · ${esc(b.nome)}</option>`).join('')}</select></label>
+    ${cbEd()&&pend.length?`<button class="btn" data-act="cb-conc-todos">Conciliar as ${pend.length} pendentes com a sugestão</button>`:''}</div>
+   ${X.length?`<form data-form="cb-conc" data-preservar><div class="table-wrap"><table><thead><tr><th>Data</th><th>Histórico do banco</th><th class="r">Valor</th><th>Contrapartida</th><th></th></tr></thead><tbody>${X.map(x=>{const s=x.lancId?null:sugereConta(e,x);const l=x.lancId&&S.lanccontabeis.find(y=>y.id===x.lancId);return `<tr>
+    <td class="num">${fmtData(x.data)}</td><td class="small">${esc(x.memo)}</td><td class="r num" style="color:${x.valor<0?'var(--crit)':'var(--ok)'}">${brl(x.valor)}</td>
+    <td>${x.lancId?`<span class="small">${esc(contaTxt(e.id,x.valor>0?l?.cred:l?.deb))}</span>`:`${selConta(e,'c_'+x.id,s.conta,cbEd()?'':'disabled')}<div class="small muted">sugestão por ${s.por}</div>`}</td>
+    <td>${x.lancId?pill('Conciliado','ok')+(cbEd()?` <button type="button" class="btn sm ghost" data-act="cb-desconc" data-id="${x.id}">Desfazer</button>`:''):cbEd()?`<button type="button" class="btn sm" data-act="cb-conc" data-id="${x.id}">Conciliar</button>`:''}</td></tr>`}).join('')}</tbody></table></div></form>`
+    :vazio('Nenhum extrato no período para esta conta. Importe o arquivo OFX do banco.')}</div>`}
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-cb-banco]')){UI.cbBanco=s.value;render()}});
+const onUploadV30=onUpload;onUpload=async function(inp){if(inp.dataset.up!=='ofx')return onUploadV30(inp);const files=[...inp.files];inp.value='';const e=emp(UI.fsn.emp);const cb=UI.cbBanco||'1.1.1.02';let n=0,dup=0;const novos=[];
+  for(const f of files){const by=new Uint8Array(await f.arrayBuffer());const ini=new TextDecoder('latin1').decode(by.slice(0,400));let t=new TextDecoder(/CHARSET:\s*(1252|8859)|ISO-8859|windows-1252/i.test(ini)?'latin1':'utf-8').decode(by);if(t.includes('�'))t=new TextDecoder('latin1').decode(by);
+    const o=lerOfx(t);for(const it of o.itens){if(S.extratos.some(x=>x.empresaId===e.id&&x.conta===cb&&x.fitid===it.fitid&&x.data===it.data&&x.valor===it.valor)||novos.some(x=>x.fitid===it.fitid&&x.data===it.data&&x.valor===it.valor)){dup++;continue}novos.push({id:uid(),empresaId:e.id,conta:cb,...it,banco:o.banco,contaBanco:o.conta,arquivo:f.name,criadoEm:agora()});n++}}
+  if(!novos.length){toast(dup?'Todas as linhas já tinham sido importadas.':'Nenhuma transação encontrada no arquivo (OFX).',true);return}
+  mut('extratos',()=>S.extratos.push(...novos),['Contabilidade','Importou extrato OFX ('+n+' linhas) em '+cb,e.razao]);toast(n+' linha(s) importada(s)'+(dup?', '+dup+' já existiam':'')+'.')};
+function cbConciliar(e,x,conta){const v=Math.abs(x.valor);const l={id:uid(),empresaId:e.id,data:x.data,deb:x.valor>0?x.conta:conta,cred:x.valor>0?conta:x.conta,valor:v,hist:x.memo||'Movimento bancário',origem:'banco',extratoId:x.id,criadoEm:agora()};S.lanccontabeis.push(l);x.lancId=l.id;
+  const r=planoRec(e.id);const txt=normP(x.memo).replace(/[0-9]/g,'').replace(/\s+/g,' ').trim().split(' ').slice(0,3).join(' ');if(r&&txt.length>=4){r.regras=(r.regras||[]).filter(k=>!(k.texto===txt&&k.sinal===(x.valor<0?-1:1)));r.regras.push({texto:txt,conta,sinal:x.valor<0?-1:1})}}
+function garantirPlano(e){if(!planoRec(e.id)){S.planocontas.push({id:uid(),empresaId:e.id,contas:PLANO_PADRAO.map(([cod,nome])=>({cod,nome})),regras:[]})}}
+ACT['cb-conc']=el=>{const e=emp(UI.fsn.emp);const x=S.extratos.find(y=>y.id===el.dataset.id);const sel=document.querySelector(`[name="c_${x.id}"]`);const conta=sel?.value;if(!conta){toast('Escolha a contrapartida.',true);return}
+  mut(['lanccontabeis','extratos','planocontas'],()=>{garantirPlano(e);cbConciliar(e,x,conta)},['Contabilidade','Conciliou '+brl(x.valor)+' · '+x.memo,e.razao])};
+ACT['cb-conc-todos']=()=>{const e=emp(UI.fsn.emp);const {dIni,dFim}=cbPeriodo();const X=S.extratos.filter(x=>x.empresaId===e.id&&x.conta===UI.cbBanco&&x.data>=dIni&&x.data<=dFim&&!x.lancId);
+  const esc_=X.map(x=>[x,document.querySelector(`[name="c_${x.id}"]`)?.value||sugereConta(e,x).conta]);
+  mut(['lanccontabeis','extratos','planocontas'],()=>{garantirPlano(e);esc_.forEach(([x,c])=>cbConciliar(e,x,c))},['Contabilidade','Conciliou '+X.length+' linha(s) do extrato',e.razao]);toast(X.length+' linha(s) conciliada(s).')};
+ACT['cb-desconc']=el=>{const x=S.extratos.find(y=>y.id===el.dataset.id);if(!x)return;mut(['lanccontabeis','extratos'],()=>{S.lanccontabeis=S.lanccontabeis.filter(l=>l.id!==x.lancId);x.lancId=null},['Contabilidade','Desfez conciliação de '+brl(x.valor),emp(x.empresaId)?.razao||''])};
+
+/* ---------- demonstrações ---------- */
+function cbBalanceteDados(e){const {dIni,dFim}=cbPeriodo();const ant=cbMov(e.id,null,addDia(dIni,-1)),per=cbMov(e.id,dIni,dFim);
+  return planoDe(e.id).map(c=>{const a=analitica(c.cod)?(ant[c.cod]||{d:0,c:0}):somaGrupo(ant,c.cod);const p=analitica(c.cod)?(per[c.cod]||{d:0,c:0}):somaGrupo(per,c.cod);
+    const sa=saldoNat(c.cod,a),sf=saldoNat(c.cod,{d:a.d+p.d,c:a.c+p.c});return {cod:c.cod,nome:c.nome,a:analitica(c.cod),sa,d:r2(p.d),c:r2(p.c),sf}}).filter(x=>x.sa||x.d||x.c||x.sf)}
+const addDia=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.toISOString().slice(0,10)};
+const sinalSaldo=(cod,v)=>v<0?brl(-v)+(natD(cod)?' C':' D'):brl(v)+(v?(natD(cod)?' D':' C'):'');
+function cbBalancete(e){const R=cbBalanceteDados(e);const {dIni,dFim}=cbPeriodo();const td=R.filter(x=>x.a).reduce((a,x)=>a+x.d,0),tc=R.filter(x=>x.a).reduce((a,x)=>a+x.c,0);
+  return cbRelHead(e,'Balancete de verificação',`De ${fmtData(dIni)} a ${fmtData(dFim)}. Débitos e créditos precisam bater.`,'balancete')+`<div class="panel">${R.length?`<div class="table-wrap"><table><thead><tr><th>Conta</th><th class="r">Saldo anterior</th><th class="r">Débitos</th><th class="r">Créditos</th><th class="r">Saldo atual</th></tr></thead><tbody>${R.map(x=>`<tr${x.a?'':' style="font-weight:600;background:var(--surface-2)"'}>
+   <td style="padding-left:${8+(x.cod.split('.').length-1)*14}px">${esc(x.cod)} · ${esc(x.nome)}</td><td class="r num">${sinalSaldo(x.cod,x.sa)}</td><td class="r num">${brl(x.d)}</td><td class="r num">${brl(x.c)}</td><td class="r num">${sinalSaldo(x.cod,x.sf)}</td></tr>`).join('')}
+   <tr><td><b>Total das analíticas</b></td><td></td><td class="r num"><b>${brl(td)}</b></td><td class="r num"><b>${brl(tc)}</b></td><td>${Math.abs(td-tc)<.01?pill('fechado','ok'):pill('diferença '+brl(td-tc),'crit')}</td></tr></tbody></table></div>`:vazio('Sem lançamentos até o fim do período.')}</div>`}
+function cbRelHead(e,t,sub,k){return head(t,sub,`<button class="btn" data-act="cb-rel-pdf" data-k="${k}">${svg('download')}PDF</button><button class="btn" data-act="cb-rel-csv" data-k="${k}">${svg('download')}Planilha</button>`)}
+function cbDreDados(e){const {dIni,dFim}=cbPeriodo();const m=cbMov(e.id,dIni,dFim);const v=pref=>{const x=somaGrupo(m,pref);return r2(x.c-x.d)};
+  const det=pref=>contasA(e.id).filter(c=>c.cod.startsWith(pref+'.')).map(c=>{const x=m[c.cod]||{d:0,c:0};return [c.cod+' · '+c.nome,r2(x.c-x.d)]}).filter(x=>x[1]);
+  const rb=v('3.1'),ded=v('3.2'),rl=r2(rb+ded),cus=v('4.1'),lb=r2(rl+cus),pes=v('4.2'),adm=v('4.3'),tri=v('4.5'),op=r2(lb+pes+adm+tri),fin=v('4.4'),out=v('3.3'),res=r2(op+fin+out);
+  return [['RECEITA BRUTA',rb,det('3.1'),1],['(-) Deduções da receita',ded,det('3.2')],['= RECEITA LÍQUIDA',rl,[],1],['(-) Custos',cus,det('4.1')],['= LUCRO BRUTO',lb,[],1],['(-) Despesas com pessoal',pes,det('4.2')],['(-) Despesas administrativas',adm,det('4.3')],['(-) Despesas tributárias',tri,det('4.5')],
+    ['= RESULTADO OPERACIONAL',op,[],1],['(-) Despesas financeiras',fin,det('4.4')],['(+) Outras receitas',out,det('3.3')],['= RESULTADO DO PERÍODO',res,[],2]]}
+function cbDre(e){const D=cbDreDados(e);const {dIni,dFim}=cbPeriodo();
+  return cbRelHead(e,'Demonstração do resultado (DRE)',`De ${fmtData(dIni)} a ${fmtData(dFim)}. Receitas positivas, custos e despesas negativos.`,'dre')+`<div class="panel"><div class="table-wrap"><table><tbody>${D.map(([t,val,det,forte])=>`<tr style="${forte?'font-weight:700;background:var(--surface-2)':''}"><td>${t}</td><td class="r num" style="${forte===2?`color:${val<0?'var(--crit)':'var(--ok)'}`:''}">${brl(val)}</td></tr>${det.map(([n,x])=>`<tr><td class="small" style="padding-left:28px">${esc(n)}</td><td class="r num small">${brl(x)}</td></tr>`).join('')}`).join('')}</tbody></table></div></div>`}
+function cbBalancoDados(e){const {dFim}=cbPeriodo();const m=cbMov(e.id,null,dFim);const sD=p=>{const x=somaGrupo(m,p);return r2(x.d-x.c)},sC=p=>{const x=somaGrupo(m,p);return r2(x.c-x.d)};
+  const res=r2(sC('3')+sC('4'));const det=(pref,cred)=>contasA(e.id).filter(c=>c.cod.startsWith(pref+'.')).map(c=>{const x=m[c.cod]||{d:0,c:0};return [c.cod+' · '+c.nome,r2(cred?x.c-x.d:x.d-x.c)]}).filter(x=>x[1]);
+  const ativo=[['Ativo circulante',sD('1.1'),det('1.1')],['Ativo não circulante',sD('1.2'),det('1.2')]];const passivo=[['Passivo circulante',sC('2.1'),det('2.1',1)],['Passivo não circulante',sC('2.2'),det('2.2',1)],['Patrimônio líquido',r2(sC('2.3')+res),det('2.3',1).concat(res?[['Resultado do exercício (não encerrado)',res]]:[])]];
+  return {ativo,passivo,tA:sD('1'),tP:r2(sC('2')+res),res}}
+function cbBalanco(e){const B=cbBalancoDados(e);const {dFim}=cbPeriodo();const bloco=(t,G,tot)=>`<div class="panel" style="flex:1;min-width:300px"><div class="panel-head"><h2>${t}</h2><b class="num">${brl(tot)}</b></div><div class="table-wrap"><table><tbody>${G.map(([n,v,det])=>`<tr style="font-weight:600;background:var(--surface-2)"><td>${n}</td><td class="r num">${brl(v)}</td></tr>${det.map(([dn,dv])=>`<tr><td class="small" style="padding-left:22px">${esc(dn)}</td><td class="r num small">${brl(dv)}</td></tr>`).join('')}`).join('')}</tbody></table></div></div>`;
+  return cbRelHead(e,'Balanço patrimonial',`Posição em ${fmtData(dFim)}. ${Math.abs(B.tA-B.tP)<.01?'Ativo igual a passivo + patrimônio líquido.':'Atenção: diferença de '+brl(B.tA-B.tP)+' entre ativo e passivo + PL.'}`,'balanco')+`<div style="display:flex;gap:14px;flex-wrap:wrap">${bloco('Ativo',B.ativo,B.tA)}${bloco('Passivo e patrimônio líquido',B.passivo,B.tP)}</div>`}
+function cbFluxoDados(e){const {dIni,dFim}=cbPeriodo();const disp=c=>String(c).startsWith('1.1.1');const ini=(()=>{const m=cbMov(e.id,null,addDia(dIni,-1));const x=somaGrupo(m,'1.1.1');return r2(x.d-x.c)})();
+  const grupos={op:{},inv:{},fin:{}};const g=c=>/^1\.2/.test(c)?'inv':/^(2\.1\.4|2\.2|2\.3)/.test(c)?'fin':'op';
+  S.lanccontabeis.filter(l=>l.empresaId===e.id&&l.data>=dIni&&l.data<=dFim&&disp(l.deb)!==disp(l.cred)).forEach(l=>{const ent=disp(l.deb);const cp=ent?l.cred:l.deb;const v=ent?+l.valor:-l.valor;const G=grupos[g(cp)];G[cp]=(G[cp]||0)+v});
+  const lin=k=>Object.entries(grupos[k]).map(([c,v])=>[c+' · '+nomeConta(e.id,c),r2(v)]).sort((a,b)=>a[1]-b[1]);const tot=k=>r2(Object.values(grupos[k]).reduce((a,v)=>a+v,0));
+  const varia=r2(tot('op')+tot('inv')+tot('fin'));return {ini,op:lin('op'),inv:lin('inv'),fin:lin('fin'),tOp:tot('op'),tInv:tot('inv'),tFin:tot('fin'),varia,fim:r2(ini+varia)}}
+function cbFluxo(e){const F=cbFluxoDados(e);const {dIni,dFim}=cbPeriodo();const sec=(t,L,tot)=>`<tr style="font-weight:600;background:var(--surface-2)"><td>${t}</td><td class="r num">${brl(tot)}</td></tr>${L.map(([n,v])=>`<tr><td class="small" style="padding-left:22px">${esc(n)}</td><td class="r num small">${brl(v)}</td></tr>`).join('')}`;
+  return cbRelHead(e,'Fluxo de caixa (método direto)',`De ${fmtData(dIni)} a ${fmtData(dFim)}, pelas contas de caixa, bancos e aplicações (1.1.1).`,'fluxo')+`<div class="panel"><div class="table-wrap"><table><tbody><tr><td><b>Saldo inicial de caixa e equivalentes</b></td><td class="r num"><b>${brl(F.ini)}</b></td></tr>
+   ${sec('Atividades operacionais',F.op,F.tOp)}${sec('Atividades de investimento',F.inv,F.tInv)}${sec('Atividades de financiamento',F.fin,F.tFin)}
+   <tr><td><b>Variação do período</b></td><td class="r num"><b>${brl(F.varia)}</b></td></tr><tr style="font-weight:700"><td>Saldo final de caixa e equivalentes</td><td class="r num">${brl(F.fim)}</td></tr></tbody></table></div></div>`}
+function cbRazao(e){const {dIni,dFim}=cbPeriodo();const modo=UI.cbRazao||'diario';
+  if(modo==='diario'){const L=S.lanccontabeis.filter(l=>l.empresaId===e.id&&l.data>=dIni&&l.data<=dFim).sort((a,b)=>a.data.localeCompare(b.data));
+    return cbRelHead(e,'Livro Diário',`De ${fmtData(dIni)} a ${fmtData(dFim)}.`,'diario')+`<div class="panel"><div class="mtabs" role="tablist" style="margin-bottom:10px"><button role="tab" aria-selected="true">Diário</button><button role="tab" aria-selected="false" data-act="cb-razao-modo" data-v="razao">Razão por conta</button></div>
+     ${L.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Conta</th><th>Histórico</th><th class="r">Débito</th><th class="r">Crédito</th></tr></thead><tbody>${L.slice(0,800).map(l=>`<tr><td class="num">${fmtData(l.data)}</td><td class="small">D ${esc(contaTxt(e.id,l.deb))}</td><td class="small" rowspan="2">${esc(l.hist||'')}</td><td class="r num">${brl(l.valor)}</td><td></td></tr><tr><td></td><td class="small">C ${esc(contaTxt(e.id,l.cred))}</td><td></td><td class="r num">${brl(l.valor)}</td></tr>`).join('')}</tbody></table></div>`:vazio('Sem lançamentos no período.')}</div>`}
+  const contas=contasA(e.id).filter(c=>S.lanccontabeis.some(l=>l.empresaId===e.id&&(l.deb===c.cod||l.cred===c.cod)));const cc=UI.cbConta&&contas.some(c=>c.cod===UI.cbConta)?UI.cbConta:contas[0]?.cod;UI.cbConta=cc;
+  const ant=(()=>{const m=cbMov(e.id,null,addDia(dIni,-1))[cc]||{d:0,c:0};return r2(m.d-m.c)})();let s=ant;
+  const L=S.lanccontabeis.filter(l=>l.empresaId===e.id&&l.data>=dIni&&l.data<=dFim&&(l.deb===cc||l.cred===cc)).sort((a,b)=>a.data.localeCompare(b.data)).map(l=>{const d=l.deb===cc?+l.valor:0,c=l.cred===cc?+l.valor:0;s=r2(s+d-c);return {l,d,c,s}});
+  return cbRelHead(e,'Razão',`De ${fmtData(dIni)} a ${fmtData(dFim)}.`,'razao')+`<div class="panel"><div class="mtabs" role="tablist" style="margin-bottom:10px"><button role="tab" aria-selected="false" data-act="cb-razao-modo" data-v="diario">Diário</button><button role="tab" aria-selected="true">Razão por conta</button></div>
+   ${contas.length?`<label class="small muted" style="display:flex;gap:8px;align-items:center;margin-bottom:10px">Conta <select data-cb-conta style="width:auto">${contas.map(c=>`<option value="${c.cod}" ${c.cod===cc?'selected':''}>${c.cod} · ${esc(c.nome)}</option>`).join('')}</select></label>
+   <div class="table-wrap"><table><thead><tr><th>Data</th><th>Histórico</th><th>Contrapartida</th><th class="r">Débito</th><th class="r">Crédito</th><th class="r">Saldo</th></tr></thead><tbody><tr><td></td><td><b>Saldo anterior</b></td><td></td><td></td><td></td><td class="r num"><b>${sinalSaldo('1',ant)}</b></td></tr>
+   ${L.map(x=>`<tr><td class="num">${fmtData(x.l.data)}</td><td class="small">${esc(x.l.hist||'')}</td><td class="small">${esc(contaTxt(e.id,x.l.deb===cc?x.l.cred:x.l.deb))}</td><td class="r num">${x.d?brl(x.d):''}</td><td class="r num">${x.c?brl(x.c):''}</td><td class="r num">${sinalSaldo('1',x.s)}</td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhuma conta com lançamentos.')}</div>`}
+ACT['cb-razao-modo']=el=>{UI.cbRazao=el.dataset.v;render()};
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-cb-conta]')){UI.cbConta=s.value;render()}});
+// exportação PDF/planilha das demonstrações
+function cbRelTabela(e,k){const B=x=>brl(x);
+  if(k==='balancete'){const R=cbBalanceteDados(e);return {cab:['Conta','Saldo anterior','Débitos','Créditos','Saldo atual'],l:R.map(x=>[x.cod+' · '+x.nome,x.sa,x.d,x.c,x.sf]),t:'Balancete de verificação'}}
+  if(k==='dre'){const D=cbDreDados(e);return {cab:['Demonstração do resultado','Valor'],l:D.flatMap(([t,v,det])=>[[t,v],...det.map(([n,x])=>['   '+n,x])]),t:'Demonstração do resultado do exercício'}}
+  if(k==='balanco'){const Bl=cbBalancoDados(e);return {cab:['Balanço patrimonial','Valor'],l:[['ATIVO',Bl.tA],...Bl.ativo.flatMap(([n,v,det])=>[['  '+n,v],...det.map(([dn,dv])=>['     '+dn,dv])]),['PASSIVO E PATRIMÔNIO LÍQUIDO',Bl.tP],...Bl.passivo.flatMap(([n,v,det])=>[['  '+n,v],...det.map(([dn,dv])=>['     '+dn,dv])])],t:'Balanço patrimonial'}}
+  if(k==='fluxo'){const F=cbFluxoDados(e);return {cab:['Fluxo de caixa','Valor'],l:[['Saldo inicial',F.ini],['Atividades operacionais',F.tOp],...F.op.map(([n,v])=>['   '+n,v]),['Atividades de investimento',F.tInv],...F.inv.map(([n,v])=>['   '+n,v]),['Atividades de financiamento',F.tFin],...F.fin.map(([n,v])=>['   '+n,v]),['Variação do período',F.varia],['Saldo final',F.fim]],t:'Demonstração dos fluxos de caixa'}}
+  const {dIni,dFim}=cbPeriodo();const L=S.lanccontabeis.filter(l=>l.empresaId===e.id&&l.data>=dIni&&l.data<=dFim&&(k!=='razao'||l.deb===UI.cbConta||l.cred===UI.cbConta)).sort((a,b)=>a.data.localeCompare(b.data));
+  return {cab:['Data','Débito','Crédito','Histórico','Valor'],l:L.map(l=>[fmtData(l.data),contaTxt(e.id,l.deb),contaTxt(e.id,l.cred),l.hist||'',+l.valor]),t:k==='razao'?'Razão · '+contaTxt(e.id,UI.cbConta):'Livro Diário'}}
+ACT['cb-rel-csv']=el=>{const e=emp(UI.fsn.emp);const d=cbRelTabela(e,el.dataset.k);const q=v=>typeof v==='number'?String(r2(v)).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"';
+  baixar(`${el.dataset.k}-${UI.fsn.comp}-${soDig(e.cnpj)}.csv`,'﻿'+[d.cab,...d.l].map(l=>l.map(q).join(';')).join('\r\n'),'text/csv;charset=utf-8')};
+ACT['cb-rel-pdf']=el=>{const e=emp(UI.fsn.emp);const d=cbRelTabela(e,el.dataset.k);const {dIni,dFim}=cbPeriodo();const resp=cfg().contrato?.contadorNome||cfg().responsavelTecnico||'';
+  janelaPdf(d.t,`<h1>${esc(d.t)}</h1><p class="sub">${esc(e.razao)} · CNPJ ${fmtCNPJ(e.cnpj||'')} · ${el.dataset.k==='balanco'?'Posição em '+fmtData(dFim):'De '+fmtData(dIni)+' a '+fmtData(dFim)}</p>
+   <table><thead><tr>${d.cab.map((c,i)=>`<th class="${i&&typeof d.l[0]?.[i]==='number'?'r':''}">${esc(c)}</th>`).join('')}</tr></thead><tbody>${d.l.map(r=>`<tr${/^[A-Z=]/.test(String(r[0]))&&!/^\d/.test(String(r[0]))&&d.cab.length===2?' class="tot"':''}>${r.map(v=>typeof v==='number'?`<td class="r">${brl(v)}</td>`:`<td>${esc(String(v)).replace(/^ +/,m=>'&nbsp;'.repeat(m.length*2))}</td>`).join('')}</tr>`).join('')}</tbody></table>
+   ${['balanco','dre','balancete'].includes(el.dataset.k)?`<div class="ass"><div>${esc(e.razao)}<br>Representante legal</div><div>${esc(resp)}<br>Contador${cfg().crc?' · '+esc(cfg().crc):''}</div></div>`:''}`)};
+/* ==== v30 (fim) ==== */
+
 
 
 /* ==== v27: Meu Fiscal Contábil (contabil.omeufiscal.com.br) — escrituração separada do painel, mesmo login e mesmo banco ==== */
 const URL_CONTABIL=String((window.MF&&MF.contabilUrl)||'https://contabil.omeufiscal.com.br').replace(/\/$/,'');
+const URL_FISCAL=String((window.MF&&MF.fiscalUrl)||'https://fiscal.omeufiscal.com.br').replace(/\/$/,'');
 const URL_PAINEL=String((window.MF&&MF.painelUrl)||'https://painel.omeufiscal.com.br').replace(/\/$/,'');
 const URL_DP=String((window.MF&&MF.dpUrl)||'https://dp.omeufiscal.com.br').replace(/\/$/,'');
-const APP_SIS=APP_CONTABIL||APP_DP;   // os sistemas de escrituração (contábil/fiscal e DP) usam o mesmo "casco" de sistema contábil
+const APP_SIS=APP_FISCAL||APP_CONTABIL||APP_DP;   // os três sistemas de departamento (fiscal, contábil e DP) usam o mesmo "casco" de sistema contábil
 if(!APP_SIS){
   /* painel: Apuração do Simples, notas de saída e notas de entrada passam a existir só no sistema contábil */
   for(const v of ['a-simples','a-nfe']){const i=NAV_A.findIndex(n=>n[0]===v);if(i>=0)NAV_A.splice(i,1)}
   const sidebarV27=sidebar;
   sidebar=function(){const h=sidebarV27();if(UI.modo!=='painel'||!podeMod('guias','ver'))return h;
-    return h.replace('</nav>',`<a href="${esc(URL_CONTABIL)}" target="_blank" rel="noopener" class="nav-ext">${svg('calc')}<span class="lbl">Sistema contábil</span><span class="ext" aria-hidden="true">↗</span></a>${podeMod('dem','ver')?`<a href="${esc(URL_DP)}" target="_blank" rel="noopener" class="nav-ext nav-ext2">${svg('users')}<span class="lbl">Departamento pessoal</span><span class="ext" aria-hidden="true">↗</span></a>`:''}</nav>`)};
+    return h.replace('</nav>',`<a href="${esc(URL_FISCAL)}" target="_blank" rel="noopener" class="nav-ext">${svg('receipt')}<span class="lbl">Sistema fiscal</span><span class="ext" aria-hidden="true">↗</span></a><a href="${esc(URL_CONTABIL)}" target="_blank" rel="noopener" class="nav-ext nav-ext2">${svg('calc')}<span class="lbl">Sistema contábil</span><span class="ext" aria-hidden="true">↗</span></a>${podeMod('dem','ver')?`<a href="${esc(URL_DP)}" target="_blank" rel="noopener" class="nav-ext nav-ext2">${svg('users')}<span class="lbl">Departamento pessoal</span><span class="ext" aria-hidden="true">↗</span></a>`:''}</nav>`)};
   (()=>{const st=document.createElement('style');st.textContent=`.nav-ext{margin-top:10px;border-top:1px solid rgba(148,163,184,.16);padding-top:12px!important}.nav-ext2{margin-top:0;border-top:0;padding-top:9px!important}.nav-ext .ext{margin-left:auto;opacity:.6;font-size:.85em}`;document.head.appendChild(st)})();
 }
 if(APP_SIS){
-  const MODS=[['fiscal','Escrita Fiscal',URL_CONTABIL+'/escrita'],['contabil','Contabilidade',null],['folha','Folha de Pagamento',URL_DP+'/folha'],['anuais','Obrigações anuais',null]];
-  const MOD_ATIVO=APP_DP?'folha':'fiscal';
+  const MODS=[['fiscal','Escrita Fiscal',URL_FISCAL+'/escrita'],['contabil','Contabilidade',URL_CONTABIL+'/contabil'],['folha','Folha de Pagamento',URL_DP+'/folha'],['anuais','Obrigações anuais',null]];
+  const MOD_ATIVO=APP_DP?'folha':APP_CONTABIL?'contabil':'fiscal';
   const NAV_FISCAL=[
     ['Competência',[['f-central','Central da competência','checksq','Todas as empresas no mês: movimento, apuração e guia, com apuração em lote']]],
     ['Movimento',[['f-saidas','Notas fiscais de saída','upload','Importação de XML (NF-e, NFC-e, NFS-e), receita por CFOP e CST'],['f-entradas','Notas fiscais de entrada','filetext','Busca automática na SEFAZ e XML dos fornecedores'],['f-lanc','Lançamentos fiscais','receipt','Saídas, serviços, entradas, serviços tomados com retenções e outros documentos, com acumuladores']]],
     ['Apuração',[['f-apur','Simples Nacional e MEI','calc','Receitas por anexo, RBT12, Fator R e DAS']]],
     ['Relatórios',[['f-rel','Livros e relatórios','chart','Livros de saídas e entradas, resumos e base do PGDAS-D']]],
   ];
-  const NAV_F=APP_DP?NAV_DP:NAV_FISCAL;
+  const NAV_F=APP_DP?NAV_DP:APP_CONTABIL?NAV_CTB:NAV_FISCAL;
   const F_VIEWS=NAV_F.flatMap(g=>g[1].map(i=>i[0]));
-  const V_PADRAO=F_VIEWS[0];
-  const COM_PERIODO=APP_DP?[]:['f-saidas','f-entradas','f-rel','f-lanc'];
+  const V_PADRAO=APP_CONTABIL?'c-lanc':F_VIEWS[0];
+  const COM_PERIODO=APP_DP?[]:APP_CONTABIL?CTB_PERIODO:['f-saidas','f-entradas','f-rel','f-lanc'];
   const empsCtb=()=>empresasVisiveis().slice().sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
   function ctbEstado(){const es=empsCtb();const F=UI.fsn||(UI.fsn={emp:null,comp:addMes(compAtual(),APP_DP?0:-1)});
     if(!F.comp)F.comp=addMes(compAtual(),APP_DP?0:-1);
     if(!es.some(e=>e.id===F.emp)){const lemb=(()=>{try{return localStorage.getItem('mf-ctb-emp')}catch(e){return null}})();F.emp=(es.find(e=>e.id===lemb)||(APP_DP?es.find(e=>S.funcionarios.some(f=>f.empresaId===e.id&&!f.desligado)):es.find(e=>e.regime==='SN'||e.regime==='MEI'))||es[0])?.id||null}
     const F2=UI.fnf||(UI.fnf={});if(!F2.ate||F2.ate<F.comp)F2.ate=F.comp;return F}
   const lembrarEmp=id=>{try{localStorage.setItem('mf-ctb-emp',id)}catch(e){}};
-  const HOME_SIS=APP_DP?'/folha':'/escrita';
+  const HOME_SIS=APP_DP?'/folha':APP_CONTABIL?'/contabil':'/escrita';
 
   lerHash=function(){const h=(location.hash||'').slice(1);UI.modo='painel';if(F_VIEWS.includes(h)||h==='a-perfil')UI.view=h;else if(!F_VIEWS.includes(UI.view)&&UI.view!=='a-perfil')UI.view=V_PADRAO};
   if(!F_VIEWS.includes((location.hash||'').slice(1))&&location.hash!=='#a-perfil')history.replaceState(null,'','#'+V_PADRAO);
 
   function ctbTopo(){return `<header class="ctb-top">
-    <a class="ctb-marca" href="#${V_PADRAO}"><span class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></span><b><span class="wm-meu">meu</span>fiscal</b><span class="ctb-sis">${APP_DP?'DP':'Contábil'}</span></a>
+    <a class="ctb-marca" href="#${V_PADRAO}"><span class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></span><b><span class="wm-meu">meu</span>fiscal</b><span class="ctb-sis">${APP_DP?'DP':APP_CONTABIL?'Contábil':'Fiscal'}</span></a>
     <nav class="ctb-mods" aria-label="Módulos">${MODS.map(([k,t,url])=>k===MOD_ATIVO?`<a href="#${V_PADRAO}" class="on" aria-current="true">${t}</a>`:url?`<a href="${esc(url)}" title="Abre o sistema de ${esc(t)}">${t}</a>`:`<span class="off" title="Em desenvolvimento">${t}<small>em breve</small></span>`).join('')}</nav>
     <div class="ctb-usr"><a href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Painel ↗</a><a href="#a-perfil">${esc(ME.nome||'Meu perfil')}</a><a href="#" data-act="mf-sair">Sair</a></div></header>`}
   function ctbContexto(){const F=ctbEstado();const e=emp(F.emp);const meses=[];for(let i=-1;i<36;i++)meses.push(addMes(compAtual(),-i));
@@ -7467,8 +7695,8 @@ if(APP_SIS){
       ${e?`<div class="ctb-campo"><span>Regime</span><b class="ctb-val">${esc(nomeRegime(e))}${e.fatorR?' · Fator R':''}</b></div>`:''}
       ${per?`<div class="ctb-campo"><span>Período</span><div class="ctb-per"><em>de</em><b class="ctb-val" style="padding:0 4px">${fmtComp(F.comp)}</b><em>até</em>${selMes('data-nf="ate"',UI.fnf.ate)}</div></div>`:''}
     </div>`}
-  function ctbMenu(){return `<aside class="ctb-nav" aria-label="${APP_DP?'Folha de Pagamento':'Escrita Fiscal'}">${ctbCardComp()}${NAV_F.map(([g,its])=>`<div class="ctb-grp"><span>${g}</span>${its.map(([v,t,ic,dica])=>`<a href="#${v}" title="${esc(dica)}" ${UI.view===v?'aria-current="page"':''}>${svg(ic)}<span>${t}</span></a>`).join('')}</div>`).join('')}
-    <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>${APP_DP?'Férias, 13º salário, rescisões e eSocial/DCTFWeb entram aqui, uma de cada vez.':'Contabilidade e obrigações anuais entram aqui, uma de cada vez.'}</p></div></aside>`}
+  function ctbMenu(){return `<aside class="ctb-nav" aria-label="${APP_DP?'Folha de Pagamento':APP_CONTABIL?'Contabilidade':'Escrita Fiscal'}">${ctbCardComp()}${NAV_F.map(([g,its])=>`<div class="ctb-grp"><span>${g}</span>${its.map(([v,t,ic,dica])=>`<a href="#${v}" title="${esc(dica)}" ${UI.view===v?'aria-current="page"':''}>${svg(ic)}<span>${t}</span></a>`).join('')}</div>`).join('')}
+    <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>${APP_DP?'Férias, 13º salário, rescisões e eSocial/DCTFWeb entram aqui, uma de cada vez.':APP_CONTABIL?'ECD, ECF, DMPL e notas explicativas entram aqui, uma de cada vez.':'EFD ICMS/IPI, EFD-Reinf e DCTFWeb entram aqui, uma de cada vez.'}</p></div></aside>`}
   function ctbStatus(){const F=UI.fsn||{};const e=emp(F.emp);
     const txt=MODO!=='api'?'Modo local':MF.estado==='online'?'Tempo real · conectado':MF.estado==='reconectando'?'Reconectando…':'Conectando…';
     return `<footer class="ctb-status"><span class="conn ${MODO!=='api'||MF.estado==='online'?'ok':''}" id="mf-selo"><i></i>${txt}</span><span>${esc(cfg().escritorio||'')}</span>${e?`<span>${esc(e.fantasia||e.razao)}</span>`:''}${F.comp?`<span>Competência ${fmtComp(F.comp)}</span>`:''}<span class="grow"></span><span class="ctb-atalhos">F8 trocar empresa · PgUp/PgDn competência</span>${cfg().crc?`<span>${esc(cfg().crc)}</span>`:''}</footer>`}
@@ -7500,6 +7728,7 @@ if(APP_SIS){
     if(UI.view==='a-perfil')return conteudoV27();
     if(!F_VIEWS.includes(UI.view))UI.view=V_PADRAO;
     if(APP_DP)return dpConteudo();
+    if(APP_CONTABIL)return cbConteudo();
     if(UI.view==='f-central')return podeMod('guias','ver')?ctbCentral():vazio('Seu acesso não inclui a escrita fiscal.');
     if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui a escrita fiscal. Peça ao administrador do escritório para liberar o módulo "Apuração, guias e notas".');
     const F=ctbEstado();const e=emp(F.emp);
@@ -7533,7 +7762,7 @@ if(APP_SIS){
   // a competência "de" anda junto com o "até" quando o período é de um mês só
   document.addEventListener('change',ev=>{const el=ev.target;if(el.matches&&el.matches('.ctb-ctx [data-sn="comp"]')){const F2=UI.fnf||(UI.fnf={});if(!F2.ate||F2.ate<el.value)F2.ate=el.value}},true);
 
-  document.title=APP_DP?'Departamento Pessoal · Meu Fiscal':'Contábil · Meu Fiscal';
+  document.title=APP_DP?'Departamento Pessoal · Meu Fiscal':APP_CONTABIL?'Contábil · Meu Fiscal':'Fiscal · Meu Fiscal';
   (()=>{const st=document.createElement('style');st.textContent=`
 body{background:#EEF2F6;font-size:13.5px}
 .ctb{min-height:100vh;display:grid;grid-template-rows:auto auto 1fr auto}

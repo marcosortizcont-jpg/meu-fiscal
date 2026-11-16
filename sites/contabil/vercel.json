@@ -7,22 +7,27 @@
   "redirects": [
     {
       "source": "/",
-      "destination": "/escrita",
+      "destination": "/contabil",
       "permanent": false
     },
     {
       "source": "/admin",
-      "destination": "/escrita",
+      "destination": "/contabil",
       "permanent": false
     },
     {
       "source": "/admin/:caminho*",
-      "destination": "/escrita",
+      "destination": "/contabil",
       "permanent": false
     },
     {
       "source": "/dashboard",
-      "destination": "/escrita",
+      "destination": "/contabil",
+      "permanent": false
+    },
+    {
+      "source": "/escrita",
+      "destination": "https://fiscal.omeufiscal.com.br/escrita",
       "permanent": false
     }
   ],
@@ -36,7 +41,7 @@
       "destination": "/login.html"
     },
     {
-      "source": "/escrita",
+      "source": "/contabil",
       "destination": "/app.html"
     }
   ],

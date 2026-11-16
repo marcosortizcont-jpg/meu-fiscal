@@ -8,25 +8,31 @@
 
 [[redirects]]
   from = "/"
-  to = "/escrita"
+  to = "/contabil"
   status = 302
   force = true
 
 [[redirects]]
   from = "/admin"
-  to = "/escrita"
+  to = "/contabil"
   status = 302
   force = true
 
 [[redirects]]
   from = "/admin/*"
-  to = "/escrita"
+  to = "/contabil"
   status = 302
   force = true
 
 [[redirects]]
   from = "/dashboard"
-  to = "/escrita"
+  to = "/contabil"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/escrita"
+  to = "https://fiscal.omeufiscal.com.br/escrita"
   status = 302
   force = true
 
@@ -43,7 +49,7 @@
   force = true
 
 [[redirects]]
-  from = "/escrita"
+  from = "/contabil"
   to = "/app.html"
   status = 200
   force = true
