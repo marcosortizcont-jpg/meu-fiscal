@@ -370,6 +370,29 @@ O DP é o quarto site e usa o mesmo casco do sistema contábil: módulos no topo
 - **Build:** `node sites/build.mjs dp` (rotas `/login` e `/folha`). Na Cloudflare, use o Worker `meufiscal-dp` com Root directory `sites/dp` e build `node ../build.mjs dp`.
 - **Próximas etapas:** férias, 13º, rescisão, horistas e eSocial/DCTFWeb.
 
+### Férias, 13º e rescisões (DP)
+
+- **Férias:** controle dos períodos aquisitivos de cada empregado, com o saldo pelas faltas (art. 130), o limite para conceder e o alerta de pagamento em dobro.
+  - Na programação: abono pecuniário de 1/3 e adiantamento da 1ª parcela do 13º.
+  - Cálculo: remuneração com a média das variáveis do período aquisitivo; férias + 1/3 e abono + 1/3; INSS e IRRF em separado. O FGTS não incide sobre o abono.
+  - O recibo sai com pagamento 2 dias antes do início, junto com o aviso de férias em PDF.
+  - Na folha do mês, os dias de férias saem do salário, e o INSS considera salário + férias do mês, cobrando só a diferença.
+- **13º salário:**
+  - Avos contam os meses com 15 dias ou mais, e a média de HE e comissões vem das folhas fechadas.
+  - 1ª parcela: metade, sem descontos (ou a que já foi paga nas férias).
+  - 2ª parcela: total com INSS e IRRF próprios, menos o adiantamento.
+  - FGTS de cada parcela e recibos em PDF.
+- **Rescisões:**
+  - Motivos: sem justa causa, pedido de demissão, justa causa, acordo (484-A), término de experiência e de prazo.
+  - Aviso prévio proporcional (Lei 12.506), que pode ser indenizado (com projeção), trabalhado, dispensado ou descontado.
+  - Verbas: saldo de salário, 13º proporcional menos o adiantamento, férias vencidas e proporcionais com 1/3.
+  - INSS e IRRF do saldo e do 13º em separado; aviso e férias indenizadas sem IRRF.
+  - FGTS do mês, multa de 40% ou 20% sobre o saldo informado, prazo de 10 dias e termo de rescisão em PDF.
+  - Ao salvar, o empregado é desligado e sai da folha do mês.
+- O FGTS, o INSS e o IRRF desses recibos aparecem na tela da folha do mês de pagamento, para somar às guias (coleção `dpeventos`).
+- O IRRF usa a redução da Lei 15.270/2025 sobre a base de cada pagamento. Confira a orientação da Receita para férias e rescisões.
+- **Fora do cálculo:** indenizações dos arts. 479/480, estabilidades e verbas de convenção.
+
 ## Escrita fiscal de saída (no sistema contábil)
 
 A escrita fiscal fica no sistema contábil, nas rotinas Notas fiscais de saída, Simples Nacional e MEI, e Livros e relatórios.

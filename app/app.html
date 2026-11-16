@@ -7174,7 +7174,7 @@ function dpPdfHolerite(e,comp,x){const d=miniPdf();const L=14,R=196;let y=18;con
   d.fonte('b').tamanho(10).texto(x.nome,L,y);d.fonte('n').tamanho(9).texto(String((x.cargo||'')+(x.cbo?' · CBO '+x.cbo:'')).slice(0,40),132,y);y+=5;
   d.texto('CPF '+fmtCPF(x.cpf||'')+(x.matricula?' · Matrícula '+x.matricula:''),L,y).texto('Admissão '+fmtData(x.admissao),132,y);y+=7;
   d.caixa(L,y-4.6,R-L,6.6,[241,245,249]);d.fonte('b').tamanho(8.5).texto('Cód.',L+1,y).texto('Descrição',L+13,y).texto('Ref.',118,y).texto('Proventos',148,y).texto('Descontos',176,y);y+=6.2;
-  x.rubricas.forEach(r=>{d.fonte('n').tamanho(8.5).texto(r.cod,L+1,y).texto(String(r.desc).slice(0,52),L+13,y).texto(String(r.ref||''),118,y);d.fonte('m').texto(v(r.valor),r.tipo==='P'?168:R,y,'dir');y+=5});
+  x.rubricas.forEach(r=>{d.fonte('n').tamanho(8.5).texto(r.cod,L+1,y).texto(String(r.desc).slice(0,52),L+13,y).texto(String(r.ref||''),118,y);if(r.tipo!=='I')d.fonte('m').texto(v(r.valor),r.tipo==='P'?168:R,y,'dir');y+=5});
   d.linha(L,y-2.5,R,y-2.5);y+=2;d.fonte('b').tamanho(8.5).texto('Totais',L+13,y);d.fonte('mb').texto(v(x.proventos),168,y,'dir').texto(v(x.descontos),R,y,'dir');y+=7;
   d.caixa(120,y-4.8,R-120,7,[209,250,229]);d.fonte('b').tamanho(10).texto('Valor líquido',122,y);d.fonte('mb').texto(v(x.liquido),R-1,y,'dir');y+=11;
   const bases=[['Salário base',x.salario],['Base INSS',x.baseInss],['Base FGTS',x.baseFgts],['FGTS do mês',x.fgts],['Base IRRF',x.baseIrrf]];
@@ -7642,6 +7642,202 @@ ACT['cb-rel-pdf']=el=>{const e=emp(UI.fsn.emp);const d=cbRelTabela(e,el.dataset.
    <table><thead><tr>${d.cab.map((c,i)=>`<th class="${i&&typeof d.l[0]?.[i]==='number'?'r':''}">${esc(c)}</th>`).join('')}</tr></thead><tbody>${d.l.map(r=>`<tr${/^[A-Z=]/.test(String(r[0]))&&!/^\d/.test(String(r[0]))&&d.cab.length===2?' class="tot"':''}>${r.map(v=>typeof v==='number'?`<td class="r">${brl(v)}</td>`:`<td>${esc(String(v)).replace(/^ +/,m=>'&nbsp;'.repeat(m.length*2))}</td>`).join('')}</tr>`).join('')}</tbody></table>
    ${['balanco','dre','balancete'].includes(el.dataset.k)?`<div class="ass"><div>${esc(e.razao)}<br>Representante legal</div><div>${esc(resp)}<br>Contador${cfg().crc?' · '+esc(cfg().crc):''}</div></div>`:''}`)};
 /* ==== v30 (fim) ==== */
+/* ==== v31: DP — Férias, 13º salário e Rescisões ==== */
+if(!COLS.includes('dpeventos'))COLS.push('dpeventos');if(!Array.isArray(S.dpeventos))S.dpeventos=[];
+NAV_DP.splice(3,0,['Eventos',[['d-ferias','Férias','calc','Períodos aquisitivos, programação, abono e recibo'],['d-13','13º salário','receipt','1ª e 2ª parcelas com avos e médias'],['d-resc','Rescisões','userplus','Cálculo das verbas rescisórias por motivo e termo de rescisão']]]);
+/* ---------- datas ---------- */
+const dt=s=>new Date(String(s).slice(0,10)+'T12:00:00');const iso=d=>d.toISOString().slice(0,10);
+const dMais=(s,n)=>{const d=dt(s);d.setDate(d.getDate()+n);return iso(d)};
+const aMais=(s,n)=>{const d=dt(s);d.setFullYear(d.getFullYear()+n);return iso(d)};
+const mMais=(s,n)=>{const d=dt(s);const dia=d.getDate();d.setDate(1);d.setMonth(d.getMonth()+n);const ult=new Date(d.getFullYear(),d.getMonth()+1,0).getDate();d.setDate(Math.min(dia,ult));return iso(d)};
+const diasEntre=(a,b)=>Math.round((dt(b)-dt(a))/864e5);
+const anosCompletos=(a,b)=>{let n=0;while(aMais(a,n+1)<=b)n++;return n};
+const fimDoMes=s=>dpFimMes(String(s).slice(0,7));
+/* ---------- bases ---------- */
+function dpAdic(f){if(!f.adicional)return 0;if(f.adicional==='peric')return (+f.salario||0)*.30;const p={insal10:.1,insal20:.2,insal40:.4}[f.adicional];return p?DP26.minimo*p:0}
+// média das variáveis (HE, DSR, comissões) nas folhas fechadas de um intervalo de competências
+function dpMedia(eid,fid,compIni,compFim,meses){let s=0;S.dpfolhas.filter(r=>r.empresaId===eid&&r.status==='fechada'&&r.calc&&r.comp>=compIni&&r.comp<=compFim).forEach(r=>{const x=r.calc.L.find(y=>y.funcId===fid);if(x)s+=x.rubricas.filter(y=>['010','011','012','030'].includes(y.cod)).reduce((a,y)=>a+y.valor,0)});return r2(s/Math.max(1,meses))}
+const mesesEntre=(c1,c2)=>(+c2.slice(0,4)-+c1.slice(0,4))*12+(+c2.slice(5,7)-+c1.slice(5,7))+1;
+const ehClt=f=>['empregado','aprendiz',undefined,''].includes(f.vinculo);
+const evDe=(eid,tipo)=>S.dpeventos.filter(x=>x.empresaId===eid&&x.tipo===tipo);
+/* ---------- férias ---------- */
+const diasDireito=faltas=>faltas<=5?30:faltas<=14?24:faltas<=23?18:faltas<=32?12:0;   // CLT art. 130
+function periodosAquisitivos(f,ref,ateGozo){const P=[];if(!f.admissao)return P;const fim=f.desligado&&f.desligadoEm?f.desligadoEm:ref;
+  for(let k=0;k<60;k++){const ini=aMais(f.admissao,k);if(ini>fim)break;const pf=dMais(aMais(f.admissao,k+1),-1);
+    const ev=S.dpeventos.filter(x=>x.tipo==='ferias'&&x.funcId===f.id&&x.dados.periodo===k&&(!ateGozo||x.dados.inicio<=ateGozo));const faltas=Math.max(0,...ev.map(x=>+x.dados.faltas||0),0);
+    const usados=ev.reduce((a,x)=>a+(+x.dados.dias||0)+(x.calc.abonoDias||0),0);const direito=diasDireito(faltas);
+    P.push({k,ini,fim:pf,completo:pf<=fim&&pf<=ref,direito,usados,saldo:Math.max(0,direito-usados),limite:dMais(aMais(pf,1),0),ev})}
+  return P}
+function calcFerias(e,f,d){const vin=f.vinculo||'empregado';const sal=+f.salario||0,adic=dpAdic(f);const P=periodosAquisitivos(f,hoje()).find(p=>p.k===+d.periodo);
+  const media=P?dpMedia(e.id,f.id,P.ini.slice(0,7),P.fim.slice(0,7),12):0;const rem=r2(sal+adic+media);const diaria=rem/30;const direito=diasDireito(+d.faltas||0);
+  const abonoDias=d.abono?Math.floor(direito/3):0;const dias=+d.dias||0;
+  const R=[];const add=(cod,desc,ref,v,t)=>{v=r2(v);if(v)R.push({cod,desc,ref,valor:v,tipo:t})};
+  const vF=r2(diaria*dias),terco=r2(vF/3),vAb=r2(diaria*abonoDias),tAb=r2(vAb/3);
+  add('150','Férias gozadas',dias+' dias',vF,'P');add('151','1/3 constitucional de férias','',terco,'P');add('152','Abono pecuniário',abonoDias+' dias',vAb,'P');add('153','1/3 sobre o abono','',tAb,'P');
+  const adi13=d.adiantar13?r2((sal+adic)/2):0;add('154','Adiantamento da 1ª parcela do 13º','50%',adi13,'P');
+  const base=r2(vF+terco);const inss=dpInss(base,vin);add('201','INSS sobre férias',base?pct(inss/base):'',inss,'D');
+  const ir=dpIrrf(base,inss,+f.depIR||0);add('202','IRRF sobre férias',ir.valor?pct(ir.aliq):'',ir.valor,'D');
+  const prov=r2(R.filter(x=>x.tipo==='P').reduce((a,x)=>a+x.valor,0)),desc=r2(R.filter(x=>x.tipo==='D').reduce((a,x)=>a+x.valor,0));
+  const fim=dMais(d.inicio,dias-1);const fgts=r2((base+adi13)*(vin==='aprendiz'?DP26.fgtsAprendiz:DP26.fgts));
+  // dias de gozo por mês (para a folha e o INSS do mês)
+  const porMes={};for(let i=0;i<dias;i++){const c=dMais(d.inicio,i).slice(0,7);porMes[c]=(porMes[c]||0)+1}
+  return {rubricas:R,proventos:prov,descontos:desc,liquido:r2(prov-desc),rem,media,sal,adic,diaria:r2(diaria),dias,abonoDias,direito,inicio:d.inicio,fim,retorno:dMais(fim,1),pagamento:dMais(d.inicio,-2),base,inss,irrf:ir.valor,irrfInfo:ir,fgts,adi13,porMes,
+    periodo:P?{ini:P.ini,fim:P.fim,limite:P.limite}:null,emDobro:P&&d.inicio>P.limite}}
+// a folha do mês: dias de férias saem do salário e o INSS do mês considera a base das férias
+const feriasNoMes=(f,comp)=>S.dpeventos.filter(x=>x.tipo==='ferias'&&x.funcId===f.id&&x.calc?.porMes?.[comp]);
+const dpDiasV31=dpDias;dpDias=function(f,comp){const d=dpDiasV31(f,comp);const fer=feriasNoMes(f,comp).reduce((a,x)=>a+x.calc.porMes[comp],0);return Math.max(0,d-Math.min(30,fer))};
+const dpAtivoV31=dpAtivoNoMes;dpAtivoNoMes=function(f,comp){if(!dpAtivoV31(f,comp))return false;return !S.dpeventos.some(x=>x.tipo==='rescisao'&&x.funcId===f.id&&String(x.dados.data).slice(0,7)===comp)};
+const dpCalcFuncV31=dpCalcFunc;dpCalcFunc=function(e,f,comp){const r=dpCalcFuncV31(e,f,comp);const fer=feriasNoMes(f,comp);if(!fer.length)return r;
+  let baseF=0,inssF=0;fer.forEach(x=>{const p=x.calc.porMes[comp]/x.calc.dias;baseF+=x.calc.base*p;inssF+=x.calc.inss*p});
+  const tot=dpInss(r.baseInss+baseF,r.vinculo);const atual=r.inss;const dif=r2(tot-atual-inssF);
+  const R=r.rubricas.slice();R.push({cod:'155',desc:'Férias no mês (pagas em recibo) · base '+brl(baseF),ref:fer.reduce((a,x)=>a+x.calc.porMes[comp],0)+' dias',valor:r2(baseF),tipo:'I'});
+  if(dif>0.004)R.push({cod:'203',desc:'Diferença de INSS (salário + férias do mês)','ref':'',valor:dif,tipo:'D'});
+  const desc=r2(R.filter(x=>x.tipo==='D').reduce((a,x)=>a+x.valor,0));return {...r,rubricas:R.sort((a,b)=>a.cod.localeCompare(b.cod)),inss:r2(atual+Math.max(0,dif)),descontos:desc,liquido:r2(r.proventos-desc),baseFerias:r2(baseF)}};
+/* ---------- 13º ---------- */
+function avosAno(f,ano,ate){let n=0;const lim=ate||ano+'-12-31';for(let m=1;m<=12;m++){const c=ano+'-'+String(m).padStart(2,'0');const ini=c+'-01',fim=dpFimMes(c);
+  const a=f.admissao>ini?f.admissao:ini;let b=fim<lim?fim:lim;if(f.desligado&&f.desligadoEm&&f.desligadoEm<b)b=f.desligadoEm;if(a>b)continue;if(diasEntre(a,b)+1>=15)n++}return n}
+function calc13(e,f,ano){const vin=f.vinculo||'empregado';const sal=+f.salario||0,adic=dpAdic(f);const avos=avosAno(f,ano);const c0=f.admissao.slice(0,4)===String(ano)?f.admissao.slice(0,7):ano+'-01';
+  const media=dpMedia(e.id,f.id,c0,ano+'-11',mesesEntre(c0,ano+'-11'));const rem=r2(sal+adic+media);const total=r2(rem*avos/12);
+  const pag1=S.dpeventos.filter(x=>x.funcId===f.id&&((x.tipo==='13-1'&&x.dados.ano===ano)||(x.tipo==='ferias'&&x.calc.adi13&&String(x.calc.pagamento).slice(0,4)===String(ano))));
+  const ja=r2(pag1.reduce((a,x)=>a+(x.tipo==='13-1'?x.calc.p1:x.calc.adi13),0));
+  const p1calc=r2((sal+adic)*avos/12/2);
+  const inss=dpInss(total,vin);const ir=dpIrrf(total,inss,+f.depIR||0);const liq2=r2(total-ja-inss-ir.valor);const fg=vin==='aprendiz'?DP26.fgtsAprendiz:DP26.fgts;
+  return {avos,sal,adic,media,rem,total,p1:p1calc,pago1:ja,inss,irrf:ir.valor,irrfInfo:ir,liq2,fgts1:r2(p1calc*fg),fgts2:r2((total-ja)*fg),p1Origem:pag1.length?(pag1[0].tipo==='ferias'?'nas férias':'1ª parcela'):''}}
+/* ---------- rescisão ---------- */
+const MOTIVOS={sem_justa:'Dispensa sem justa causa',pedido:'Pedido de demissão',justa:'Dispensa por justa causa',acordo:'Acordo entre as partes (art. 484-A)',termino_exp:'Término do contrato de experiência',termino_prazo:'Término do contrato por prazo determinado'};
+const AVISOS={indenizado:'Indenizado pelo empregador',trabalhado:'Trabalhado',dispensado:'Dispensado do cumprimento',descontado:'Não cumprido (descontado do empregado)',nenhum:'Não se aplica'};
+function calcRescisao(e,f,d){const vin=f.vinculo||'empregado';const sal=+f.salario||0,adic=dpAdic(f);const data=d.data;const m=d.motivo;
+  const c12=data.slice(0,7);const media=dpMedia(e.id,f.id,addMes(c12,-12),addMes(c12,-1),12);const rem=r2(sal+adic+media);
+  const R=[];const add=(cod,desc,ref,v,t,inc)=>{v=r2(v);if(v>0.004)R.push({cod,desc,ref,valor:v,tipo:t,...(inc||{})})};
+  const anos=anosCompletos(f.admissao,data);const diasAviso=Math.min(90,30+3*anos);
+  const aviso=['sem_justa','acordo'].includes(m)?(d.aviso||'indenizado'):m==='pedido'?(d.aviso||'trabalhado'):'nenhum';
+  const indeniz=aviso==='indenizado';const proj=indeniz?dMais(data,diasAviso):data;
+  // saldo de salário
+  const ini=f.admissao.slice(0,7)===c12?Math.min(30,+f.admissao.slice(8,10)):1;const diasSaldo=Math.max(0,Math.min(30,+data.slice(8,10))-ini+1);
+  add('300','Saldo de salário',diasSaldo+' dias',(sal+adic)/30*diasSaldo,'P',{inss:1,irrf:1,fgts:1});
+  if(indeniz)add('301','Aviso prévio indenizado',(m==='acordo'?diasAviso/2:diasAviso)+' dias',rem/30*diasAviso*(m==='acordo'?.5:1),'P',{fgts:1});
+  if(aviso==='descontado')add('310','Aviso prévio não cumprido','30 dias',sal,'D');
+  // 13º proporcional (com a projeção do aviso)
+  let d13=0;if(m!=='justa'){const ano=+proj.slice(0,4);const fx={...f,desligado:true,desligadoEm:proj};const avos=avosAno(fx,ano);d13=r2(rem*avos/12);add('302','13º salário proporcional',avos+'/12',d13,'P',{fgts:1})}
+  const ja13=m==='justa'?0:r2(S.dpeventos.filter(x=>x.funcId===f.id&&((x.tipo==='13-1'&&String(x.dados.ano)===proj.slice(0,4))||(x.tipo==='ferias'&&x.calc.adi13&&String(x.calc.pagamento).slice(0,4)===proj.slice(0,4)))).reduce((a,x)=>a+(x.tipo==='13-1'?x.calc.p1:x.calc.adi13),0));
+  if(ja13)add('311','Adiantamento de 13º já pago','',Math.min(ja13,d13),'D');
+  // férias vencidas e proporcionais
+  const fx={...f,desligado:true,desligadoEm:proj};const P=periodosAquisitivos(fx,proj,data);
+  const ferFuturas=S.dpeventos.filter(x=>x.tipo==='ferias'&&x.funcId===f.id&&x.dados.inicio>data).length;let fv=0,fp=0,avF=0;
+  P.forEach(p=>{if(p.fim<=proj)fv+=p.saldo;else if(m!=='justa'){let a=0;for(let i=0;i<12;i++){const ini_=mMais(p.ini,i),fim_=dMais(mMais(p.ini,i+1),-1);if(ini_>proj)break;const b=fim_<proj?fim_:proj;if(diasEntre(ini_,b)+1>=15)a++}avF=a;fp=r2(p.direito*a/12)}});
+  if(fv){const v=rem/30*fv;add('304','Férias vencidas',fv+' dias',v,'P');add('305','1/3 sobre férias vencidas','',v/3,'P')}
+  if(fp){const v=rem/30*fp;add('306','Férias proporcionais',avF+'/12',v,'P');add('307','1/3 sobre férias proporcionais','',v/3,'P')}
+  // descontos legais: INSS e IRRF do saldo e do 13º separados; aviso e férias indenizadas são isentos de IRRF
+  const baseSaldo=R.filter(x=>x.inss).reduce((a,x)=>a+x.valor,0);const inssS=dpInss(baseSaldo,vin);add('201','INSS sobre saldo de salário','',inssS,'D');
+  const irS=dpIrrf(baseSaldo,inssS,+f.depIR||0);add('202','IRRF sobre saldo de salário','',irS.valor,'D');
+  const inss13=d13?dpInss(d13,vin):0;add('204','INSS sobre 13º salário','',inss13,'D');const ir13=d13?dpIrrf(d13,inss13,+f.depIR||0):{valor:0};add('205','IRRF sobre 13º salário','',ir13.valor,'D');
+  const prov=r2(R.filter(x=>x.tipo==='P').reduce((a,x)=>a+x.valor,0)),desc=r2(R.filter(x=>x.tipo==='D').reduce((a,x)=>a+x.valor,0));
+  const fg=vin==='aprendiz'?DP26.fgtsAprendiz:DP26.fgts;const baseFgts=r2(R.filter(x=>x.fgts).reduce((a,x)=>a+x.valor,0));const fgtsMes=r2(baseFgts*fg);
+  const saldoFgts=r2((+d.saldoFgts||0)+fgtsMes);const pm=m==='sem_justa'?.40:m==='acordo'?.20:0;const multa=r2(saldoFgts*pm);
+  return {rubricas:R,proventos:prov,descontos:desc,liquido:r2(prov-desc),rem,media,anos,diasAviso,aviso,projecao:proj,fgtsMes,baseFgts,saldoFgts,multa,multaPct:pm,
+    ferFuturas,prazo:dMais(data,10),saque:m==='sem_justa'?'Saque integral do FGTS':m==='acordo'?'Saque de até 80% do FGTS':'Sem saque do FGTS',seguro:m==='sem_justa'?'Pode ter direito ao seguro-desemprego':'Sem seguro-desemprego'}}
+/* ---------- telas ---------- */
+const evTab=(R)=>`<div class="table-wrap"><table><thead><tr><th>Cód.</th><th>Descrição</th><th class="r">Ref.</th><th class="r">Proventos</th><th class="r">Descontos</th></tr></thead><tbody>${R.map(r=>`<tr><td class="num">${r.cod}</td><td>${esc(r.desc)}</td><td class="r small">${esc(r.ref||'')}</td><td class="r num">${r.tipo==='P'?brl(r.valor):''}</td><td class="r num">${r.tipo==='D'?brl(r.valor):''}</td></tr>`).join('')}</tbody></table></div>`;
+const AVISO_IR='<p class="small muted">IRRF com a redução da Lei 15.270/2025 aplicada à base de cada pagamento (férias, 13º e saldo de salário em separado). Confira a orientação da Receita para férias e rescisões.</p>';
+function dpFerias(e,comp){const ref=dpFimMes(comp);const fs=S.funcionarios.filter(f=>f.empresaId===e.id&&!f.desligado&&ehClt(f)).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
+  const ev=evDe(e.id,'ferias').sort((a,b)=>String(b.dados.inicio).localeCompare(String(a.dados.inicio)));
+  const linhas=fs.map(f=>{const P=periodosAquisitivos(f,ref);const venc=P.filter(p=>p.completo&&p.saldo>0);const atual=P.find(p=>!p.completo)||P[P.length-1];const prox=venc[0];
+    const st=prox?(prox.limite<ref?pill('Vencidas: pagar em dobro','crit'):diasEntre(ref,prox.limite)<=60?pill('Vencem em '+fmtData(prox.limite),'warn'):pill(venc.length+' período(s) a gozar','info')):pill('Em aquisição','');
+    return `<tr><td><b>${esc(f.nome)}</b><div class="small muted">admissão ${fmtData(f.admissao)}</div></td><td class="small">${atual?fmtData(atual.ini)+' a '+fmtData(atual.fim):'—'}</td><td class="r num">${venc.reduce((a,p)=>a+p.saldo,0)||'—'}</td><td class="small">${prox?fmtData(prox.limite):'—'}</td><td>${st}</td>
+     <td>${dpEd()&&P.length?`<button class="btn sm primary" data-act="fer-nova" data-id="${f.id}">Programar férias</button>`:''}</td></tr>`}).join('');
+  return `${head('Férias','Períodos aquisitivos de cada empregado, prazo para conceder, programação com abono pecuniário e adiantamento do 13º, e o recibo de férias. Os dias de férias saem da folha do mês e o INSS do mês considera a base das férias.')}
+   <div class="panel"><div class="panel-head"><h2>Controle de períodos</h2></div>${fs.length?`<div class="table-wrap"><table><thead><tr><th>Empregado</th><th>Período aquisitivo atual</th><th class="r">Dias a gozar (vencidos)</th><th>Limite para conceder</th><th>Situação</th><th></th></tr></thead><tbody>${linhas}</tbody></table></div>`:vazio('Nenhum empregado CLT ativo.')}</div>
+   <div class="panel"><div class="panel-head"><h2>Férias programadas e pagas</h2></div>${ev.length?`<div class="table-wrap"><table><thead><tr><th>Empregado</th><th>Gozo</th><th class="r">Dias</th><th>Pagamento até</th><th class="r">Líquido</th><th></th></tr></thead><tbody>${ev.map(x=>{const f=S.funcionarios.find(y=>y.id===x.funcId);return `<tr>
+     <td><b>${esc(f?.nome||x.nome||'')}</b>${x.calc.emDobro?' '+pill('em dobro','crit'):''}</td><td class="small">${fmtData(x.calc.inicio)} a ${fmtData(x.calc.fim)}${x.calc.abonoDias?`<div class="muted">+ ${x.calc.abonoDias} dias de abono</div>`:''}</td><td class="r num">${x.calc.dias}</td><td class="num">${fmtData(x.calc.pagamento)}</td><td class="r num">${brl(x.calc.liquido)}</td>
+     <td><div class="actions" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn sm" data-act="ev-pdf" data-id="${x.id}">${svg('download')}Aviso e recibo</button>${dpEd()?`<button class="btn sm ghost" data-act="ev-excluir" data-id="${x.id}">Excluir</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`:vazio('Nenhuma férias programada.')}</div>`}
+function ferForm(f,d){const e=emp(f.empresaId);const P=periodosAquisitivos(f,dMais(hoje(),400)).filter(p=>p.saldo>0);d=d||{};const per=d.periodo??P[0]?.k??0;const pp=P.find(p=>p.k===+per);
+  const c=d.inicio&&d.dias?calcFerias(e,f,{...d,periodo:per}):null;
+  return mHead('Férias de '+f.nome)+`<form data-form="fer" data-id="${f.id}" data-preservar><div class="modal-body"><div class="grid-f">
+   <label class="f full"><span>Período aquisitivo *</span><select name="periodo" data-fer-calc>${P.map(p=>`<option value="${p.k}" ${p.k===+per?'selected':''}>${fmtData(p.ini)} a ${fmtData(p.fim)} · saldo ${p.saldo} dias${p.completo?'':' (em aquisição: férias antecipadas)'}</option>`).join('')}</select></label>
+   <label class="f"><span>Início do gozo *</span><input type="date" name="inicio" value="${esc(d.inicio||'')}" required data-fer-calc></label>
+   <label class="f"><span>Dias de gozo *</span><input type="number" name="dias" min="5" max="30" value="${esc(d.dias||(pp?Math.min(30,pp.saldo):30))}" required data-fer-calc></label>
+   <label class="f"><span>Faltas injustificadas no período</span><input type="number" name="faltas" min="0" max="60" value="${esc(d.faltas||0)}" data-fer-calc></label>
+   <label class="f chk"><input type="checkbox" name="abono" ${d.abono?'checked':''} data-fer-calc> Vender 1/3 (abono pecuniário)</label>
+   <label class="f chk"><input type="checkbox" name="adiantar13" ${d.adiantar13?'checked':''} data-fer-calc> Adiantar a 1ª parcela do 13º</label></div>
+   <div id="fer-prev">${c?ferPrev(c):'<p class="small muted">Informe o início e os dias para ver o cálculo.</p>'}</div>${AVISO_IR}</div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button>${dpEd()?'<button class="btn primary">Salvar férias</button>':''}</div></form>`}
+function ferPrev(c){return `<div class="dl" style="margin:10px 0"><dt>Remuneração base</dt><dd class="num">${brl(c.rem)}${c.media?` <span class="small muted">(inclui média de variáveis ${brl(c.media)})</span>`:''}</dd><dt>Gozo</dt><dd>${fmtData(c.inicio)} a ${fmtData(c.fim)} · retorno ${fmtData(c.retorno)}</dd><dt>Pagar até</dt><dd>${fmtData(c.pagamento)} (2 dias antes do início)</dd>${c.emDobro?'<dt>Atenção</dt><dd style="color:var(--crit)">Início depois do prazo concessivo: as férias devem ser pagas em dobro (art. 137 CLT).</dd>':''}</div>${evTab(c.rubricas)}
+  <div class="dl" style="margin-top:8px"><dt>Líquido</dt><dd class="num"><b>${brl(c.liquido)}</b></dd><dt>FGTS</dt><dd class="num">${brl(c.fgts)}</dd></div>`}
+function ferDados(form){const g=n=>form.querySelector(`[name=${n}]`);return {periodo:+g('periodo').value,inicio:g('inicio').value,dias:+g('dias').value,faltas:+g('faltas').value||0,abono:g('abono').checked,adiantar13:g('adiantar13').checked}}
+document.addEventListener('change',ev=>{const s=ev.target;if(!(s.matches&&s.matches('[data-fer-calc]')))return;const form=s.closest('form');const f=S.funcionarios.find(x=>x.id===form.dataset.id);const d=ferDados(form);const box=document.getElementById('fer-prev');
+  if(box)box.innerHTML=d.inicio&&d.dias?ferPrev(calcFerias(emp(f.empresaId),f,d)):'<p class="small muted">Informe o início e os dias para ver o cálculo.</p>'});
+ACT['fer-nova']=el=>{const f=S.funcionarios.find(x=>x.id===el.dataset.id);if(f)openModal(ferForm(f),true)};
+FORM['fer']=(fd,form)=>{const f=S.funcionarios.find(x=>x.id===form.dataset.id);const e=emp(f.empresaId);const d=ferDados(form);const P=periodosAquisitivos(f,dMais(hoje(),400)).find(p=>p.k===d.periodo);
+  if(!d.inicio){toast('Informe o início.',true);return}const c=calcFerias(e,f,d);if(d.dias+c.abonoDias>(P?diasDireito(d.faltas)-P.usados:30)){toast('Dias de gozo + abono passam do saldo do período.',true);return}
+  if(d.dias<5){toast('O período de férias não pode ter menos de 5 dias.',true);return}
+  mut('dpeventos',()=>S.dpeventos.push({id:uid(),empresaId:e.id,funcId:f.id,nome:f.nome,tipo:'ferias',comp:c.pagamento.slice(0,7),dados:d,calc:c,criadoEm:agora(),por:ME.nome||''}),['Pessoal','Programou férias de '+f.nome+' a partir de '+fmtData(d.inicio),e.razao]);closeModal();toast('Férias salvas. Os dias saem da folha de '+Object.keys(c.porMes).map(fmtComp).join(' e ')+'.')};
+function dp13(e,comp){const ano=+comp.slice(0,4);const fs=S.funcionarios.filter(f=>f.empresaId===e.id&&ehClt(f)&&f.admissao<=ano+'-12-31'&&(!f.desligado||f.desligadoEm>=ano+'-01-01')&&!S.dpeventos.some(x=>x.tipo==='rescisao'&&x.funcId===f.id&&String(x.dados.data).slice(0,4)===String(ano))).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));
+  const L=fs.map(f=>({f,c:calc13(e,f,ano),e1:S.dpeventos.find(x=>x.tipo==='13-1'&&x.funcId===f.id&&x.dados.ano===ano),e2:S.dpeventos.find(x=>x.tipo==='13-2'&&x.funcId===f.id&&x.dados.ano===ano)}));const T=k=>r2(L.reduce((a,x)=>a+x.c[k],0));
+  return `${head('13º salário · '+ano,`1ª parcela até 30/11 (metade, sem descontos) e 2ª parcela até 20/12 (com INSS e IRRF sobre o total). Avos: mês com 15 dias ou mais trabalhados. Inclui a média das horas extras e comissões das folhas fechadas.`,dpEd()&&L.length?`<button class="btn" data-act="d13-gerar" data-p="1">Gerar 1ª parcela</button><button class="btn primary" data-act="d13-gerar" data-p="2">Gerar 2ª parcela</button>`:'')}
+   <div class="crm-kpis"><div class="kpi"><span class="eyebrow">13º integral</span><b>${brl(T('total'))}</b></div><div class="kpi"><span class="eyebrow">1ª parcela</span><b>${brl(T('p1'))}</b></div><div class="kpi"><span class="eyebrow">INSS · IRRF</span><b>${brl(T('inss'))} · ${brl(T('irrf'))}</b></div><div class="kpi"><span class="eyebrow">FGTS (1ª + 2ª)</span><b>${brl(r2(T('fgts1')+T('fgts2')))}</b></div></div>
+   <div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr><th>Empregado</th><th class="r">Avos</th><th class="r">Base</th><th class="r">13º integral</th><th class="r">1ª parcela</th><th class="r">INSS</th><th class="r">IRRF</th><th class="r">2ª parcela líquida</th><th>Situação</th><th></th></tr></thead><tbody>${L.map(({f,c,e1,e2})=>`<tr>
+     <td><b>${esc(f.nome)}</b>${c.media?`<div class="small muted">média variáveis ${brl(c.media)}</div>`:''}</td><td class="r num">${c.avos}/12</td><td class="r num">${brl(c.rem)}</td><td class="r num">${brl(c.total)}</td><td class="r num">${brl(e1?e1.calc.p1:c.pago1||c.p1)}${c.p1Origem==='nas férias'?'<div class="small muted">paga nas férias</div>':''}</td>
+     <td class="r num">${brl(c.inss)}</td><td class="r num">${brl(c.irrf)}</td><td class="r num"><b>${brl(c.liq2)}</b></td><td>${e2?pill('2ª gerada','ok'):e1||c.pago1?pill('1ª paga','info'):pill('A gerar','warn')}</td>
+     <td><div class="actions" style="flex-wrap:nowrap;justify-content:flex-end">${e1?`<button class="btn sm" data-act="ev-pdf" data-id="${e1.id}">1ª</button>`:''}${e2?`<button class="btn sm" data-act="ev-pdf" data-id="${e2.id}">2ª</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>${AVISO_IR}`:vazio('Nenhum empregado com direito ao 13º neste ano.')}</div>`}
+ACT['d13-gerar']=el=>{const e=emp(UI.fsn.emp);const ano=+UI.fsn.comp.slice(0,4);const p=el.dataset.p;
+  const fs=S.funcionarios.filter(f=>f.empresaId===e.id&&ehClt(f)&&f.admissao<=ano+'-12-31'&&(!f.desligado||f.desligadoEm>=ano+'-01-01')&&!S.dpeventos.some(x=>x.tipo==='rescisao'&&x.funcId===f.id&&String(x.dados.data).slice(0,4)===String(ano)));
+  const novos=[];fs.forEach(f=>{const c=calc13(e,f,ano);if(p==='1'){if(c.pago1||!c.p1)return}if(c.avos<1)return;novos.push({f,c})});
+  if(!novos.length){toast(p==='1'?'Todos já receberam a 1ª parcela (ou não têm avos).':'Nenhum empregado para gerar.',true);return}
+  confirmar(`Gerar ${p}ª parcela do 13º de ${ano}`,`${novos.length} empregado(s). ${p==='1'?'Pagamento até 30/11, sem descontos; FGTS na competência de novembro.':'Pagamento até 20/12, com INSS e IRRF sobre o total; FGTS na competência de dezembro.'} Se já existir, o cálculo é refeito.`,'Gerar',()=>{
+    mut('dpeventos',()=>{novos.forEach(({f,c})=>{const tipo='13-'+p;S.dpeventos=S.dpeventos.filter(x=>!(x.tipo===tipo&&x.funcId===f.id&&x.dados.ano===ano));
+      const R=p==='1'?[{cod:'160',desc:'1ª parcela do 13º salário',ref:c.avos+'/12',valor:c.p1,tipo:'P'}]:[{cod:'161',desc:'13º salário integral',ref:c.avos+'/12',valor:c.total,tipo:'P'},{cod:'162',desc:'Adiantamento da 1ª parcela',ref:'',valor:c.pago1,tipo:'D'},{cod:'204',desc:'INSS sobre 13º',ref:'',valor:c.inss,tipo:'D'},{cod:'205',desc:'IRRF sobre 13º',ref:'',valor:c.irrf,tipo:'D'}].filter(x=>x.valor);
+      const prov=r2(R.filter(x=>x.tipo==='P').reduce((a,x)=>a+x.valor,0)),desc=r2(R.filter(x=>x.tipo==='D').reduce((a,x)=>a+x.valor,0));
+      S.dpeventos.push({id:uid(),empresaId:e.id,funcId:f.id,nome:f.nome,tipo,comp:ano+(p==='1'?'-11':'-12'),dados:{ano},calc:{...c,rubricas:R,proventos:prov,descontos:desc,liquido:r2(prov-desc),fgts:p==='1'?c.fgts1:c.fgts2,pagamento:ano+(p==='1'?'-11-30':'-12-20')},criadoEm:agora(),por:ME.nome||''})})},['Pessoal',`Gerou a ${p}ª parcela do 13º de ${ano} (${novos.length})`,e.razao]);toast(`${p}ª parcela gerada para ${novos.length} empregado(s).`)})};
+function dpResc(e,comp){const ev=evDe(e.id,'rescisao').sort((a,b)=>String(b.dados.data).localeCompare(String(a.dados.data)));
+  return `${head('Rescisões','Cálculo das verbas rescisórias por motivo: saldo de salário, aviso prévio proporcional (Lei 12.506), 13º e férias proporcionais e vencidas com 1/3, INSS e IRRF em separado, FGTS do mês e multa. Ao salvar, o empregado é desligado e sai da folha do mês.',dpEd()?`<button class="btn primary" data-act="resc-nova">${svg('plus')}Nova rescisão</button>`:'')}
+   <div class="panel">${ev.length?`<div class="table-wrap"><table><thead><tr><th>Empregado</th><th>Desligamento</th><th>Motivo</th><th class="r">Líquido</th><th class="r">Multa FGTS</th><th>Pagar até</th><th></th></tr></thead><tbody>${ev.map(x=>`<tr><td><b>${esc(x.nome)}</b></td><td class="num">${fmtData(x.dados.data)}</td><td class="small">${esc(MOTIVOS[x.dados.motivo])}<div class="muted">aviso ${esc(AVISOS[x.calc.aviso].toLowerCase())}</div></td><td class="r num">${brl(x.calc.liquido)}</td><td class="r num">${brl(x.calc.multa)}</td><td class="num">${fmtData(x.calc.prazo)}</td>
+     <td><div class="actions" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn sm" data-act="ev-pdf" data-id="${x.id}">${svg('download')}Termo</button>${dpEd()?`<button class="btn sm ghost" data-act="ev-excluir" data-id="${x.id}">Excluir</button>`:''}</div></td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhuma rescisão calculada.')}</div>`}
+function rescForm(d){const e=emp(UI.fsn.emp);d=d||{};const fs=S.funcionarios.filter(f=>f.empresaId===e.id&&ehClt(f)&&!f.desligado).sort((a,b)=>String(a.nome).localeCompare(String(b.nome),'pt-BR'));const f=S.funcionarios.find(x=>x.id===d.funcId)||fs[0];
+  const m=d.motivo||'sem_justa';const avs=['sem_justa','acordo'].includes(m)?['indenizado','trabalhado','dispensado']:m==='pedido'?['trabalhado','descontado','dispensado']:['nenhum'];
+  const c=f&&d.data?calcRescisao(e,f,{...d,aviso:avs.includes(d.aviso)?d.aviso:avs[0]}):null;
+  return mHead('Rescisão')+`<form data-form="resc" data-preservar><div class="modal-body"><div class="grid-f">
+   <label class="f full"><span>Empregado *</span><select name="funcId" data-resc-calc>${fs.map(x=>`<option value="${x.id}" ${x.id===f?.id?'selected':''}>${esc(x.nome)} · admissão ${fmtData(x.admissao)}</option>`).join('')}</select></label>
+   <label class="f"><span>Último dia trabalhado *</span><input type="date" name="data" value="${esc(d.data||'')}" required data-resc-calc></label>
+   <label class="f"><span>Motivo *</span><select name="motivo" data-resc-calc>${Object.entries(MOTIVOS).map(([k,t])=>`<option value="${k}" ${k===m?'selected':''}>${t}</option>`).join('')}</select></label>
+   <label class="f"><span>Aviso prévio</span><select name="aviso" data-resc-calc>${avs.map(k=>`<option value="${k}" ${k===d.aviso?'selected':''}>${AVISOS[k]}</option>`).join('')}</select></label>
+   <label class="f"><span>Saldo do FGTS para fins rescisórios (R$)</span><input type="number" step="0.01" min="0" name="saldoFgts" value="${esc(d.saldoFgts||'')}" placeholder="extrato do FGTS Digital" data-resc-calc></label></div>
+   <div id="resc-prev">${c?rescPrev(c):'<p class="small muted">Escolha o empregado e a data para ver o cálculo.</p>'}</div>${AVISO_IR}
+   <p class="small muted">Não inclui as indenizações dos arts. 479 e 480 (quebra antecipada de contrato por prazo), estabilidades e verbas de convenção coletiva: lance à parte se houver.</p></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button>${dpEd()?'<button class="btn primary">Salvar e desligar</button>':''}</div></form>`}
+function rescPrev(c){return `${c.ferFuturas?'<div class="banner warn" style="display:block;margin-top:10px">Há férias programadas para depois do desligamento: os dias entram como vencidas aqui. Exclua essas férias na tela Férias.</div>':''}<div class="dl" style="margin:10px 0"><dt>Remuneração base</dt><dd class="num">${brl(c.rem)}${c.media?` <span class="small muted">(média de variáveis ${brl(c.media)})</span>`:''}</dd><dt>Tempo de casa</dt><dd>${c.anos} ano(s) completo(s) · aviso de ${c.diasAviso} dias${c.aviso==='indenizado'?' · projeção até '+fmtData(c.projecao):''}</dd><dt>Pagar até</dt><dd>${fmtData(c.prazo)} (10 dias)</dd></div>${evTab(c.rubricas)}
+  <div class="dl" style="margin-top:8px"><dt>Líquido a pagar</dt><dd class="num"><b>${brl(c.liquido)}</b></dd><dt>FGTS do mês rescisório</dt><dd class="num">${brl(c.fgtsMes)}</dd><dt>Multa do FGTS</dt><dd class="num">${c.multaPct?brl(c.multa)+' ('+pct(c.multaPct)+' de '+brl(c.saldoFgts)+')':'não há'}</dd><dt>FGTS e seguro</dt><dd>${c.saque} · ${c.seguro}</dd></div>`}
+function rescDados(form){const g=n=>form.querySelector(`[name=${n}]`);return {funcId:g('funcId').value,data:g('data').value,motivo:g('motivo').value,aviso:g('aviso').value,saldoFgts:+g('saldoFgts').value||0}}
+document.addEventListener('change',ev=>{const s=ev.target;if(!(s.matches&&s.matches('[data-resc-calc]')))return;const form=s.closest('form');const d=rescDados(form);if(s.name==='motivo'){UI.modal=null;openModal(rescForm({...d,aviso:null}),true);return}
+  const f=S.funcionarios.find(x=>x.id===d.funcId);const box=document.getElementById('resc-prev');if(box)box.innerHTML=f&&d.data?rescPrev(calcRescisao(emp(f.empresaId),f,d)):''});
+ACT['resc-nova']=()=>openModal(rescForm(null),true);
+FORM['resc']=(fd,form)=>{const d=rescDados(form);const f=S.funcionarios.find(x=>x.id===d.funcId);if(!f||!d.data){toast('Escolha o empregado e a data.',true);return}if(d.data<f.admissao){toast('Data antes da admissão.',true);return}
+  const e=emp(f.empresaId);const c=calcRescisao(e,f,d);
+  mut(['dpeventos','funcionarios'],()=>{S.dpeventos.push({id:uid(),empresaId:e.id,funcId:f.id,nome:f.nome,tipo:'rescisao',comp:d.data.slice(0,7),dados:d,calc:c,criadoEm:agora(),por:ME.nome||''});f.desligado=true;f.desligadoEm=d.data;f.desligamentoMotivo=MOTIVOS[d.motivo]},
+    ['Pessoal','Calculou a rescisão de '+f.nome+' ('+MOTIVOS[d.motivo]+')',e.razao]);closeModal();toast('Rescisão salva: '+f.nome+' desligado em '+fmtData(d.data)+'.')};
+ACT['ev-excluir']=el=>{const x=S.dpeventos.find(y=>y.id===el.dataset.id);if(!x)return;const f=S.funcionarios.find(y=>y.id===x.funcId);
+  confirmar('Excluir '+(x.tipo==='rescisao'?'rescisão':'férias'),`Excluir ${x.tipo==='rescisao'?'a rescisão':'as férias'} de ${esc(x.nome)}?${x.tipo==='rescisao'?' O empregado volta a ficar ativo.':''}`,'Excluir',()=>mut(['dpeventos','funcionarios'],()=>{S.dpeventos=S.dpeventos.filter(y=>y!==x);if(x.tipo==='rescisao'&&f){f.desligado=false;f.desligadoEm=null;f.desligamentoMotivo=null}},['Pessoal','Excluiu evento '+x.tipo+' de '+x.nome,emp(x.empresaId)?.razao||'']),true)};
+// PDFs: aviso e recibo de férias, recibo de 13º e termo de rescisão
+ACT['ev-pdf']=el=>{const x=S.dpeventos.find(y=>y.id===el.dataset.id);if(!x)return;const e=emp(x.empresaId);const f=S.funcionarios.find(y=>y.id===x.funcId)||{nome:x.nome};const c=x.calc;
+  const cab=t=>`<h1>${t}</h1><p class="sub">${esc(e.razao)} · CNPJ ${fmtCNPJ(e.cnpj||'')}</p><div class="dl"><b>Empregado</b><span>${esc(f.nome)} · CPF ${fmtCPF(f.cpf||'')}</span><b>Cargo</b><span>${esc(f.cargo||'')}${f.cbo?' · CBO '+esc(f.cbo):''}</span><b>Admissão</b><span>${fmtData(f.admissao)}</span></div>`;
+  const tab=`<table><thead><tr><th>Cód.</th><th>Descrição</th><th class="r">Ref.</th><th class="r">Proventos</th><th class="r">Descontos</th></tr></thead><tbody>${c.rubricas.map(r=>`<tr><td>${r.cod}</td><td>${esc(r.desc)}</td><td class="r">${esc(r.ref||'')}</td><td class="r">${r.tipo==='P'?brl(r.valor):''}</td><td class="r">${r.tipo==='D'?brl(r.valor):''}</td></tr>`).join('')}<tr class="tot"><td></td><td>Totais</td><td></td><td class="r">${brl(c.proventos)}</td><td class="r">${brl(c.descontos)}</td></tr><tr class="tot"><td></td><td colspan="3">Valor líquido</td><td class="r">${brl(c.liquido)}</td></tr></tbody></table>`;
+  const ass=`<div class="ass"><div>${esc(e.razao)}<br>Empregador</div><div>${esc(f.nome)}<br>Empregado</div></div>`;
+  if(x.tipo==='ferias')janelaPdf('Férias · '+f.nome,cab('Aviso e recibo de férias')+`<h2>Aviso de férias</h2><p>Comunicamos que suas férias, referentes ao período aquisitivo de ${fmtData(c.periodo?.ini)} a ${fmtData(c.periodo?.fim)}, serão concedidas de <b>${fmtData(c.inicio)}</b> a <b>${fmtData(c.fim)}</b> (${c.dias} dias)${c.abonoDias?`, com conversão de ${c.abonoDias} dias em abono pecuniário`:''}, devendo retornar ao trabalho em ${fmtData(c.retorno)}.</p>${ass}<h2>Recibo de férias</h2>${tab}<p>Recebi a importância líquida acima, paga em ${fmtData(c.pagamento)}, referente às férias descritas.</p>${ass}`);
+  else if(x.tipo==='rescisao')janelaPdf('Rescisão · '+f.nome,cab('Termo de rescisão do contrato de trabalho')+`<div class="dl" style="margin-top:8px"><b>Último dia trabalhado</b><span>${fmtData(x.dados.data)}</span><b>Motivo</b><span>${esc(MOTIVOS[x.dados.motivo])}</span><b>Aviso prévio</b><span>${esc(AVISOS[c.aviso])}${c.aviso==='indenizado'?' · '+c.diasAviso+' dias · projeção '+fmtData(c.projecao):''}</span><b>Remuneração para fins rescisórios</b><span>${brl(c.rem)}</span></div><h2>Discriminação das verbas</h2>${tab}
+    <div class="dl" style="margin-top:8px"><b>FGTS do mês rescisório</b><span>${brl(c.fgtsMes)}</span><b>Multa rescisória do FGTS</b><span>${c.multaPct?brl(c.multa)+' ('+pct(c.multaPct)+')':'—'}</span><b>Prazo de pagamento</b><span>${fmtData(c.prazo)}</span></div>${ass}`);
+  else janelaPdf('13º salário · '+f.nome,cab('Recibo de 13º salário · '+(x.tipo==='13-1'?'1ª':'2ª')+' parcela de '+x.dados.ano)+`<h2>Valores</h2>${tab}<p>Recebi a importância líquida acima, referente ao 13º salário (${c.avos}/12), paga em ${fmtData(c.pagamento)}.</p>${ass}`)};
+// FGTS de férias, 13º e rescisão entra nas guias do mês de pagamento
+const calcFolhaV31=calcFolha;calcFolha=function(e,comp){const c=calcFolhaV31(e,comp);const ev=S.dpeventos.filter(x=>x.empresaId===e.id&&(x.tipo==='rescisao'?String(x.dados.data).slice(0,7)===comp:x.comp===comp));
+  const fgE=r2(ev.reduce((a,x)=>a+(x.tipo==='rescisao'?x.calc.fgtsMes:x.calc.fgts||0),0));const inssE=r2(ev.reduce((a,x)=>a+(x.calc.rubricas||[]).filter(r=>['201','204'].includes(r.cod)).reduce((b,r)=>b+r.valor,0),0));
+  const irE=r2(ev.reduce((a,x)=>a+(x.calc.rubricas||[]).filter(r=>['202','205'].includes(r.cod)).reduce((b,r)=>b+r.valor,0),0));
+  return {...c,eventos:ev.map(x=>({tipo:x.tipo,nome:x.nome,liquido:x.calc.liquido})),fgtsEventos:fgE,inssEventos:inssE,irrfEventos:irE}};
+const dpFolhaPgV31=dpFolhaPg;dpFolhaPg=function(e,comp){let h=dpFolhaPgV31(e,comp);const F=calcFolha(e,comp);if(!F.eventos.length)return h;
+  const nome={ferias:'Férias','13-1':'13º 1ª parcela','13-2':'13º 2ª parcela',rescisao:'Rescisão'};
+  return h+`<div class="panel"><div class="panel-head"><h2>Férias, 13º e rescisões pagos em ${fmtComp(comp)}</h2></div><div class="table-wrap"><table><thead><tr><th>Evento</th><th>Empregado</th><th class="r">Líquido</th></tr></thead><tbody>${F.eventos.map(x=>`<tr><td>${nome[x.tipo]}</td><td>${esc(x.nome)}</td><td class="r num">${brl(x.liquido)}</td></tr>`).join('')}</tbody></table></div>
+   <p class="small muted">Somar às guias do mês: FGTS ${brl(F.fgtsEventos)} · INSS ${brl(F.inssEventos)} · IRRF ${brl(F.irrfEventos)} (recibos em separado da folha).</p></div>`};
+const dpConteudoV31=dpConteudo;dpConteudo=function(){const V={'d-ferias':dpFerias,'d-13':dp13,'d-resc':dpResc}[UI.view];if(!V)return dpConteudoV31();
+  if(!podeMod('dem','ver'))return dpConteudoV31();const e=emp(UI.fsn?.emp);if(!e)return dpConteudoV31();return V(e,UI.fsn.comp||compAtual())};
+/* ==== v31 (fim) ==== */
+
 
 
 
