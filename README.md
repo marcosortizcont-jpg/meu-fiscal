@@ -315,6 +315,26 @@ A escrituração fica num terceiro site, separado do painel. Ele usa o mesmo log
 3. Com o domínio ativo na Cloudflare, abra **Worker → Settings → Domains & Routes → Add → Custom domain** e informe `contabil.omeufiscal.com.br`.
 4. O login é por domínio. Entre uma vez com o mesmo e-mail e senha do painel.
 
+## Departamento Pessoal (`dp.omeufiscal.com.br`)
+
+O DP é o quarto site e usa o mesmo casco do sistema contábil: módulos no topo (Escrita Fiscal ↔ Folha de Pagamento), empresa e competência fixas, **F8** e **PgUp/PgDn**. O login, o banco e as permissões são os mesmos do painel. As telas exigem o módulo "Demandas, admissões e folha".
+
+- **Colaboradores e sócios:** ficha completa com vínculo (CLT, aprendiz, estagiário ou sócio com pró-labore), contrato, adicional, VT, dependentes de IRRF e de salário-família, e dados de pagamento. Também tem desligamento e reativação. Os sócios não aparecem no portal do cliente.
+- **Admissões:** os pedidos que o cliente envia pelo portal aparecem aqui. Você muda a situação e efetiva; o colaborador entra no cadastro com os documentos.
+- **Lançamentos do mês:** HE 50% e 100%, faltas, atrasos, comissões, gratificação, outros proventos e descontos, adiantamento e custo do VT. Dias úteis e domingos/feriados vêm do calendário e podem ser ajustados.
+- **Cálculo da folha (tabelas 2026):**
+  - INSS progressivo, com teto de R$ 8.475,55; o sócio paga 11%.
+  - IRRF pela tabela da Lei 15.191/2025, com a redução da Lei 15.270/2025: isento até R$ 5.000 e redução parcial até R$ 7.350. Usa dedução por dependente ou o desconto simplificado, o que for melhor, e dispensa valores abaixo de R$ 10.
+  - FGTS de 8% (aprendiz 2%) e salário-família de R$ 67,54 por filho para remuneração até R$ 1.980,38.
+  - Horas extras com DSR, faltas, atrasos, VT de 6% e proporcionalidade na admissão e no desligamento.
+  - Encargos patronais conforme o regime: Simples com CPP no DAS, Anexo IV, MEI 3%, e LP/LR com 20% + RAT×FAP + terceiros.
+- **Fechar folha** grava o cálculo. A folha fechada alimenta o **Fator R** do sistema contábil.
+- **Holerites:** PDF para impressão. "Publicar no portal" gera um PDF por colaborador (gerador próprio, sem biblioteca externa) e o coloca em "Pessoal e folha" no portal do cliente.
+- **Relatórios:** resumo por rubrica, FGTS, INSS, IRRF e líquidos para pagamento, em tela, CSV ou PDF.
+- **Coleções novas:** `dpmov` e `dpfolhas`, no módulo `dem` e ocultas para o cliente.
+- **Build:** `node sites/build.mjs dp` (rotas `/login` e `/folha`). Na Cloudflare, use o Worker `meufiscal-dp` com Root directory `sites/dp` e build `node ../build.mjs dp`.
+- **Próximas etapas:** férias, 13º, rescisão, horistas e eSocial/DCTFWeb.
+
 ## Escrita fiscal de saída (no sistema contábil)
 
 A escrita fiscal fica no sistema contábil, nas rotinas Notas fiscais de saída, Simples Nacional e MEI, e Livros e relatórios.
