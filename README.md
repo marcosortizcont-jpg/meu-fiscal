@@ -268,6 +268,20 @@ o arquivo guardado em **Documentos da empresa**, sem passar pelo atendente. Tamb
 - Liga/desliga e categorias permitidas em **Atendimento › Regras do atendimento** (padrão: todas menos "Outros").
 - Cada envio fica no histórico da conversa com uma nota interna ("O Théo enviou ao cliente: Contrato Social").
 
+## Apuração do Simples Nacional (etapa 1 do sistema fiscal/contábil)
+
+Menu **Apuração do Simples** no painel (permissão do módulo "Apuração, guias e notas").
+- **Lançamentos de receita** por competência (coleção `receitas`): data, valor, descrição, **anexo da atividade** (I a V, ou
+  "III ou V pelo Fator R") e segregação: ISS retido, ICMS-ST, PIS/Cofins monofásico, exportação, sem ISS. Importa as NFS-e
+  emitidas do mês. O total dos lançamentos vira o faturamento do mês (`faturamento`, origem `lancamentos`), base do RBT12.
+- **Cálculo**: RBT12 dos 12 meses anteriores (proporcional no início de atividade), Fator R com a folha de 12 meses (FS12, informada
+  ou estimada), alíquota efetiva por anexo e **repartição dos tributos** por faixa (LC 123, Anexos I a V, LC 155/2016), ISS limitado
+  a 5% com redistribuição do excesso, dedução dos tributos segregados, alertas de sublimite (R$ 3,6 mi) e limite (R$ 4,8 mi).
+- **Memória de cálculo**, **registro de receitas** e, para MEI, **relatório mensal de receitas brutas** em PDF (página de impressão).
+- **Gerar/atualizar guia DAS** com o valor calculado e a memória gravada na guia (guia paga ou com comprovante não muda).
+- A tela "Apuração e guias" passa a usar esse cálculo quando há lançamentos. Conferir com o PGDAS-D antes de transmitir.
+- Tabelas valem até 2026; a partir de 2027 entram as regras da reforma tributária (IBS/CBS) no Simples.
+
 ## Notas de entrada (NF-e dos fornecedores, direto da SEFAZ)
 
 Menu **Notas de entrada** no painel. Para cada empresa com **certificado A1** cadastrado, o sistema consulta de hora em hora o
