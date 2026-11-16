@@ -7208,6 +7208,215 @@ ACT['dp-rel-csv']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const k=UI.dpRel
 ACT['dp-rel-pdf']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const k=UI.dpRel||'rubricas';const F=dpFolhaDe(e,comp);const d=dpRelDados(k,F);const fmt=(v,i)=>d.num.includes(i)&&typeof v==='number'?brl(v):esc(v);
   janelaPdf(DP_RELS[k]+' '+fmtComp(comp),`<h1>${DP_RELS[k]} · ${fmtComp(comp)}</h1><p class="sub">${esc(e.razao)} · CNPJ ${fmtCNPJ(e.cnpj||'')}${F.fechada?'':' · cálculo provisório'}</p><table><thead><tr>${d.cab.map((c,i)=>`<th class="${d.num.includes(i)?'r':''}">${c}</th>`).join('')}</tr></thead><tbody>${d.linhas.map(l=>`<tr>${l.map((v,i)=>`<td class="${d.num.includes(i)?'r':''}">${fmt(v,i)}</td>`).join('')}</tr>`).join('')}<tr class="tot">${d.total.map((v,i)=>`<td class="${d.num.includes(i)?'r':''}">${fmt(v,i)}</td>`).join('')}</tr></tbody></table>`)};
 /* ==== v28 (fim) ==== */
+/* ==== v29: contábil/fiscal por competência — competência na lateral, Gerar apuração, Central da competência, lançamentos fiscais com acumuladores ==== */
+if(!COLS.includes('lancfiscais'))COLS.push('lancfiscais');
+if(!Array.isArray(S.lancfiscais))S.lancfiscais=[];
+// Acumuladores: classificam cada lançamento (como na Domínio) e dizem o efeito na apuração
+const ACUM=[
+ // saídas e receitas
+ {c:1,t:'saida',n:'Venda de mercadorias (revenda)',cfop:'5102',rec:{anexo:'I'}},
+ {c:2,t:'saida',n:'Venda de mercadorias com ICMS-ST',cfop:'5405',rec:{anexo:'I',st:true}},
+ {c:3,t:'saida',n:'Venda de produtos monofásicos (PIS/Cofins)',cfop:'5102',rec:{anexo:'I',monofasico:true}},
+ {c:4,t:'saida',n:'Venda de produção própria (indústria)',cfop:'5101',rec:{anexo:'II'}},
+ {c:5,t:'saida',n:'Exportação de mercadorias',cfop:'7102',rec:{anexo:'I',exportacao:true}},
+ {c:6,t:'saida',n:'Remessa, transferência ou bonificação (sem receita)',cfop:'5949',rec:null},
+ {c:7,t:'saida',n:'Devolução de compra (sem receita)',cfop:'5202',rec:null},
+ {c:10,t:'servico',n:'Prestação de serviços',rec:{anexo:'SERV'}},
+ {c:11,t:'servico',n:'Prestação de serviços com ISS retido',rec:{anexo:'SERV',issRetido:true}},
+ {c:12,t:'servico',n:'Locação de bens móveis (sem ISS)',rec:{anexo:'III',semIss:true}},
+ {c:13,t:'servico',n:'Serviço com ISS devido a outro município',rec:{anexo:'SERV'},obs:'Informe o município no histórico'},
+ {c:19,t:'saida',n:'Receita não tributada no Simples (não optante)',rec:{naoOptante:true,anexo:'I'}},
+ // entradas
+ {c:101,t:'entrada',n:'Compra para revenda',cfop:'1102'},
+ {c:102,t:'entrada',n:'Compra de matéria-prima / insumos',cfop:'1101'},
+ {c:103,t:'entrada',n:'Material de uso e consumo',cfop:'1556'},
+ {c:104,t:'entrada',n:'Ativo imobilizado',cfop:'1551'},
+ {c:105,t:'entrada',n:'Devolução de venda (abate a receita)',cfop:'1202',rec:{anexo:'I',sinal:-1}},
+ {c:106,t:'entrada',n:'Compra com ICMS-ST',cfop:'1403'},
+ {c:107,t:'entrada',n:'Entrada em bonificação, doação ou remessa',cfop:'1949'},
+ // serviços tomados
+ {c:201,t:'tomado',n:'Serviço tomado de pessoa jurídica'},
+ {c:202,t:'tomado',n:'Cessão de mão de obra / empreitada (INSS 11%)',inss:true},
+ {c:203,t:'tomado',n:'Serviço tomado de profissional autônomo (RPA)',inss:true},
+ // outros documentos
+ {c:301,t:'outro',n:'Energia elétrica',esp:'06',cfop:'1253'},{c:302,t:'outro',n:'Telecomunicações / internet',esp:'21',cfop:'1303'},{c:303,t:'outro',n:'Água e esgoto',esp:'29'},
+ {c:304,t:'outro',n:'Frete / transporte (CT-e)',esp:'57',cfop:'1353'},{c:305,t:'outro',n:'Aluguel de imóvel',esp:'REC'},{c:306,t:'outro',n:'Outras despesas com documento',esp:'REC'},
+];
+const TIPO_LANC={saida:'Saída (NF de venda)',servico:'Serviço prestado',entrada:'Entrada (compra)',tomado:'Serviço tomado',outro:'Outros documentos'};
+const ESPECIES={'55':'NF-e','65':'NFC-e','01':'NF modelo 1/1A','02':'NF de venda a consumidor','NFSE':'NFS-e','RPA':'RPA','57':'CT-e','06':'Conta de energia','21':'Conta de comunicação','22':'Telecomunicação','29':'Conta de água','REC':'Recibo / outros'};
+const ESP_PADRAO={saida:'55',servico:'NFSE',entrada:'55',tomado:'NFSE',outro:'REC'};
+const acumDe=c=>ACUM.find(a=>a.c===+c);
+const RET=[['iss','ISS retido'],['irrf','IRRF'],['pis','PIS'],['cofins','Cofins'],['csll','CSLL'],['inss','INSS']];
+
+/* ---------- efeito na apuração: receitas geradas pelos lançamentos ---------- */
+function sincLanc(l){const e=emp(l.empresaId);if(!e)return;const id='lanc:'+l.id;const comps=new Set(S.receitas.filter(r=>r.docId===id).map(r=>r.comp));
+  S.receitas=S.receitas.filter(r=>r.docId!==id);const a=acumDe(l.acum);const comp=String(l.competencia||l.data).slice(0,7);
+  if(a?.rec&&!l.cancelado&&(+l.valor||0)){const mei=e.regime==='MEI';const sinal=a.rec.sinal||1;
+    let base={};if(mei)base={meiCat:a.t==='servico'?'serv':a.rec.anexo==='II'?'ind':'com',comNota:!['REC'].includes(l.especie)};
+    else{const an=a.rec.anexo==='SERV'?anexoServico(e):a.rec.anexo;base={anexo:an,fatorR:a.t==='servico'&&!!e.fatorR&&['III','V'].includes(an)};['st','monofasico','exportacao','issRetido','semIss','naoOptante'].forEach(k=>{if(a.rec[k])base[k]=true});if(a.t==='servico'&&+l.ret?.iss>0)base.issRetido=true}
+    S.receitas.push({id:uid(),empresaId:e.id,comp,data:l.data,descricao:`${ESPECIES[l.especie]||'Doc.'} ${l.numero||''} · ${l.part?.nome||''} · ${a.n}`.slice(0,160),origem:'lanc',docId:id,...base,valor:r2(sinal*(+l.valor||0)),criadoEm:agora()})}
+  comps.add(comp);comps.forEach(c=>sincFat(e.id,c))}
+
+/* ---------- situação da competência ---------- */
+function stComp(e,comp){
+  const mei=e.regime==='MEI';const sn=e.regime==='SN';const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo===(mei?'DAS-MEI':'DAS'))||(mei?S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&/DAS/.test(x.tipo)):null);
+  const L=snRec(e.id,comp);const fat=receitaMes(e.id,comp);const docs=S.docsaida.filter(d=>d.empresaId===e.id&&String(d.competencia||d.emissao).slice(0,7)===comp).length;
+  const lanc=S.lancfiscais.filter(l=>l.empresaId===e.id&&String(l.competencia||l.data).slice(0,7)===comp).length;
+  let calc=null;if(sn&&(L.length||fat!=null)){try{calc=apurarSN(e,comp).total}catch(x){}}
+  const fech=snFechada(e.id,comp);
+  let k,t,c;
+  if(!sn&&!mei){k='fora';t=nomeRegime(e);c=''}
+  else if(g&&g.status==='paga'){k='paga';t='Guia paga';c='ok'}
+  else if(g&&g.status!=='rascunho'){k='liberada';t='Guia liberada';c='info'}
+  else if(mei){k=g?'apurada':'mei';t=g?'Guia gerada':'DAS-MEI fixo';c=g?'ok':''}
+  else if(g&&calc!=null&&Math.abs((+g.valor||0)-calc)<.01){k='apurada';t='Apurada';c='ok'}
+  else if(g&&calc!=null){k='desatualizada';t='Apuração desatualizada';c='warn'}
+  else if(L.length||fat!=null){k='lancada';t='Receitas lançadas';c='warn'}
+  else{k='vazia';t='Sem movimento lançado';c='crit'}
+  return {k,t,c,g,calc,L:L.length,docs,lanc,fat,fech}}
+function gerarApuracao(e,comp,lote){
+  if(e.regime==='MEI')return {ok:false,msg:'MEI: o DAS-MEI é fixo e sai pelo PGMEI (Controle de obrigações no painel).'};
+  if(e.regime!=='SN')return {ok:false,msg:'Fora do Simples Nacional.'};
+  const L=snRec(e.id,comp);if(!L.length&&receitaMes(e.id,comp)==null)return {ok:false,msg:'Sem receita lançada na competência.'};
+  const a=apurarSN(e,comp);const g0=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo==='DAS');
+  if(g0&&['paga','informada'].includes(g0.status))return {ok:false,msg:'Guia já paga ou com comprovante: valor travado.'};
+  if(g0&&g0.status!=='rascunho'&&lote)return {ok:false,msg:'Guia já liberada ao cliente: atualize individualmente.'};
+  const fazer=()=>{let g=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo==='DAS');
+    if(!g){g={id:uid(),empresaId:e.id,comp,tipo:'DAS',venc:vencPadrao('DAS',comp),status:'rascunho',criadaEm:agora()};S.guias.push(g)}
+    g.valor=a.total;g.apuracao={rbt12:r2(a.rbt12),fatorR:a.usaFatorR?r2(a.fatorR*10000)/10000:null,receita:r2(a.receita),anexos:a.grupos.map(x=>({anexo:x.anexo,receita:r2(x.receita),faixa:x.fx+1,aliq:r2(x.aliq*1e6)/1e6,total:x.total})),tributos:a.tot,em:agora(),por:ME.nome||''}};
+  return {ok:true,valor:a.total,fazer,liberada:!!(g0&&g0.status!=='rascunho'),antes:g0?.valor}}
+ACT['ctb-apurar']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;if(!e)return;const r=gerarApuracao(e,comp,false);if(!r.ok){toast(r.msg,true);return}
+  const ir=()=>{mut('guias',r.fazer,['Apuração','Gerou a apuração '+fmtComp(comp)+' · DAS '+brl(r.valor),e.razao]);toast(`Apuração de ${fmtComp(comp)} gerada: DAS de ${brl(r.valor)} (guia em rascunho, anexe o PGDAS-D e libere).`)};
+  if(r.liberada)confirmar('Atualizar guia já liberada',`A guia DAS de ${fmtComp(comp)} já foi liberada ao cliente com ${brl(r.antes)}. Atualizar para ${brl(r.valor)}? Lembre de anexar o PDF novo do PGDAS-D.`,'Atualizar',ir);else ir()};
+
+/* ---------- card de competência na lateral ---------- */
+function ctbCardComp(){const F=UI.fsn||{};const comp=F.comp||compAtual();const meses=[];for(let i=-1;i<36;i++)meses.push(addMes(compAtual(),-i));
+  const sel=`<select data-sn="comp" aria-label="Competência">${meses.map(c=>`<option value="${c}" ${c===comp?'selected':''}>${fmtComp(c)}</option>`).join('')}</select>`;
+  const e=emp(F.emp);let st='',acao='';
+  if(APP_DP&&e){const r=dpFolhaRec(e.id,comp);st=r?.status==='fechada'?pill('Folha fechada','ok'):pill('Folha aberta','warn');acao=`<a class="btn sm primary" href="#d-folha">Calcular folha</a>`}
+  else if(e){const s=stComp(e,comp);st=pill(s.t,s.c);const pode=podeMod('guias','editar')&&e.regime==='SN'&&!['paga','fora'].includes(s.k);
+    acao=pode?`<button class="btn sm primary" data-act="ctb-apurar">${s.k==='apurada'?'Gerar de novo':'Gerar apuração'}</button>`:''}
+  return `<div class="ctb-comp"><span>Competência <kbd>PgUp</kbd><kbd>PgDn</kbd></span><div class="ctb-comp-sel"><button type="button" class="ctb-seta" data-act="ctb-comp" data-d="-1" aria-label="Anterior">‹</button>${sel}<button type="button" class="ctb-seta" data-act="ctb-comp" data-d="1" aria-label="Próxima">›</button></div>
+   ${comp===compAtual()?'<small>mês corrente</small>':comp===addMes(compAtual(),-1)?'<small>mês anterior · em apuração</small>':''}<div class="ctb-comp-st">${st}</div>${acao}</div>`}
+
+/* ---------- Central da competência ---------- */
+function ctbCentral(){const comp=UI.fsn.comp;const f=UI.fcent||(UI.fcent={q:'',regime:'',st:'',resp:''});const q=normP(f.q);
+  const es=empsBase().filter(e=>e.regime==='SN'||e.regime==='MEI');
+  const L=es.map(e=>({e,s:stComp(e,comp)})).filter(({e,s})=>(!q||normP([e.fantasia,e.razao,e.cnpj,soDig(e.cnpj)].join(' ')).includes(q))&&(!f.regime||e.regime===f.regime)&&(!f.st||s.k===f.st)&&(!f.resp||respIds(e).includes(f.resp)));
+  const cont=k=>es.filter(e=>stComp(e,comp).k===k).length;const sel=UI.centSel||(UI.centSel=new Set());
+  const ops=[['','Todas as situações'],['vazia','Sem movimento lançado'],['lancada','Receitas lançadas (não apuradas)'],['desatualizada','Apuração desatualizada'],['apurada','Apurada'],['liberada','Guia liberada'],['paga','Guia paga'],['mei','MEI']];
+  const resps=[...new Set(es.flatMap(respIds))].map(id=>S.operadores.find(o=>o.id===id)).filter(Boolean);
+  return `${head('Central da competência',`Todas as empresas do Simples e MEI em ${fmtComp(comp)}: o que já tem movimento, o que falta apurar e a situação da guia. Gere as apurações em lote.`,podeMod('guias','editar')?`<button class="btn primary" data-act="cent-lote" ${sel.size?'':'disabled'}>Gerar apuração das selecionadas (${sel.size})</button>`:'')}
+   <div class="crm-kpis">${[['vazia','Sem movimento','crit'],['lancada','A apurar','warn'],['desatualizada','Desatualizadas','warn'],['apurada','Apuradas','ok']].map(([k,t])=>`<button class="kpi" style="text-align:left;cursor:pointer;${f.st===k?'outline:2px solid var(--accent)':''}" data-act="cent-st" data-v="${f.st===k?'':k}"><span class="eyebrow">${t}</span><b>${cont(k)}</b></button>`).join('')}</div>
+   <div class="panel"><div class="actions" style="flex-wrap:wrap;margin-bottom:10px"><input type="search" data-cent="q" placeholder="Buscar empresa ou CNPJ" value="${esc(f.q)}" style="max-width:260px">
+     <select data-cent="regime" style="width:auto"><option value="">Simples e MEI</option><option value="SN" ${f.regime==='SN'?'selected':''}>Simples Nacional</option><option value="MEI" ${f.regime==='MEI'?'selected':''}>MEI</option></select>
+     <select data-cent="st" style="width:auto">${ops.map(([v,t])=>`<option value="${v}" ${f.st===v?'selected':''}>${t}</option>`).join('')}</select>
+     ${resps.length?`<select data-cent="resp" style="width:auto"><option value="">Todos os responsáveis</option>${resps.map(o=>`<option value="${o.id}" ${f.resp===o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>`:''}</div>
+   ${L.length?`<div class="table-wrap"><table><thead><tr><th style="width:28px"><input type="checkbox" data-cent-todos ${L.length&&L.every(x=>sel.has(x.e.id))?'checked':''} aria-label="Selecionar todas"></th><th>Empresa</th><th>Regime</th><th class="r">Notas</th><th class="r">Lanç.</th><th class="r">Receita do mês</th><th class="r">DAS calculado</th><th>Guia</th><th>Situação</th><th></th></tr></thead><tbody>${L.map(({e,s})=>`<tr>
+     <td>${e.regime==='SN'?`<input type="checkbox" data-cent-sel="${e.id}" ${sel.has(e.id)?'checked':''} aria-label="Selecionar">`:''}</td>
+     <td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted mono">${fmtCNPJ(e.cnpj||'')}</div></td><td class="small">${e.regime==='MEI'?'MEI':'SN · Anexo '+esc(e.fatorR?'III/V':e.anexo||'—')}</td>
+     <td class="r num">${s.docs||''}</td><td class="r num">${s.lanc||''}</td><td class="r num">${s.fat!=null?brl(s.fat):'—'}</td><td class="r num">${s.calc!=null?brl(s.calc):e.regime==='MEI'?brl(DAS_MEI[e.meiAtividade||'servicos']):'—'}</td>
+     <td class="small">${s.g?`${brl(s.g.valor)}<div class="muted">${pill(statusGuia(s.g).t,statusGuia(s.g).c)}</div>`:'—'}</td><td>${pill(s.t,s.c)}</td>
+     <td><button class="btn sm" data-act="cent-abrir" data-id="${e.id}">Abrir</button></td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhuma empresa neste filtro.')}</div>`}
+const empsBase=()=>empresasVisiveis().slice().sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
+ACT['cent-st']=el=>{(UI.fcent||(UI.fcent={})).st=el.dataset.v;render()};
+ACT['cent-abrir']=el=>{UI.fsn.emp=el.dataset.id;try{localStorage.setItem('mf-ctb-emp',el.dataset.id)}catch(x){}location.hash='f-apur'};
+document.addEventListener('change',ev=>{const s=ev.target;if(!s.matches)return;
+  if(s.matches('[data-cent]')&&s.tagName==='SELECT'){(UI.fcent||(UI.fcent={}))[s.dataset.cent]=s.value;render()}
+  if(s.matches('[data-cent-sel]')){const S_=UI.centSel||(UI.centSel=new Set());s.checked?S_.add(s.dataset.centSel):S_.delete(s.dataset.centSel);render()}
+  if(s.matches('[data-cent-todos]')){const S_=UI.centSel||(UI.centSel=new Set());document.querySelectorAll('[data-cent-sel]').forEach(c=>s.checked?S_.add(c.dataset.centSel):S_.delete(c.dataset.centSel));render()}});
+document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('input[data-cent]')){(UI.fcent||(UI.fcent={})).q=s.value;clearTimeout(UI._centT);UI._centT=setTimeout(()=>{render();const i=document.querySelector('input[data-cent]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)}});
+ACT['cent-lote']=()=>{const comp=UI.fsn.comp;const ids=[...(UI.centSel||[])];if(!ids.length)return;const ok=[],pul=[];
+  ids.forEach(id=>{const e=emp(id);if(!e)return;const r=gerarApuracao(e,comp,true);if(r.ok)ok.push([e,r]);else pul.push((e.fantasia||e.razao)+': '+r.msg)});
+  if(ok.length)mut('guias',()=>ok.forEach(([e,r])=>r.fazer()),['Apuração','Gerou '+ok.length+' apuração(ões) de '+fmtComp(comp)+' em lote','']);
+  UI.centSel=new Set();render();
+  openModal(mHead('Apuração em lote · '+fmtComp(comp))+`<div class="modal-body"><p><b>${ok.length}</b> apuração(ões) gerada(s)${ok.length?': '+ok.map(([e,r])=>esc(e.fantasia||e.razao)+' ('+brl(r.valor)+')').join(', '):''}.</p>${pul.length?`<p style="margin-top:10px"><b>Não geradas:</b></p><ul class="small">${pul.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:''}<p class="small muted" style="margin-top:10px">As guias ficam em rascunho: anexe o PGDAS-D e libere ao cliente em Controle de obrigações no painel.</p></div><div class="modal-foot"><button class="btn primary" data-act="close-modal">Fechar</button></div>`)};
+
+/* ---------- Lançamentos fiscais ---------- */
+function lancFiltrados(){const F=UI.fsn;const {de,ate}=periodoNf();const f=UI.flanc||(UI.flanc={tipo:'',q:''});const q=normP(f.q||'');
+  return S.lancfiscais.filter(l=>{const c=String(l.competencia||l.data).slice(0,7);return l.empresaId===F.emp&&c>=de&&c<=ate&&(!f.tipo||l.tipo===f.tipo)&&(!q||normP([l.numero,l.part?.nome,l.part?.doc,acumDe(l.acum)?.n,l.hist].join(' ')).includes(q))})
+   .sort((a,b)=>String(a.data).localeCompare(String(b.data))||String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}))}
+function ctbLanc(){const F=UI.fsn;const e=emp(F.emp);const f=UI.flanc||(UI.flanc={tipo:'',q:''});const L=lancFiltrados();const ed=podeMod('guias','editar')&&!snFechada(e.id,F.comp);
+  const tot=t=>L.filter(l=>!t||l.tipo===t).reduce((a,l)=>a+(+l.valor||0),0);const ret=L.reduce((a,l)=>a+RET.reduce((b,[k])=>b+(+l.ret?.[k]||0),0),0);
+  const tabs=[['','Todos'],...Object.entries(TIPO_LANC)];
+  return `${head('Lançamentos fiscais','Notas e documentos digitados, como na escrita fiscal: cada lançamento tem um acumulador que diz se gera receita do Simples, em que anexo e com qual segregação. Os XML importados ficam em Notas de saída e de entrada.',ed?`<button class="btn primary" data-act="lanc-novo">${svg('plus')}Novo lançamento</button>`:'')}
+   <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Saídas e serviços</span><b>${brl(tot('saida')+tot('servico'))}</b></div><div class="kpi"><span class="eyebrow">Entradas e outros</span><b>${brl(tot('entrada')+tot('outro'))}</b></div><div class="kpi"><span class="eyebrow">Serviços tomados</span><b>${brl(tot('tomado'))}</b></div><div class="kpi"><span class="eyebrow">Retenções</span><b>${brl(ret)}</b></div></div>
+   <div class="panel"><div class="panel-head" style="flex-wrap:wrap;gap:8px"><div class="mtabs" role="tablist">${tabs.map(([k,t])=>`<button role="tab" aria-selected="${(f.tipo||'')===k}" data-act="lanc-tipo" data-v="${k}">${t}</button>`).join('')}</div>
+     <input type="search" data-lanc-busca placeholder="Número, participante ou acumulador" value="${esc(f.q||'')}" style="max-width:240px"></div>
+   ${L.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Tipo</th><th>Documento</th><th>Participante</th><th>Acumulador</th><th class="r">Valor</th><th class="r">Retenções</th><th></th></tr></thead><tbody>${L.map(l=>{const a=acumDe(l.acum);const r=RET.reduce((b,[k])=>b+(+l.ret?.[k]||0),0);return `<tr>
+     <td class="num">${fmtData(l.data)}</td><td class="small">${TIPO_LANC[l.tipo]}</td><td class="small">${esc(ESPECIES[l.especie]||l.especie||'')} ${esc(l.numero||'')}${l.serie?'/'+esc(l.serie):''}${l.cfop?`<div class="muted">CFOP ${esc(l.cfop)}</div>`:''}</td>
+     <td>${esc(l.part?.nome||'')}<div class="small muted mono">${l.part?.doc?fmtDoc(l.part.doc):''}</div></td><td class="small">${a?a.c+' · '+esc(a.n):'—'}${a?.rec?`<div>${pill(a.rec.sinal<0?'abate receita':a.rec.naoOptante?'não optante':'gera receita',a.rec.sinal<0?'warn':'ok')}</div>`:''}</td>
+     <td class="r num">${brl(l.valor)}</td><td class="r num">${r?brl(r):''}</td><td><div class="actions" style="flex-wrap:nowrap;justify-content:flex-end"><button class="btn sm" data-act="lanc-editar" data-id="${l.id}">${ed?'Editar':'Ver'}</button>${ed?`<button class="btn sm ghost" data-act="lanc-excluir" data-id="${l.id}">Excluir</button>`:''}</div></td></tr>`}).join('')}</tbody></table></div>`
+    :vazio('Nenhum lançamento no período.',ed?'<button class="btn primary" data-act="lanc-novo">Lançar o primeiro</button>':'')}</div>`}
+ACT['lanc-tipo']=el=>{(UI.flanc||(UI.flanc={})).tipo=el.dataset.v;render()};
+document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-lanc-busca]')){(UI.flanc||(UI.flanc={})).q=s.value;clearTimeout(UI._lancT);UI._lancT=setTimeout(()=>{render();const i=document.querySelector('[data-lanc-busca]');if(i){i.focus();i.setSelectionRange(i.value.length,i.value.length)}},250)}});
+function lancForm(l){const F=UI.fsn;const tipo=l?.tipo||UI.lancTipoNovo||'saida';const ac=ACUM.filter(a=>a.t===tipo);const a0=acumDe(l?.acum)||ac[0];const ult=dpFimMes(F.comp);const d=l?.data||(F.comp===compAtual()?hoje():ult);
+  const v=k=>esc(l?.[k]??'');const ro=podeMod('guias','editar')?'':'disabled';const ret=l?.ret||{};const tom=tipo==='tomado',serv=tipo==='servico';
+  return mHead(l?'Lançamento '+(l.numero||''):'Novo lançamento')+`<form data-form="lanc" data-id="${l?.id||''}" data-preservar><div class="modal-body">
+   <div class="grid-f">
+    <label class="f"><span>Tipo *</span><select name="tipo" data-lanc-tipo ${l?'disabled':''} ${ro}>${Object.entries(TIPO_LANC).map(([k,t])=>`<option value="${k}" ${k===tipo?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="f" style="grid-column:span 2"><span>Acumulador *</span><select name="acum" data-lanc-acum ${ro}>${ac.map(a=>`<option value="${a.c}" ${a.c===a0.c?'selected':''}>${a.c} · ${esc(a.n)}</option>`).join('')}</select></label>
+    <label class="f"><span>Espécie</span><select name="especie" ${ro}>${Object.entries(ESPECIES).map(([k,t])=>`<option value="${k}" ${(l?.especie||a0.esp||ESP_PADRAO[tipo])===k?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="f"><span>Data do documento *</span><input type="date" name="data" value="${esc(d)}" required ${ro}></label>
+    <label class="f"><span>Competência</span><input type="month" name="competencia" value="${esc(l?.competencia||String(d).slice(0,7))}" ${ro}></label>
+    <label class="f"><span>Número</span><input name="numero" value="${v('numero')}" ${ro}></label><label class="f"><span>Série</span><input name="serie" value="${v('serie')}" ${ro}></label>
+    <label class="f"><span>${tipo==='saida'||serv?'CNPJ/CPF do cliente':'CNPJ/CPF do fornecedor/prestador'}</span><input name="partDoc" value="${esc(l?.part?.doc?fmtDoc(l.part.doc):'')}" inputmode="numeric" class="mono" ${ro}></label>
+    <label class="f" style="grid-column:span 2"><span>Nome / razão social</span><input name="partNome" value="${esc(l?.part?.nome||'')}" ${ro}></label>
+    <label class="f"><span>UF</span><input name="uf" maxlength="2" value="${v('uf')}" ${ro}></label>
+    ${tipo==='servico'||tom?'':`<label class="f"><span>CFOP</span><input name="cfop" maxlength="4" inputmode="numeric" value="${esc(l?.cfop||a0.cfop||'')}" data-lanc-cfop ${ro}></label>`}
+    <label class="f"><span>Valor contábil (R$) *</span><input type="number" step="0.01" min="0" name="valor" value="${v('valor')}" required ${ro}></label>
+    ${tipo==='saida'||tipo==='entrada'||tipo==='outro'?`<label class="f"><span>Base ICMS</span><input type="number" step="0.01" min="0" name="bcIcms" value="${v('bcIcms')}" ${ro}></label><label class="f"><span>ICMS</span><input type="number" step="0.01" min="0" name="icms" value="${v('icms')}" ${ro}></label><label class="f"><span>ICMS-ST</span><input type="number" step="0.01" min="0" name="st" value="${v('st')}" ${ro}></label><label class="f"><span>IPI</span><input type="number" step="0.01" min="0" name="ipi" value="${v('ipi')}" ${ro}></label>`:''}
+    ${serv||tom?`<label class="f"><span>Código do serviço (LC 116)</span><input name="codServ" value="${v('codServ')}" placeholder="Ex.: 17.01" ${ro}></label><label class="f"><span>Município do ISS</span><input name="munIss" value="${v('munIss')}" ${ro}></label>`:''}
+   </div>
+   ${serv||tom?`<div class="form-sec"><h3>Retenções${tom?' feitas pela empresa':' sofridas'}</h3><div class="grid-f">${RET.map(([k,t])=>`<label class="f"><span>${t}</span><input type="number" step="0.01" min="0" name="ret_${k}" value="${esc(ret[k]??'')}" data-lanc-ret="${k}" ${ro}></label>`).join('')}</div>
+     ${tom?`<div class="actions" style="margin-top:6px"><button type="button" class="btn sm" data-act="lanc-sugerir">Sugerir retenções</button><span class="small muted">IRRF 1,5%, PIS 0,65%, Cofins 3%, CSLL 1%${acumDe(a0.c)?.inss?' e INSS 11%':''} sobre o valor; o ISS depende do município. Retenção de IRRF ou de PIS/Cofins/CSLL somada até R$ 10 não é feita.</span></div>`:''}</div>`:''}
+   <label class="f full" style="margin-top:8px"><span>Histórico / observação</span><input name="hist" value="${v('hist')}" maxlength="300" ${ro}></label>
+   <p class="small muted" id="lanc-efeito">${efeitoAcum(a0)}</p>
+  </div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button>${podeMod('guias','editar')?'<button class="btn primary">Salvar lançamento</button>':''}</div></form>`}
+function efeitoAcum(a){if(!a)return '';if(a.rec)return a.rec.sinal<0?'Este acumulador abate a receita do Simples no Anexo I (devolução de venda).':a.rec.naoOptante?'Entra como receita não optante: soma na RBT12, fora do DAS.':`Gera receita do Simples no Anexo ${a.rec.anexo==='SERV'?'do serviço da empresa':a.rec.anexo}${['st','monofasico','exportacao','issRetido','semIss'].filter(k=>a.rec[k]).map(k=>' · '+(SEGREG[k]?.rot||k)).join('')}.`;
+  return a.t==='tomado'?'Serviço tomado: entra no relatório de retenções (base da EFD-Reinf e DCTFWeb).':'Não gera receita: entra no Livro de Entradas e nos relatórios.'}
+ACT['lanc-novo']=()=>{UI.lancTipoNovo=UI.flanc?.tipo||'saida';openModal(lancForm(null),true)};
+ACT['lanc-editar']=el=>{const l=S.lancfiscais.find(x=>x.id===el.dataset.id);if(l)openModal(lancForm(l),true)};
+document.addEventListener('change',ev=>{const s=ev.target;if(!s.matches)return;
+  if(s.matches('[data-lanc-tipo]')){UI.lancTipoNovo=s.value;UI.modal=null;openModal(lancForm(null),true)}
+  if(s.matches('[data-lanc-acum]')){const a=acumDe(s.value);const p=document.getElementById('lanc-efeito');if(p)p.textContent=efeitoAcum(a);const c=s.form.querySelector('[data-lanc-cfop]');if(c&&a?.cfop)c.value=a.cfop;const es=s.form.querySelector('[name=especie]');if(es&&a?.esp)es.value=a.esp}});
+ACT['lanc-sugerir']=el=>{const f=el.closest('form');const v=+f.querySelector('[name=valor]').value||0;const a=acumDe(f.querySelector('[name=acum]').value);
+  const r={irrf:r2(v*.015),pis:r2(v*.0065),cofins:r2(v*.03),csll:r2(v*.01),inss:a?.inss?r2(v*.11):0};const csrf=r.pis+r.cofins+r.csll;
+  const set=(k,x)=>{f.querySelector(`[data-lanc-ret="${k}"]`).value=x||''};set('irrf',r.irrf>10?r.irrf:0);['pis','cofins','csll'].forEach(k=>set(k,csrf>10?r[k]:0));set('inss',r.inss>=10?r.inss:0)};
+FORM['lanc']=(fd,form)=>{const F=UI.fsn;const e=emp(F.emp);const id=form.dataset.id;const l0=id&&S.lancfiscais.find(x=>x.id===id);const tipo=l0?.tipo||fd.get('tipo');
+  const valor=r2(+fd.get('valor'));if(!(valor>0)){toast('Informe o valor contábil.',true);return}const data=fd.get('data');if(!data){toast('Informe a data.',true);return}
+  const doc=soDig(fd.get('partDoc'));if(doc&&!(doc.length===11?cpfValido(doc):doc.length===14)){toast('CNPJ/CPF do participante inválido.',true);return}
+  const n=k=>{const x=fd.get(k);return x===''||x==null?null:r2(+x)};const ret={};RET.forEach(([k])=>{const x=n('ret_'+k);if(x)ret[k]=x});
+  const dados={empresaId:e.id,tipo,acum:+fd.get('acum'),especie:fd.get('especie'),data,competencia:fd.get('competencia')||String(data).slice(0,7),numero:String(fd.get('numero')||'').trim(),serie:String(fd.get('serie')||'').trim(),
+    part:{doc,nome:String(fd.get('partNome')||'').trim()},uf:String(fd.get('uf')||'').toUpperCase(),cfop:soDig(fd.get('cfop')||''),valor,bcIcms:n('bcIcms'),icms:n('icms'),st:n('st'),ipi:n('ipi'),codServ:String(fd.get('codServ')||''),munIss:String(fd.get('munIss')||''),ret,hist:String(fd.get('hist')||'').trim()};
+  if(snFechada(e.id,dados.competencia)){toast('A competência '+fmtComp(dados.competencia)+' está fechada.',true);return}
+  mut(['lancfiscais','receitas','faturamento'],()=>{let l=l0;if(l)Object.assign(l,dados,{atualizadoEm:agora()});else{l={id:uid(),...dados,criadoEm:agora(),por:ME.nome||''};S.lancfiscais.push(l)}sincLanc(l)},
+    ['Escrita fiscal',(l0?'Editou':'Lançou')+' '+TIPO_LANC[tipo]+' '+(dados.numero||'')+' · '+brl(valor),e.razao]);closeModal();toast('Lançamento salvo'+(acumDe(dados.acum)?.rec?' e receita atualizada na apuração.':'.'))};
+ACT['lanc-excluir']=el=>{const l=S.lancfiscais.find(x=>x.id===el.dataset.id);if(!l)return;
+  confirmar('Excluir lançamento',`Excluir ${esc(TIPO_LANC[l.tipo])} ${esc(l.numero||'')} de ${brl(l.valor)}? A receita gerada por ele sai da apuração.`,'Excluir',()=>mut(['lancfiscais','receitas','faturamento'],()=>{S.lancfiscais=S.lancfiscais.filter(x=>x!==l);l.cancelado=true;sincLanc(l)},['Escrita fiscal','Excluiu lançamento '+(l.numero||'')+' · '+brl(l.valor),emp(l.empresaId)?.razao||'']),true)};
+
+/* ---------- livros e relatórios incluem os lançamentos ---------- */
+RELS.retencoes={t:'Retenções sobre serviços (tomados e prestados)',ret:true};RELS.lancamentos={t:'Lançamentos fiscais por acumulador',acum:true};
+const dadosRelatorioV29=dadosRelatorio;
+dadosRelatorio=function(k){const R=RELS[k];const F=UI.fsn;const {de,ate}=periodoNf();
+  const LF=S.lancfiscais.filter(l=>{const c=String(l.competencia||l.data).slice(0,7);return l.empresaId===F.emp&&c>=de&&c<=ate}).sort((a,b)=>String(a.data).localeCompare(String(b.data)));
+  if(R.ret){const X=LF.filter(l=>RET.some(([kk])=>+l.ret?.[kk]>0));const lin=X.map(l=>[fmtData(l.data),l.tipo==='tomado'?'Tomado':'Prestado',`${ESPECIES[l.especie]||''} ${l.numero||''}`,(l.part?.nome||'').slice(0,40),l.part?.doc?fmtDoc(l.part.doc):'',brl(l.valor),...RET.map(([kk])=>brl(+l.ret?.[kk]||0)),[xDia(l.data),l.tipo,l.numero,l.part?.nome,l.part?.doc,l.valor,...RET.map(([kk])=>+l.ret?.[kk]||0)]]);
+    const s=i=>lin.reduce((a,x)=>a+x[12][i],0);
+    return {cols:['Data','Tipo','Documento','Participante','CNPJ/CPF','Valor',...RET.map(r=>r[1])],linhas:lin.map(x=>x.slice(0,12)),csv:lin.map(x=>x[12]),total:['Total','','','','',brl(s(5)),...RET.map((r,i)=>brl(s(6+i)))],obs:'Serviços tomados com retenção: base para a EFD-Reinf (R-2010 INSS, R-4020 IRRF/CSRF) e para a DCTFWeb. Prestados: retenções sofridas, compensáveis.'}}
+  if(R.acum){const m={};LF.forEach(l=>{const a=acumDe(l.acum);const g=a?a.c+' · '+a.n:'—';const x=m[g]||(m[g]={g,t:TIPO_LANC[l.tipo],q:0,v:0});x.q++;x.v+=+l.valor||0});const xs=Object.values(m).sort((a,b)=>b.v-a.v);
+    return {cols:['Acumulador','Tipo','Lançamentos','Valor'],linhas:xs.map(x=>[x.g,x.t,x.q,brl(x.v)]),csv:xs.map(x=>[x.g,x.t,x.q,x.v]),total:['Total','',LF.length,brl(xs.reduce((a,x)=>a+x.v,0))]}}
+  const d=dadosRelatorioV29(k);
+  if(R.livro==='saida'){const X=LF.filter(l=>l.tipo==='saida'||l.tipo==='servico');if(!X.length)return d;
+    const novas=X.map(l=>{const c=l.tipo==='servico'?'Serviço':l.cfop||'';const cs=[xDia(l.data),ESPECIES[l.especie]||l.especie,l.serie,l.numero,c,+l.valor||0,+l.bcIcms||0,+l.icms||0,+l.ipi||0];return {l:[fmtData(l.data),ESPECIES[l.especie]||l.especie,l.serie||'',l.numero||'',l.uf||'',c,brl(cs[5]),brl(cs[6]),brl(cs[7]),brl(cs[8])],c:cs}});
+    const tudo=d.linhas.map((l,i)=>({l,c:d.csv[i]})).concat(novas).sort((a,b)=>String(a.c[0]).localeCompare(String(b.c[0])));const s=i=>tudo.reduce((a,x)=>a+(+x.c[i]||0),0);
+    return {...d,linhas:tudo.map(x=>x.l),csv:tudo.map(x=>x.c),total:['Total','','','','','',brl(s(5)),brl(s(6)),brl(s(7)),brl(s(8))]}}
+  if(R.livro==='entrada'){const X=LF.filter(l=>['entrada','outro','tomado'].includes(l.tipo));if(!X.length)return d;
+    const novas=X.map(l=>{const c=l.tipo==='tomado'?'Serviço':l.cfop||'—';const cs=[xDia(l.data),l.serie,l.numero,l.part?.nome,c,+l.valor||0,+l.bcIcms||0,+l.icms||0];return {l:[fmtData(l.data),ESPECIES[l.especie]||l.especie,l.serie||'',l.numero||'',(l.part?.nome||'').slice(0,40),c,brl(cs[5]),brl(cs[6]),brl(cs[7])],c:cs}});
+    const tudo=d.linhas.map((l,i)=>({l,c:d.csv[i]})).concat(novas).sort((a,b)=>String(a.c[0]).localeCompare(String(b.c[0])));const s=i=>tudo.reduce((a,x)=>a+(+x.c[i]||0),0);
+    return {...d,linhas:tudo.map(x=>x.l),csv:tudo.map(x=>x.c),total:['Total','','','','','',brl(s(5)),brl(s(6)),brl(s(7))]}}
+  return d};
+/* ==== v29 (fim) ==== */
+
 
 /* ==== v27: Meu Fiscal Contábil (contabil.omeufiscal.com.br) — escrituração separada do painel, mesmo login e mesmo banco ==== */
 const URL_CONTABIL=String((window.MF&&MF.contabilUrl)||'https://contabil.omeufiscal.com.br').replace(/\/$/,'');
@@ -7226,14 +7435,15 @@ if(APP_SIS){
   const MODS=[['fiscal','Escrita Fiscal',URL_CONTABIL+'/escrita'],['contabil','Contabilidade',null],['folha','Folha de Pagamento',URL_DP+'/folha'],['anuais','Obrigações anuais',null]];
   const MOD_ATIVO=APP_DP?'folha':'fiscal';
   const NAV_FISCAL=[
-    ['Movimento',[['f-saidas','Notas fiscais de saída','upload','Importação de XML (NF-e, NFC-e, NFS-e), receita por CFOP e CST'],['f-entradas','Notas fiscais de entrada','filetext','Busca automática na SEFAZ e XML dos fornecedores']]],
+    ['Competência',[['f-central','Central da competência','checksq','Todas as empresas no mês: movimento, apuração e guia, com apuração em lote']]],
+    ['Movimento',[['f-saidas','Notas fiscais de saída','upload','Importação de XML (NF-e, NFC-e, NFS-e), receita por CFOP e CST'],['f-entradas','Notas fiscais de entrada','filetext','Busca automática na SEFAZ e XML dos fornecedores'],['f-lanc','Lançamentos fiscais','receipt','Saídas, serviços, entradas, serviços tomados com retenções e outros documentos, com acumuladores']]],
     ['Apuração',[['f-apur','Simples Nacional e MEI','calc','Receitas por anexo, RBT12, Fator R e DAS']]],
     ['Relatórios',[['f-rel','Livros e relatórios','chart','Livros de saídas e entradas, resumos e base do PGDAS-D']]],
   ];
   const NAV_F=APP_DP?NAV_DP:NAV_FISCAL;
   const F_VIEWS=NAV_F.flatMap(g=>g[1].map(i=>i[0]));
   const V_PADRAO=F_VIEWS[0];
-  const COM_PERIODO=APP_DP?[]:['f-saidas','f-entradas','f-rel'];
+  const COM_PERIODO=APP_DP?[]:['f-saidas','f-entradas','f-rel','f-lanc'];
   const empsCtb=()=>empresasVisiveis().slice().sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
   function ctbEstado(){const es=empsCtb();const F=UI.fsn||(UI.fsn={emp:null,comp:addMes(compAtual(),APP_DP?0:-1)});
     if(!F.comp)F.comp=addMes(compAtual(),APP_DP?0:-1);
@@ -7255,9 +7465,9 @@ if(APP_SIS){
     return `<div class="ctb-ctx">
       <div class="ctb-campo ctb-emp"><span>Empresa <kbd>F8</kbd></span><button type="button" class="ctb-emp-btn" data-act="ctb-trocar" title="Trocar empresa (F8)">${e?`<b>${esc(e.fantasia||e.razao)}</b><small>${esc(e.razao&&e.fantasia&&e.razao!==e.fantasia?e.razao+' · ':'')}${fmtCNPJ(e.cnpj||'')}</small>`:'<b>Selecione a empresa</b>'}</button></div>
       ${e?`<div class="ctb-campo"><span>Regime</span><b class="ctb-val">${esc(nomeRegime(e))}${e.fatorR?' · Fator R':''}</b></div>`:''}
-      <div class="ctb-campo"><span>${per?'Período':'Competência'} <kbd>PgUp</kbd><kbd>PgDn</kbd></span><div class="ctb-per"><button type="button" class="ctb-seta" data-act="ctb-comp" data-d="-1" aria-label="Competência anterior">‹</button>${selMes('data-sn="comp"',F.comp)}${per?`<em>até</em>${selMes('data-nf="ate"',UI.fnf.ate)}`:''}<button type="button" class="ctb-seta" data-act="ctb-comp" data-d="1" aria-label="Próxima competência">›</button></div></div>
+      ${per?`<div class="ctb-campo"><span>Período</span><div class="ctb-per"><em>de</em><b class="ctb-val" style="padding:0 4px">${fmtComp(F.comp)}</b><em>até</em>${selMes('data-nf="ate"',UI.fnf.ate)}</div></div>`:''}
     </div>`}
-  function ctbMenu(){return `<aside class="ctb-nav" aria-label="${APP_DP?'Folha de Pagamento':'Escrita Fiscal'}">${NAV_F.map(([g,its])=>`<div class="ctb-grp"><span>${g}</span>${its.map(([v,t,ic,dica])=>`<a href="#${v}" title="${esc(dica)}" ${UI.view===v?'aria-current="page"':''}>${svg(ic)}<span>${t}</span></a>`).join('')}</div>`).join('')}
+  function ctbMenu(){return `<aside class="ctb-nav" aria-label="${APP_DP?'Folha de Pagamento':'Escrita Fiscal'}">${ctbCardComp()}${NAV_F.map(([g,its])=>`<div class="ctb-grp"><span>${g}</span>${its.map(([v,t,ic,dica])=>`<a href="#${v}" title="${esc(dica)}" ${UI.view===v?'aria-current="page"':''}>${svg(ic)}<span>${t}</span></a>`).join('')}</div>`).join('')}
     <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>${APP_DP?'Férias, 13º salário, rescisões e eSocial/DCTFWeb entram aqui, uma de cada vez.':'Contabilidade e obrigações anuais entram aqui, uma de cada vez.'}</p></div></aside>`}
   function ctbStatus(){const F=UI.fsn||{};const e=emp(F.emp);
     const txt=MODO!=='api'?'Modo local':MF.estado==='online'?'Tempo real · conectado':MF.estado==='reconectando'?'Reconectando…':'Conectando…';
@@ -7290,6 +7500,7 @@ if(APP_SIS){
     if(UI.view==='a-perfil')return conteudoV27();
     if(!F_VIEWS.includes(UI.view))UI.view=V_PADRAO;
     if(APP_DP)return dpConteudo();
+    if(UI.view==='f-central')return podeMod('guias','ver')?ctbCentral():vazio('Seu acesso não inclui a escrita fiscal.');
     if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui a escrita fiscal. Peça ao administrador do escritório para liberar o módulo "Apuração, guias e notas".');
     const F=ctbEstado();const e=emp(F.emp);
     if(!e)return vazio('Nenhuma empresa ativa na carteira. As empresas são cadastradas no painel contábil.',`<a class="btn primary" href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Abrir o painel</a>`);
@@ -7298,6 +7509,7 @@ if(APP_SIS){
     if(UI.view==='f-apur'){UI.snAba='apur';return simples?aSimples():foraSN('Apuração do Simples Nacional')}
     if(UI.view==='f-saidas'){UI.snAba='notas';return simples?aSimplesAba():foraSN('Notas fiscais de saída')}
     if(UI.view==='f-rel'){UI.snAba='rel';return simples?aSimplesAba():foraSN('Livros e relatórios')}
+    if(UI.view==='f-lanc')return ctbLanc();
     if(UI.view==='f-entradas'){const f=UI.fnfe||(UI.fnfe={});f.emp=e.id;f.mes='';return ctbEntradas()}
     return conteudoV27();
   };
@@ -7346,6 +7558,10 @@ kbd{font-family:var(--f-code);font-size:9.5px;font-weight:400;letter-spacing:0;t
 .ctb-seta{width:30px;height:32px;border:1px solid var(--line-strong);border-radius:7px;background:#fff;font-size:18px;line-height:1;cursor:pointer;color:var(--ink)}.ctb-seta:hover{border-color:var(--accent);color:var(--accent)}
 .ctb-corpo{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:0}
 .ctb-nav{background:#fff;border-right:1px solid var(--line);padding:14px 10px 24px;display:flex;flex-direction:column;gap:16px}
+.ctb-comp{display:flex;flex-direction:column;gap:6px;padding:12px;border:1px solid var(--line-strong);border-radius:10px;background:linear-gradient(180deg,#F8FAFC,#fff)}
+.ctb-comp>span{font-size:10.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:600;display:flex;gap:4px;align-items:center}
+.ctb-comp-sel{display:flex;gap:4px;align-items:center}.ctb-comp-sel select{flex:1;min-width:0;font-weight:600;font-size:14px;padding:6px 8px}.ctb-comp small{font-size:11px;color:var(--muted)}
+.ctb-comp-st .pill{font-size:11px}.ctb-comp .btn{justify-content:center}
 .ctb-grp{display:flex;flex-direction:column;gap:2px}.ctb-grp>span{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:600;padding:0 10px 4px}
 .ctb-grp a{display:flex;align-items:center;gap:9px;padding:7px 10px;border-radius:7px;color:var(--ink);text-decoration:none;font-size:13px;font-weight:500}
 .ctb-grp a svg{width:17px;height:17px;color:var(--muted);flex-shrink:0;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}.ctb-grp a:hover{background:var(--surface-2)}
@@ -7365,7 +7581,7 @@ kbd{font-family:var(--f-code);font-size:9.5px;font-weight:400;letter-spacing:0;t
 @media (max-width:900px){
   .ctb-corpo{grid-template-columns:minmax(0,1fr)}
   .ctb-nav{position:static;height:auto;flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px 10px;gap:4px}
-  .ctb-grp{flex-direction:row;gap:4px}.ctb-grp>span,.ctb-breve{display:none}.ctb-grp a{white-space:nowrap}
+  .ctb-grp{flex-direction:row;flex-wrap:wrap;gap:4px}.ctb-grp>span,.ctb-breve{display:none}.ctb-nav{flex-wrap:wrap}.ctb-comp{flex:1 1 100%;flex-direction:row;flex-wrap:wrap;align-items:center}.ctb-grp a{white-space:nowrap}
   .ctb-ctx{position:static}.ctb-emp-btn{min-width:0;width:100%}.ctb-emp{flex:1 1 100%}
   .ctb-mods{display:none}.ctb-atalhos{display:none}.ctb-usr a[href='#a-perfil']{display:none}.ctb-top{gap:12px;padding:0 12px}.ctb-status>span:not(.conn){display:none}.ctb .content{padding:14px 16px 40px}
   .ctb-op{grid-template-columns:minmax(0,1fr) auto}.ctb-op span:last-child{display:none}

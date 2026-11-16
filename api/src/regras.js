@@ -6,7 +6,7 @@
 
 export const COLECOES = ['config', 'operadores', 'empresas', 'faturamento', 'despesas', 'guias', 'documentos', 'checklist', 'obrigacoes',
   'fechamentos', 'funcionarios', 'folhas', 'admissoes', 'notas', 'tomadores', 'servicos', 'certificados', 'tickets', 'conversas', 'cnds',
-  'ecac', 'faturas', 'consentimentos', 'auditoria', 'catalogo', 'regimes', 'leads', 'lancamentos', 'docsinternos', 'contatos', 'parceiros', 'nfentrada', 'receitas', 'docsaida', 'dpmov', 'dpfolhas'];
+  'ecac', 'faturas', 'consentimentos', 'auditoria', 'catalogo', 'regimes', 'leads', 'lancamentos', 'docsinternos', 'contatos', 'parceiros', 'nfentrada', 'receitas', 'docsaida', 'dpmov', 'dpfolhas', 'lancfiscais'];
 import { MODULO_DA_COLECAO, SEMPRE_LEGIVEIS, pode } from './permissoes.js';
 
 // Coleções que existem para o escritório inteiro (sem empresa)
@@ -14,7 +14,7 @@ const GLOBAIS = new Set(['config', 'operadores', 'auditoria', 'catalogo', 'regim
 // O cliente nunca recebe estas coleções
 // docsinternos: documentos que a equipe anexa no cadastro do cliente para uso interno dos departamentos
 // dpmov/dpfolhas: lançamentos e cálculo da folha (o cliente recebe os holerites publicados em "folhas")
-const OCULTAS_CLIENTE = new Set(['operadores', 'auditoria', 'catalogo', 'regimes', 'leads', 'docsinternos', 'contatos', 'dpmov', 'dpfolhas']);
+const OCULTAS_CLIENTE = new Set(['operadores', 'auditoria', 'catalogo', 'regimes', 'leads', 'docsinternos', 'contatos', 'dpmov', 'dpfolhas', 'lancfiscais']);
 
 /*
  * Permissões do cliente por coleção.

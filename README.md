@@ -315,6 +315,16 @@ A escrituração fica num terceiro site, separado do painel. Ele usa o mesmo log
 3. Com o domínio ativo na Cloudflare, abra **Worker → Settings → Domains & Routes → Add → Custom domain** e informe `contabil.omeufiscal.com.br`.
 4. O login é por domínio. Entre uma vez com o mesmo e-mail e senha do painel.
 
+### Competência, apuração e lançamentos (sistema contábil)
+
+- **Competência na lateral:** um cartão mostra o mês (‹ › ou PgUp/PgDn), a situação e o botão **Gerar apuração**.
+  - Situações: sem movimento, receitas lançadas, apurada, desatualizada, guia liberada ou paga.
+  - O botão calcula o DAS e cria ou atualiza a guia em rascunho, com a memória da apuração.
+- **Central da competência:** todas as empresas do Simples e MEI no mês, com notas, lançamentos, receita, DAS calculado e situação da guia. Filtros por busca, regime, situação e responsável. Gera a apuração em lote das selecionadas; guias já liberadas ou pagas não são alteradas no lote.
+- **Lançamentos fiscais** (coleção `lancfiscais`): saídas, serviços prestados, entradas, serviços tomados e outros documentos (energia, telecom, água, CT-e, aluguel). Cada lançamento usa um **acumulador** com código, como na Domínio, que diz se gera receita do Simples, em qual anexo e com qual segregação (ST, monofásico, exportação, ISS retido, locação sem ISS, não optante). A devolução de venda abate a receita.
+- **Serviços tomados:** retenções de ISS, IRRF, PIS, Cofins, CSLL e INSS, com o botão "Sugerir retenções" (1,5% / 4,65% / 11%, sem reter quando dá até R$ 10).
+- **Livros e relatórios:** os lançamentos entram nos Livros de Saídas e de Entradas. Há dois relatórios novos: "Retenções sobre serviços", base da EFD-Reinf e da DCTFWeb, e "Lançamentos por acumulador".
+
 ## Departamento Pessoal (`dp.omeufiscal.com.br`)
 
 O DP é o quarto site e usa o mesmo casco do sistema contábil: módulos no topo (Escrita Fiscal ↔ Folha de Pagamento), empresa e competência fixas, **F8** e **PgUp/PgDn**. O login, o banco e as permissões são os mesmos do painel. As telas exigem o módulo "Demandas, admissões e folha".
