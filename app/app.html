@@ -7105,7 +7105,7 @@ function dpFolhaPg(e,comp){const F=dpFolhaDe(e,comp);const ed=dpEd();const rec=F
   const st=F.fechada?pill('Fechada em '+fmtData(String(rec.fechadaEm).slice(0,10)),'ok'):pill('Aberta · cálculo ao vivo','warn');
   const acoes=[F.L.length?`<button class="btn" data-act="dp-holerites">${svg('download')}Holerites (PDF)</button><button class="btn" data-act="dp-resumo-pdf">${svg('download')}Resumo da folha</button>`:'',
     ed&&F.L.length?(F.fechada?`<button class="btn" data-act="dp-publicar">${svg('upload')}${rec.publicadaEm?'Publicar de novo':'Publicar holerites no portal'}</button><button class="btn ghost" data-act="dp-reabrir">Reabrir</button>`:`<button class="btn primary" data-act="dp-fechar">Fechar folha</button>`):''].join('');
-  const pt=F.patronal;const venc=addMes(comp,1)+'-20';
+  const pt=F.patronal;const venc=vencPadrao('FGTS',comp);
   return `${head('Cálculo da folha',`Folha de ${fmtComp(comp)} com as tabelas de ${DP26.ano}: INSS progressivo, IRRF com a redução da Lei 15.270/2025, FGTS, salário-família, horas extras com DSR, faltas e vale-transporte.`,acoes)}
    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${st}${rec?.publicadaEm?pill('Holerites no portal desde '+fmtData(String(rec.publicadaEm).slice(0,10)),'info'):''}</div>
    ${F.avisos.map(t=>`<div class="banner warn" style="display:block">${esc(t)}</div>`).join('')}
@@ -7120,7 +7120,7 @@ function dpFolhaPg(e,comp){const F=dpFolhaDe(e,comp);const ed=dpEd();const rec=F
     <div class="table-wrap"><table><thead><tr><th>Guia</th><th>Composição</th><th>Vencimento</th><th class="r">Valor</th></tr></thead><tbody>
      <tr><td><b>FGTS Digital</b></td><td class="small">${pct(DP26.fgts)} sobre a remuneração (aprendiz ${pct(DP26.fgtsAprendiz)})</td><td class="num">${fmtData(venc)}</td><td class="r num"><b>${brl(F.fgts)}</b></td></tr>
      <tr><td><b>INSS (DCTFWeb)</b></td><td class="small">Segurados ${brl(F.inss)}${pt.total?` + patronal ${brl(pt.total)}`:''}${F.salFamilia?` − salário-família ${brl(F.salFamilia)}`:''}</td><td class="num">${fmtData(venc)}</td><td class="r num"><b>${brl(r2(F.inss+pt.total-F.salFamilia))}</b></td></tr>
-     <tr><td><b>IRRF sobre salários</b></td><td class="small">Código 0561 (trabalho assalariado e pró-labore)</td><td class="num">${fmtData(venc)}</td><td class="r num"><b>${brl(F.irrf)}</b></td></tr></tbody></table></div>
+     <tr><td><b>IRRF sobre salários</b></td><td class="small">Código 0561 · desde mai/2023 vai no mesmo DARF da DCTFWeb</td><td class="num">${fmtData(venc)}</td><td class="r num"><b>${brl(F.irrf)}</b></td></tr></tbody></table></div>
     <p class="small muted">${esc(pt.obs)} ${pt.total?`CPP ${brl(pt.cpp)}${pt.rat?' · RAT×FAP '+brl(pt.rat):''}${pt.terc?' · terceiros '+brl(pt.terc):''}.`:''} Vencimentos no dia 20 do mês seguinte: antecipe se cair em dia sem expediente bancário. Confira com o eSocial e a DCTFWeb antes de emitir.</p>
     <p class="small muted">Folha para o Fator R (remunerações + FGTS + contribuição patronal): <b>${brl(F.fatorR)}</b>. Depois de fechada, ela entra sozinha no cálculo do Fator R no sistema contábil.</p></div>`:''}`}
 function dpHoleriteHtml(e,comp,x,pdf){const P=x.rubricas.filter(r=>r.tipo==='P'),D=x.rubricas.filter(r=>r.tipo==='D');const n=Math.max(P.length,D.length);
@@ -8083,6 +8083,52 @@ const dpRelDadosV32=dpRelDados;dpRelDados=function(k,F){const L=F.L;
   if(k==='vale'){const X=L.map(x=>[x.nome,fmtCPF(x.cpf),x.banco,x.pix,x.rubricas.filter(r=>r.cod==='230').reduce((a,r)=>a+r.valor,0)]).filter(x=>x[4]);return {cab:['Empregado','CPF','Banco','PIX','Vale'],num:[4],linhas:X,total:['Total','','','',r2(X.reduce((a,x)=>a+x[4],0))]}}
   return dpRelDadosV32(k,F)};
 /* ==== v32b (fim) ==== */
+/* ==== v33: fechamento da folha com confirmação, guias e fila de transmissão ==== */
+function dpGuiasDaFolha(e,comp,F){const fgts=r2((F.fgts||0)+(F.fgtsEventos||0));const inss=r2((F.inss||0)+(F.inssEventos||0)+(F.patronal?.total||0)-(F.salFamilia||0));const irrf=r2((F.irrf||0)+(F.irrfEventos||0));
+  const G=[];if(fgts>0)G.push({tipo:'FGTS',nome:'FGTS Digital (GFD)',valor:fgts,memoria:{fgtsFolha:F.fgts||0,fgtsEventos:F.fgtsEventos||0}});
+  if(inss+irrf>0)G.push({tipo:'DCTFWeb',nome:'DARF DCTFWeb (INSS + IRRF)',valor:r2(inss+irrf),memoria:{inssSegurados:r2((F.inss||0)+(F.inssEventos||0)),inssPatronal:F.patronal?.total||0,salarioFamilia:F.salFamilia||0,irrf}});
+  return G.map(g=>({...g,venc:vencPadrao(g.tipo,comp)}))}
+function dpGerarGuias(e,comp,F){const G=dpGuiasDaFolha(e,comp,F);const res=[];
+  G.forEach(x=>{let g=S.guias.find(y=>y.empresaId===e.id&&y.comp===comp&&y.tipo===x.tipo&&y.origem==='folha');
+    if(g&&!['rascunho'].includes(g.status)){res.push([x.nome,'mantida (já '+g.status+')']);return}
+    if(!g){g={id:uid(),empresaId:e.id,comp,tipo:x.tipo,depto:'Pessoal',status:'rascunho',arquivo:null,origem:'folha',criadaEm:agora()};S.guias.push(g)}
+    Object.assign(g,{valor:x.valor,venc:x.venc,memoria:x.memoria,atualizadaEm:agora()});res.push([x.nome,brl(x.valor)+' · vence '+fmtData(x.venc)])});
+  return res}
+function dpTransmissao(F){const n=F.L.length,soc=F.L.filter(x=>x.vinculo==='socio').length;
+  return {status:'fila',em:agora(),eventos:[['S-1200','Remuneração',n],['S-1210','Pagamentos',n],['S-1299','Fechamento dos periódicos',1],['DCTFWeb','Declaração (gerada pelo eSocial)',1]],motivo:'Conexão com o eSocial ainda não configurada (certificado digital / Integra Contador).',socios:soc}}
+ACT['dp-recalc']=()=>{render();toast('Folha recalculada com os lançamentos atuais.')};
+ACT['dp-fechar']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const F=calcFolha(e,comp);if(!F.L.length){toast('Ninguém na folha desta competência.',true);return}
+  const conf=F.conferencia||[];const crit=conf.filter(x=>x[0]==='crit');const G=dpGuiasDaFolha(e,comp,F);
+  UI._confirmCb=null;openModal(mHead('Fechar a folha de '+fmtComp(comp)+'?')+`<form data-form="dp-fechar"><div class="modal-body">
+   <p style="margin-top:0">Tem certeza? Ao fechar, os valores ficam gravados, os lançamentos do mês travam e a folha passa a valer para o Fator R e para a contabilidade.</p>
+   <div class="table-wrap"><table><tbody><tr><td>Pessoas</td><td class="r num">${F.L.length}</td></tr><tr><td>Líquido a pagar</td><td class="r num"><b>${brl(F.liquido)}</b></td></tr>${G.map(g=>`<tr><td>${esc(g.nome)}<div class="small muted">vence ${fmtData(g.venc)}</div></td><td class="r num"><b>${brl(g.valor)}</b></td></tr>`).join('')}</tbody></table></div>
+   ${crit.length?`<div class="banner" style="display:block;margin-top:10px;border-color:var(--crit);color:var(--crit)"><b>${crit.length} pendência(s) crítica(s):</b><ul style="margin:6px 0 0;padding-left:18px">${crit.map(x=>'<li>'+esc(x[1])+'</li>').join('')}</ul><label class="chk" style="margin-top:8px"><input type="checkbox" name="ciente" required> Conferi e quero fechar mesmo assim</label></div>`:''}
+   <div style="display:flex;flex-direction:column;gap:6px;margin-top:12px"><label class="chk"><input type="checkbox" name="guias" checked> Gerar as guias (FGTS e DARF DCTFWeb) em rascunho no módulo de Guias</label>
+   <label class="chk"><input type="checkbox" name="transmitir" checked> Enviar ao eSocial (S-1200, S-1210 e S-1299) e DCTFWeb</label>
+   <p class="small muted" style="margin:0 0 0 24px">A conexão com o eSocial ainda não está configurada: os eventos ficam na fila de transmissão e saem assim que o certificado for ligado. Até lá, transmita pelo seu sistema/portal e anexe as guias oficiais.</p></div>
+  </div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Sim, fechar a folha</button></div></form>`,true)};
+FORM['dp-fechar']=fd=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const F=calcFolha(e,comp);let res=[];const tr=fd.get('transmitir')?dpTransmissao(F):null;
+  mut(['dpfolhas','guias'],()=>{let r=dpFolhaRec(e.id,comp);if(!r){r={id:uid(),empresaId:e.id,comp};S.dpfolhas.push(r)}Object.assign(r,{status:'fechada',calc:F,fechadaEm:agora(),fechadaPor:ME.nome||''});if(tr)r.transmissao=tr;
+    if(fd.get('guias'))res=dpGerarGuias(e,comp,F)},['Pessoal','Fechou a folha '+fmtComp(comp)+' · líquido '+brl(F.liquido)+(fd.get('guias')?' · guias geradas':''),e.razao]);
+  closeModal();toast('Folha fechada.'+(res.length?' Guias: '+res.map(x=>x[0]+' '+x[1]).join(' · '):'')+(tr?' Eventos do eSocial na fila de transmissão.':''))};
+ACT['dp-guias-pdf']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const F=dpFolhaDe(e,comp);const G=dpGuiasDaFolha(e,comp,F);
+  janelaPdf('Guias da folha '+fmtComp(comp),`<h1>Demonstrativo de encargos da folha</h1><p class="sub">${esc(e.razao)} · CNPJ ${fmtCNPJ(e.cnpj||'')} · competência ${fmtComp(comp)}</p>
+   <table><thead><tr><th>Guia</th><th>Composição</th><th class="r">Vencimento</th><th class="r">Valor</th></tr></thead><tbody>${G.map(g=>`<tr><td>${esc(g.nome)}</td><td class="small">${Object.entries(g.memoria).filter(([,v])=>v).map(([k,v])=>({fgtsFolha:'FGTS da folha',fgtsEventos:'FGTS de férias/13º/rescisão',inssSegurados:'INSS dos segurados',inssPatronal:'INSS patronal/RAT/terceiros',salarioFamilia:'(−) salário-família',irrf:'IRRF'}[k]||k)+' '+brl(v)).join('<br>')}</td><td class="r">${fmtData(g.venc)}</td><td class="r"><b>${brl(g.valor)}</b></td></tr>`).join('')}</tbody></table>
+   <p class="sub">Valores apurados pela folha. A guia oficial é emitida no FGTS Digital (GFD) e na DCTFWeb (DARF) depois da transmissão ao eSocial.</p>`)};
+ACT['dp-trans-ok']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const r=dpFolhaRec(e.id,comp);if(!r?.transmissao)return;
+  confirmar('Marcar como transmitido','Confirma que os eventos desta folha já foram transmitidos ao eSocial e a DCTFWeb foi encerrada por fora do sistema?','Marcar transmitido',()=>mut('dpfolhas',()=>{r.transmissao={...r.transmissao,status:'manual',transmitidoEm:agora(),por:ME.nome||''}},['Pessoal','Marcou a folha '+fmtComp(comp)+' como transmitida',e.razao]))};
+const dpFolhaPgV33=dpFolhaPg;dpFolhaPg=function(e,comp){let h=dpFolhaPgV33(e,comp);const r=dpFolhaRec(e.id,comp);
+  h=h.replace('<button class="btn primary" data-act="dp-fechar">Fechar folha</button>','<button class="btn" data-act="dp-recalc">Calcular</button><button class="btn primary" data-act="dp-fechar">Fechar folha</button>');
+  if(r?.status==='fechada'){const T=r.transmissao;const G=S.guias.filter(g=>g.empresaId===e.id&&g.comp===comp&&g.origem==='folha');
+    const painel=`<div class="panel"><div class="panel-head"><h2>Fechamento</h2><div class="actions"><button class="btn sm" data-act="dp-guias-pdf">Demonstrativo das guias (PDF)</button>${G.length?'<a class="btn sm" href="'+(MF.painelUrl||'')+'/admin/dashboard#a-guias" target="_blank" rel="noopener">Abrir no módulo de Guias ↗</a>':''}</div></div>
+     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px"><div><span class="eyebrow">Guias</span>${G.length?`<ul class="small" style="padding-left:18px;margin:6px 0">${G.map(g=>`<li>${g.tipo==='FGTS'?'FGTS Digital (GFD)':'DARF DCTFWeb'} · <b>${brl(g.valor)}</b> · vence ${fmtData(g.venc)} · ${pill(g.status,g.status==='paga'?'ok':g.status==='liberada'?'info':'warn')}</li>`).join('')}</ul><p class="small muted">Anexe a guia oficial e libere ao cliente no módulo de Guias.</p>`:'<p class="small muted">Nenhuma guia gerada no fechamento.</p>'}</div>
+     <div><span class="eyebrow">Transmissão</span>${!T?'<p class="small muted">Não enviada no fechamento.</p>':T.status==='fila'?`<p class="small" style="margin:6px 0">${pill('Na fila','warn')} ${T.eventos.map(x=>x[0]+(x[2]>1?' ('+x[2]+')':'')).join(', ')}</p><p class="small muted">${esc(T.motivo)}</p>${dpEd()?'<button class="btn sm" data-act="dp-trans-ok">Já transmiti por fora</button>':''}`:`<p class="small" style="margin:6px 0">${pill('Transmitido','ok')} em ${fmtData(String(T.transmitidoEm).slice(0,10))}${T.status==='manual'?' (informado manualmente por '+esc(T.por||'')+')':''}</p>`}</div></div></div>`;
+    h=h.replace('<div class="crm-kpis">',painel+'<div class="crm-kpis">')}
+  return h};
+const ctbCardCompV33=ctbCardComp;ctbCardComp=function(){let h=ctbCardCompV33();if(!APP_DP)return h;const e=emp(UI.fsn?.emp);if(!e)return h;const comp=UI.fsn.comp||compAtual();const r=dpFolhaRec(e.id,comp);
+  if(r?.status!=='fechada'&&dpEd())h=h.replace('<a class="btn sm primary" href="#d-folha">Calcular folha</a>','<div style="display:flex;gap:6px"><a class="btn sm" href="#d-folha">Calcular</a><button class="btn sm primary" data-act="dp-fechar">Fechar folha</button></div>');
+  return h};
+/* ==== v33 (fim) ==== */
 
 
 

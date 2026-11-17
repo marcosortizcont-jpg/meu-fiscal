@@ -18,6 +18,13 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### Fechamento da folha (DP)
+
+- "Fechar folha" fica ao lado de "Calcular" (na tela da folha e no card de competência) e pede confirmação com o resumo: líquido, guias e pendências críticas (estas exigem marcar "Conferi").
+- Ao fechar, gera em rascunho no módulo de Guias (origem `folha`): **FGTS Digital (GFD)** e **DARF DCTFWeb** (INSS segurados + patronal − salário-família + IRRF, que desde mai/2023 vai na DCTFWeb). Vencimento dia 20, antecipado se não for dia útil. Fechar de novo atualiza os rascunhos; guias já liberadas/pagas não são alteradas.
+- "Enviar ao eSocial" põe S-1200, S-1210, S-1299 e a DCTFWeb na fila de transmissão (`dpfolhas.transmissao`). A transmissão automática depende do certificado / Integra Contador; até lá há o botão "Já transmiti por fora".
+- Demonstrativo das guias em PDF.
+
 ### API em domínio próprio
 
 Os sites repassam `/api/*` para **https://api.omeufiscal.com.br** (domínio próprio no Render; CNAME `api` → `meufiscal-api.onrender.com` no Cloudflare, *DNS only*). O endereço `*.onrender.com` passou a exigir verificação "Confirme que é humano" (HTTP 429) para as chamadas vindas dos Workers, o que derrubava o login.
