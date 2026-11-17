@@ -18,6 +18,20 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### Escrita fiscal: proteções e atalhos do analista
+
+- **Competência travada** (encerrada ou com DAS liberado/pago): notas e cancelamentos que chegam depois ficam **retidos** (guardados, fora da receita) até o analista decidir "Incluir" (soma à receita e a guia aparece como divergente) ou "Descartar". Lançamento manual em mês travado pede confirmação.
+- **Receita informada nunca é sobrescrita** pelas notas (`faturamento.origem` ≠ `lancamentos`); se diferir da soma das notas no mês em apuração, a geração da guia é bloqueada até escolher "Usar as notas" ou ajustar.
+- **RBT12 incompleto bloqueia a apuração**: botão "Informar histórico" com colagem do extrato do PGDAS-D (preenche os 12 meses), data de abertura e FS12.
+- **Guia liberada ou paga com valor diferente** da apuração atual aparece como divergente (crítico) na Central e na tela.
+- **Importação multiempresa**: um ZIP com notas de vários clientes distribui cada nota pelo CNPJ; cancelamento que chega antes da nota fica guardado (`empresas.cancPend`) e é aplicado quando a nota chega; nota entre dois clientes vira saída de um e entrada do outro. Resumo por empresa e mês, com números faltando.
+- **Guarda do XML original**: ZIP por empresa e competência (até ~3,5 MB cada) em `arquivos`; "Baixar XML do período" monta um ZIP com os originais.
+- **Números faltando** por modelo/série (continua do último número do mês anterior), com "Estão inutilizados".
+- **Busca de notas** em todas as empresas (Ctrl+K): número, chave, participante ou CNPJ.
+- **Lançamento duplicado**: avisa número repetido e nota que já entrou por XML.
+- **PDFs das guias em lote** na Central: casa pelo CNPJ no nome do arquivo ou dentro do PDF e libera as que batem com a apuração.
+- A Central mostra todas as empresas (filtro por regime, incluindo Lucro Presumido e Real).
+
 ### Fechamento da folha (DP)
 
 - "Fechar folha" fica ao lado de "Calcular" (na tela da folha e no card de competência) e pede confirmação com o resumo: líquido, guias e pendências críticas (estas exigem marcar "Conferi").
