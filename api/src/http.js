@@ -88,11 +88,20 @@ function lerCookies(h) {
   String(h || '').split(';').forEach(p => { const i = p.indexOf('='); if (i > 0) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); });
   return out;
 }
-export function definirCookie(res, nome, valor, { maxAge, sameSite = 'Lax' } = {}) {
+export function definirCookie(res, nome, valor, { maxAge, sameSite = 'Lax', dominio } = {}) {
   const partes = [`${nome}=${encodeURIComponent(valor)}`, 'Path=/', 'HttpOnly', `SameSite=${sameSite}`];
+  if (dominio) partes.push(`Domain=${dominio}`);
   if (CONFIG.cookieSeguro) partes.push('Secure');
   if (maxAge !== undefined) partes.push(`Max-Age=${maxAge}`);
   const atual = res.getHeader('Set-Cookie'); res.setHeader('Set-Cookie', [...(atual ? [].concat(atual) : []), partes.join('; ')]);
 }
 // A Vercel/Netlify colocam o IP real do visitante no primeiro item de X-Forwarded-For
 function ipDe(req) { return String(req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket.remoteAddress || ''; }
+
+// Domínio do cookie da equipe: compartilhado entre painel, fiscal, contábil e DP (todos em subdomínios do mesmo domínio),
+// para entrar uma vez só. Vem de COOKIE_DOMINIO (ex.: omeufiscal.com.br) e só vale quando o site está nesse domínio.
+export function dominioCookie(ctx) {
+  const dom = String(process.env.COOKIE_DOMINIO || 'omeufiscal.com.br').replace(/^\./, '').toLowerCase();
+  const host = String(ctx.req.headers['x-forwarded-host'] || ctx.req.headers.host || '').split(':')[0].toLowerCase();
+  return dom && (host === dom || host.endsWith('.' + dom)) ? dom : undefined;
+}

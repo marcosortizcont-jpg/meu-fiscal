@@ -3,7 +3,7 @@
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { CONFIG, SITES, COOKIE, AMBIENTE_DO_SITE, DURACAO, SENHA_RE, EMAIL_RE } from './config.js';
-import { ErroHttp, definirCookie, enviar, lerCorpoBruto, siteDaOrigem } from './http.js';
+import { ErroHttp, definirCookie, dominioCookie, enviar, lerCorpoBruto, siteDaOrigem } from './http.js';
 import { assinarJwt, verificarJwt, hashSenha, conferirSenha, sha256, aleatorio, limitar } from './seguranca.js';
 import { COLECOES, empresaDe, filtroLeitura, podeLer, visivelAoCliente, prepararLeitura, conferirEscrita, carimbar } from './regras.js';
 import { urlEnvio, urlDownload, caminhoDisco, gravarDisco } from './arquivos.js';
@@ -66,6 +66,9 @@ export function registrarRotas(r, { db, hub }) {
   function siteDe(ctx) {
     const h = ctx.req.headers['x-mf-site'];
     if (SITES.includes(h)) return h;
+    // no portal do cliente (www/raiz) o cookie compartilhado da equipe não deve passar na frente do cookie do cliente
+    const host = String(ctx.req.headers['x-forwarded-host'] || ctx.req.headers.host || '').split(':')[0].toLowerCase();
+    if (/^(www\.)?omeufiscal\.com\.br$/.test(host) && ctx.cookies[COOKIE.cliente]) return 'cliente';
     if (ctx.cookies[COOKIE.painel]) return 'painel';
     if (ctx.cookies[COOKIE.cliente]) return 'cliente';
     return null;
@@ -128,8 +131,10 @@ export function registrarRotas(r, { db, hub }) {
     await db.query(`INSERT INTO sessoes (id, usuario_id, site, expira_em, ip, user_agent) VALUES ($1,$2,$3, now() + make_interval(secs => $4), $5, $6)`,
       [sha256(sid), u.id, site, dur, ctx.ip, String(ctx.req.headers['user-agent'] || '').slice(0, 300)]);
     await db.query('UPDATE usuarios SET ultimo_login_em = now() WHERE id = $1', [u.id]);
+    const dominio = site === 'painel' ? dominioCookie(ctx) : undefined;
+    if (dominio) definirCookie(ctx.res, COOKIE[site], '', { maxAge: 0, sameSite: 'Strict' });   // apaga a sessão antiga presa só a este subdomínio
     definirCookie(ctx.res, COOKIE[site], assinarJwt({ sid, aud: AUD(site) }, CONFIG.segredo[site], dur),
-      { maxAge: (site === 'cliente' && !lembrar) ? undefined : dur, sameSite: site === 'painel' ? 'Strict' : 'Lax' });
+      { maxAge: (site === 'cliente' && !lembrar) ? undefined : dur, sameSite: site === 'painel' ? 'Strict' : 'Lax', dominio });
     await log(`entrar_${site}`, { usuarioId: u.id, email, ip: ctx.ip });
     return { ok: true, nome: u.nome };
   });
@@ -140,6 +145,8 @@ export function registrarRotas(r, { db, hub }) {
       const p = verificarJwt(ctx.cookies[COOKIE[site]], CONFIG.segredo[site], AUD(site));
       if (p) { const id = sha256(p.sid); await db.query('UPDATE sessoes SET revogada_em = now() WHERE id = $1', [id]); cache.delete(id); hub.encerrarSessao(id); }
       definirCookie(ctx.res, COOKIE[site], '', { maxAge: 0, sameSite: site === 'painel' ? 'Strict' : 'Lax' });
+      const dominio = site === 'painel' ? dominioCookie(ctx) : undefined;
+      if (dominio) definirCookie(ctx.res, COOKIE[site], '', { maxAge: 0, sameSite: 'Strict', dominio });
     }
     return { ok: true };
   });
