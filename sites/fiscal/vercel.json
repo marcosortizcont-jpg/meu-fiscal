@@ -29,7 +29,7 @@
   "rewrites": [
     {
       "source": "/api/:caminho*",
-      "destination": "https://meufiscal-api.onrender.com/api/:caminho*"
+      "destination": "https://api.omeufiscal.com.br/api/:caminho*"
     },
     {
       "source": "/login",
@@ -46,7 +46,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com; media-src 'self' blob: https://*.r2.cloudflarestorage.com; connect-src 'self' https://meufiscal-api.onrender.com https://*.r2.cloudflarestorage.com; worker-src 'self' blob:; frame-src 'self' blob: https://*.r2.cloudflarestorage.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com; media-src 'self' blob: https://*.r2.cloudflarestorage.com; connect-src 'self' https://api.omeufiscal.com.br https://*.r2.cloudflarestorage.com; worker-src 'self' blob:; frame-src 'self' blob: https://*.r2.cloudflarestorage.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"
         },
         {
           "key": "X-Frame-Options",

@@ -18,6 +18,10 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### API em domínio próprio
+
+Os sites repassam `/api/*` para **https://api.omeufiscal.com.br** (domínio próprio no Render; CNAME `api` → `meufiscal-api.onrender.com` no Cloudflare, *DNS only*). O endereço `*.onrender.com` passou a exigir verificação "Confirme que é humano" (HTTP 429) para as chamadas vindas dos Workers, o que derrubava o login.
+
 ## Como os dois sites ficam separados e seguros
 
 1. **Cookie próprio por domínio.** Cada site chama `/api/*` no próprio domínio e a hospedagem faz o proxy até a API. Assim o cookie de sessão (`client_session` no portal, `admin_session` no painel) é de primeira parte, `HttpOnly`, `Secure` e `SameSite`. Isso funciona mesmo em navegadores que bloqueiam cookies de terceiros (Safari, Chrome).

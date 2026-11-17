@@ -1,7 +1,7 @@
 // Gerado por: node sites/build.mjs painel --configurar
 // Cloudflare Worker: repassa /api/* para a API, mantendo o cookie de sessão no domínio do site.
 // A variável API_URL (Settings → Variables) tem prioridade sobre o endereço abaixo.
-const API_PADRAO = 'https://meufiscal-api.onrender.com';
+const API_PADRAO = 'https://api.omeufiscal.com.br';
 export async function onRequest({ request, env }) {
   const api = String(env.API_URL || API_PADRAO).replace(/\/$/, '');
   const u = new URL(request.url);
