@@ -3578,21 +3578,31 @@ const CATALOGO_EXTRA=()=>{const c=(id,nome,depto,recorrencia,venc,obs='')=>({id,
   c('parc-simples','Parcelamento do Simples Nacional','Fiscal','mensal',{tipo:'ultimo_util',mesesApos:0},'Parcela vence no último dia útil do mês.'),
   c('parc-pgfn','Parcelamento PGFN (dívida ativa da União)','Fiscal','mensal',{tipo:'ultimo_util',mesesApos:0},'Parcela vence no último dia útil do mês.'),
   c('parc-estadual','Parcelamento estadual (ICMS)','Fiscal','mensal',{tipo:'dia',dia:20,ajuste:'antecipa',mesesApos:0},'Confira o dia de vencimento no termo de parcelamento da SEFAZ.'),
-  c('parc-municipal','Parcelamento municipal (ISS/taxas)','Fiscal','mensal',{tipo:'dia',dia:10,ajuste:'prorroga',mesesApos:0},'Confira o dia de vencimento no termo da prefeitura.')]};
+  c('parc-municipal','Parcelamento municipal (ISS/taxas)','Fiscal','mensal',{tipo:'dia',dia:10,ajuste:'prorroga',mesesApos:0},'Confira o dia de vencimento no termo da prefeitura.'),
+  c('icms-proprio','ICMS próprio (apuração e guia)','Fiscal','mensal',{tipo:'dia',dia:10,ajuste:'antecipa',mesesApos:1},'O dia varia pelo setor: confira na SEFAZ e ajuste.'),
+  c('iss-proprio','ISS próprio (guia municipal)','Fiscal','mensal',{tipo:'dia',dia:10,ajuste:'prorroga',mesesApos:1},'Confira o dia do município.'),
+  c('destda','DeSTDA','Fiscal','mensal',{tipo:'dia',dia:28,ajuste:'prorroga',mesesApos:1},'Simples Nacional com ST, DIFAL ou antecipação nas entradas.')]};
 const catalogoPadraoV1=catalogoPadrao;
 catalogoPadrao=function(){return [...catalogoPadraoV1().map(o=>({...o,condicao:'',diasTecnico:3})),...CATALOGO_EXTRA()]};
 const PACOTE_FOLHA=['esocial','dctfweb','fgts'];
+// Lucro Presumido e Real, com e sem inscrição estadual: a IE traz o ICMS próprio e a EFD ICMS/IPI; sem IE (só serviços) entra o ISS próprio
+const REGIMES_LUCRO=()=>{const base=['contabilidade',...PACOTE_FOLHA,'reinf','pis-cofins','efd-contribuicoes','irpj-csll','ecd','ecf'];const ie=['icms-proprio','efd-icms-ipi'];
+  return [{id:'reg2-lp-com-ie',codigo:'LP-COM-IE',nome:'Lucro Presumido C/ Inscrição Estadual',base:'LP',anexo:null,obrigacoes:[...base,...ie,'iss-proprio']},
+    {id:'reg2-lp-sem-ie',codigo:'LP-SEM-IE',nome:'Lucro Presumido S/ Inscrição Estadual',base:'LP',anexo:null,obrigacoes:[...base,'iss-proprio']},
+    {id:'reg2-lr-com-ie',codigo:'LR-COM-IE',nome:'Lucro Real C/ Inscrição Estadual',base:'LR',anexo:null,obrigacoes:[...base,...ie,'iss-proprio']},
+    {id:'reg2-lr-sem-ie',codigo:'LR-SEM-IE',nome:'Lucro Real S/ Inscrição Estadual',base:'LR',anexo:null,obrigacoes:[...base,'iss-proprio']}]};
 regimesPadrao=function(){
   const sn=['pgdas','defis','contabilidade',...PACOTE_FOLHA];
   return [
     {id:'reg2-mei',codigo:'MEI',nome:'MEI',base:'MEI',anexo:null,obrigacoes:['das-mei','dasn-simei',...PACOTE_FOLHA]},
     {id:'reg2-sn-sem-ie',codigo:'SN-SEM-IE',nome:'Simples Nacional S/ Inscrição Estadual',base:'SN',anexo:null,obrigacoes:sn},
-    {id:'reg2-sn-com-ie',codigo:'SN-COM-IE',nome:'Simples Nacional C/ Inscrição Estadual',base:'SN',anexo:null,obrigacoes:[...sn,'efd-icms-ipi']},
+    {id:'reg2-sn-com-ie',codigo:'SN-COM-IE',nome:'Simples Nacional C/ Inscrição Estadual',base:'SN',anexo:null,obrigacoes:[...sn,'efd-icms-ipi','destda']},
+    ...REGIMES_LUCRO(),
     {id:'reg2-outros',codigo:'OUTROS',nome:'Outros',base:'OUTRO',anexo:null,obrigacoes:['contabilidade']},
   ];
 };
 const temIE=e=>!!(e.ie&&!/isent|^\s*$/i.test(e.ie));
-const regimeNovoDe=e=>e.regime==='MEI'?'reg2-mei':e.regime==='SN'?(temIE(e)?'reg2-sn-com-ie':'reg2-sn-sem-ie'):'reg2-outros';
+const regimeNovoDe=e=>e.regime==='MEI'?'reg2-mei':e.regime==='SN'?(temIE(e)?'reg2-sn-com-ie':'reg2-sn-sem-ie'):['LP','LR'].includes(e.regime)?'reg2-'+e.regime.toLowerCase()+(temIE(e)?'-com-ie':'-sem-ie'):'reg2-outros';
 // troca única: catálogo completo, 4 regimes, empresas remapeadas sem perder obrigações e início do controle
 function migrarRegimesV2(){
   if(UI.migrandoReg||cfg().regimesV2||UI.modo!=='painel'||!podeMod('obrig','editar')||!S.empresas.length)return;
@@ -8668,7 +8678,7 @@ async function criarExemplos(){
     conf:{razao:'Confecção Exemplo Pantanal Ltda',fantasia:'Exemplo · Confecção (Lucro Presumido, indústria)',regime:'LP',anexo:null,fatorR:false,atividade:'Confecção de peças do vestuário',cnae:'1412-6/01',abertura:'2015-02-10',prolabore:6000,industria:true,lp:{presMerc:'comercio',presServ:'servicos',icmsDia:10,issDia:10,lc224:true}},
     tech:{razao:'Tech Exemplo Soluções em Software Ltda',fantasia:'Exemplo · Software (Lucro Real)',regime:'LR',anexo:null,fatorR:false,atividade:'Desenvolvimento de software sob encomenda',cnae:'6201-5/01',abertura:'2016-07-01',prolabore:12000,lp:{presServ:'servicos',lrForma:'trimestral',icmsDia:10,issDia:10,lc224:true}},
     mei:{razao:'Salão Exemplo Bela Arte '+exNum(11),fantasia:'Exemplo · Salão (MEI)',regime:'MEI',anexo:null,meiAtividade:'servicos',fatorR:false,atividade:'Cabeleireiros, manicure e pedicure',cnae:'9602-5/01',abertura:'2022-03-01',prolabore:0}};
-  const ids={};Object.entries(E).forEach(([k,x])=>{ids[k]='ex-'+k+'-'+uid().slice(0,6);x.id=ids[k];x.cnpj=novoCnpj();x.uf='MS';x.ibge='5002704';x.ie=x.regime==='MEI'?'':'28'+exNum(7);x.status='ativo';x.exemplo=true;x.kitExemplo=true;x.acessos=[];x.obrigExtras=[];x.obrigRemovidas=[];x.responsaveis={};x.operadorId=S.operadores[0]?.id||null;x.inicioControle=p2;x.reinf=['conf','tech'].includes(k);x.criadoEm=agora();try{const rid=regimeNovoDe(x);if(S.regimes.some(r=>r.id===rid))x.regimeId=rid}catch(er){}x.plano={nome:'Exemplo (sem cobrança)',valor:0,funcInclusos:10,adicionalFunc:0,metodo:'pix'};x.checklist=CK_EX.slice();x.telefone='';x.email='';x.socios=[{nome:'Sócio de Exemplo',cpf:cpfComDV('5'+exNum(8)),participacao:100}]});
+  const ids={};Object.entries(E).forEach(([k,x])=>{ids[k]='ex-'+k+'-'+uid().slice(0,6);x.id=ids[k];x.cnpj=novoCnpj();x.uf='MS';x.ibge='5002704';x.ie=['merc','conf'].includes(k)?'28'+exNum(7):'';x.status='ativo';x.exemplo=true;x.kitExemplo=true;x.acessos=[];x.obrigExtras=[];x.obrigRemovidas=[];x.responsaveis={};x.operadorId=S.operadores[0]?.id||null;x.inicioControle=p2;x.reinf=['conf','tech'].includes(k);x.criadoEm=agora();try{const rid=regimeNovoDe(x);if(S.regimes.some(r=>r.id===rid))x.regimeId=rid}catch(er){}x.plano={nome:'Exemplo (sem cobrança)',valor:0,funcInclusos:10,adicionalFunc:0,metodo:'pix'};x.checklist=CK_EX.slice();x.telefone='';x.email='';x.socios=[{nome:'Sócio de Exemplo',cpf:cpfComDV('5'+exNum(8)),participacao:100}]});
   // funcionários
   const F=[];const func=(emp,nome,cargo,salario,o={})=>F.push({id:uid(),empresaId:ids[emp],nome,cargo,salario,cpf:cpfComDV('3'+exNum(8)),pis:'1'+exNum(10),vinculo:'empregado',admissao:o.adm||'2024-03-01',jornada:44,depIR:o.dep||0,depSF:o.sf||0,vt:!!o.vt,vtDiario:o.vt||null,vaMensal:o.va||null,vaDescPct:o.va?10:null,vale:true,nascimento:'1990-05-10',sexo:'F',uf:'MS',cidade:'Campo Grande',banco:'Banco Exemplo',pix:'',status:'ativo',exemplo:true,...(o.extra||{})});
   func('merc','Carla Exemplo Souza','Operadora de caixa',1850,{vt:9,va:550});func('merc','Diego Exemplo Lima','Repositor',1700,{vt:9.86,dep:2,sf:2,adm:'2025-06-02'});func('merc','Patrícia Exemplo Nunes','Gerente de loja',3600,{dep:1,adm:'2023-01-10'});
@@ -8736,6 +8746,64 @@ if(typeof aCarteira==='function'){const aCarteiraV36=aCarteira;aCarteira=functio
   const b=`${S.empresas.some(e=>e.kitExemplo)?'<button class="btn ghost" data-act="ex-remover">Remover empresas de exemplo</button>':''}<button class="btn" data-act="ex-criar">Criar empresas de exemplo</button>`;
   return h.includes('data-act="cart-abrir" data-id=""')?h.replace('<button class="btn primary" data-act="cart-abrir" data-id="">',b+'<button class="btn primary" data-act="cart-abrir" data-id="">'):h}}
 /* ==== v36 (fim) ==== */
+/* ==== v37: regimes Lucro Presumido/Real com e sem IE · ICMS só para contribuinte · encargos patronais e terceiros por FPAS ==== */
+/* ---------- migração única: cria os 4 regimes do lucro, as obrigações novas e remapeia as empresas LP/LR ---------- */
+function migrarRegimesV3(){
+  if(UI.migrandoV3||cfg().regimesV3||MODO!=='api'||!S.regimes.length||!podeMod('obrig','editar'))return;UI.migrandoV3=true;
+  const novos=REGIMES_LUCRO();const cat=CATALOGO_EXTRA().filter(x=>['icms-proprio','iss-proprio','destda'].includes(x.id));let n=0;
+  mut(['catalogo','regimes','empresas','config'],()=>{cat.forEach(x=>{if(!S.catalogo.some(y=>y.id===x.id))S.catalogo.push(x)});
+    novos.forEach(r=>{if(!S.regimes.some(x=>x.id===r.id))S.regimes.splice(Math.max(0,S.regimes.findIndex(x=>x.id==='reg2-outros')),0,r)});
+    const snIE=S.regimes.find(r=>r.id==='reg2-sn-com-ie');if(snIE&&!(snIE.obrigacoes||[]).includes('destda'))snIE.obrigacoes=[...(snIE.obrigacoes||[]),'destda'];
+    S.empresas.forEach(e=>{if(!['LP','LR'].includes(e.regime))return;const r=regimeDe(e);if(r&&['LP','LR'].includes(r.base)&&r.id!=='reg2-outros')return;e.regimeId=regimeNovoDe(e);n++});
+    if(!S.config[0])S.config.push({id:uid()});S.config[0].regimesV3=true},['Obrigações','Criou os regimes Lucro Presumido e Real (com e sem IE) e remapeou '+n+' empresa(s)','']);UI.migrandoV3=false}
+const ORDEM_REG=['reg2-mei','reg2-sn-sem-ie','reg2-sn-com-ie','reg2-lp-com-ie','reg2-lp-sem-ie','reg2-lr-com-ie','reg2-lr-sem-ie','reg2-outros'];
+// empresas com regime apagado/antigo (regimeDe nulo) voltam a ter o regime pelo cadastro; regimes em ordem
+function ajustarRegimes(){if(MODO!=='api'||!S.regimes.length||!podeMod('obrig','editar')||UI.ajustandoReg)return;
+  const orf=S.empresas.filter(e=>!regimeDe(e)&&S.regimes.some(r=>r.id===regimeNovoDe(e)));const ord=S.regimes.map(r=>r.id).join()!==S.regimes.slice().sort((a,b)=>(ORDEM_REG.indexOf(a.id)+1||99)-(ORDEM_REG.indexOf(b.id)+1||99)).map(r=>r.id).join();
+  if(!orf.length&&!ord)return;UI.ajustandoReg=true;
+  mut(['empresas','regimes'],()=>{orf.forEach(e=>{e.regimeId=regimeNovoDe(e)});if(ord)S.regimes.sort((a,b)=>(ORDEM_REG.indexOf(a.id)+1||99)-(ORDEM_REG.indexOf(b.id)+1||99))},orf.length?['Obrigações','Regime reatribuído pelo cadastro: '+orf.length+' empresa(s)','']:null);UI.ajustandoReg=false}
+(function vigiarV3(){let t=0;const i=setInterval(()=>{t++;if(t>40){clearInterval(i);return}if(MODO==='api'&&S.empresas.length){if(!cfg().regimesV3)migrarRegimesV3();else{ajustarRegimes();clearInterval(i)}}},3000)})();
+/* ---------- contribuinte de ICMS: regime "com IE" ou IE no cadastro ---------- */
+const contribICMS=e=>{const r=regimeDe(e);if(r&&/sem-ie$/i.test(r.id))return false;if(r&&/com-ie$/i.test(r.id))return true;return temIE(e)};
+const apurarLucroV37=apurarLucro;apurarLucro=function(e,comp){const a=apurarLucroV37(e,comp);a.contribICMS=contribICMS(e);if(!a.contribICMS){a.icms={deb:0,cred:0,ant:0,aj:0,devedor:0,credorTransp:0,naoContrib:true}}return a};
+const fLucroV37=fLucro;fLucro=function(){let h=fLucroV37();const e=emp(UI.fsn.emp);if(!e||!['LP','LR'].includes(e.regime))return h;const r=regimeDe(e);
+  h=h.replace(/(<h1>)(Lucro (Presumido|Real))(<\/h1>)/,`$1$2$4<div class="small muted" style="margin-top:-6px">${esc(r?.nome||nomeRegime(e))}</div>`);
+  if(!contribICMS(e))h=h.replace(/<div class="panel"><div class="panel-head"><h2>ICMS próprio[\s\S]*?<\/table><\/div><\/div>/,'<div class="panel"><div class="panel-head"><h2>ICMS próprio</h2></div><p class="small muted" style="margin:0">Empresa sem inscrição estadual (regime "S/ IE"): não apura ICMS próprio nem entrega EFD ICMS/IPI. Se passou a vender mercadorias, troque o regime para "C/ Inscrição Estadual" no painel.</p></div>');
+  return h};
+const fArquivosV37=fArquivos;fArquivos=function(){let h=fArquivosV37();const e=emp(UI.fsn.emp);if(e&&['LP','LR'].includes(e.regime)&&!contribICMS(e))h=h.replace(/<button class="btn primary" data-act="arq-efd">[\s\S]*?<\/button>/,'<p class="small muted">Empresa sem inscrição estadual: não entrega EFD ICMS/IPI.</p>');return h};
+/* ---------- DP: CPP, RAT×FAP e terceiros pelo FPAS ---------- */
+const FPAS={'515':{n:'515 · Comércio e serviços em geral',terc:[['Salário-educação',2.5],['INCRA',.2],['SENAC',1],['SESC',1.5],['SEBRAE',.6]]},
+  '507':{n:'507 · Indústria',terc:[['Salário-educação',2.5],['INCRA',.2],['SENAI',1],['SESI',1.5],['SEBRAE',.6]]},
+  '612':{n:'612 · Transporte rodoviário',terc:[['Salário-educação',2.5],['INCRA',.2],['SEST',1.5],['SENAT',1],['SEBRAE',.6]]},
+  '566':{n:'566 · Estabelecimento de ensino',terc:[['Salário-educação',2.5],['INCRA',.2],['SEBRAE',.6]]},
+  '736':{n:'736 · Instituição financeira',terc:[['Salário-educação',2.5],['INCRA',.2]],cppAdic:2.5},
+  'outro':{n:'Outro (informar o total de terceiros)',terc:[]}};
+function dpEmpregador(e){const d=e.dp||{};const fp=FPAS[d.fpas]?d.fpas:(e.industria?'507':'515');const F=FPAS[fp];
+  const terc=fp==='outro'?(+d.terceiros||0):F.terc.reduce((a,x)=>a+x[1],0);return {fpas:fp,F,rat:+d.rat||2,fap:+d.fap||1,terc,cpp:20+(F.cppAdic||0)}}
+const dpPatronalV37=dpPatronal;dpPatronal=function(e){const b=dpPatronalV37(e);if(e.regime==='MEI'||(e.regime==='SN'&&e.anexo!=='IV'))return {...b,aliq:{cpp:b.cpp*100,rat:0,terc:0}};
+  const P=dpEmpregador(e);const rat=r2(P.rat*P.fap)/100;
+  if(e.regime==='SN')return {cpp:.20,rat,terc:0,sobreSocio:true,aliq:{cpp:20,rat:r2(P.rat*P.fap),terc:0},obs:`Simples Nacional, Anexo IV: CPP de 20% + RAT ${P.rat}% × FAP ${P.fap} recolhidos à parte (sem terceiros).`};
+  return {cpp:P.cpp/100,rat,terc:P.terc/100,sobreSocio:true,aliq:{cpp:P.cpp,rat:r2(P.rat*P.fap),terc:P.terc},fpas:P.fpas,
+    obs:`CPP ${P.cpp}% + RAT ${P.rat}% × FAP ${P.fap} + terceiros ${r2(P.terc)}% (FPAS ${P.fpas==='outro'?'informado':P.fpas}${P.F.terc.length?': '+P.F.terc.map(x=>x[0]+' '+x[1]+'%').join(', '):''}); 20% sobre o pró-labore.`}};
+function dpEncargosForm(e){const P=dpEmpregador(e);const sn=e.regime==='SN'&&e.anexo!=='IV'||e.regime==='MEI';const ed=dpEd();
+  return mHead('Encargos patronais · '+(e.fantasia||e.razao))+`<form data-form="dp-encargos"><div class="modal-body">${sn?`<div class="banner info" style="display:block;margin-bottom:10px">${esc(dpPatronal(e).obs)} Os campos abaixo só valem se a empresa mudar para Lucro Presumido/Real ou Anexo IV.</div>`:''}
+   <div class="grid-f"><label class="f" style="grid-column:span 2"><span>FPAS (terceiros)</span><select name="fpas" data-fpas ${ed?'':'disabled'}>${Object.entries(FPAS).map(([k,f])=>`<option value="${k}" ${P.fpas===k?'selected':''}>${esc(f.n)}</option>`).join('')}</select></label>
+    <label class="f"><span>Terceiros (% total, se "Outro")</span><input type="number" step="0.01" min="0" max="10" name="terceiros" value="${P.fpas==='outro'?P.terc:''}" ${ed?'':'disabled'}></label>
+    <label class="f"><span>RAT/SAT (%)</span><select name="rat" ${ed?'':'disabled'}>${[1,2,3].map(x=>`<option ${P.rat===x?'selected':''}>${x}</option>`).join('')}</select></label>
+    <label class="f"><span>FAP (0,5 a 2,0)</span><input type="number" step="0.0001" min="0.5" max="2" name="fap" value="${P.fap}" ${ed?'':'disabled'}></label></div>
+   <p class="small muted">CPP de 20% (22,5% para instituição financeira) sobre a folha e 20% sobre o pró-labore. O RAT vem do CNAE preponderante (anexo V do Decreto 3.048/99) e o FAP é publicado anualmente pela Previdência. Terceiros pelo FPAS: ${esc(P.F.terc.map(x=>x[0]+' '+x[1]+'%').join(', ')||'informe o total')}.</p></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button>${ed?'<button class="btn primary">Salvar</button>':''}</div></form>`}
+ACT['dp-encargos']=()=>{const e=emp(UI.fsn.emp);if(e)openModal(dpEncargosForm(e),true)};
+FORM['dp-encargos']=fd=>{const e=emp(UI.fsn.emp);const fap=+fd.get('fap');if(!(fap>=.5&&fap<=2)){toast('O FAP vai de 0,5000 a 2,0000.',true);return}
+  mut('empresas',()=>{e.dp={...(e.dp||{}),fpas:fd.get('fpas'),rat:+fd.get('rat')||2,fap,terceiros:fd.get('fpas')==='outro'?(+fd.get('terceiros')||0):null}},['Pessoal','Encargos patronais: FPAS '+fd.get('fpas')+', RAT '+fd.get('rat')+'%, FAP '+fap,e.razao]);closeModal();toast('Encargos salvos. A folha já foi recalculada.')};
+const dpFolhaPgV37=dpFolhaPg;dpFolhaPg=function(e,comp){let h=dpFolhaPgV37(e,comp);const F=dpFolhaDe(e,comp);const pt=F.patronal||{};const a=pt.aliq||dpPatronal(e).aliq||{};
+  const painel=`<div class="panel"><div class="panel-head"><h2>Encargos patronais</h2><button class="btn sm" data-act="dp-encargos">Configurar FPAS, RAT e FAP</button></div><div class="table-wrap"><table><tbody>
+    <tr><td>CPP (contribuição patronal)</td><td class="small muted">${a.cpp??0}% da folha${pt.sobreSocio?' + 20% do pró-labore':''}</td><td class="r num">${brl(pt.cpp||0)}</td></tr>
+    <tr><td>RAT ajustado (RAT × FAP)</td><td class="small muted">${a.rat??0}%</td><td class="r num">${brl(pt.rat||0)}</td></tr>
+    <tr><td>Terceiros (outras entidades)</td><td class="small muted">${a.terc??0}%${pt.fpas?' · FPAS '+pt.fpas:''}</td><td class="r num">${brl(pt.terc||0)}</td></tr>
+    <tr><td><b>Total patronal</b></td><td class="small muted">${esc(pt.obs||'')}</td><td class="r num"><b>${brl(pt.total||0)}</b></td></tr></tbody></table></div></div>`;
+  return h.includes('<div class="panel"><div class="panel-head"><h2>Encargos e guias do mês</h2>')?h.replace('<div class="panel"><div class="panel-head"><h2>Encargos e guias do mês</h2>',painel+'<div class="panel"><div class="panel-head"><h2>Encargos e guias do mês</h2>'):h+painel};
+/* ==== v37 (fim) ==== */
 
 
 

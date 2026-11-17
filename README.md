@@ -18,6 +18,12 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### Regimes do lucro e encargos patronais
+
+- Regimes **Lucro Presumido C/ IE, LP S/ IE, Lucro Real C/ IE e LR S/ IE** (`reg2-lp-*`, `reg2-lr-*`), com pacote de obrigações: contabilidade, eSocial, DCTFWeb, FGTS, Reinf, PIS/COFINS, EFD-Contribuições, IRPJ/CSLL, ECD, ECF, ISS próprio e, com IE, ICMS próprio e EFD ICMS/IPI. Catálogo ganhou ICMS próprio, ISS próprio e DeSTDA (no pacote do SN C/ IE). Migração única (`config.regimesV3`) cria os regimes e remapeia as empresas LP/LR; empresas sem regime válido voltam ao regime do cadastro.
+- No fiscal, empresa "S/ IE" não apura ICMS próprio nem gera EFD ICMS/IPI.
+- No DP, "Configurar FPAS, RAT e FAP": CPP 20% (22,5% instituição financeira), RAT × FAP e terceiros pelo FPAS (515, 507, 612, 566, 736 ou total informado), com o detalhamento na folha.
+
 ### Escrita fiscal: Lucro Presumido/Real, ICMS, arquivos, IBS/CBS e captura
 
 - **Documentos do cliente na Central**: coluna com o que cada cliente enviou, "Cobrar N clientes agora" e **cobrança automática** (`config.docsAuto = {ativo, dias, hora}`), rodada pela API (`documentos.js`, a cada 30 min) para a competência anterior.
