@@ -25,10 +25,11 @@ services:
         sync: false
       - key: DATABASE_URL_DIRECT       # Neon, com Connection pooling desligado
         sync: false
+      # ATENÇÃO: este arquivo é um Blueprint sincronizado. O que estiver aqui sobrescreve o painel do Render a cada push.
       - key: ORIGENS_CLIENTE
-        value: https://meufiscal-cliente.vercel.app
+        value: https://www.omeufiscal.com.br,https://omeufiscal.com.br,https://meufiscal-cliente.marcosortiz-cont.workers.dev
       - key: ORIGENS_PAINEL
-        value: https://meufiscal-painel.vercel.app
+        value: https://painel.omeufiscal.com.br,https://meufiscal-painel.marcosortiz-cont.workers.dev,https://fiscal.omeufiscal.com.br,https://meufiscal-fiscal.marcosortiz-cont.workers.dev,https://contabil.omeufiscal.com.br,https://meufiscal-contabil.marcosortiz-cont.workers.dev,https://dp.omeufiscal.com.br,https://meufiscal-dp.marcosortiz-cont.workers.dev
       - key: URL_PUBLICA_API
         value: https://api.omeufiscal.com.br
       # Arquivos no próprio banco nesta fase (até 4 MB cada). Para usar Neon Object Storage ou R2,
