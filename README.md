@@ -18,6 +18,15 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### Escrita fiscal: Lucro Presumido/Real, ICMS, arquivos, IBS/CBS e captura
+
+- **Documentos do cliente na Central**: coluna com o que cada cliente enviou, "Cobrar N clientes agora" e **cobrança automática** (`config.docsAuto = {ativo, dias, hora}`), rodada pela API (`documentos.js`, a cada 30 min) para a competência anterior.
+- **Lucro Presumido e Real** (`#f-lucro`): PIS/COFINS cumulativo (0,65%/3%) ou não cumulativo (1,65%/7,6% com créditos das entradas para revenda/insumo, sem o ICMS, e receitas financeiras 0,65%/4%), excluindo monofásico, exportação e o ICMS destacado (Tema 69); IRPJ/CSLL trimestral por presunção (com o acréscimo de 10% da LC 224/2025 sobre a receita acima de R$ 5 milhões no ano: IRPJ desde o 1º tri/2026, CSLL desde o 2º tri/2026, desligável por liminar), LR trimestral pelo resultado da Contabilidade com adições/exclusões/prejuízo (30%) ou estimativa mensal; ICMS próprio (débitos − créditos − saldo credor anterior) e ISS próprio. Gera guias PIS, COFINS, ICMS, ISS, IRPJ e CSLL com o código do DARF.
+- **ICMS nas entradas** (`#f-icms`): destino de cada NF de compra (revenda, insumo, uso, ativo); DIFAL pela fórmula de base dupla da IN SAT/MS 4/2023 (alíquota interna configurável, 17% padrão; interestadual pela nota ou pela regra do art. 9º quando o fornecedor é do Simples); antecipação configurável; guia ICMS-DIFAL. **DeSTDA** (Ato COTEPE 47/2015) para o Simples.
+- **Arquivos** (`#f-arq`): EFD ICMS/IPI (leiaute 020: 0000/0005/0100/0150/0190/0200, C100/C170/C190, E110/E116), EFD-Contribuições (cumulativo em F550; não cumulativo em F100 com M100/M105/M500/M505) e EFD-Reinf (R-2010, R-4020, R-2099, R-4099 em XML para assinar). Sempre validar no PVA.
+- **IBS/CBS** (`#f-ibs`): lê o grupo IBSCBS das NF-e e confere obrigatoriedade (regime normal desde 03/08/2026; Simples a partir de 2027), alíquotas de 2026 (CBS 0,9%, IBS UF 0,1%, municipal 0) e valores.
+- **Captura** (`api/src/captura.js`): NFS-e emitidas pelo ADN (`/contribuintes/DFe/{NSU}`, mTLS com o A1) e situação das NF-e/NFC-e no NFeConsultaProtocolo4; o XML entra pela mesma importação (travas, retenções). `CAPTURA_FALSO=1` simula localmente.
+
 ### Escrita fiscal: proteções e atalhos do analista
 
 - **Competência travada** (encerrada ou com DAS liberado/pago): notas e cancelamentos que chegam depois ficam **retidos** (guardados, fora da receita) até o analista decidir "Incluir" (soma à receita e a guia aparece como divergente) ou "Descartar". Lançamento manual em mês travado pede confirmação.

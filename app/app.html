@@ -8336,6 +8336,314 @@ const ctbCentralV34=ctbCentral;ctbCentral=function(){let h=ctbCentralV34();
   h=h.replace('<button class="btn primary" data-act="cent-lote"',`<button class="btn" data-act="nf-busca" title="Ctrl+K">Buscar nota</button><label class="btn">${svg('upload')}Importar XML / ZIP de vários clientes<input type="file" hidden multiple accept=".xml,.zip" data-up="xml-fiscal"></label><label class="btn">${svg('upload')}PDFs das guias em lote<input type="file" hidden multiple accept=".pdf" data-up="das-lote"></label><button class="btn primary" data-act="cent-lote"`);
   return comAvisos(h,'f-central')};
 /* ==== v34 (fim) ==== */
+/* ==== v35a: documentos do cliente na Central · Lucro Presumido e Real · ICMS (próprio, DIFAL, antecipação) · DeSTDA ==== */
+Object.assign(DEPTO_DA_GUIA,{PIS:'Fiscal',COFINS:'Fiscal',IRPJ:'Fiscal',CSLL:'Fiscal',ICMS:'Fiscal','ICMS-DIFAL':'Fiscal'});
+Object.assign(VENC_REGRA,{PIS:'antecipa',COFINS:'antecipa',IRPJ:'antecipa',CSLL:'antecipa',ICMS:'antecipa','ICMS-DIFAL':'antecipa'});
+const ultDiaMes=c=>`${c}-${pad(new Date(+c.slice(0,4),+c.slice(5,7),0).getDate())}`;
+const triDe=c=>{const m=+c.slice(5,7);const t=Math.ceil(m/3);const ini=c.slice(0,4)+'-'+pad(t*3-2);return {t,ini,fim:addMes(ini,2),comps:[ini,addMes(ini,1),addMes(ini,2)],nome:t+'º trimestre/'+c.slice(0,4)}};
+/* ---------- 1. documentos do cliente na Central ---------- */
+function docsResumo(e,comp){const it=typeof itensDoMes==='function'?itensDoMes(e,comp):[];if(!it.length)return null;const k=it.map(x=>estadoDoc(e,comp,x).k);
+  return {tot:it.length,ok:k.filter(x=>docConcluido(x)||x==='enviado'||x==='semmov'||x==='sem_movimento').length,pend:it.filter((x,i)=>['pendente','recusado','pendencia'].includes(k[i])).map(x=>x.nome)}}
+const ctbCentralV35=ctbCentral;ctbCentral=function(){let h=ctbCentralV35();const comp=UI.fsn.comp;
+  // coluna "Documentos" na tabela
+  h=h.replace('<th>Empresa</th>','<th>Empresa</th><th>Documentos</th>');
+  h=h.replace(/<td><b>([^<]*)<\/b><div class="small muted mono">([^<]*)<\/div><\/td>/g,(m0,nome,cnpj)=>{const e=S.empresas.find(x=>fmtCNPJ(x.cnpj||'')===cnpj);const d=e&&docsResumo(e,comp);
+    return m0+`<td class="small">${!d?'<span class="muted">—</span>':d.pend.length?`<span title="${esc(d.pend.join(', '))}" style="color:var(--warn)">${d.ok}/${d.tot} · falta ${d.pend.length}</span>`:pill(d.ok+'/'+d.tot,'ok')}</td>`});
+  const pend=empsBase().map(e=>[e,docsResumo(e,comp)]).filter(([,d])=>d&&d.pend.length);const A=cfg().docsAuto||{};
+  const barra=`<div class="panel" style="padding:10px 16px"><div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;justify-content:space-between"><span><b>Documentos de ${fmtComp(comp)}</b> · ${pend.length?pend.length+' cliente(s) com pendência':'todos enviaram'}${A.ativo?` · cobrança automática nos dias ${esc((A.dias||[]).join(' e '))}`:''}</span>
+    <span class="actions">${podeMod('docs','editar')&&pend.length?`<button class="btn sm primary" data-act="cent-cobrar">Cobrar ${pend.length} cliente(s) agora</button>`:''}${podeMod('docs','editar')?`<button class="btn sm" data-act="docs-auto">Cobrança automática</button>`:''}</span></div></div>`;
+  return h.replace('<div class="crm-kpis">',barra+'<div class="crm-kpis">')};
+ACT['cent-cobrar']=()=>{const comp=UI.fsn.comp;const L=empsBase().map(e=>[e,docsResumo(e,comp)]).filter(([,d])=>d&&d.pend.length);if(!L.length)return;
+  confirmar('Cobrar documentos de '+fmtComp(comp),`Enviar WhatsApp e e-mail para ${L.length} cliente(s) com a lista do que falta?<ul class="small">${L.slice(0,12).map(([e,d])=>`<li>${esc(e.fantasia||e.razao)}: ${esc(d.pend.join(', '))}</li>`).join('')}${L.length>12?'<li>…</li>':''}</ul>`,'Cobrar',async()=>{
+    if(MODO!=='api'){toast('A cobrança funciona na versão publicada.',true);return}let ok=0;const f=[];for(const [e,d] of L){try{await MF.api('POST','/api/documentos/cobrar',{empresaId:e.id,comp,itens:d.pend});ok++}catch(er){f.push((e.fantasia||e.razao)+': '+er.message)}}
+    audit('Recebimento de documentos','Cobrou '+ok+' cliente(s) pela Central fiscal',fmtComp(comp));toast(ok+' cliente(s) cobrado(s).'+(f.length?' Falhas: '+f.slice(0,2).join(' · '):''),!!f.length)})};
+ACT['docs-auto']=()=>{const A=cfg().docsAuto||{};openModal(mHead('Cobrança automática de documentos')+`<form data-form="docs-auto"><div class="modal-body"><p class="small muted" style="margin-top:0">Nos dias escolhidos, o sistema manda WhatsApp e e-mail para cada cliente com a lista do que ainda falta da competência anterior. Quem já enviou tudo não recebe nada.</p>
+  <div class="grid-f"><label class="f chk"><input type="checkbox" name="ativo" ${A.ativo?'checked':''}> Ativar</label><label class="f"><span>Dias do mês (separe por vírgula)</span><input name="dias" value="${esc((A.dias||[5,10]).join(', '))}"></label><label class="f"><span>A partir das (hora)</span><input type="number" name="hora" min="7" max="20" value="${A.hora??9}"></label></div></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar</button></div></form>`)};
+FORM['docs-auto']=fd=>{const dias=[...new Set(String(fd.get('dias')||'').split(/[^\d]+/).map(Number).filter(n=>n>=1&&n<=28))].sort((a,b)=>a-b);if(fd.get('ativo')&&!dias.length){toast('Informe ao menos um dia entre 1 e 28.',true);return}
+  mut('config',()=>{if(!S.config[0])S.config.push({id:uid()});S.config[0].docsAuto={ativo:!!fd.get('ativo'),dias,hora:+fd.get('hora')||9}},['Configurações','Cobrança automática de documentos: '+(fd.get('ativo')?'dias '+dias.join(', '):'desligada'),'']);closeModal();toast('Configuração salva.')};
+/* ---------- 2. Lucro Presumido e Lucro Real ---------- */
+const LP_PRES={comercio:{n:'Comércio e indústria',irpj:.08,csll:.12},servicos:{n:'Serviços em geral',irpj:.32,csll:.32},hospitalar:{n:'Serviços hospitalares e de saúde (8%)',irpj:.08,csll:.12},transpCarga:{n:'Transporte de cargas',irpj:.08,csll:.12},transpPass:{n:'Transporte de passageiros',irpj:.16,csll:.12},combustivel:{n:'Revenda de combustíveis',irpj:.016,csll:.12},construcao:{n:'Construção com material (empreitada total)',irpj:.08,csll:.12},servicos16:{n:'Serviços até R$ 120 mil/ano (16%)',irpj:.16,csll:.32}};
+const DARF={PIS:{cum:'8109',nc:'6912'},COFINS:{cum:'2172',nc:'5856'},IRPJ:{lp:'2089',lrTri:'0220',lrEst:'2362'},CSLL:{lp:'2372',lrTri:'6012',lrEst:'2484'}};
+const lpCfg=e=>({presServ:'servicos',issDia:10,icmsDia:10,lrForma:'trimestral',lc224:true,...(e.lp||{})});
+function recLp(eid,comp){return S.receitas.filter(r=>r.empresaId===eid&&r.comp===comp)}
+function grupoLp(e,r){const c=lpCfg(e);if(['I','II'].includes(r.anexo))return c.presMerc||'comercio';return c.presServ||'servicos'}
+function icmsDestacado(eid,comp){let deb=0;const porDoc={};S.docsaida.filter(d=>d.empresaId===eid&&!d.retido&&d.situacao==='autorizada'&&String(d.competencia||d.emissao).slice(0,7)===comp&&soDig(d.emitente?.doc)===soDig(emp(eid)?.cnpj)).forEach(d=>(d.itens||[]).forEach(it=>{if(cfopReceita(it.cfop)){deb+=+it.vICMS||0}}));return r2(deb)}
+function icmsDevolucoes(eid,comp){let v=0;S.docsaida.filter(d=>d.empresaId===eid&&!d.retido&&d.situacao==='autorizada'&&String(d.competencia||d.emissao).slice(0,7)===comp).forEach(d=>(d.itens||[]).forEach(it=>{if(cfopDevolucao(it.cfop,soDig(d.emitente?.doc)===soDig(emp(eid)?.cnpj)))v+=+it.vICMS||0}));return r2(v)}
+function retSofridas(eid,comps){const R={irrf:0,pis:0,cofins:0,csll:0,iss:0,inss:0};S.lancfiscais.filter(l=>l.empresaId===eid&&l.tipo==='servico'&&!l.cancelado&&comps.includes(String(l.competencia||l.data).slice(0,7))).forEach(l=>Object.keys(R).forEach(k=>R[k]+=+(l.ret||{})[k]||0));
+  Object.keys(R).forEach(k=>R[k]=r2(R[k]));return R}
+function entradasCred(eid,comp){// NF-e de entrada para revenda/insumo (não uso/consumo/ativo), no mês da emissão
+  return S.nfentrada.filter(n=>n.empresaId===eid&&n.situacao!=='cancelada'&&String(n.emissao).slice(0,7)===comp&&!['uso','ativo'].includes(n.destino||''))}
+function icmsProprio(e,comp){const deb=icmsDestacado(e.id,comp);let cred=0;entradasCred(e.id,comp).forEach(n=>(n.itens||[]).forEach(it=>cred+=+it.vICMS||0));cred=r2(cred+icmsDevolucoes(e.id,comp));
+  const ant=r2(+(e.icmsSaldo||{})[addMes(comp,-1)]||0);const aj=r2(+((e.lpMes||{})[comp]?.icmsAjuste)||0);const saldo=r2(deb-cred-ant+aj);return {deb,cred,ant,aj,devedor:saldo>0?saldo:0,credorTransp:saldo<0?-saldo:0}}
+function issProprio(e,comp){let v=0,base=0;S.docsaida.filter(d=>d.empresaId===e.id&&!d.retido&&d.modelo==='NFSE'&&d.situacao==='autorizada'&&String(d.competencia||d.emissao).slice(0,7)===comp&&!d.iss?.retido).forEach(d=>{base+=d.totais?.vNF||0;v+=d.iss?.valor||0});return {base:r2(base),valor:r2(v)}}
+function apurarLucro(e,comp){const c=lpCfg(e);const lr=e.regime==='LR';const m=(e.lpMes||{})[comp]||{};const L=recLp(e.id,comp);
+  // receita bruta por grupo de presunção, sem monofásico/exportação para PIS/COFINS
+  const grupos={};let rb=0,isentaPC=0;L.forEach(r=>{const g=grupoLp(e,r);grupos[g]=r2((grupos[g]||0)+(+r.valor||0));rb+=+r.valor||0;if(r.monofasico||r.exportacao)isentaPC+=+r.valor||0});rb=r2(rb);
+  let icmsExc=0;S.docsaida.filter(d=>d.empresaId===e.id&&!d.retido&&d.situacao==='autorizada'&&String(d.competencia||d.emissao).slice(0,7)===comp&&soDig(d.emitente?.doc)===soDig(e.cnpj)).forEach(d=>(d.itens||[]).forEach(it=>{if(cfopReceita(it.cfop)&&!monoItem(it)&&!/^[37]/.test(it.cfop))icmsExc+=+it.vICMS||0}));icmsExc=r2(icmsExc);// Tema 69 do STF: ICMS destacado (das receitas tributadas) fora da base do PIS/COFINS
+  const outras=r2(+m.outrasRec||0),fin=r2(+m.recFin||0);
+  const basePC=Math.max(0,r2(rb-isentaPC-icmsExc));const ret=retSofridas(e.id,[comp]);
+  let pis,cofins,credPis=0,credCof=0;
+  if(lr){let bc=0;entradasCred(e.id,comp).forEach(n=>(n.itens||[]).forEach(it=>{bc+=(+it.vProd||0)-(+it.vDesc||0)+(+it.vFrete||0)+(+it.vSeg||0)+(+it.vOutro||0)-(+it.vICMS||0)}));bc=r2(bc+(+m.outrosCred||0));
+    credPis=r2(bc*.0165);credCof=r2(bc*.076);pis=r2(Math.max(0,basePC*.0165+fin*.0065-credPis));cofins=r2(Math.max(0,basePC*.076+fin*.04-credCof))}
+  else{pis=r2(basePC*.0065);cofins=r2(basePC*.03)}
+  const pisDev=r2(Math.max(0,pis-ret.pis)),cofDev=r2(Math.max(0,cofins-ret.cofins));
+  return {lr,rb,grupos,isentaPC:r2(isentaPC),icmsExc,basePC,outras,fin,pis,cofins,credPis,credCof,ret,pisDev,cofDev,iss:issProprio(e,comp),icms:icmsProprio(e,comp)}}
+function receitaAnoAte(e,comp){let s=0;for(let c=comp.slice(0,4)+'-01';c<=comp;c=addMes(c,1))s+=recLp(e.id,c).reduce((a,r)=>a+(+r.valor||0),0);return r2(s)}
+function lucroContabil(e,dIni,dFim){const m=cbMov(e.id,dIni,dFim);const v=pref=>{const x=somaGrupo(m,pref);return r2(x.c-x.d)};return r2(v('3.1')+v('3.2')+v('4.1')+v('4.2')+v('4.3')+v('4.5')+v('4.4')+v('3.3'))}
+function apurarIrpjCsll(e,comp){const c=lpCfg(e);const T=triDe(comp);const lr=e.regime==='LR';const est=lr&&c.lrForma==='estimativa';const comps=est?[comp]:T.comps;
+  const grupos={};let rec=0,outras=0;comps.forEach(k=>{const a=apurarLucro(e,k);Object.entries(a.grupos).forEach(([g,v])=>grupos[g]=r2((grupos[g]||0)+v));rec+=a.rb;outras+=a.outras+a.fin});rec=r2(rec);outras=r2(outras);
+  const ret=retSofridas(e.id,comps);const t=(e.lrTri||{})[comps[0].slice(0,4)+'-T'+T.t]||{};
+  let baseIr=0,baseCs=0,acresc={ir:0,cs:0,exced:0},lucro=null,memo=[];
+  if(!lr||est){// presunção (LP trimestral ou LR estimativa mensal)
+    const fim=comps[comps.length-1];const acum=receitaAnoAte(e,fim);const exced=Math.max(0,Math.min(rec,acum-5e6));const fr=rec?exced/rec:0;
+    const ano=+fim.slice(0,4),tri=Math.ceil(+fim.slice(5,7)/3);const irOk=c.lc224&&!lr&&(ano>2026||ano===2026),csOk=c.lc224&&!lr&&(ano>2026||(ano===2026&&tri>=2));
+    Object.entries(grupos).forEach(([g,v])=>{const p=LP_PRES[g]||LP_PRES.servicos;const bi=v*p.irpj+(irOk?v*fr*p.irpj*.1:0),bc=v*p.csll+(csOk?v*fr*p.csll*.1:0);baseIr+=bi;baseCs+=bc;if(irOk)acresc.ir+=v*fr*p.irpj*.1;if(csOk)acresc.cs+=v*fr*p.csll*.1;memo.push([p.n,v,p.irpj,p.csll])});
+    acresc.exced=r2(exced);baseIr=r2(baseIr+outras);baseCs=r2(baseCs+outras)}
+  else{const ini=comps[0]+'-01',fim=ultDiaMes(comps[2]);lucro=lucroContabil(e,ini,fim);const aj=r2(lucro+(+t.adicoes||0)-(+t.exclusoes||0));const comp30=r2(Math.min(+t.prejuizo||0,Math.max(0,aj)*.3));baseIr=r2(Math.max(0,aj-comp30));baseCs=r2(Math.max(0,aj-Math.min(+t.baseNeg||+t.prejuizo||0,Math.max(0,aj)*.3)))}
+  const lim=est?20000:60000;const irpj=r2(baseIr*.15+Math.max(0,baseIr-lim)*.1),csll=r2(baseCs*.09);
+  const irDev=r2(Math.max(0,irpj-ret.irrf)),csDev=r2(Math.max(0,csll-ret.csll));
+  const venc=ajustaVenc(ultDiaMes(addMes(comps[comps.length-1],1)),'antecipa');
+  return {T,est,lr,comps,grupos,rec,outras,baseIr,baseCs,acresc,irpj,csll,ret,irDev,csDev,venc,lucro,memo,t,fimTri:comp===T.fim||est,quotas:irDev+csDev>=2000&&!est}}
+function fLucro(){const F=UI.fsn;const e=emp(F.emp);const comp=F.comp;if(!e)return vazio('Escolha uma empresa.');
+  if(!['LP','LR'].includes(e.regime))return head('Lucro Presumido e Real','')+vazio(`${esc(e.fantasia||e.razao)} é do ${esc(nomeRegime(e))}. Esta apuração vale para empresas do Lucro Presumido e Real.`,`<button class="btn" data-act="ctb-trocar">Trocar empresa</button>`);
+  const a=apurarLucro(e,comp);const ir=apurarIrpjCsll(e,comp);const c=lpCfg(e);const ed=podeMod('guias','editar')&&!travaComp(e.id,comp);const m=(e.lpMes||{})[comp]||{};
+  const gs=S.guias.filter(g=>g.empresaId===e.id&&(g.comp===comp||(ir.fimTri&&g.comp===comp))&&['PIS','COFINS','IRPJ','CSLL','ISS','ICMS'].includes(g.tipo));
+  const linha=(t,v,s)=>`<tr><td>${t}</td><td class="r num">${typeof v==='number'?brl(v):v}</td>${s!==undefined?`<td class="small muted">${s}</td>`:'<td></td>'}</tr>`;
+  const sem=!recLp(e.id,comp).length;
+  return `${head(a.lr?'Lucro Real':'Lucro Presumido',`${esc(e.fantasia||e.razao)} · ${fmtComp(comp)}. Receitas vêm das notas de saída e lançamentos; o ICMS destacado sai da base do PIS/COFINS (Tema 69 do STF).`,`${ed?`<button class="btn" data-act="lp-cfg">Parâmetros</button><button class="btn primary" data-act="lp-guias">Gerar guias de ${fmtComp(comp)}</button>`:`<button class="btn" data-act="lp-cfg">Parâmetros</button>`}`)}
+   ${sem?'<div class="banner warn" style="display:block;margin-bottom:10px">Nenhuma receita lançada neste mês. Importe os XML de saída ou lance as notas antes de gerar as guias.</div>':''}
+   <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Receita bruta</span><b>${brl(a.rb)}</b></div><div class="kpi"><span class="eyebrow">PIS + COFINS</span><b>${brl(a.pisDev+a.cofDev)}</b></div><div class="kpi"><span class="eyebrow">ICMS a recolher</span><b>${brl(a.icms.devedor)}</b></div><div class="kpi"><span class="eyebrow">${ir.est?'IRPJ+CSLL (estimativa)':'IRPJ+CSLL do '+ir.T.nome}</span><b>${brl(ir.irDev+ir.csDev)}</b></div></div>
+   <div class="panel"><div class="panel-head"><h2>PIS e COFINS ${a.lr?'não cumulativos':'cumulativos'} · ${fmtComp(comp)}</h2></div><div class="table-wrap"><table><tbody>
+    ${Object.entries(a.grupos).map(([g,v])=>linha('Receita · '+(LP_PRES[g]?.n||g),v)).join('')}
+    ${linha('(−) Monofásico e exportação',-a.isentaPC)}${linha('(−) ICMS destacado nas saídas',-a.icmsExc,'Tema 69 do STF')}${linha('<b>Base</b>',a.basePC)}
+    ${a.lr?linha('Receitas financeiras',a.fin,'PIS 0,65% · COFINS 4%')+linha('(−) Créditos sobre compras',-(a.credPis+a.credCof),'1,65% e 7,6% sobre entradas para revenda/insumo, sem o ICMS'):''}
+    ${linha('PIS ('+(a.lr?'1,65%':'0,65%')+')',a.pis,'DARF '+(a.lr?DARF.PIS.nc:DARF.PIS.cum))}${linha('COFINS ('+(a.lr?'7,6%':'3%')+')',a.cofins,'DARF '+(a.lr?DARF.COFINS.nc:DARF.COFINS.cum))}
+    ${a.ret.pis||a.ret.cofins?linha('(−) Retidos por clientes',-(a.ret.pis+a.ret.cofins),'serviços prestados com retenção'):''}
+    ${linha('<b>A recolher</b>','<b>'+brl(a.pisDev)+' + '+brl(a.cofDev)+'</b>','vence '+fmtData(ajustaVenc(addMes(comp,1)+'-25','antecipa')))}</tbody></table></div>
+    <div class="grid-f" style="margin-top:10px">${['outrasRec:Outras receitas (aluguéis, ganhos) · só IRPJ/CSLL','recFin:Receitas financeiras','icmsAjuste:Ajuste de ICMS (+ débito / − crédito)'].concat(a.lr?['outrosCred:Outras bases de crédito PIS/COFINS (energia, aluguéis PJ…)']:[]).map(x=>{const [k,t]=x.split(':');return `<label class="f"><span>${t}</span><input type="number" step="0.01" data-lpm="${k}" value="${m[k]??''}" ${ed?'':'disabled'}></label>`}).join('')}</div></div>
+   <div class="panel"><div class="panel-head"><h2>ICMS próprio · ${fmtComp(comp)}</h2></div><div class="table-wrap"><table><tbody>${linha('Débitos (saídas)',a.icms.deb)}${linha('(−) Créditos (entradas para revenda/insumo e devoluções)',-a.icms.cred,'classifique uso e consumo em "ICMS nas entradas"')}${linha('(−) Saldo credor do mês anterior',-a.icms.ant)}${a.icms.aj?linha('Ajustes',a.icms.aj):''}
+    ${linha('<b>'+(a.icms.devedor?'A recolher':'Saldo credor para o próximo mês')+'</b>','<b>'+brl(a.icms.devedor||a.icms.credorTransp)+'</b>',a.icms.devedor?'vence dia '+c.icmsDia+' (confira o prazo do seu setor na SEFAZ)':'')}</tbody></table></div></div>
+   <div class="panel"><div class="panel-head"><h2>ISS próprio · ${fmtComp(comp)}</h2></div><p class="small" style="margin:0">NFS-e sem retenção: base ${brl(a.iss.base)} · ISS ${brl(a.iss.valor)} · vence dia ${c.issDia}.${a.ret.iss?' ISS retido pelos tomadores: '+brl(a.ret.iss)+' (não recolhe).':''}</p></div>
+   <div class="panel"><div class="panel-head"><h2>${ir.est?'IRPJ e CSLL por estimativa · '+fmtComp(comp):'IRPJ e CSLL · '+ir.T.nome}</h2>${!ir.fimTri?`<span class="small muted">parcial: o trimestre fecha em ${fmtComp(ir.T.fim)}</span>`:''}</div><div class="table-wrap"><table><tbody>
+    ${ir.lucro!=null?linha('Resultado contábil do trimestre',ir.lucro,'da Contabilidade')+linha('(+) Adições / (−) Exclusões',r2((+ir.t.adicoes||0)-(+ir.t.exclusoes||0)))+linha('(−) Compensação de prejuízo (até 30%)',-Math.min(+ir.t.prejuizo||0,Math.max(0,ir.lucro)*.3)):
+      ir.memo.map(([n,v,pi,pc])=>linha(n,v,`presunção IRPJ ${pct(pi)} · CSLL ${pct(pc)}`)).join('')+(ir.acresc.exced?linha('Receita acima de R$ 5 milhões no ano',ir.acresc.exced,'LC 224/2025: presunção +10% sobre esta parcela'+(lpCfg(e).lc224?'':' (desligado: liminar)')):'')+(ir.outras?linha('(+) Outras receitas e financeiras',ir.outras):'')}
+    ${linha('Base IRPJ',ir.baseIr)}${linha('IRPJ 15% + adicional 10% acima de '+brl(ir.est?20000:60000),ir.irpj,'DARF '+(ir.lr?(ir.est?DARF.IRPJ.lrEst:DARF.IRPJ.lrTri):DARF.IRPJ.lp))}
+    ${linha('Base CSLL',ir.baseCs)}${linha('CSLL 9%',ir.csll,'DARF '+(ir.lr?(ir.est?DARF.CSLL.lrEst:DARF.CSLL.lrTri):DARF.CSLL.lp))}
+    ${ir.ret.irrf||ir.ret.csll?linha('(−) IRRF e CSLL retidos',-(ir.ret.irrf+ir.ret.csll)):''}
+    ${linha('<b>A recolher</b>','<b>'+brl(ir.irDev)+' + '+brl(ir.csDev)+'</b>','vence '+fmtData(ir.venc)+(ir.quotas?' · pode dividir em até 3 quotas (mín. R$ 1.000, com Selic)':''))}</tbody></table></div>
+    ${a.lr&&!ir.est?`<div class="grid-f" style="margin-top:10px">${['adicoes:Adições (LALUR)','exclusoes:Exclusões (LALUR)','prejuizo:Prejuízo fiscal a compensar','baseNeg:Base negativa de CSLL a compensar'].map(x=>{const [k,t]=x.split(':');return `<label class="f"><span>${t}</span><input type="number" step="0.01" data-lrt="${k}" value="${ir.t[k]??''}" ${ed?'':'disabled'}></label>`}).join('')}</div>`:''}</div>
+   ${gs.length?`<div class="panel"><div class="panel-head"><h2>Guias geradas</h2></div><div class="table-wrap"><table><tbody>${gs.map(g=>`<tr><td>${esc(g.tipo)}</td><td class="small">${esc(g.memoria?.codigo?'DARF '+g.memoria.codigo:'')}</td><td class="r num">${brl(g.valor)}</td><td>${fmtData(g.venc)}</td><td>${pill(statusGuia(g).t,statusGuia(g).c)}</td></tr>`).join('')}</tbody></table></div><p class="small muted">Anexe o DARF/guia oficial e libere ao cliente no módulo de Guias (ou pelo envio em lote na Central).</p></div>`:''}`}
+document.addEventListener('change',ev=>{const t=ev.target;if(!t.matches)return;const e=emp(UI.fsn?.emp);if(!e)return;const comp=UI.fsn.comp;
+  if(t.matches('[data-lpm]')){mut('empresas',()=>{e.lpMes={...(e.lpMes||{})};e.lpMes[comp]={...(e.lpMes[comp]||{}),[t.dataset.lpm]:t.value===''?null:+t.value}},['Escrita fiscal','Ajuste '+t.dataset.lpm+' '+fmtComp(comp),e.razao])}
+  if(t.matches('[data-lrt]')){const k=comp.slice(0,4)+'-T'+triDe(comp).t;mut('empresas',()=>{e.lrTri={...(e.lrTri||{})};e.lrTri[k]={...(e.lrTri[k]||{}),[t.dataset.lrt]:t.value===''?null:+t.value}},['Escrita fiscal','LALUR '+t.dataset.lrt+' '+k,e.razao])}});
+ACT['lp-cfg']=()=>{const e=emp(UI.fsn.emp);const c=lpCfg(e);const ed=podeMod('guias','editar');
+  openModal(mHead('Parâmetros · '+(e.fantasia||e.razao))+`<form data-form="lp-cfg"><div class="modal-body"><div class="grid-f">
+   <label class="f"><span>Presunção das vendas de mercadorias</span><select name="presMerc">${Object.entries(LP_PRES).filter(([k])=>['comercio','combustivel','transpCarga','construcao'].includes(k)).map(([k,p])=>`<option value="${k}" ${(c.presMerc||'comercio')===k?'selected':''}>${esc(p.n)} (${pct(p.irpj)})</option>`).join('')}</select></label>
+   <label class="f"><span>Presunção dos serviços</span><select name="presServ">${Object.entries(LP_PRES).filter(([k])=>k!=='comercio'&&k!=='combustivel').map(([k,p])=>`<option value="${k}" ${c.presServ===k?'selected':''}>${esc(p.n)} (${pct(p.irpj)})</option>`).join('')}</select></label>
+   ${e.regime==='LR'?`<label class="f"><span>IRPJ/CSLL no Lucro Real</span><select name="lrForma"><option value="trimestral" ${c.lrForma==='trimestral'?'selected':''}>Trimestral (lucro da Contabilidade)</option><option value="estimativa" ${c.lrForma==='estimativa'?'selected':''}>Anual com estimativa mensal</option></select></label>`:''}
+   <label class="f"><span>Vencimento do ICMS (dia)</span><input type="number" name="icmsDia" min="1" max="31" value="${c.icmsDia}"></label><label class="f"><span>Vencimento do ISS (dia)</span><input type="number" name="issDia" min="1" max="31" value="${c.issDia}"></label>
+   <label class="f chk"><input type="checkbox" name="lc224" ${c.lc224?'checked':''}> Aplicar o acréscimo de 10% da LC 224/2025 (desmarque se a empresa tem liminar)</label></div></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button>${ed?'<button class="btn primary">Salvar</button>':''}</div></form>`)};
+FORM['lp-cfg']=fd=>{const e=emp(UI.fsn.emp);mut('empresas',()=>{e.lp={...(e.lp||{}),presMerc:fd.get('presMerc'),presServ:fd.get('presServ'),lrForma:fd.get('lrForma')||lpCfg(e).lrForma,icmsDia:+fd.get('icmsDia')||10,issDia:+fd.get('issDia')||10,lc224:!!fd.get('lc224')}},['Escrita fiscal','Parâmetros do Lucro '+(e.regime==='LR'?'Real':'Presumido'),e.razao]);closeModal()};
+ACT['lp-guias']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const a=apurarLucro(e,comp),ir=apurarIrpjCsll(e,comp),c=lpCfg(e);
+  const vDia=d=>ajustaVenc(addMes(comp,1)+'-'+pad(Math.min(d,28)),'antecipa');const L=[];
+  if(a.pisDev>0)L.push({tipo:'PIS',comp,valor:a.pisDev,venc:ajustaVenc(addMes(comp,1)+'-25','antecipa'),memoria:{codigo:a.lr?DARF.PIS.nc:DARF.PIS.cum,base:a.basePC,retido:a.ret.pis,creditos:a.credPis}});
+  if(a.cofDev>0)L.push({tipo:'COFINS',comp,valor:a.cofDev,venc:ajustaVenc(addMes(comp,1)+'-25','antecipa'),memoria:{codigo:a.lr?DARF.COFINS.nc:DARF.COFINS.cum,base:a.basePC,retido:a.ret.cofins,creditos:a.credCof}});
+  if(a.icms.devedor>0)L.push({tipo:'ICMS',comp,valor:a.icms.devedor,venc:vDia(c.icmsDia),memoria:{debitos:a.icms.deb,creditos:a.icms.cred,saldoAnterior:a.icms.ant}});
+  if(a.iss.valor>0)L.push({tipo:'ISS',comp,valor:a.iss.valor,venc:vDia(c.issDia),memoria:{base:a.iss.base}});
+  if(ir.fimTri){if(ir.irDev>0)L.push({tipo:'IRPJ',comp,valor:ir.irDev,venc:ir.venc,memoria:{codigo:ir.lr?(ir.est?DARF.IRPJ.lrEst:DARF.IRPJ.lrTri):DARF.IRPJ.lp,base:ir.baseIr,periodo:ir.est?fmtComp(comp):ir.T.nome,retido:ir.ret.irrf}});
+    if(ir.csDev>0)L.push({tipo:'CSLL',comp,valor:ir.csDev,venc:ir.venc,memoria:{codigo:ir.lr?(ir.est?DARF.CSLL.lrEst:DARF.CSLL.lrTri):DARF.CSLL.lp,base:ir.baseCs,periodo:ir.est?fmtComp(comp):ir.T.nome,retido:ir.ret.csll}})}
+  if(!L.length){toast('Nada a recolher nesta competência.',true);return}
+  const bloq=L.filter(x=>{const g=S.guias.find(y=>y.empresaId===e.id&&y.comp===comp&&y.tipo===x.tipo);return g&&g.status!=='rascunho'});
+  mut(['guias','empresas'],()=>{L.forEach(x=>{if(bloq.includes(x))return;let g=S.guias.find(y=>y.empresaId===e.id&&y.comp===comp&&y.tipo===x.tipo);if(!g){g={id:uid(),empresaId:e.id,depto:'Fiscal',status:'rascunho',arquivo:null,criadaEm:agora(),origem:'lucro'};S.guias.push(g)}Object.assign(g,x)});
+    e.icmsSaldo={...(e.icmsSaldo||{}),[comp]:a.icms.credorTransp}},['Apuração','Gerou guias de '+fmtComp(comp)+': '+L.map(x=>x.tipo+' '+brl(x.valor)).join(', '),e.razao]);
+  toast(L.length-bloq.length+' guia(s) em rascunho.'+(bloq.length?' Não alteradas (já liberadas/pagas): '+bloq.map(x=>x.tipo).join(', ')+'.':''),!!bloq.length)};
+// a Central passa a mostrar a apuração do LP/LR
+const stCompV35=stComp;stComp=function(e,comp){const s=stCompV35(e,comp);if(!['LP','LR'].includes(e.regime))return s;
+  const a=apurarLucro(e,comp);const gs=S.guias.filter(g=>g.empresaId===e.id&&g.comp===comp&&['PIS','COFINS','ICMS','ISS','IRPJ','CSLL'].includes(g.tipo));const tot=r2(gs.reduce((x,g)=>x+(+g.valor||0),0));
+  const calc=r2(a.pisDev+a.cofDev+a.icms.devedor+a.iss.valor+(triDe(comp).fim===comp||lpCfg(e).lrForma==='estimativa'&&e.regime==='LR'?(()=>{const i=apurarIrpjCsll(e,comp);return i.irDev+i.csDev})():0));
+  s.fat=a.rb||null;s.calc=calc;s.g=gs.length?{valor:tot,status:gs.every(g=>g.status==='paga')?'paga':gs.some(g=>g.status==='rascunho')?'rascunho':'liberada',venc:gs[0].venc,tipo:'Guias'}:null;
+  if(!a.rb&&!gs.length){s.k='vazia';s.t='Sem movimento lançado';s.c='crit'}else if(!gs.length){s.k='lancada';s.t='Receitas lançadas';s.c='warn'}else if(Math.abs(tot-calc)>=.01){s.k='desatualizada';s.t='Guias divergem da apuração';s.c='warn'}else{s.k=gs.every(g=>g.status==='paga')?'paga':gs.some(g=>g.status==='rascunho')?'apurada':'liberada';s.t=s.k==='paga'?'Guias pagas':s.k==='apurada'?'Apurada':'Guias liberadas';s.c=s.k==='apurada'||s.k==='paga'?'ok':'info'}
+  return s};
+const centAbrirV35=ACT['cent-abrir'];ACT['cent-abrir']=el=>{const e=emp(el.dataset.id);if(e&&['LP','LR'].includes(e.regime)){UI.fsn.emp=e.id;try{localStorage.setItem('mf-ctb-emp',e.id)}catch(x){}location.hash='f-lucro';return}return centAbrirV35(el)};
+/* ---------- 3. ICMS nas entradas: DIFAL (uso, consumo, ativo) e antecipação, para qualquer regime; DeSTDA para o Simples ---------- */
+const UF_SUL_SUDESTE=['PR','SC','RS','SP','RJ','MG'];
+function alqInter(n,it,ufDest){if(['1','2','3','8'].includes(String(it.orig)))return .04;if(+it.pICMS>0&&n.emitente?.crt!=='1')return +it.pICMS/100;const o=n.emitente?.uf||'';return UF_SUL_SUDESTE.includes(o)&&!UF_SUL_SUDESTE.includes(ufDest)&&ufDest!=='ES'?.07:.12}
+const icmsCfg=e=>({interna:17,antecipaModo:'nao',antecipaPct:0,difalDia:10,...(e.icms||{})});
+function difalNota(e,n){const c=icmsCfg(e);const uf=e.uf||'MS';const dest=n.destino||'revenda';let difal=0,antec=0;const it=n.itens||[];
+  it.forEach(i=>{if(+i.vST>0||['500','201','202','203'].includes(i.csosn)||['10','30','60','70'].includes(i.cst))return;
+    const vop=(+i.vProd||0)-(+i.vDesc||0)+(+i.vFrete||0)+(+i.vSeg||0)+(+i.vOutro||0)+(+i.vIPI||0);const ai=alqInter(n,i,uf),an=c.interna/100;
+    const dif=Math.max(0,((vop*(1-ai))/(1-an))*an-vop*ai);// IN SAT/MS 4/2023, base dupla
+    if(dest==='uso'||dest==='ativo')difal+=dif;else if(dest==='revenda'&&c.antecipaModo==='difal')antec+=dif;else if(dest==='revenda'&&c.antecipaModo==='pct')antec+=vop*(+c.antecipaPct||0)/100});
+  return {difal:r2(difal),antec:r2(antec),interestadual:(n.emitente?.uf||uf)!==uf}}
+function fIcmsEntradas(){const F=UI.fsn;const e=emp(F.emp);const comp=F.comp;if(!e)return vazio('Escolha uma empresa.');const c=icmsCfg(e);const ed=podeMod('guias','editar')&&!travaComp(e.id,comp);
+  const N=S.nfentrada.filter(n=>n.empresaId===e.id&&n.situacao!=='cancelada'&&String(n.emissao).slice(0,7)===comp).sort((a,b)=>String(a.emissao).localeCompare(String(b.emissao)));
+  const R=N.map(n=>({n,...difalNota(e,n)}));const inter=R.filter(x=>x.interestadual);const tD=r2(inter.reduce((a,x)=>a+x.difal,0)),tA=r2(inter.reduce((a,x)=>a+x.antec,0));
+  const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo==='ICMS-DIFAL');
+  return `${head('ICMS nas entradas',`Notas de compra de ${fmtComp(comp)}. Classifique o destino de cada nota: o DIFAL (uso, consumo e ativo) segue a fórmula de base dupla da IN SAT/MS 4/2023, com alíquota interna de ${c.interna}%. Itens com ST já retida ficam de fora.`,`<button class="btn" data-act="icms-cfg">Parâmetros</button>${e.regime==='SN'||e.regime==='MEI'?`<button class="btn" data-act="destda">${svg('download')}DeSTDA de ${fmtComp(comp)}</button>`:''}${ed&&(tD+tA)>0?`<button class="btn primary" data-act="difal-guia">${g?'Atualizar':'Gerar'} guia (${brl(tD+tA)})</button>`:''}`)}
+   <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Notas no mês</span><b>${N.length}</b></div><div class="kpi"><span class="eyebrow">De outros estados</span><b>${inter.length}</b></div><div class="kpi"><span class="eyebrow">DIFAL (uso/ativo)</span><b>${brl(tD)}</b></div><div class="kpi"><span class="eyebrow">Antecipação (revenda)</span><b>${c.antecipaModo==='nao'?'não configurada':brl(tA)}</b></div></div>
+   <div class="panel">${N.length?`<div class="table-wrap"><table><thead><tr><th>Emissão</th><th>Fornecedor</th><th>UF</th><th class="r">Valor</th><th>Destino</th><th class="r">DIFAL</th><th class="r">Antecipação</th></tr></thead><tbody>${R.map(x=>`<tr><td class="num small">${fmtData(x.n.emissao)}</td><td class="small"><b>${esc(x.n.emitente?.nome||'')}</b><div class="muted">NF ${esc(x.n.numero||'')}</div></td><td>${esc(x.n.emitente?.uf||'—')}</td><td class="r num">${brl(x.n.valor)}</td>
+     <td><select data-ndest="${esc(x.n.id)}" ${ed?'':'disabled'} style="width:auto">${[['revenda','Revenda'],['insumo','Insumo/industrialização'],['uso','Uso e consumo'],['ativo','Ativo imobilizado']].map(([k,t])=>`<option value="${k}" ${(x.n.destino||'revenda')===k?'selected':''}>${t}</option>`).join('')}</select></td>
+     <td class="r num">${x.interestadual?brl(x.difal):'<span class="muted">interna</span>'}</td><td class="r num">${x.interestadual?brl(x.antec):''}</td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhuma nota de entrada neste mês. Elas chegam pela busca na SEFAZ ou pela importação de XML.')}</div>
+   <p class="small muted">${c.antecipaModo==='nao'?'Antecipação nas compras para revenda está desligada: ative em Parâmetros se o regime da empresa exigir (por diferencial de alíquota ou percentual fixo).':''} A classificação do destino também define os créditos de ICMS e PIS/COFINS do Lucro Presumido e Real.</p>`}
+document.addEventListener('change',ev=>{const t=ev.target;if(!t.matches||!t.matches('[data-ndest]'))return;const n=S.nfentrada.find(x=>x.id===t.dataset.ndest);if(!n)return;mut('nfentrada',()=>{n.destino=t.value},['Escrita fiscal','Destino da NF '+(n.numero||'')+': '+t.value,emp(n.empresaId)?.razao||''])});
+ACT['icms-cfg']=()=>{const e=emp(UI.fsn.emp);const c=icmsCfg(e);openModal(mHead('ICMS · '+(e.fantasia||e.razao))+`<form data-form="icms-cfg"><div class="modal-body"><div class="grid-f">
+  <label class="f"><span>Alíquota interna (%)</span><input type="number" step="0.01" name="interna" value="${c.interna}"></label>
+  <label class="f"><span>Antecipação nas compras para revenda</span><select name="antecipaModo"><option value="nao" ${c.antecipaModo==='nao'?'selected':''}>Não se aplica</option><option value="difal" ${c.antecipaModo==='difal'?'selected':''}>Diferencial de alíquotas</option><option value="pct" ${c.antecipaModo==='pct'?'selected':''}>Percentual sobre o valor</option></select></label>
+  <label class="f"><span>Percentual (se "percentual")</span><input type="number" step="0.01" name="antecipaPct" value="${c.antecipaPct||''}"></label><label class="f"><span>Vencimento da guia (dia do mês seguinte)</span><input type="number" min="1" max="31" name="difalDia" value="${c.difalDia}"></label></div>
+  <p class="small muted">Confira a regra do estado para o setor da empresa (Lei 1.810/1997 e regulamentos da SEFAZ/MS). O sistema só aplica o que estiver configurado aqui.</p></div><div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar</button></div></form>`)};
+FORM['icms-cfg']=fd=>{const e=emp(UI.fsn.emp);mut('empresas',()=>{e.icms={interna:+fd.get('interna')||17,antecipaModo:fd.get('antecipaModo'),antecipaPct:+fd.get('antecipaPct')||0,difalDia:+fd.get('difalDia')||10}},['Escrita fiscal','Parâmetros de ICMS',e.razao]);closeModal()};
+ACT['difal-guia']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const c=icmsCfg(e);const R=S.nfentrada.filter(n=>n.empresaId===e.id&&n.situacao!=='cancelada'&&String(n.emissao).slice(0,7)===comp).map(n=>difalNota(e,n));
+  const d=r2(R.reduce((a,x)=>a+x.difal,0)),an=r2(R.reduce((a,x)=>a+x.antec,0));const g0=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo==='ICMS-DIFAL');if(g0&&g0.status!=='rascunho'){toast('A guia já foi liberada: atualize pelo módulo de Guias.',true);return}
+  mut('guias',()=>{let g=g0;if(!g){g={id:uid(),empresaId:e.id,comp,tipo:'ICMS-DIFAL',depto:'Fiscal',status:'rascunho',arquivo:null,criadaEm:agora()};S.guias.push(g)}Object.assign(g,{valor:r2(d+an),venc:ajustaVenc(addMes(comp,1)+'-'+pad(Math.min(c.difalDia,28)),'antecipa'),memoria:{difal:d,antecipacao:an,interna:c.interna}})},['Apuração','Guia ICMS DIFAL/antecipação '+fmtComp(comp)+' · '+brl(d+an),e.razao]);toast('Guia em rascunho: '+brl(d+an)+'.')};
+function baixarTexto(nome,txt,latin1=true){const bytes=latin1?Uint8Array.from([...txt].map(ch=>{const c=ch.charCodeAt(0);return c<256?c:63})):new TextEncoder().encode(txt);const blob=new Blob([bytes],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=nome;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500)}
+const spedV=v=>v==null||v===''?'':typeof v==='number'?v.toFixed(2).replace('.',','):String(v).replace(/\|/g,' ').replace(/[\r\n]+/g,' ').trim();
+const spedD=iso=>iso?iso.slice(8,10)+iso.slice(5,7)+iso.slice(0,4):'';
+function montarSped(linhas){// linhas: arrays [REG, ...campos]; acrescenta encerramentos e o bloco 9
+  const cont={};const out=[];linhas.forEach(l=>{cont[l[0]]=(cont[l[0]]||0)+1;out.push('|'+l.map(spedV).join('|')+'|')});return {out,cont}}
+ACT['destda']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const R=S.nfentrada.filter(n=>n.empresaId===e.id&&n.situacao!=='cancelada'&&String(n.emissao).slice(0,7)===comp).map(n=>({n,...difalNota(e,n)})).filter(x=>x.interestadual);
+  const ini=comp+'-01',fim=ultDiaMes(comp);const tot=k=>r2(R.reduce((a,x)=>a+x[k],0));const vNF=r2(R.filter(x=>x.difal||x.antec).reduce((a,x)=>a+(+x.n.valor||0),0));
+  const sit={0:r2(R.filter(x=>x.n.destino==='ativo').reduce((a,x)=>a+x.difal,0)),1:r2(R.filter(x=>x.n.destino==='uso').reduce((a,x)=>a+x.difal,0)),3:tot('antec')};
+  const cfgE=cfg();const L=[['0000','LFPD',spedD(ini),spedD(fim),e.razao,soDig(e.cnpj),e.uf||'MS',soDig(e.ie||''),soDig(e.codMun||e.ibge||''),soDig(e.im||''),'','', '2000','0','30','Brasil',e.fantasia||'','','',''],
+    ['0001','0'],['0030','1','7','9','9','1','1','1','1','1','9','1','1','0','1',(sit[3]>0?'0':'1'),'1','1'],['0100',cfgE.escritorio||cfgE.marca||'','900',soDig(cfgE.cnpj||''),soDig(cfgE.cpfContador||''),cfgE.crc||'','','','','','',cfgE.uf||'MS',soDig(cfgE.codMun||''),'','',soDig(cfgE.telefone||''),'',cfgE.email||'']];
+  const G=[['G001','0'],['G020','1',spedD(ini),spedD(fim)]];const totDA=r2(sit[0]+sit[1]+sit[3]);
+  if(totDA>0){G.push(['G600',vNF,0,totDA]);[0,1,3].forEach(k=>{if(sit[k]>0)G.push(['G605',String(k),sit[k],0,sit[k]])})}
+  const l0=L.length+1;L.push(['0990',String(l0)]);const lG=G.length+1;G.push(['G990',String(lG)]);
+  const corpo=[...L,...G];const cont={};corpo.forEach(l=>cont[l[0]]=(cont[l[0]]||0)+1);const regs=[...Object.keys(cont),'9001','9900','9990','9999'];
+  const nove=[['9001','0'],...regs.map(r=>['9900',r,String(r==='9900'?regs.length:(cont[r]||1))])];nove.push(['9990',String(nove.length+2)]);const total=corpo.length+nove.length+1;nove.push(['9999',String(total)]);
+  baixarTexto(`DeSTDA_${soDig(e.cnpj)}_${comp.replace('-','')}.txt`,[...corpo,...nove].map(l=>'|'+l.map(spedV).join('|')+'|').join('\r\n')+'\r\n');
+  toast('DeSTDA gerada: DIFAL ativo '+brl(sit[0])+', uso/consumo '+brl(sit[1])+', antecipação '+brl(sit[3])+'. Importe no SEDIF-SN para validar e transmitir.')};
+/* ==== v35a (fim) ==== */
+/* ==== v35b: arquivos (EFD ICMS/IPI, EFD-Contribuições, EFD-Reinf) · IBS/CBS · captura de NFS-e e situação das NF-e ==== */
+/* ---------- leitura do grupo IBSCBS nas NF-e ---------- */
+const lerNFeV35=lerNFe;lerNFe=function(d){const r=lerNFeV35(d);try{const inf=XQ(d,'infNFe');const dets=XFilhos(inf,'det');
+  r.itens.forEach((it,i)=>{const imp=XQ(dets[i],'imposto');const g=imp&&XQ(imp,'IBSCBS');if(!g)return;const gg=XQ(g,'gIBSCBS');
+    it.ibscbs={cst:XT(g,'CST'),cClassTrib:XT(g,'cClassTrib'),vBC:XN(gg,'vBC'),pIBSUF:XN(XQ(gg,'gIBSUF'),'pIBSUF'),vIBSUF:XN(XQ(gg,'gIBSUF'),'vIBSUF'),pIBSMun:XN(XQ(gg,'gIBSMun'),'pIBSMun'),vIBSMun:XN(XQ(gg,'gIBSMun'),'vIBSMun'),pCBS:XN(XQ(gg,'gCBS'),'pCBS'),vCBS:XN(XQ(gg,'gCBS'),'vCBS')}});
+  const t=XQ(inf,'IBSCBSTot');if(t)r.totais.ibscbs={vBC:XN(t,'vBCIBSCBS'),vIBS:XN(XQ(t,'gIBS'),'vIBS'),vCBS:XN(XQ(t,'gCBS'),'vCBS')};
+  r.emitente.ie=XT(XQ(inf,'emit'),'IE');r.destinatario.ie=XT(XQ(inf,'dest'),'IE');r.dhSaiEnt=xDia(XT(XQ(inf,'ide'),'dhSaiEnt'));}catch(x){}return r};
+/* ---------- conferência IBS/CBS ---------- */
+const IBS26={pIBSUF:.1,pIBSMun:0,pCBS:.9,inicioNormal:'2026-08-03',inicioSN:'2027-01-01'};
+function conferirIbsCbs(e,d){const normal=!['SN','MEI'].includes(e.regime);const dt=String(d.emissao||'');const ano=+dt.slice(0,4);const P=[];if(d.modelo==='NFSE'||d.situacao!=='autorizada')return {P,ok:true,aplica:false};
+  const obrig=normal?dt>=IBS26.inicioNormal:dt>=IBS26.inicioSN;const its=d.itens||[];const com=its.filter(i=>i.ibscbs);
+  if(!com.length){if(obrig)P.push(['crit','Grupo IBSCBS ausente'+(normal?' (obrigatório para o regime normal desde 03/08/2026)':' (obrigatório para o Simples desde 01/01/2027)')]);return {P,ok:!P.length,aplica:obrig}}
+  if(com.length<its.length)P.push(['warn',`${its.length-com.length} item(ns) sem IBSCBS`]);
+  com.forEach(i=>{const g=i.ibscbs;if(!g.cClassTrib)P.push(['warn',`Item ${i.n}: sem cClassTrib`]);if(g.cst==='000'&&ano===2026){if(Math.abs(g.pCBS-IBS26.pCBS)>.0001)P.push(['crit',`Item ${i.n}: CBS ${g.pCBS}% (em 2026 é ${IBS26.pCBS}%)`]);if(Math.abs(g.pIBSUF-IBS26.pIBSUF)>.0001)P.push(['crit',`Item ${i.n}: IBS UF ${g.pIBSUF}% (em 2026 é ${IBS26.pIBSUF}%)`]);if(g.pIBSMun>0)P.push(['crit',`Item ${i.n}: IBS municipal deve ser 0 em 2026`])}
+    if(g.vBC>0&&Math.abs(r2(g.vBC*g.pCBS/100)-g.vCBS)>.011)P.push(['warn',`Item ${i.n}: vCBS ${brl(g.vCBS)} ≠ base × alíquota (${brl(r2(g.vBC*g.pCBS/100))})`]);
+    const base=(+i.vProd||0)-(+i.vDesc||0)+(+i.vFrete||0)+(+i.vSeg||0)+(+i.vOutro||0)-(+i.vICMS||0)-(+i.vPIS||0)-(+i.vCOFINS||0);if(g.cst==='000'&&g.vBC>0&&Math.abs(g.vBC-base)>Math.max(.05,base*.005))P.push(['info',`Item ${i.n}: base ${brl(g.vBC)} difere do valor sem ICMS/PIS/COFINS (${brl(r2(base))}); confira`])});
+  return {P,ok:!P.some(p=>p[0]==='crit'),aplica:true,vIBS:r2(com.reduce((a,i)=>a+(i.ibscbs.vIBSUF||0)+(i.ibscbs.vIBSMun||0),0)),vCBS:r2(com.reduce((a,i)=>a+(i.ibscbs.vCBS||0),0))}}
+function fIbsCbs(){const F=UI.fsn;const e=emp(F.emp);const comp=F.comp;if(!e)return vazio('Escolha uma empresa.');const normal=!['SN','MEI'].includes(e.regime);
+  const D=S.docsaida.filter(d=>d.empresaId===e.id&&d.modelo!=='NFSE'&&String(d.competencia||d.emissao).slice(0,7)===comp&&soDig(d.emitente?.doc)===soDig(e.cnpj)).map(d=>({d,c:conferirIbsCbs(e,d)}));
+  const crit=D.filter(x=>x.c.P.some(p=>p[0]==='crit')).length;const tI=r2(D.reduce((a,x)=>a+(x.c.vIBS||0),0)),tC=r2(D.reduce((a,x)=>a+(x.c.vCBS||0),0));
+  return `${head('Reforma tributária: IBS e CBS nas notas',`Confere o grupo IBSCBS das NF-e/NFC-e emitidas em ${fmtComp(comp)}. Em 2026 as alíquotas são de teste (CBS 0,9%, IBS estadual 0,1%, municipal 0%) e não há recolhimento quando as obrigações acessórias são cumpridas. ${normal?'Regime normal: grupo obrigatório desde 03/08/2026.':'Simples Nacional/MEI: grupo obrigatório a partir de 01/01/2027.'}`)}
+   <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Notas</span><b>${D.length}</b></div><div class="kpi"><span class="eyebrow">Com problema crítico</span><b>${crit}</b></div><div class="kpi"><span class="eyebrow">IBS destacado</span><b>${brl(tI)}</b></div><div class="kpi"><span class="eyebrow">CBS destacada</span><b>${brl(tC)}</b></div></div>
+   <div class="panel">${D.length?`<div class="table-wrap"><table><thead><tr><th>Nota</th><th>Emissão</th><th class="r">Valor</th><th class="r">IBS</th><th class="r">CBS</th><th>Conferência</th></tr></thead><tbody>${D.map(({d,c})=>`<tr><td class="small">${esc(MOD_NOME[d.modelo]||'NF')} ${esc(d.numero)}/${esc(d.serie||'')}</td><td class="num small">${fmtData(d.emissao)}</td><td class="r num">${brl(d.totais?.vNF||0)}</td><td class="r num">${c.vIBS!=null?brl(c.vIBS):'—'}</td><td class="r num">${c.vCBS!=null?brl(c.vCBS):'—'}</td>
+     <td class="small">${c.P.length?c.P.map(([n,t])=>`<div style="color:var(--${n==='crit'?'crit':n==='warn'?'warn':'muted'})">${esc(t)}</div>`).join(''):c.aplica?pill('ok','ok'):'<span class="muted">ainda não obrigatório</span>'}</td></tr>`).join('')}</tbody></table></div>`:vazio('Nenhuma NF-e/NFC-e emitida neste mês.')}</div>
+   <p class="small muted">Notas importadas antes desta versão não guardaram o grupo IBSCBS: importe os XML de novo para conferir.</p>`}
+/* ---------- arquivos ---------- */
+const ESC_CFG=()=>cfg();
+function partDe(map,doc,nome,uf,ie,codMun){const k=soDig(doc)||('X'+normP(nome).slice(0,20));if(!map[k])map[k]={cod:'P'+(Object.keys(map).length+1),doc:soDig(doc),nome:nome||'Consumidor',uf,ie,codMun};return map[k].cod}
+function cfopEntrada(cfop,dest){const c=String(cfop||'');const ini=c[0]==='6'?'2':c[0]==='7'?'3':'1';if(dest==='uso')return ini+'556';if(dest==='ativo')return ini+'551';const r=c.slice(1);if(['405','403','401'].includes(r))return ini+(dest==='insumo'?'401':'403');if(r==='910')return ini+'910';if(r==='949')return ini+'949';if(r==='202'||r==='201')return ini+(r==='202'?'202':'201');return ini+(dest==='insumo'?'101':'102')}
+function cstIcms(it,entrada){const o=String(it.orig||'0');if(it.csosn)return o+(entrada?'90':'90');return o+String(it.cst||'90').padStart(2,'0')}
+function linhasEfdIcms(e,comp){const ini=comp+'-01',fim=ultDiaMes(comp);const C=ESC_CFG();const parts={},itens={},unid=new Set();const B0=[],BC=[];
+  const docsS=S.docsaida.filter(d=>d.empresaId===e.id&&!d.retido&&d.modelo!=='NFSE'&&String(d.competencia||d.emissao).slice(0,7)===comp&&soDig(d.emitente?.doc)===soDig(e.cnpj));
+  const docsE=S.nfentrada.filter(n=>n.empresaId===e.id&&String(n.dhSaiEnt||n.emissao).slice(0,7)===comp&&n.completa!==false);
+  const item=it=>{const k=it.cod||('I'+normP(it.desc).slice(0,30));if(!itens[k])itens[k]={cod:k.slice(0,60),desc:it.desc,un:(it.un||'UN').slice(0,6),ncm:it.ncm,cest:it.cest};unid.add((it.un||'UN').slice(0,6));return itens[k].cod};
+  const c190=(its,ent,dest)=>{const g={};its.forEach(it=>{const cst=cstIcms(it,ent),cf=ent?cfopEntrada(it.cfop,dest):it.cfop,al=+it.pICMS||0;const k=cst+'|'+cf+'|'+al;const x=g[k]||(g[k]={cst,cf,al,opr:0,bc:0,icms:0,bcst:0,st:0,ipi:0});
+    x.opr+=(+it.vProd||0)-(+it.vDesc||0)+(+it.vFrete||0)+(+it.vSeg||0)+(+it.vOutro||0)+(+it.vST||0)+(+it.vIPI||0);x.bc+=+it.vBC||0;x.icms+=+it.vICMS||0;x.bcst+=+it.vBCST||0;x.st+=+it.vST||0;x.ipi+=+it.vIPI||0});
+    return Object.values(g).map(x=>['C190',x.cst,x.cf,x.al||'',r2(x.opr),r2(x.bc),r2(x.icms),r2(x.bcst),r2(x.st),0,r2(x.ipi),''])};
+  docsS.forEach(d=>{const sit=d.situacao==='cancelada'?'02':d.situacao==='denegada'?'04':'00';const mod=d.modelo||'55';
+    if(sit!=='00'){const L=new Array(29).fill('');Object.assign(L,{0:'C100',1:'1',2:'0',4:mod,5:sit,6:d.serie||'',7:d.numero,8:d.chave});BC.push(L);return}
+    const t=d.totais||{};const part=mod==='65'?'':partDe(parts,d.destinatario?.doc,d.destinatario?.nome,d.destinatario?.uf,d.destinatario?.ie,'');
+    BC.push(['C100','1','0',part,mod,'00',d.serie||'',d.numero,d.chave,spedD(d.emissao),spedD(d.dhSaiEnt||d.emissao),r2(t.vNF||0),'0',r2(t.vDesc||0),0,r2(t.vProd||0),'9',r2(t.vFrete||0),r2(t.vSeg||0),r2(t.vOutro||0),r2(t.vBC||0),r2(t.vICMS||0),r2(t.vBCST||0),r2(t.vST||0),r2(t.vIPI||0),r2(t.vPIS||0),r2(t.vCOFINS||0),'','']);
+    BC.push(...c190(d.itens||[],false))});
+  docsE.forEach(n=>{const t=n.totais||{};const part=partDe(parts,n.emitente?.cnpj,n.emitente?.nome,n.emitente?.uf,n.emitente?.ie,'');const dest=n.destino||'revenda';
+    if(n.situacao==='cancelada')return;
+    BC.push(['C100','0','1',part,'55','00',n.serie||'',n.numero,n.chave,spedD(n.emissao),spedD(n.dhSaiEnt||n.emissao),r2(t.vNF||n.valor||0),'0',r2(t.vDesc||0),0,r2(t.vProd||0),'9',r2(t.vFrete||0),r2(t.vSeg||0),r2(t.vOutro||0),r2(t.vBC||0),r2(dest==='uso'||dest==='ativo'?0:t.vICMS||0),r2(t.vBCST||0),r2(t.vST||0),r2(t.vIPI||0),r2(t.vPIS||0),r2(t.vCOFINS||0),'','']);
+    (n.itens||[]).forEach(it=>{const cr=dest==='uso'||dest==='ativo'?0:(+it.vICMS||0);const L=new Array(38).fill('');Object.assign(L,{0:'C170',1:String(it.n),2:item(it),4:it.qtd,5:(it.un||'UN').slice(0,6),6:r2(+it.vProd||0),7:r2(+it.vDesc||0),8:'0',9:cstIcms(it,true),10:cfopEntrada(it.cfop,dest),12:cr?r2(+it.vBC||0):0,13:cr?(+it.pICMS||0):0,14:r2(cr),15:r2(+it.vBCST||0),17:r2(+it.vST||0),18:'0',23:r2(+it.vIPI||0)});BC.push(L)});
+    BC.push(...c190(n.itens||[],true,dest).map(l=>{if(dest==='uso'||dest==='ativo'){l[5]=0;l[6]=0}return l}))});
+  const ap=icmsProprio(e,comp);const venc=ajustaVenc(addMes(comp,1)+'-'+pad(Math.min(lpCfg(e).icmsDia,28)),'antecipa');
+  B0.push(['0000','020','0',spedD(ini),spedD(fim),e.razao,soDig(e.cnpj),'',e.uf||'MS',soDig(e.ie||''),soDig(e.codMun||e.ibge||''),soDig(e.im||''),'','A',e.industria?'0':'1'],['0001','0'],
+    ['0005',e.fantasia||e.razao,soDig(e.cep||''),e.endereco||e.logradouro||'',e.numero||'','',e.bairro||'',soDig(e.telefone||''),'',e.email||''],
+    ['0100',C.responsavelTecnico||C.escritorio||'',soDig(C.cpfContador||''),C.crc||'',soDig(C.cnpj||''),soDig(C.cep||''),C.endereco||'',C.numero||'','',C.bairro||'',soDig(C.telefone||''),'',C.email||'',soDig(C.codMun||'')]);
+  Object.values(parts).forEach(p=>B0.push(['0150',p.cod,p.nome,'01058',p.doc.length===14?p.doc:'',p.doc.length===11?p.doc:'',soDig(p.ie||''),p.codMun||'','','','','','']));
+  [...unid].forEach(u=>B0.push(['0190',u,u]));Object.values(itens).forEach(i=>B0.push(['0200',i.cod,i.desc,'','',i.un,'00',i.ncm||'','','','','',i.cest||'']));
+  const E=[['E001','0'],['E100',spedD(ini),spedD(fim)],['E110',ap.deb,0,ap.aj>0?ap.aj:0,0,ap.cred,0,ap.aj<0?-ap.aj:0,0,ap.ant,ap.devedor,0,ap.devedor,ap.credorTransp,0]];
+  if(ap.devedor>0)E.push(['E116','000',ap.devedor,spedD(venc),'','','','','',comp.slice(5,7)+comp.slice(0,4)]);
+  const blocos=[...B0,['C001',BC.length?'0':'1'],...BC,['D001','1'],...E,['G001','1'],['H001','1'],['K001','1'],['1001','0'],['1010','N','N','N','N','N','N','N','N','N','N','N','N','N']];
+  return fecharSped(blocos,{'0':'0990',B:'B990',C:'C990',D:'D990',E:'E990',G:'G990',H:'H990',K:'K990','1':'1990'},['0','B','C','D','E','G','H','K','1'],{B:[['B001','1']]})}
+function fecharSped(linhas,fechos,ordem,extras={}){const por={};linhas.forEach(l=>{const b=l[0][0];(por[b]=por[b]||[]).push(l)});Object.entries(extras).forEach(([b,L])=>{por[b]=[...L,...(por[b]||[])]});const out=[];
+  ordem.forEach(b=>{const L=por[b]||[];if(!L.length)return;out.push(...L);out.push([fechos[b],String(L.length+1)])});
+  const cont={};out.forEach(l=>cont[l[0]]=(cont[l[0]]||0)+1);const regs=[...Object.keys(cont),'9001','9900','9990','9999'];
+  const nove=[['9001','0'],...regs.map(r=>['9900',r,String(r==='9900'?regs.length:(cont[r]||1))])];nove.push(['9990',String(nove.length+2)]);nove.push(['9999',String(out.length+nove.length+1)]);
+  return [...out,...nove].map(l=>'|'+l.map(spedV).join('|')+'|').join('\r\n')+'\r\n'}
+function linhasEfdContrib(e,comp){const ini=comp+'-01',fim=ultDiaMes(comp);const C=ESC_CFG();const lr=e.regime==='LR';const a=apurarLucro(e,comp);const parts={};
+  const L0=[['0000','006','0','','',spedD(ini),spedD(fim),e.razao,soDig(e.cnpj),e.uf||'MS',soDig(e.codMun||e.ibge||''),'','00',e.industria?'0':'2'],['0001','0'],
+    ['0100',C.responsavelTecnico||C.escritorio||'',soDig(C.cpfContador||''),C.crc||'',soDig(C.cnpj||''),soDig(C.cep||''),C.endereco||'',C.numero||'','',C.bairro||'',soDig(C.telefone||''),'',C.email||'',soDig(C.codMun||'')],
+    ['0110',lr?'1':'2',lr?'1':'','1',lr?'':'2'],['0140','',e.razao,soDig(e.cnpj),e.uf||'MS',soDig(e.ie||''),soDig(e.codMun||e.ibge||''),soDig(e.im||''),'']];
+  const F=[['F001','0'],['F010',soDig(e.cnpj)]];
+  // receitas consolidadas por CST, modelo e CFOP
+  const g={};S.docsaida.filter(d=>d.empresaId===e.id&&!d.retido&&d.situacao==='autorizada'&&String(d.competencia||d.emissao).slice(0,7)===comp&&soDig(d.emitente?.doc)===soDig(e.cnpj)).forEach(d=>{
+    if(d.modelo==='NFSE'){const k='01|SE|';const x=g[k]||(g[k]={cst:'01',mod:'',cfop:'',v:0,icms:0});x.v+=d.totais?.vNF||0;return}
+    (d.itens||[]).forEach(it=>{if(!cfopReceita(it.cfop))return;const mono=monoItem(it),exp=/^[37]/.test(it.cfop);const cst=exp?'08':mono?'04':'01';const k=cst+'|'+(d.modelo||'55')+'|'+it.cfop;const x=g[k]||(g[k]={cst,mod:d.modelo||'55',cfop:it.cfop,v:0,icms:0});x.v+=(+it.vProd||0)-(+it.vDesc||0)+(+it.vFrete||0)+(+it.vSeg||0)+(+it.vOutro||0);x.icms+=+it.vICMS||0})});
+  const aP=lr?.0165:.0065,aC=lr?.076:.03;let totP=0,totC=0,bcTot=0,recTot=0;
+  Object.values(g).forEach(x=>{const trib=x.cst==='01';const bc=trib?r2(Math.max(0,x.v-x.icms)):0;const p=r2(bc*aP),c=r2(bc*aC);totP+=p;totC+=c;bcTot+=bc;recTot+=x.v;
+    if(lr)F.push(['F100','1','','',spedD(fim),r2(x.v),x.cst,bc,trib?(aP*100).toFixed(4).replace('.',','):'',p,x.cst,bc,trib?(aC*100).toFixed(4).replace('.',','):'',c,'','','','','Receitas '+(x.mod==='SE'||!x.mod?'de serviços':'NF '+x.mod)+' CFOP '+x.cfop]);
+    else F.push(['F550',r2(x.v),x.cst,r2(x.icms),bc,trib?(aP*100).toFixed(4).replace('.',','):'',p,x.cst,r2(x.icms),bc,trib?(aC*100).toFixed(4).replace('.',','):'',c,x.mod==='SE'?'':x.mod,x.cfop,'',''])});
+  if(lr&&(a.credPis||a.credCof)){const bcC=r2(a.credPis/.0165);F.push(['F100','0','','',spedD(fim),bcC,'50',bcC,'1,6500',a.credPis,'50',bcC,'7,6000',a.credCof,'01','0','','','Créditos sobre aquisições para revenda/insumos do mês'])}
+  totP=r2(totP);totC=r2(totC);const M=[['M001','0']];
+  const cod=lr?'01':'51';
+  if(lr&&a.credPis){M.push(['M100','101','0',r2(a.credPis/.0165),'1,6500','','',a.credPis,0,0,0,a.credPis,'0',Math.min(a.credPis,totP),r2(Math.max(0,a.credPis-totP))]);M.push(['M105','01','50',r2(a.credPis/.0165),'',r2(a.credPis/.0165),r2(a.credPis/.0165),'','',''])}
+  M.push(['M200',lr?totP:0,lr?Math.min(a.credPis,totP):0,0,lr?r2(Math.max(0,totP-a.credPis)):0,lr?a.ret.pis:0,0,lr?a.pisDev:0,lr?0:totP,lr?0:a.ret.pis,0,lr?0:a.pisDev,a.pisDev]);
+  M.push(['M210',cod,r2(recTot),bcTot,0,0,bcTot,(aP*100).toFixed(4).replace('.',','),'','',totP,0,0,0,0,totP]);
+  if(lr&&a.credCof){M.push(['M500','101','0',r2(a.credCof/.076),'7,6000','','',a.credCof,0,0,0,a.credCof,'0',Math.min(a.credCof,totC),r2(Math.max(0,a.credCof-totC))]);M.push(['M505','01','50',r2(a.credCof/.076),'',r2(a.credCof/.076),r2(a.credCof/.076),'','',''])}
+  M.push(['M600',lr?totC:0,lr?Math.min(a.credCof,totC):0,0,lr?r2(Math.max(0,totC-a.credCof)):0,lr?a.ret.cofins:0,0,lr?a.cofDev:0,lr?0:totC,lr?0:a.ret.cofins,0,lr?0:a.cofDev,a.cofDev]);
+  M.push(['M610',cod,r2(recTot),bcTot,0,0,bcTot,(aC*100).toFixed(4).replace('.',','),'','',totC,0,0,0,0,totC]);
+  const blocos=[...L0,['A001','1'],['C001','1'],['D001','1'],...F,['I001','1'],...M,['P001','1'],['1001','1']];
+  return fecharSped(blocos,{'0':'0990',A:'A990',C:'C990',D:'D990',F:'F990',I:'I990',M:'M990',P:'P990','1':'1990'},['0','A','C','D','F','I','M','P','1'])}
+/* ---------- EFD-Reinf (XML dos eventos, para assinar e transmitir) ---------- */
+const xe=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const vR=n=>(+n||0).toFixed(2).replace('.',',');
+function idReinf(cnpj,seq){const d=new Date();const p=n=>String(n).padStart(2,'0');return 'ID1'+soDig(cnpj).slice(0,8).padEnd(14,'0')+d.getFullYear()+p(d.getMonth()+1)+p(d.getDate())+p(d.getHours())+p(d.getMinutes())+p(d.getSeconds())+String(seq).padStart(5,'0')}
+function eventosReinf(e,comp){const raiz=soDig(e.cnpj).slice(0,8);const T=S.lancfiscais.filter(l=>l.empresaId===e.id&&l.tipo==='tomado'&&!l.cancelado&&String(l.competencia||l.data).slice(0,7)===comp);const ev=[];let seq=1;
+  const ide=(ns,tag,corpo,retif=true)=>`<Reinf xmlns="http://www.reinf.esocial.gov.br/schemas/${ns}/v2_01_02"><${tag} id="${idReinf(e.cnpj,seq++)}"><ideEvento>${retif?'<indRetif>1</indRetif>':''}<perApur>${comp}</perApur><tpAmb>1</tpAmb><procEmi>1</procEmi><verProc>MeuFiscal</verProc></ideEvento><ideContri><tpInsc>1</tpInsc><nrInsc>${raiz}</nrInsc></ideContri>${corpo}</${tag}></Reinf>`;
+  // R-2010: serviços tomados com retenção de INSS (cessão de mão de obra/empreitada)
+  const inss=T.filter(l=>+(l.ret||{}).inss>0);const porPrest={};inss.forEach(l=>(porPrest[soDig(l.part?.doc)]=porPrest[soDig(l.part?.doc)]||[]).push(l));
+  if(inss.length)ev.push(['R-2010',ide('evt2010TomadorServicos','evtServTom',`<infoServTom><ideEstabObra><tpInscEstab>1</tpInscEstab><nrInscEstab>${soDig(e.cnpj)}</nrInscEstab><indObra>0</indObra>${Object.entries(porPrest).map(([cnpj,L])=>{const b=L.reduce((a,l)=>a+(+l.valor||0),0),rt=L.reduce((a,l)=>a+(+l.ret.inss||0),0);
+    return `<idePrestServ><cnpjPrestador>${cnpj}</cnpjPrestador><vlrTotalBruto>${vR(b)}</vlrTotalBruto><vlrTotalBaseRet>${vR(b)}</vlrTotalBaseRet><vlrTotalRetPrinc>${vR(rt)}</vlrTotalRetPrinc><indCPRB>0</indCPRB>${L.map(l=>`<nfs><serie>${xe(l.serie||'0')}</serie><numDocto>${xe(l.numero||'0')}</numDocto><dtEmissaoNF>${l.data}</dtEmissaoNF><vlrBruto>${vR(l.valor)}</vlrBruto><infoTpServ><tpServico>${xe(l.tpServReinf||'100000003')}</tpServico><vlrBaseRet>${vR(l.valor)}</vlrBaseRet><vlrRetencao>${vR(l.ret.inss)}</vlrRetencao></infoTpServ></nfs>`).join('')}</idePrestServ>`}).join('')}</ideEstabObra></infoServTom>`)]);
+  // R-4020: pagamentos a pessoa jurídica com retenção de IR/CSRF
+  const ir=T.filter(l=>['irrf','pis','cofins','csll'].some(k=>+(l.ret||{})[k]>0));const porBenef={};ir.forEach(l=>(porBenef[soDig(l.part?.doc)]=porBenef[soDig(l.part?.doc)]||[]).push(l));
+  Object.entries(porBenef).forEach(([cnpj,L])=>ev.push(['R-4020 · '+fmtCNPJ(cnpj),ide('evt4020PagtoBeneficiarioPJ','evtRetPJ',`<ideEstab><tpInscEstab>1</tpInscEstab><nrInscEstab>${soDig(e.cnpj)}</nrInscEstab><ideBenef><cnpjBenef>${cnpj}</cnpjBenef><idePgto><natRend>${xe(L[0].natRend||'17001')}</natRend>${L.map(l=>{const r=l.ret||{};const csrf=(+r.pis||0)+(+r.cofins||0)+(+r.csll||0);
+    return `<infoPgto><dtFG>${l.data}</dtFG><vlrBruto>${vR(l.valor)}</vlrBruto><retencoes>${+r.irrf>0?`<vlrBaseIR>${vR(l.valor)}</vlrBaseIR><vlrIR>${vR(r.irrf)}</vlrIR>`:''}${csrf>0?`<vlrBaseAgreg>${vR(l.valor)}</vlrBaseAgreg><vlrAgreg>${vR(csrf)}</vlrAgreg>`:''}</retencoes></infoPgto>`}).join('')}</idePgto></ideBenef></ideEstab>`)]));
+  if(inss.length)ev.push(['R-2099',ide('evt2099FechamentoPeriodo','evtFechaEvPer',`<ideRespInf><nmResp>${xe(cfg().responsavelTecnico||'')}</nmResp><cpfResp>${soDig(cfg().cpfContador||'')}</cpfResp><telefone>${soDig(cfg().telefone||'')}</telefone><email>${xe(cfg().email||'')}</email></ideRespInf><infoFech><evtServTm>S</evtServTm><evtServPr>N</evtServPr><evtAssDespRec>N</evtAssDespRec><evtAssDespRep>N</evtAssDespRep><evtComProd>N</evtComProd><evtCPRB>N</evtCPRB><evtAquis>N</evtAquis></infoFech>`,false)]);
+  if(Object.keys(porBenef).length)ev.push(['R-4099',ide('evt4099FechamentoDirf','evtFech',`<ideRespInf><nmResp>${xe(cfg().responsavelTecnico||'')}</nmResp><cpfResp>${soDig(cfg().cpfContador||'')}</cpfResp><telefone>${soDig(cfg().telefone||'')}</telefone><email>${xe(cfg().email||'')}</email></ideRespInf><infoFech><fechRet>0</fechRet></infoFech>`,false)]);
+  return {ev,inss,ir}}
+function fArquivos(){const F=UI.fsn;const e=emp(F.emp);const comp=F.comp;if(!e)return vazio('Escolha uma empresa.');const normal=['LP','LR'].includes(e.regime);const R=eventosReinf(e,comp);
+  const card=(t,s,b,ok=true)=>`<div class="panel" style="margin:0"><h2 style="margin-top:0">${t}</h2><p class="small muted">${s}</p>${ok?b:'<p class="small muted">Não se aplica a esta empresa.</p>'}</div>`;
+  return `${head('Arquivos fiscais',`${esc(e.fantasia||e.razao)} · ${fmtComp(comp)}. Os arquivos saem das notas, lançamentos e apurações do sistema. Valide sempre no programa oficial (PVA/SEDIF) antes de transmitir: lá aparecem os erros de cadastro (IE, município, contador) que precisam de ajuste.`)}
+   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px">
+    ${card('EFD ICMS/IPI','Notas de saída (C100/C190), entradas com itens (C100/C170/C190), participantes, itens e apuração do ICMS (E110/E116). Leiaute 020.',`<button class="btn primary" data-act="arq-efd">${svg('download')}Gerar EFD ICMS/IPI</button>`,normal)}
+    ${card('EFD-Contribuições',e.regime==='LR'?'Não cumulativo: receitas e créditos consolidados (F100) e apuração (M100/M200/M500/M600).':'Cumulativo pelo regime de competência consolidado (F550) e apuração (M200/M210/M600/M610).',`<button class="btn primary" data-act="arq-contrib">${svg('download')}Gerar EFD-Contribuições</button>`,normal)}
+    ${card('EFD-Reinf',`Serviços tomados: ${R.inss.length} com INSS retido (R-2010) e ${R.ir.length} com IR/CSRF retidos (R-4020), dos lançamentos fiscais. Gera os XML dos eventos para assinar e transmitir.`,R.ev.length?`<button class="btn primary" data-act="arq-reinf">${svg('download')}Baixar ${R.ev.length} evento(s)</button>`:'<p class="small muted">Nenhuma retenção nos serviços tomados deste mês: não há movimento para a Reinf.</p>')}
+    ${card('DeSTDA','Simples Nacional: DIFAL e antecipação das entradas interestaduais.',`<button class="btn" data-act="destda">${svg('download')}Gerar DeSTDA</button>`,['SN','MEI'].includes(e.regime))}</div>`}
+ACT['arq-efd']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const t=linhasEfdIcms(e,comp);baixarTexto(`EFD_ICMS_IPI_${soDig(e.cnpj)}_${comp.replace('-','')}.txt`,t);toast('EFD ICMS/IPI gerada ('+t.split('\r\n').length+' linhas). Valide no PVA.')};
+ACT['arq-contrib']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const t=linhasEfdContrib(e,comp);baixarTexto(`EFD_Contribuicoes_${soDig(e.cnpj)}_${comp.replace('-','')}.txt`,t);toast('EFD-Contribuições gerada. Valide no PVA.')};
+ACT['arq-reinf']=async()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const R=eventosReinf(e,comp);const enc=new TextEncoder();
+  const blob=await criarZip(R.ev.map(([n,x],i)=>({nome:`${String(i+1).padStart(2,'0')}_${n.replace(/[^\w-]+/g,'_')}.xml`,bytes:enc.encode('<?xml version="1.0" encoding="UTF-8"?>'+x)})));const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Reinf_${soDig(e.cnpj)}_${comp}.zip`;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+  toast(R.ev.length+' evento(s) da Reinf gerado(s) para assinatura e transmissão.')};
+/* ---------- captura automática: NFS-e emitidas (ADN) e situação das NF-e na SEFAZ ---------- */
+ACT['cap-nfse']=async el=>{const e=emp(UI.fsn.emp);if(MODO!=='api'){toast('A captura funciona na versão publicada.',true);return}el&&(el.disabled=true);
+  try{const r=await MF.api('POST','/api/captura/'+e.id+'/nfse',{});if(!r.docs?.length){toast(r.mensagem||'Nenhuma NFS-e nova no Ambiente Nacional.');return}
+    await importarXmlFiscalV34(r.docs.map(d=>new File([d.xml],d.nome,{type:'text/xml'})))}catch(er){toast(er.message,true)}finally{el&&(el.disabled=false)}};
+ACT['cap-sit']=async el=>{const e=emp(UI.fsn.emp);const {de,ate}=periodoNf();const D=S.docsaida.filter(d=>{const c=String(d.competencia||d.emissao).slice(0,7);return d.empresaId===e.id&&c>=de&&c<=ate&&/^\d{44}$/.test(d.chave||'')&&d.situacao==='autorizada'});
+  if(!D.length){toast('Nenhuma NF-e/NFC-e autorizada no período.',true);return}if(MODO!=='api'){toast('A consulta funciona na versão publicada.',true);return}el&&(el.disabled=true);
+  try{const r=await MF.api('POST','/api/captura/'+e.id+'/situacao',{chaves:D.map(d=>d.chave).slice(0,200)});const canc=(r.resultado||[]).filter(x=>x.situacao==='cancelada'||x.situacao==='denegada');const ret=[];
+    if(canc.length)mut(['docsaida','receitas','faturamento'],()=>canc.forEach(x=>{const d=D.find(y=>y.chave===x.chave);if(!d)return;const c=String(d.competencia||d.emissao).slice(0,7);const tr=travaComp(e.id,c);if(tr){d.cancelPendente=true;d.retido=true;d.retidoMotivo=tr;ret.push(d.numero);return}d.situacao=x.situacao;d.canceladaEm=agora();sincDoc(d)}),['Escrita fiscal','Consulta de situação na SEFAZ: '+canc.length+' nota(s) cancelada(s)/denegada(s)',e.razao]);
+    const nao=(r.resultado||[]).filter(x=>x.situacao==='nao_encontrada').length;
+    toast(`${(r.resultado||[]).length} nota(s) consultada(s): ${canc.length} cancelada(s)/denegada(s)${ret.length?' ('+ret.length+' em mês fechado, retidas para decisão)':''}${nao?', '+nao+' não encontrada(s) na SEFAZ':''}.`,!!(canc.length||nao))}catch(er){toast(er.message,true)}finally{el&&(el.disabled=false)}};
+const aSimplesAbaV35=aSimplesAba;aSimplesAba=function(){let h=aSimplesAbaV35();if(!APP_FISCAL||UI.snAba!=='notas')return h;
+  return h.replace('<button class="btn" data-act="xml-baixar">','<button class="btn" data-act="cap-nfse" title="Busca no Ambiente de Dados Nacional com o certificado A1 da empresa">Buscar NFS-e emitidas</button><button class="btn" data-act="cap-sit" title="Consulta cada NF-e/NFC-e do período na SEFAZ">Conferir situação na SEFAZ</button><button class="btn" data-act="xml-baixar">')};
+/* ==== v35b (fim) ==== */
 
 
 
@@ -8360,7 +8668,8 @@ if(APP_SIS){
   const NAV_FISCAL=[
     ['Competência',[['f-central','Central da competência','checksq','Todas as empresas no mês: movimento, apuração e guia, com apuração em lote']]],
     ['Movimento',[['f-saidas','Notas fiscais de saída','upload','Importação de XML (NF-e, NFC-e, NFS-e), receita por CFOP e CST'],['f-entradas','Notas fiscais de entrada','filetext','Busca automática na SEFAZ e XML dos fornecedores'],['f-lanc','Lançamentos fiscais','receipt','Saídas, serviços, entradas, serviços tomados com retenções e outros documentos, com acumuladores']]],
-    ['Apuração',[['f-apur','Simples Nacional e MEI','calc','Receitas por anexo, RBT12, Fator R e DAS']]],
+    ['Apuração',[['f-apur','Simples Nacional e MEI','calc','Receitas por anexo, RBT12, Fator R e DAS'],['f-lucro','Lucro Presumido e Real','calc','PIS/COFINS, IRPJ/CSLL, ICMS e ISS próprios, com guias'],['f-icms','ICMS nas entradas','receipt','DIFAL de uso, consumo e ativo e antecipação nas compras de outros estados']]],
+    ['Obrigações',[['f-arq','Arquivos fiscais','download','EFD ICMS/IPI, EFD-Contribuições, EFD-Reinf e DeSTDA'],['f-ibs','IBS e CBS nas notas','checksq','Conferência da reforma tributária nas NF-e e NFC-e']]],
     ['Relatórios',[['f-rel','Livros e relatórios','chart','Livros de saídas e entradas, resumos e base do PGDAS-D']]],
   ];
   const NAV_F=APP_DP?NAV_DP:APP_CONTABIL?NAV_CTB:NAV_FISCAL;
@@ -8391,7 +8700,7 @@ if(APP_SIS){
       ${per?`<div class="ctb-campo"><span>Período</span><div class="ctb-per"><em>de</em><b class="ctb-val" style="padding:0 4px">${fmtComp(F.comp)}</b><em>até</em>${selMes('data-nf="ate"',UI.fnf.ate)}</div></div>`:''}
     </div>`}
   function ctbMenu(){return `<aside class="ctb-nav" aria-label="${APP_DP?'Folha de Pagamento':APP_CONTABIL?'Contabilidade':'Escrita Fiscal'}">${ctbCardComp()}${NAV_F.map(([g,its])=>`<div class="ctb-grp"><span>${g}</span>${its.map(([v,t,ic,dica])=>`<a href="#${v}" title="${esc(dica)}" ${UI.view===v?'aria-current="page"':''}>${svg(ic)}<span>${t}</span></a>`).join('')}</div>`).join('')}
-    <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>${APP_DP?'Envio ao eSocial (S-1200, S-1210, S-2299) e DCTFWeb, e importação de ponto eletrônico (AFD).':APP_CONTABIL?'ECD, ECF, DMPL e notas explicativas entram aqui, uma de cada vez.':'EFD ICMS/IPI, EFD-Reinf e DCTFWeb entram aqui, uma de cada vez.'}</p></div></aside>`}
+    <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>${APP_DP?'Envio ao eSocial (S-1200, S-1210, S-2299) e DCTFWeb, e importação de ponto eletrônico (AFD).':APP_CONTABIL?'ECD, ECF, DMPL e notas explicativas entram aqui, uma de cada vez.':'Transmissão direta (PGDAS-D, EFD, Reinf e DeSTDA) quando o Integra Contador e os certificados estiverem ligados.'}</p></div></aside>`}
   function ctbStatus(){const F=UI.fsn||{};const e=emp(F.emp);
     const txt=MODO!=='api'?'Modo local':MF.estado==='online'?'Tempo real · conectado':MF.estado==='reconectando'?'Reconectando…':'Conectando…';
     return `<footer class="ctb-status"><span class="conn ${MODO!=='api'||MF.estado==='online'?'ok':''}" id="mf-selo"><i></i>${txt}</span><span>${esc(cfg().escritorio||'')}</span>${e?`<span>${esc(e.fantasia||e.razao)}</span>`:''}${F.comp?`<span>Competência ${fmtComp(F.comp)}</span>`:''}<span class="grow"></span><span class="ctb-atalhos">F8 trocar empresa · PgUp/PgDn competência</span>${cfg().crc?`<span>${esc(cfg().crc)}</span>`:''}</footer>`}
@@ -8434,6 +8743,10 @@ if(APP_SIS){
     if(UI.view==='f-saidas'){UI.snAba='notas';return simples?aSimplesAba():foraSN('Notas fiscais de saída')}
     if(UI.view==='f-rel'){UI.snAba='rel';return simples?aSimplesAba():foraSN('Livros e relatórios')}
     if(UI.view==='f-lanc')return ctbLanc();
+    if(UI.view==='f-lucro')return fLucro();
+    if(UI.view==='f-icms')return fIcmsEntradas();
+    if(UI.view==='f-arq')return fArquivos();
+    if(UI.view==='f-ibs')return fIbsCbs();
     if(UI.view==='f-entradas'){const f=UI.fnfe||(UI.fnfe={});f.emp=e.id;f.mes='';return ctbEntradas()}
     return conteudoV27();
   };

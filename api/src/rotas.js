@@ -21,6 +21,7 @@ import { registrarContratos, PLANOS_COMISSAO } from './contrato.js';
 import { registrarCnpj } from './cnpj.js';
 import { registrarNfse } from './nfse.js';
 import { registrarNfeEntrada } from './nfe-entrada.js';
+import { registrarCaptura } from './captura.js';
 import { criarRegistroAlteracoes, registrarRotasAlteracoes } from './alteracoes.js';
 import { registrarPerfil } from './perfil.js';
 import { registrarAtendimento, cfgAtend, filtroConversas, conversaVisivel, limparDeptos, deptosDoUsuario } from './atendimento.js';
@@ -658,6 +659,7 @@ export function registrarRotas(r, { db, hub }) {
   registrarCnpj(r, { exigir });
   registrarNfse(r, { db, exigir, log, pode });
   registrarNfeEntrada(r, { db, exigir, log, pode });
+  registrarCaptura(r, { db, exigir, log, pode });
   const contratos = registrarContratos(r, { db, exigir, log, pode }); ganchos.aoAtivar = contratos.aoAtivar; ganchos.faturaPaga = contratos.aoFaturaPaga;
   registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos });
   registrarDocumentos(r, { db, exigir, log, pode, wa });
