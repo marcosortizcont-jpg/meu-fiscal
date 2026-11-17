@@ -260,6 +260,7 @@ export function registrarIntegra(r, { db, exigir, log, pode, wa }) {
   // quem recebe cada rotina: MEI marcados (mei); Simples com DAS automático (das); empresas marcadas no cadastro (dctfweb, parcelamentos)
   const alvos = (emps, rotina, auto) => {
     const exc = new Set(auto.excluidas || []);
+    emps = emps.filter(e => !e.exemplo);   // empresas de exemplo nunca vão à Receita
     if (rotina === 'mei') return emps.filter(e => ativa(e) && ehMei(e) && !exc.has(e.id)).map(e => ({ e }));
     if (rotina === 'das') return emps.filter(e => ativa(e) && ehSimples(e) && e.integra?.das !== false).map(e => ({ e }));
     if (rotina === 'dctfweb') return emps.filter(e => ativa(e) && e.integra?.dctfweb === true).map(e => ({ e }));
