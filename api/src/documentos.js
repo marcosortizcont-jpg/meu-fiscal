@@ -44,8 +44,10 @@ export function registrarDocumentos(r, { db, exigir, log, pode, wa }) {
     const { data, comp: atual, dia, hora } = agoraLocal(); const comp = addMes(atual, -1);
     const cfgs = await db.query(`SELECT escritorio_id, id, dados FROM registros WHERE colecao = 'config'`);
     for (const c of cfgs) {
-      const a = c.dados?.docsAuto; if (!a?.ativo || !(a.dias || []).map(Number).includes(dia) || hora < Number(a.hora ?? 9) || c.dados.docsAutoUltimo === data) continue;
-      c.dados.docsAutoUltimo = data; await A.gravar(c.escritorio_id, 'config', c.id, null, c.dados);
+      const a = c.dados?.docsAuto; if (!a?.ativo || !(a.dias || []).map(Number).includes(dia) || hora < Number(a.hora ?? 9)) continue;
+      // controle da última execução fica num registro próprio (o navegador regrava a config inteira e apagaria a marca)
+      const marca = await A.registro(c.escritorio_id, 'capturaestado', 'docsauto'); if (marca?.ultimo === data) continue;
+      await A.gravar(c.escritorio_id, 'capturaestado', 'docsauto', null, { ultimo: data });
       const emps = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas'`, [c.escritorio_id]);
       const regs = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'checklist' AND dados->>'comp' = $2`, [c.escritorio_id, comp]);
       let n = 0;
