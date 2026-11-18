@@ -1,5 +1,5 @@
 // Captura automática para a escrita fiscal:
-//  - NFS-e emitidas pela empresa, no Ambiente de Dados Nacional (ADN) da NFS-e: GET /contribuintes/DFe/{NSU} com mTLS
+//  - NFS-e emitidas e recebidas (prestados e tomados) pela empresa, no Ambiente de Dados Nacional (ADN) da NFS-e: GET /contribuintes/DFe/{NSU} com mTLS
 //    pelo certificado A1 da própria empresa. A resposta traz LoteDFe[] com ArquivoXml em gzip+base64.
 //  - Situação de NF-e/NFC-e emitidas (autorizada, cancelada, denegada) pelo NFeConsultaProtocolo4 da SEFAZ autorizadora.
 // O XML vai para o navegador, que importa pelas mesmas regras das notas enviadas à mão (competência travada, cancelamentos etc.).
@@ -41,6 +41,11 @@ function simNfse(cnpj, n) {
   return `<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00"><infNFSe Id="NFS5002704${cnpj}${String(num).padStart(15, '0')}"><cLocIncid>5002704</cLocIncid><nNFSe>${num}</nNFSe><cLocEmi>5002704</cLocEmi><dhProc>${dia}T09:00:00-04:00</dhProc><emit><CNPJ>${cnpj}</CNPJ><xNome>PRESTADOR</xNome></emit><valores><vBC>${v}</vBC><pAliqAplic>2.00</pAliqAplic><vISSQN>${(v * 0.02).toFixed(2)}</vISSQN><vLiq>${v}</vLiq></valores><DPS versao="1.00"><infDPS Id="DPS${num}"><dhEmi>${dia}T08:59:00-04:00</dhEmi><dCompet>${dia}</dCompet><serie>900</serie><prest><CNPJ>${cnpj}</CNPJ></prest><toma><CNPJ>11222333000181</CNPJ><xNome>TOMADOR SIMULADO</xNome></toma><serv><cServ><cTribNac>010101</cTribNac><xDescServ>Servico simulado</xDescServ></cServ></serv><valores><vServPrest><vServ>${v}</vServ></vServPrest><trib><tribMun><tribISSQN>1</tribISSQN><tpRetISSQN>1</tpRetISSQN></tribMun></trib></valores></infDPS></DPS></infNFSe></NFSe>`;
 }
 
+function simNfseTomada(cnpj, n) {   // serviço tomado: outro prestador, a empresa como tomadora, com retenções federais
+  const dia = new Date(Date.now() - 86400000 * (2 + n)).toISOString().slice(0, 10); const num = 4400 + n; const v = (8000 + n * 500).toFixed(2); const pr = '11222333000181';
+  return `<?xml version="1.0" encoding="UTF-8"?><NFSe xmlns="http://www.sped.fazenda.gov.br/nfse" versao="1.00"><infNFSe Id="NFS5002704${pr}${String(num).padStart(15, '0')}"><cLocIncid>5002704</cLocIncid><nNFSe>${num}</nNFSe><cLocEmi>5002704</cLocEmi><dhProc>${dia}T10:00:00-04:00</dhProc><emit><CNPJ>${pr}</CNPJ><xNome>LIMPEZA E CONSERVACAO SIMULADA LTDA</xNome></emit><valores><vBC>${v}</vBC><pAliqAplic>5.00</pAliqAplic><vISSQN>${(v * 0.05).toFixed(2)}</vISSQN><vLiq>${(v * 0.8335).toFixed(2)}</vLiq></valores><DPS versao="1.00"><infDPS Id="DPST${num}"><dhEmi>${dia}T09:59:00-04:00</dhEmi><dCompet>${dia}</dCompet><serie>1</serie><prest><CNPJ>${pr}</CNPJ></prest><toma><CNPJ>${cnpj}</CNPJ><xNome>EMPRESA TOMADORA</xNome></toma><serv><cServ><cTribNac>070201</cTribNac><xDescServ>Limpeza e conservacao (cessao de mao de obra)</xDescServ></cServ></serv><valores><vServPrest><vServ>${v}</vServ></vServPrest><trib><tribMun><tribISSQN>1</tribISSQN><tpRetISSQN>2</tpRetISSQN></tribMun><tribFed><piscofins><CST>01</CST><vBCPisCofins>${v}</vBCPisCofins><pAliqPis>0.65</pAliqPis><pAliqCofins>3.00</pAliqCofins><vPis>${(v * 0.0065).toFixed(2)}</vPis><vCofins>${(v * 0.03).toFixed(2)}</vCofins><tpRetPisCofins>1</tpRetPisCofins></piscofins><vRetCP>${(v * 0.11).toFixed(2)}</vRetCP><vRetIRRF>${(v * 0.01).toFixed(2)}</vRetIRRF><vRetCSLL>${(v * 0.01).toFixed(2)}</vRetCSLL></tribFed></trib></valores></infDPS></DPS></infNFSe></NFSe>`;
+}
+
 export function registrarCaptura(r, { db, exigir, log, pode }) {
   const A = criarApoio(db);
   const ambiente = () => (process.env.NFSE_ADN_AMBIENTE === 'restrita' ? 'restrita' : 'producao');
@@ -65,7 +70,7 @@ export function registrarCaptura(r, { db, exigir, log, pode }) {
     const docs = []; let nsu = Number(est.ultNSU || 0); let msg = '';
     for (let i = 0; i < 20; i++) {
       let lote;
-      if (FALSO) lote = nsu >= 2 ? [] : [1, 2].map(k => ({ NSU: k, TipoDocumento: 'NFSE', xml: simNfse(cnpj, k) }));
+      if (FALSO) lote = nsu >= 3 ? [] : [1, 2, 3].map(k => ({ NSU: k, TipoDocumento: 'NFSE', xml: k === 3 ? simNfseTomada(cnpj, k) : simNfse(cnpj, k) }));
       else {
         const resp = await pedir(`${ADN[ambiente()]}/contribuintes/DFe/${nsu}`, { pfx: cert.pfx, senha: cert.senha });
         if (resp.status === 404 || resp.status === 204) { msg = 'Nenhum documento novo no Ambiente Nacional.'; break; }

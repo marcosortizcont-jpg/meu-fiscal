@@ -18,6 +18,17 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### Serviços prestados e tomados (NFS-e, todos os regimes)
+
+O menu Movimento do fiscal ganhou duas telas: **Serviços prestados** (`#f-nfse-p`) e **Serviços tomados** (`#f-nfse-t`). Elas aceitam XML de NFS-e do padrão nacional e do ABRASF, avulso ou em ZIP, inclusive de vários clientes no mesmo arquivo.
+
+- **Prestada** (o cliente é o prestador): vai para as notas de saída e gera a receita do regime.
+- **Tomada** (o cliente é o tomador): vira um lançamento de serviço tomado (`lancfiscais`, `id tom-…`). Leva as retenções da nota: ISS, INSS, IRRF, PIS, Cofins e CSLL. O acumulador é 201, ou 202 quando há INSS. Assim entra na EFD-Reinf (R-2010/R-4020), na DCTFWeb e nos livros.
+- Retenções federais destacadas nas NFS-e prestadas entram em `retSofridas`, que é usado nas apurações do Lucro Presumido e do Lucro Real.
+- **Buscar na Receita:** consulta o Ambiente de Dados Nacional (ADN) com o certificado A1 da empresa e traz as notas emitidas e as recebidas.
+- **Automático:** liga a busca por empresa (`capturaAuto`). Ela roda sem abrir janela quando o fiscal está aberto: 20 s depois de abrir e a cada 30 min, no máximo uma vez a cada 6 h por empresa.
+- "Notas fiscais de saída" passou a abrir para todos os regimes.
+
 ### DARF pelo SICALC (Lucro Presumido e Real)
 
 Em **Lucro Presumido e Real → Guias geradas**, cada guia de PIS, Cofins, IRPJ e CSLL tem **Emitir**, e há um botão para emitir todas de uma vez. A emissão usa o serviço SICALC do Integra Contador (`CONSOLIDARGERARDARF51`, rota `POST /api/integra/darf`), sem o captcha do SICALC Web.

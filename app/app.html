@@ -8194,9 +8194,10 @@ async function importarXmlFiscalV34(files){const arquivos=[],erros=[];
   const docs=[],cancs=[];for(const a of arquivos){let lidos;try{lidos=lerXmlFiscal(textoXml(a.bytes))}catch(x){lidos=[{erro:'XML ilegível'}]}
     for(const d of lidos){if(d.erro)erros.push(a.nome+': '+d.erro);else if(d.tipo==='cancelamento')cancs.push({...d,arq:a});else docs.push({...d,arqNome:a.nome,arq:a})}}
   const R={};const r=e=>R[e.id]||(R[e.id]={e,novas:0,atualizadas:0,iguais:0,entradas:0,canceladas:0,retidas:0,meses:{},arqs:{},cancPend:0});const semCliente={};
-  mut(['docsaida','receitas','faturamento','nfentrada','empresas'],()=>{
+  mut(['docsaida','receitas','faturamento','nfentrada','empresas','lancfiscais'],()=>{
     for(const d of docs){const emi=porCnpj[soDig(d.emitente?.doc)],dst=porCnpj[soDig(d.destinatario?.doc)];
       let e=emi||null;const entrada=!emi&&dst&&d.modelo!=='NFSE'&&!d.itens.some(it=>cfopDevolucao(it.cfop,false));
+      if(d.modelo==='NFSE'&&dst&&dst!==emi&&typeof tomadaNfse==='function'){tomadaNfse(d,dst,r(dst));if(!emi)continue}
       if(!e&&dst&&d.modelo!=='NFSE')e=dst;if(!e){const k=soDig(d.emitente?.doc)||'?';semCliente[k]=(semCliente[k]||0)+1;continue}
       const x0=r(e);
       if(entrada){const x=S.nfentrada.find(z=>z.id===d.chave);const n={...(x||{}),id:d.chave,empresaId:e.id,chave:d.chave,numero:d.numero,serie:d.serie,natOp:d.natOp,emitente:{cnpj:d.emitente.doc,nome:d.emitente.nome,uf:d.emitente.uf},emissao:d.emissao,valor:d.totais.vNF,situacao:d.situacao,completa:true,itens:d.itens,totais:d.totais,origem:x?.origem||'xml',recebidaEm:x?.recebidaEm||agora()};
@@ -8222,11 +8223,11 @@ async function importarXmlFiscalV34(files){const arquivos=[],erros=[];
   // guarda dos XML originais (5 anos), um ZIP por empresa e competência
   let falhaGuarda='';
   for(const x of Object.values(R))for(const [comp,L] of Object.entries(x.arqs)){try{const G=await guardarXmls(x.e.id,comp,L);
-      mut('docsaida',()=>G.forEach(g=>g.nomes.forEach((nome,i)=>{const id=L.find(y=>y.nome===nome)?.doc;const d=S.docsaida.find(z=>z.id===id&&z.empresaId===x.e.id);if(d)d.xmlArq={id:g.arq.id,url:g.arq.url,nome:g.arq.nome,item:nome}})))}catch(er){falhaGuarda=er.message||'falha ao guardar'}}
+      mut(['docsaida','lancfiscais'],()=>G.forEach(g=>g.nomes.forEach((nome,i)=>{const id=L.find(y=>y.nome===nome)?.doc;const d=S.docsaida.find(z=>z.id===id&&z.empresaId===x.e.id)||S.lancfiscais.find(z=>z.id===id&&z.empresaId===x.e.id);if(d)d.xmlArq={id:g.arq.id,url:g.arq.url,nome:g.arq.nome,item:nome}})))}catch(er){falhaGuarda=er.message||'falha ao guardar'}}
   // resumo
   const linhas=Object.values(R).sort((a,b)=>String(a.e.fantasia||a.e.razao).localeCompare(String(b.e.fantasia||b.e.razao),'pt-BR')).map(x=>{const lac=Object.keys(x.meses).flatMap(c=>lacunasDe(x.e.id,c).map(l=>`${fmtComp(c)} · ${MOD_NOME[l.mod]||(l.mod==='NFSE'?'NFS-e':'mod. '+l.mod)} série ${l.serie||'—'}: ${faixas(l.nums)}`));
     return `<tr><td><b>${esc(x.e.fantasia||x.e.razao)}</b><div class="small muted">${fmtCNPJ(x.e.cnpj||'')}</div></td><td class="small">${Object.entries(x.meses).sort().map(([c,n])=>`${fmtComp(c)}: ${n}`).join('<br>')||'—'}</td>
-     <td class="small">${[x.novas&&x.novas+' nova(s)',x.atualizadas&&x.atualizadas+' atualizada(s)',x.iguais&&x.iguais+' já importada(s)',x.entradas&&x.entradas+' de entrada',x.canceladas&&x.canceladas+' cancelada(s)',x.cancPend&&x.cancPend+' cancelamento(s) aguardando a nota'].filter(Boolean).join('<br>')}</td>
+     <td class="small">${[x.novas&&x.novas+' nova(s)',x.atualizadas&&x.atualizadas+' atualizada(s)',x.iguais&&x.iguais+' já importada(s)',x.entradas&&x.entradas+' de entrada',x.tomadas&&x.tomadas+' serviço(s) tomado(s)',x.tomadasAt&&x.tomadasAt+' tomado(s) atualizado(s)',x.canceladas&&x.canceladas+' cancelada(s)',x.cancPend&&x.cancPend+' cancelamento(s) aguardando a nota'].filter(Boolean).join('<br>')}</td>
      <td class="small">${x.retidas?`<span style="color:var(--crit)"><b>${x.retidas} retida(s)</b>: mês fechado, aguardam decisão</span><br>`:''}${lac.length?'<span style="color:var(--warn)">Números faltando:<br>'+lac.map(esc).join('<br>')+'</span>':''}${!x.retidas&&!lac.length?'<span class="muted">—</span>':''}</td></tr>`}).join('');
   const sc=Object.entries(semCliente);
   openModal(mHead('Importação de XML')+`<div class="modal-body">${linhas?`<div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Competências</th><th>Resultado</th><th>Atenção</th></tr></thead><tbody>${linhas}</tbody></table></div>`:'<p>Nenhuma nota de cliente da carteira nos arquivos.</p>'}
@@ -9037,6 +9038,79 @@ const lpGuiasV39=ACT['lp-guias'];ACT['lp-guias']=el=>{const e=emp(UI.fsn.emp),co
   if(Q.length)mut('guias',()=>{S.guias=S.guias.filter(g=>!(Q.includes(g)&&g.quota>1));Q.filter(g=>g.quota===1).forEach(g=>{delete g.quota;delete g.quotas;delete g.principal;delete g.vencOriginal})},['Guias','Desfez as quotas de '+fmtComp(comp)+' para regerar',e.razao]);
   return lpGuiasV39(el)};
 /* ==== v39 (fim) ==== */
+/* ==== v40: NFS-e de serviços prestados e tomados (padrão nacional e ABRASF) para todos os regimes · busca no Ambiente Nacional ==== */
+/* retenções federais destacadas na NFS-e */
+const lerNFSeNacionalV40=lerNFSeNacional;lerNFSeNacional=function(d){const r=lerNFSeNacionalV40(d);const tf=XQ(XQ(d,'infDPS'),'tribFed');
+  if(tf){const pc=XQ(tf,'piscofins');const retPC=pc&&['1','3'].includes(XT(pc,'tpRetPisCofins'));r.retFed={inss:XN(tf,'vRetCP'),irrf:XN(tf,'vRetIRRF'),csll:XN(tf,'vRetCSLL'),pis:retPC?XN(pc,'vPis'):0,cofins:retPC?XN(pc,'vCofins'):0}}
+  return r};
+const lerNFSeAbrasfV40=lerNFSeAbrasf;lerNFSeAbrasf=function(el){const r=lerNFSeAbrasfV40(el);const inf=XQ(el,'InfNfse');const val=XQ(XQ(el,'Servico')||XQ(inf,'Servico'),'Valores');
+  if(val)r.retFed={inss:XN(val,'ValorInss'),irrf:XN(val,'ValorIr'),csll:XN(val,'ValorCsll'),pis:XN(val,'ValorPis'),cofins:XN(val,'ValorCofins')};return r};
+const somaRetFed=rf=>r2(['inss','irrf','csll','pis','cofins'].reduce((a,k)=>a+(+rf?.[k]||0),0));
+/* NFS-e em que o cliente é o tomador vira lançamento de serviço tomado (entra na Reinf, DCTFWeb, livros e relatórios) */
+function tomadaNfse(d,e,x0){const id='tom-'+d.id;const comp=String(d.competencia||d.emissao).slice(0,7);const ex=S.lancfiscais.find(l=>l.id===id&&l.empresaId===e.id);
+  const rf=d.retFed||{};const ret={};if(d.iss?.retido&&+d.iss.valor>0)ret.iss=r2(d.iss.valor);['irrf','pis','cofins','csll','inss'].forEach(k=>{if(+rf[k]>0)ret[k]=r2(rf[k])});
+  const l={...(ex||{}),id,empresaId:e.id,tipo:'tomado',acum:ex?.acum||(ret.inss?202:201),especie:'NFSE',data:d.emissao,competencia:comp,numero:d.numero,serie:d.serie||'',
+    part:{doc:soDig(d.emitente?.doc),nome:d.emitente?.nome||''},uf:'',cfop:'',valor:+d.totais?.vNF||0,codServ:d.servico?.codigo||'',munIss:d.servico?.municipioIncidencia||'',ret,hist:d.natOp||'',
+    origem:'xml',chave:d.chave||'',padrao:d.padrao,situacao:d.situacao,iss:d.iss,cancelado:d.situacao==='cancelada'||undefined,importadoEm:ex?.importadoEm||agora(),atualizadoEm:agora()};
+  if(ex){const igual=Math.abs((+ex.valor||0)-l.valor)<.01&&ex.situacao===l.situacao;Object.assign(ex,l);if(igual)x0.iguais++;else x0.tomadasAt=(x0.tomadasAt||0)+1}else{S.lancfiscais.push(l);x0.tomadas=(x0.tomadas||0)+1}
+  if(d.arq)(x0.arqs[comp]=x0.arqs[comp]||[]).push({doc:id,nome:d.arqNome,bytes:d.arq.bytes})}
+/* retenções sofridas também pelas NFS-e prestadas (além dos lançamentos manuais) */
+const retSofridasV40=retSofridas;retSofridas=function(eid,comps){const R=retSofridasV40(eid,comps);
+  S.docsaida.filter(d=>d.empresaId===eid&&d.modelo==='NFSE'&&!d.retido&&d.situacao==='autorizada'&&comps.includes(String(d.competencia||d.emissao).slice(0,7))&&d.retFed).forEach(d=>['irrf','pis','cofins','csll','inss'].forEach(k=>R[k]=r2(R[k]+(+d.retFed[k]||0))));return R};
+
+/* ---------- telas ---------- */
+const capHtml=e=>{const ed=podeMod('guias','editar');return ed?`<button class="btn" data-act="cap-nfse" title="Busca no Ambiente de Dados Nacional da NFS-e as notas emitidas e recebidas pela empresa (certificado A1 da empresa)">${svg('refresh')}Buscar na Receita (Ambiente Nacional)</button>
+  <label class="btn" title="Ao abrir o sistema e a cada 30 min, busca sozinho as NFS-e novas desta empresa"><input type="checkbox" data-act="cap-auto" ${e.capturaAuto?'checked':''} style="margin:0 6px 0 0">Automático</label>
+  <label class="btn primary">${svg('upload')}Importar XML ou ZIP<input type="file" hidden multiple accept=".xml,.zip" data-up="xml-fiscal"></label>`:''};
+const capInfo=e=>{const u=(()=>{try{return localStorage.getItem('mf-cap-'+e.id)}catch(x){return null}})();return `<p class="small muted" style="margin-top:0">Aceita NFS-e do padrão nacional e ABRASF (XML avulso ou ZIP, inclusive de vários clientes). A busca na Receita usa o certificado A1 da empresa no Ambiente de Dados Nacional e traz as notas emitidas <b>e</b> as recebidas.${e.capturaAuto?' Busca automática ligada'+(u?' · última em '+fmtDH(u):'')+'.':''}</p>`};
+const xmlLink=x=>x.xmlArq?.url?`<a class="small" href="${esc(x.xmlArq.url)}" target="_blank" rel="noopener" title="${esc(x.xmlArq.item||'')}">XML</a>`:'';
+function fNfsePrest(){const F=UI.fsn;const e=emp(F.emp);const {de,ate}=periodoNf();const q=normP((UI.fns||{}).q||'');
+  const T=S.docsaida.filter(d=>d.empresaId===e.id&&d.modelo==='NFSE'&&d.tpNF!=='0'&&soDig(d.emitente?.doc)===soDig(e.cnpj)&&docMes(d)>=de&&docMes(d)<=ate).sort((a,b)=>String(a.emissao).localeCompare(String(b.emissao))||String(a.numero).localeCompare(String(b.numero),undefined,{numeric:true}));
+  const L=q?T.filter(d=>normP([d.numero,d.destinatario?.nome,d.destinatario?.doc,d.natOp].join(' ')).includes(q)):T;const A=L.filter(d=>d.situacao==='autorizada'&&!d.retido);
+  const s=f=>r2(A.reduce((a,d)=>a+(+f(d)||0),0));const sn=e.regime==='SN'||e.regime==='MEI';
+  return head('Serviços prestados','NFS-e emitidas pela empresa: importação de XML (padrão nacional e ABRASF) ou busca direta no Ambiente Nacional. A receita entra na apuração do regime.')+
+   `<div class="crm-kpis"><div class="kpi"><span class="eyebrow">Notas autorizadas</span><b>${A.length}</b></div><div class="kpi"><span class="eyebrow">Valor dos serviços</span><b>${brl(s(d=>d.totais?.vNF))}</b></div>
+    <div class="kpi"><span class="eyebrow">${sn?'ISS destacado (no DAS)':'ISS próprio'}</span><b>${brl(s(d=>d.iss?.retido?0:d.iss?.valor))}</b></div><div class="kpi"><span class="eyebrow">ISS retido · retenções federais</span><b>${brl(s(d=>d.iss?.retido?d.iss.valor:0))} · ${brl(s(d=>somaRetFed(d.retFed)))}</b></div></div>
+   <div class="panel"><div class="panel-head" style="flex-wrap:wrap;gap:8px"><h2>NFS-e emitidas</h2><div class="actions">${capHtml(e)}</div></div>${capInfo(e)}
+    <div class="actions" style="margin-bottom:10px"><input type="search" data-fns-busca placeholder="Número, tomador, CNPJ ou serviço" value="${esc((UI.fns||{}).q||'')}" style="max-width:280px"></div>
+    ${L.length?`<div class="table-wrap"><table><thead><tr><th>Emissão</th><th>Número</th><th>Tomador</th><th>Serviço</th><th class="r">Valor</th><th class="r">ISS</th><th>ISS retido</th><th class="r">Ret. federais</th><th>Situação</th><th></th></tr></thead><tbody>${L.slice(0,500).map(d=>`<tr>
+     <td class="num small">${fmtData(d.emissao)}</td><td class="small">${esc(d.numero)}${d.padrao?`<div class="muted">${esc(d.padrao)}</div>`:''}</td><td><b>${esc(d.destinatario?.nome||'')}</b><div class="small muted mono">${d.destinatario?.doc?fmtDoc(d.destinatario.doc):''}</div></td>
+     <td class="small">${esc(d.servico?.codigo||'')}<div class="muted">${esc((d.natOp||'').slice(0,50))}</div></td><td class="r num">${brl(d.totais?.vNF||0)}</td><td class="r num">${brl(d.iss?.valor||0)}<div class="small muted">${d.iss?.aliquota?String(d.iss.aliquota).replace('.',',')+'%':''}</div></td>
+     <td>${d.iss?.retido?pill('Retido','warn'):'<span class="small muted">Não</span>'}</td><td class="r num">${somaRetFed(d.retFed)?brl(somaRetFed(d.retFed)):'—'}</td>
+     <td>${d.retido?pill('Retida (mês fechado)','crit'):pill(d.situacao==='autorizada'?'Autorizada':d.situacao==='cancelada'?'Cancelada':d.situacao,d.situacao==='autorizada'?'ok':'crit')}</td><td>${xmlLink(d)}</td></tr>`).join('')}</tbody></table></div>${L.length>500?'<p class="small muted">Mostrando 500 notas.</p>':''}`
+     :vazio('Nenhuma NFS-e emitida no período. Importe os XML ou busque no Ambiente Nacional.')}
+    <p class="small muted">NFS-e com ISS retido pelo tomador não geram ISS a recolher pela empresa${sn?' e são segregadas no PGDAS-D':''}. As retenções federais (IRRF, PIS, Cofins, CSLL e INSS) destacadas na nota entram como compensação nas apurações e nos relatórios.</p></div>`}
+function fNfseTom(){const F=UI.fsn;const e=emp(F.emp);const {de,ate}=periodoNf();const q=normP((UI.fns||{}).q||'');const ed=podeMod('guias','editar');
+  const T=S.lancfiscais.filter(l=>l.empresaId===e.id&&l.tipo==='tomado'&&lancMes(l)>=de&&lancMes(l)<=ate).sort((a,b)=>String(a.data).localeCompare(String(b.data)));
+  const L=q?T.filter(l=>normP([l.numero,l.part?.nome,l.part?.doc,l.hist].join(' ')).includes(q)):T;const A=L.filter(l=>!l.cancelado);const s=k=>r2(A.reduce((a,l)=>a+(+l.ret?.[k]||0),0));
+  return head('Serviços tomados','NFS-e recebidas de prestadores: importação de XML ou busca no Ambiente Nacional. As retenções vão para a EFD-Reinf (R-2010 e R-4020), a DCTFWeb e o ISS retido a recolher.')+
+   `<div class="crm-kpis"><div class="kpi"><span class="eyebrow">Notas · valor</span><b>${A.length} · ${brl(r2(A.reduce((a,l)=>a+(+l.valor||0),0)))}</b></div><div class="kpi"><span class="eyebrow">ISS retido a recolher</span><b>${brl(s('iss'))}</b></div>
+    <div class="kpi"><span class="eyebrow">INSS retido (11%)</span><b>${brl(s('inss'))}</b></div><div class="kpi"><span class="eyebrow">IRRF · PIS/Cofins/CSLL</span><b>${brl(s('irrf'))} · ${brl(r2(s('pis')+s('cofins')+s('csll')))}</b></div></div>
+   <div class="panel"><div class="panel-head" style="flex-wrap:wrap;gap:8px"><h2>NFS-e recebidas</h2><div class="actions">${ed?'<button class="btn" data-act="tom-novo">Lançar sem XML</button>':''}${capHtml(e)}</div></div>${capInfo(e)}
+    <div class="actions" style="margin-bottom:10px"><input type="search" data-fns-busca placeholder="Número, prestador, CNPJ ou serviço" value="${esc((UI.fns||{}).q||'')}" style="max-width:280px"></div>
+    ${L.length?`<div class="table-wrap"><table><thead><tr><th>Data</th><th>Número</th><th>Prestador</th><th>Serviço</th><th class="r">Valor</th><th class="r">ISS retido</th><th class="r">INSS</th><th class="r">IRRF</th><th class="r">PIS/Cof/CSLL</th><th>Origem</th><th></th></tr></thead><tbody>${L.slice(0,500).map(l=>{const r=l.ret||{};return `<tr${l.cancelado?' style="opacity:.55"':''}>
+     <td class="num small">${fmtData(l.data)}</td><td class="small">${esc(l.numero||'')}</td><td><b>${esc(l.part?.nome||'')}</b><div class="small muted mono">${l.part?.doc?fmtDoc(l.part.doc):''}</div></td>
+     <td class="small">${esc(l.codServ||'')}<div class="muted">${esc((l.hist||'').slice(0,50))}</div></td><td class="r num">${brl(l.valor||0)}</td><td class="r num">${r.iss?brl(r.iss):'—'}</td><td class="r num">${r.inss?brl(r.inss):'—'}</td><td class="r num">${r.irrf?brl(r.irrf):'—'}</td>
+     <td class="r num">${(+r.pis||0)+(+r.cofins||0)+(+r.csll||0)?brl(r2((+r.pis||0)+(+r.cofins||0)+(+r.csll||0))):'—'}</td><td class="small">${l.cancelado?pill('Cancelada','crit'):l.origem==='xml'?'XML '+esc(l.padrao||''):'Manual'} ${xmlLink(l)}</td>
+     <td class="r" style="white-space:nowrap">${ed?`<button class="btn sm" data-act="lanc-editar" data-id="${l.id}">Editar</button> <button class="btn sm ghost" data-act="lanc-excluir" data-id="${l.id}">Excluir</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`
+     :vazio('Nenhum serviço tomado no período. Importe os XML das NFS-e recebidas ou busque no Ambiente Nacional.')}
+    <p class="small muted">O acumulador é escolhido pela retenção (201 serviço de PJ; 202 cessão de mão de obra, quando há INSS). Ajuste em Editar se precisar. Os relatórios ficam em Livros e relatórios → Serviços tomados e Retenções.</p></div>`}
+ACT['tom-novo']=()=>{UI.lancTipoNovo='tomado';openModal(lancForm(null),true)};
+document.addEventListener('input',ev=>{const t=ev.target;if(t.matches&&t.matches('[data-fns-busca]')){(UI.fns||(UI.fns={})).q=t.value;clearTimeout(UI._fnsT);UI._fnsT=setTimeout(()=>{render();const n=document.querySelector('[data-fns-busca]');if(n){n.focus();n.setSelectionRange(n.value.length,n.value.length)}},250)}});
+/* ---------- busca automática no Ambiente Nacional ---------- */
+ACT['cap-auto']=el=>{const e=emp(UI.fsn.emp);if(!e)return;mut('empresas',()=>{e.capturaAuto=el.checked},['Escrita fiscal','Busca automática de NFS-e '+(el.checked?'ligada':'desligada'),e.razao]);if(el.checked)setTimeout(()=>capturaAuto(true),500)};
+const capNfseV40=ACT['cap-nfse'];ACT['cap-nfse']=async el=>{await capNfseV40(el);try{localStorage.setItem('mf-cap-'+UI.fsn.emp,agora())}catch(x){}};
+async function capturaAuto(forcar){if(MODO!=='api'||!APP_FISCAL||!podeMod('guias','editar')||UI.capRodando)return;UI.capRodando=true;let tot=0;const falhas=[];
+  try{for(const e of S.empresas.filter(x=>x.capturaAuto&&x.status!=='inativo')){let ult=null;try{ult=localStorage.getItem('mf-cap-'+e.id)}catch(x){}
+      if(!forcar&&ult&&Date.now()-Date.parse(ult)<6*3600e3)continue;
+      try{const r=await MF.api('POST','/api/captura/'+e.id+'/nfse',{});try{localStorage.setItem('mf-cap-'+e.id,agora())}catch(x){}
+        if(r.docs?.length){UI.capQuieto=true;try{await importarXmlFiscalV34(r.docs.map(d=>new File([d.xml],d.nome,{type:'text/xml'})))}finally{UI.capQuieto=false}tot+=r.docs.length}}
+      catch(er){falhas.push((e.fantasia||e.razao)+': '+er.message)}}}
+  finally{UI.capRodando=false}
+  if(tot||falhas.length)toast(`Busca automática de NFS-e: ${tot} nota(s) nova(s).${falhas.length?' Não buscou: '+falhas.slice(0,2).join(' · '):''}`,!!falhas.length&&!tot)}
+const openModalV40=openModal;openModal=function(...a){if(UI.capQuieto)return;return openModalV40(...a)};
+(function vigiarCaptura(){setTimeout(()=>capturaAuto(false),20000);setInterval(()=>capturaAuto(false),30*60000)})();
+/* ==== v40 (fim) ==== */
 
 
 
@@ -9060,7 +9134,7 @@ if(APP_SIS){
   const MOD_ATIVO=APP_DP?'folha':APP_CONTABIL?'contabil':'fiscal';
   const NAV_FISCAL=[
     ['Competência',[['f-central','Central da competência','checksq','Todas as empresas no mês: movimento, apuração e guia, com apuração em lote']]],
-    ['Movimento',[['f-saidas','Notas fiscais de saída','upload','Importação de XML (NF-e, NFC-e, NFS-e), receita por CFOP e CST'],['f-entradas','Notas fiscais de entrada','filetext','Busca automática na SEFAZ e XML dos fornecedores'],['f-lanc','Lançamentos fiscais','receipt','Saídas, serviços, entradas, serviços tomados com retenções e outros documentos, com acumuladores']]],
+    ['Movimento',[['f-saidas','Notas fiscais de saída','upload','Importação de XML (NF-e, NFC-e, NFS-e), receita por CFOP e CST'],['f-entradas','Notas fiscais de entrada','filetext','Busca automática na SEFAZ e XML dos fornecedores'],['f-nfse-p','Serviços prestados','upload','NFS-e emitidas: XML padrão nacional/ABRASF e busca no Ambiente Nacional'],['f-nfse-t','Serviços tomados','filetext','NFS-e recebidas com retenções (ISS, INSS, IRRF, CSRF): XML e busca no Ambiente Nacional'],['f-lanc','Lançamentos fiscais','receipt','Saídas, serviços, entradas, serviços tomados com retenções e outros documentos, com acumuladores']]],
     ['Apuração',[['f-apur','Simples Nacional e MEI','calc','Receitas por anexo, RBT12, Fator R e DAS'],['f-lucro','Lucro Presumido e Real','calc','PIS/COFINS, IRPJ/CSLL, ICMS e ISS próprios, com guias'],['f-icms','ICMS nas entradas','receipt','DIFAL de uso, consumo e ativo e antecipação nas compras de outros estados']]],
     ['Obrigações',[['f-arq','Arquivos fiscais','download','EFD ICMS/IPI, EFD-Contribuições, EFD-Reinf e DeSTDA'],['f-ibs','IBS e CBS nas notas','checksq','Conferência da reforma tributária nas NF-e e NFC-e']]],
     ['Relatórios',[['f-rel','Livros e relatórios','chart','Livros fiscais, apurações, faturamento, movimento e impostos pagos, para todos os regimes']]],
@@ -9068,7 +9142,7 @@ if(APP_SIS){
   const NAV_F=APP_DP?NAV_DP:APP_CONTABIL?NAV_CTB:NAV_FISCAL;
   const F_VIEWS=NAV_F.flatMap(g=>g[1].map(i=>i[0]));
   const V_PADRAO=APP_CONTABIL?'c-lanc':F_VIEWS[0];
-  const COM_PERIODO=APP_DP?[]:APP_CONTABIL?CTB_PERIODO:['f-saidas','f-entradas','f-rel','f-lanc'];
+  const COM_PERIODO=APP_DP?[]:APP_CONTABIL?CTB_PERIODO:['f-saidas','f-entradas','f-rel','f-lanc','f-nfse-p','f-nfse-t'];
   const empsCtb=()=>empresasVisiveis().slice().sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
   function ctbEstado(){const es=empsCtb();const F=UI.fsn||(UI.fsn={emp:null,comp:addMes(compAtual(),APP_DP?0:-1)});
     if(!F.comp)F.comp=addMes(compAtual(),APP_DP?0:-1);
@@ -9133,7 +9207,9 @@ if(APP_SIS){
     const simples=e.regime==='SN'||e.regime==='MEI';
     const foraSN=t=>head(t,'')+vazio(`${esc(e.fantasia||e.razao)} está no regime ${esc(nomeRegime(e))}. Esta rotina vale para empresas do Simples Nacional e MEI; os demais regimes entram nas próximas etapas.`,`<button class="btn" data-act="ctb-trocar">Trocar empresa</button>`);
     if(UI.view==='f-apur'){UI.snAba='apur';return simples?aSimples():foraSN('Apuração do Simples Nacional')}
-    if(UI.view==='f-saidas'){UI.snAba='notas';return simples?aSimplesAba():foraSN('Notas fiscais de saída')}
+    if(UI.view==='f-saidas'){UI.snAba='notas';return aSimplesAba()}
+    if(UI.view==='f-nfse-p')return fNfsePrest();
+    if(UI.view==='f-nfse-t')return fNfseTom();
     if(UI.view==='f-rel'){UI.snAba='rel';return fRelatorios()}
     if(UI.view==='f-lanc')return ctbLanc();
     if(UI.view==='f-lucro')return fLucro();
