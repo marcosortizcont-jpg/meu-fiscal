@@ -9323,7 +9323,7 @@ async function textoPdfTodo(file){const lib=await carregarPDF();const doc=await 
   for(let i=1;i<=Math.min(doc.numPages,20);i++){const pg=await doc.getPage(i);const c=await pg.getTextContent();t+=c.items.map(x=>x.str).join(' ')+'\n'}return t}
 function lerPgdas(txt){const T=txt.replace(/\s+/g,' ');const num=s=>valBR(s);const R={};
   const cn=T.match(/CNPJ(?: Básico| Matriz)?:?\s*(\d{2}\.?\d{3}\.?\d{3}(?:\/?\d{4}-?\d{2})?)/i);R.cnpj=cn?soDig(cn[1]):'';
-  const pa=T.match(/Per[ií]odo de Apura[çc][ãa]o(?: \(PA\))?:?\s*(\d{2})\/(\d{4})/i);R.pa=pa?pa[2]+'-'+pa[1]:'';
+  const pa=T.match(/Per[ií]odo de Apura[çc][ãa]o(?: \(PA\))?:?\s*(?:\d{2}\/)?(\d{2})\/(\d{4})/i);R.pa=pa?pa[2]+'-'+pa[1]:'';
   const nm=T.match(/Nome empresarial:?\s*(.+?)\s+(?:Data de abertura|Optante|Regime|Data de in[ií]cio|CNPJ)/i);R.nome=nm?nm[1].trim():'';
   const vals=re=>{const m=T.match(re);if(!m)return null;const ns=(T.slice(m.index+m[0].length,m.index+m[0].length+120).match(/-?[\d.]+,\d{2}/g)||[]).map(num);return ns.length?ns:null};
   const rb=vals(/\(RBT12\)/i);R.rbt12=rb?(rb.length>=3?rb[2]:rb[0]):null;
