@@ -25,7 +25,8 @@ Em Livros e relatórios → Faturamento → **Declaração de faturamento (banco
 - **Período:** livre, de 1 a 36 meses, com atalhos (últimos 3, 6, 12 ou 24 meses, ano corrente e ano anterior).
 - **Meses editáveis:** cada mês vem com o valor escriturado e pode ser ajustado ou desfeito. O total e o valor por extenso atualizam na hora. Os ajustes valem só para aquela declaração e ficam no histórico (`empresa.declFat` e auditoria).
 - **Assinaturas:** sócio administrador (nome e CPF) e contador (nome, CPF e CRC). Destinatário, finalidade, local e data são opcionais. CPFs que faltavam no cadastro ficam salvos.
-- **PDF:** layout centralizado em uma página; com mais de 12 meses a tabela vai para duas colunas.
+- **PDF:** layout centralizado, sem logo, em uma página, com o endereço do cadastro da empresa. Com mais de 12 meses a tabela vai para duas colunas.
+- **Histórico (`empresa.fatSalvos`):** "Salvar no histórico e gerar PDF" pede uma descrição (banco, finalidade). Na tela do relatório, cada registro tem PDF (reimprime igual), Atualizar (abre no editor) e Excluir. No editor, "Importar dados de um faturamento salvo" carrega período, valores e assinaturas; ao salvar, dá para atualizar o registro ou criar um novo.
 
 ### Serviços prestados e tomados (NFS-e, todos os regimes)
 

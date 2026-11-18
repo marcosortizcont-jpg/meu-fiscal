@@ -8575,7 +8575,7 @@ function linhasEfdIcms(e,comp){const ini=comp+'-01',fim=ultDiaMes(comp);const C=
     BC.push(...c190(n.itens||[],true,dest).map(l=>{if(dest==='uso'||dest==='ativo'){l[5]=0;l[6]=0}return l}))});
   const ap=icmsProprio(e,comp);const venc=ajustaVenc(addMes(comp,1)+'-'+pad(Math.min(lpCfg(e).icmsDia,28)),'antecipa');
   B0.push(['0000','020','0',spedD(ini),spedD(fim),e.razao,soDig(e.cnpj),'',e.uf||'MS',soDig(e.ie||''),soDig(e.codMun||e.ibge||''),soDig(e.im||''),'','A',e.industria?'0':'1'],['0001','0'],
-    ['0005',e.fantasia||e.razao,soDig(e.cep||''),e.endereco||e.logradouro||'',e.numero||'','',e.bairro||'',soDig(e.telefone||''),'',e.email||''],
+    ['0005',e.fantasia||e.razao,endCampos(e).cep,endCampos(e).log,endCampos(e).num,endCampos(e).comp,endCampos(e).bairro,soDig(e.telefone||''),'',e.email||''],
     ['0100',C.responsavelTecnico||C.escritorio||'',soDig(C.cpfContador||''),C.crc||'',soDig(C.cnpj||''),soDig(C.cep||''),C.endereco||'',C.numero||'','',C.bairro||'',soDig(C.telefone||''),'',C.email||'',soDig(C.codMun||'')]);
   Object.values(parts).forEach(p=>B0.push(['0150',p.cod,p.nome,'01058',p.doc.length===14?p.doc:'',p.doc.length===11?p.doc:'',soDig(p.ie||''),p.codMun||'','','','','','']));
   [...unid].forEach(u=>B0.push(['0190',u,u]));Object.values(itens).forEach(i=>B0.push(['0200',i.cod,i.desc,'','',i.un,'00',i.ncm||'','','','','',i.cest||'']));
@@ -8983,7 +8983,7 @@ ACT['rel-pdf']=()=>{const k=UI.snRel;const R=RELS[k];const e=emp(UI.fsn.emp);if(
   if(R.decl){const tot=d.csv.reduce((a,r)=>a+(+r[1]||0),0);
     janelaPdf(R.t,cab+tab+`<p style="margin-top:18px">Declaramos, para os devidos fins, que a empresa acima teve, nos 12 meses de ${fmtComp(addMes(ate,-11))} a ${fmtComp(ate)}, faturamento bruto de <b>${brl(r2(tot))}</b>, conforme os registros fiscais escriturados.</p><p>${esc(e.municipio||'')}${e.municipio?', ':''}${fmtData(hoje())}.</p>
       <div class="ass"><div>${esc(e.razao)}<br>Responsável legal</div><div>${contador}<br>Contador</div></div>`);return}
-  const termo=t=>`<div style="page-break-after:always;padding-top:120px;text-align:center"><h1>Termo de ${t}</h1><p style="max-width:560px;margin:18px auto;text-align:justify">${t==='abertura'?'Este livro contém':'Este livro conteve'} o <b>${esc(R.t)}</b> da empresa <b>${esc(e.razao)}</b>, CNPJ ${fmtCNPJ(e.cnpj||'')}${e.ie?', inscrição estadual '+esc(e.ie):''}${e.im?', inscrição municipal '+esc(e.im):''}, ${e.endereco||e.logradouro?'estabelecida em '+esc([e.endereco||e.logradouro,e.numero,e.bairro,e.municipio&&e.municipio+'/'+(e.uf||'')].filter(Boolean).join(', '))+', ':''}referente ao período de ${per}, escriturado por processamento eletrônico de dados.</p><p>${fmtData(hoje())}</p><div class="ass"><div>${esc(e.razao)}<br>Responsável legal</div><div>${contador}</div></div></div>`;
+  const termo=t=>`<div style="page-break-after:always;padding-top:120px;text-align:center"><h1>Termo de ${t}</h1><p style="max-width:560px;margin:18px auto;text-align:justify">${t==='abertura'?'Este livro contém':'Este livro conteve'} o <b>${esc(R.t)}</b> da empresa <b>${esc(e.razao)}</b>, CNPJ ${fmtCNPJ(e.cnpj||'')}${e.ie?', inscrição estadual '+esc(e.ie):''}${e.im?', inscrição municipal '+esc(e.im):''}, ${endTexto(e)?'estabelecida em '+esc(endTexto(e))+', ':''}referente ao período de ${per}, escriturado por processamento eletrônico de dados.</p><p>${fmtData(hoje())}</p><div class="ass"><div>${esc(e.razao)}<br>Responsável legal</div><div>${contador}</div></div></div>`;
   const comTermo=R.livro&&UI.relTermo;
   janelaPdf(R.t,(comTermo?termo('abertura'):'')+cab+tab+(d.obs?`<p class="nota">${esc(d.obs)}</p>`:'')+(R.livro||['piscofins','irpjcsll','das','iss'].includes(k)?`<div class="ass"><div>${esc(e.razao)}</div><div>${contador}</div></div>`:'')+(comTermo?'<div style="page-break-before:always"></div>'+termo('encerramento').replace('page-break-after:always;',''):''))};
 /* ==== v38 (fim) ==== */
@@ -9133,7 +9133,10 @@ function novoFD(e,de,ate,ant){const vals={},orig={};relMeses(de,ate).forEach(c=>
   return ant?{...ant,de,ate,vals,orig}:{eid:e.id,de,ate,vals,orig,socio:{nome:s?.nome||'',cpf:soDig(s?.cpf||'')},cont:ct,cidade:e.municipio?e.municipio+(e.uf?'/'+e.uf:''):(cfg().cidade||'Campo Grande/MS'),data:hoje(),dest:'',fin:''}}
 function fdTotal(F){return r2(Object.keys(F.vals).filter(c=>c>=F.de&&c<=F.ate).reduce((a,c)=>a+(+F.vals[c]||0),0))}
 function fatDeclForm(){const F=UI.fatDecl;const e=emp(F.eid);const cs=relMeses(F.de,F.ate);const tot=fdTotal(F);const ed=cs.filter(c=>Math.abs((+F.vals[c]||0)-(+F.orig[c]||0))>=.005).length;
+  const hist=(e.fatSalvos||[]).slice().reverse();const ori=F.salvoId&&(e.fatSalvos||[]).find(x=>x.id===F.salvoId);
   return mHead('Declaração de faturamento · '+(e.fantasia||e.razao))+`<form data-form="fat-decl"><div class="modal-body">
+   ${hist.length?`<div class="f" style="margin-bottom:12px"><span>Importar dados de um faturamento salvo</span><select data-fd-imp><option value="">— começar do escriturado —</option>${hist.map(x=>`<option value="${x.id}" ${x.id===F.salvoId?'selected':''}>${esc(x.desc)} · ${fmtComp(x.de)} a ${fmtComp(x.ate)} · ${brl(x.total)} · salvo em ${fmtData(String(x.em).slice(0,10))}</option>`).join('')}</select></div>`:''}
+   ${ori?`<div class="banner info" style="display:block;margin-bottom:10px">Editando "<b>${esc(ori.desc)}</b>". Ao salvar, você escolhe entre atualizar este registro ou criar um novo. Meses fora do período salvo vêm do escriturado.</div>`:''}
    <div class="grid-f"><label class="f"><span>De</span><input type="month" name="de" value="${F.de}" data-fd-per></label><label class="f"><span>Até</span><input type="month" name="ate" value="${F.ate}" max="${compAtual()}" data-fd-per></label>
     <div class="f full"><span>Atalhos</span><div class="actions">${[[3,'3 meses'],[6,'6 meses'],[12,'12 meses'],[24,'24 meses']].map(([n,t])=>`<button type="button" class="btn sm" data-act="fd-atalho" data-n="${n}">Últimos ${t}</button>`).join('')}<button type="button" class="btn sm" data-act="fd-atalho" data-n="ano">Ano de ${F.ate.slice(0,4)}</button><button type="button" class="btn sm" data-act="fd-atalho" data-n="anoant">Ano de ${+F.ate.slice(0,4)-1}</button></div></div></div>
    <div class="table-wrap" style="margin-top:12px;max-height:340px;overflow:auto"><table><thead><tr><th>Mês</th><th class="r">Escriturado</th><th class="r" style="width:190px">Valor na declaração</th><th></th></tr></thead><tbody>${cs.map(c=>{const dif=Math.abs((+F.vals[c]||0)-(+F.orig[c]||0))>=.005;return `<tr>
@@ -9151,11 +9154,13 @@ function fatDeclForm(){const F=UI.fatDecl;const e=emp(F.eid);const cs=relMeses(F
     <label class="f"><span>CRC</span><input name="contCrc" value="${esc(F.cont.crc)}" required placeholder="CRC/MS 000000/O-0"></label>
     <label class="f"><span>Local</span><input name="cidade" value="${esc(F.cidade)}"></label><label class="f"><span>Data</span><input type="date" name="data" value="${F.data}"></label>
     <label class="f"><span>Destinatário (opcional)</span><input name="dest" value="${esc(F.dest)}" placeholder="ex.: Banco do Brasil S.A."></label>
-    <label class="f full"><span>Finalidade (opcional)</span><input name="fin" value="${esc(F.fin)}" placeholder="ex.: abertura de conta, análise de crédito, cadastro"></label></div>
+    <label class="f full"><span>Finalidade (opcional)</span><input name="fin" value="${esc(F.fin)}" placeholder="ex.: abertura de conta, análise de crédito, cadastro"></label>
+    <label class="f full"><span>Descrição para o histórico (ao salvar)</span><input name="desc" value="${esc(F.desc||'')}" maxlength="120" placeholder="ex.: Banco do Brasil · renovação do limite · 12 meses"></label>
+    ${ori?`<label class="f chk full"><input type="checkbox" name="novo"> Salvar como novo registro (sem alterar "${esc(ori.desc)}")</label>`:''}</div>
    <p class="small muted">CPFs que faltavam no cadastro ficam salvos para as próximas declarações.</p></div>
-  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">${svg('download')}Gerar PDF</button></div></form>`}
+  <div class="modal-foot" style="flex-wrap:wrap;gap:8px"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button type="button" class="btn" data-act="fd-gerar" data-salvar="0">${svg('download')}Só gerar PDF</button><button type="button" class="btn primary" data-act="fd-gerar" data-salvar="1">${svg('download')}${F.salvoId?'Salvar e gerar PDF':'Salvar no histórico e gerar PDF'}</button></div></form>`}
 function fdLerCampos(){const f=document.querySelector('form[data-form="fat-decl"]');const F=UI.fatDecl;if(!f||!F)return;const g=n=>f.querySelector(`[name="${n}"]`)?.value??'';
-  F.socio={nome:g('socioNome').trim(),cpf:soDig(g('socioCpf'))};F.cont={nome:g('contNome').trim(),cpf:soDig(g('contCpf')),crc:g('contCrc').trim()};F.cidade=g('cidade').trim();F.data=g('data')||hoje();F.dest=g('dest').trim();F.fin=g('fin').trim();
+  F.socio={nome:g('socioNome').trim(),cpf:soDig(g('socioCpf'))};F.cont={nome:g('contNome').trim(),cpf:soDig(g('contCpf')),crc:g('contCrc').trim()};F.cidade=g('cidade').trim();F.data=g('data')||hoje();F.dest=g('dest').trim();F.fin=g('fin').trim();F.desc=g('desc').trim();F.novo=!!f.querySelector('[name=novo]')?.checked;
   f.querySelectorAll('[data-fd-mes]').forEach(i=>{F.vals[i.dataset.fdMes]=valBR(i.value)})}
 function fdPeriodo(de,ate){const F=UI.fatDecl;const e=emp(F.eid);if(!/^\d{4}-\d{2}$/.test(de)||!/^\d{4}-\d{2}$/.test(ate))return;if(de>ate)[de,ate]=[ate,de];
   if(relMeses(de,ate).length>36){toast('Período de até 36 meses.',true);de=addMes(ate,-35)}fdLerCampos();UI.fatDecl=novoFD(e,de,ate,UI.fatDecl);openModal(fatDeclForm(),true)}
@@ -9169,7 +9174,8 @@ document.addEventListener('change',ev=>{const t=ev.target;if(!t.closest||!t.clos
   else if(t.matches('[data-fd-mes]')){t.value=fmtValIn(valBR(t.value));fdLerCampos();openModal(fatDeclForm(),true);const n=document.querySelector(`[data-fd-mes="${t.dataset.fdMes}"]`);n?.closest('tr')?.nextElementSibling?.querySelector('[data-fd-mes]')?.focus()}});
 document.addEventListener('input',ev=>{const t=ev.target;if(!t.matches||!t.matches('[data-fd-mes]'))return;const f=t.form;let tot=0;f.querySelectorAll('[data-fd-mes]').forEach(i=>tot+=valBR(i.value));tot=r2(tot);
   const b=f.querySelector('[data-fd-tot]');if(b)b.textContent=brl(tot);const x=f.querySelector('[data-fd-ext]');if(x)x.textContent=extensoBRL(tot)});
-FORM['fat-decl']=(fd,form)=>{fdLerCampos();const F=UI.fatDecl;const e=emp(F.eid);
+FORM['fat-decl']=()=>fdGerar(false);ACT['fd-gerar']=el=>fdGerar(el.dataset.salvar==='1');
+function fdGerar(salvar){fdLerCampos();const F=UI.fatDecl;const e=emp(F.eid);if(salvar&&!F.desc){toast('Escreva uma descrição para salvar no histórico (ex.: o banco e a finalidade).',true);document.querySelector('form[data-form="fat-decl"] [name=desc]')?.focus();return}
   if(!F.socio.nome||!cpfValido(F.socio.cpf)){toast('Informe o nome e um CPF válido do sócio administrador.',true);return}
   if(!F.cont.nome||!cpfValido(F.cont.cpf)){toast('Informe o nome e um CPF válido do contador.',true);return}
   if(!F.cont.crc){toast('Informe o registro no CRC.',true);return}
@@ -9177,14 +9183,17 @@ FORM['fat-decl']=(fd,form)=>{fdLerCampos();const F=UI.fatDecl;const e=emp(F.eid)
   /* guarda os CPFs que faltavam e registra a emissão (com os ajustes) no histórico */
   const ss=e.socios||[];const s=ss.find(x=>normP(x.nome)===normP(F.socio.nome));const salvarSoc=s&&soDig(s.cpf||'')!==F.socio.cpf&&!soDig(s.cpf||'');const salvarCont=!soDig(cfg().cpfContador||'');
   mut(salvarSoc||salvarCont?['empresas','config']:['empresas'],()=>{if(salvarSoc)s.cpf=F.socio.cpf;if(salvarCont){if(!S.config[0])S.config.push({id:uid()});S.config[0].cpfContador=F.cont.cpf}
-      e.declFat=[...(e.declFat||[]).slice(-19),{em:agora(),por:ME.nome||'',de:F.de,ate:F.ate,total:fdTotal(F),ajustes:alt.map(c=>({c,de:F.orig[c],para:F.vals[c]})),dest:F.dest}]},
-    ['Escrita fiscal',`Declaração de faturamento ${fmtComp(F.de)} a ${fmtComp(F.ate)}: ${brl(fdTotal(F))}${alt.length?' · '+alt.length+' mês(es) ajustado(s): '+alt.map(c=>fmtComp(c)+' '+brl(F.orig[c])+' → '+brl(F.vals[c])).join('; '):''}`,e.razao]);
-  pdfDeclFat(e,F);closeModal()};
+      e.declFat=[...(e.declFat||[]).slice(-19),{em:agora(),por:ME.nome||'',de:F.de,ate:F.ate,total:fdTotal(F),ajustes:alt.map(c=>({c,de:F.orig[c],para:F.vals[c]})),dest:F.dest}];
+      if(salvar){const vals={};cs.forEach(c=>vals[c]=r2(+F.vals[c]||0));const reg={desc:F.desc,de:F.de,ate:F.ate,vals,total:fdTotal(F),socio:F.socio,cont:F.cont,cidade:F.cidade,data:F.data,dest:F.dest,fin:F.fin,ajustados:alt.length,em:agora(),por:ME.nome||''};
+        const L=e.fatSalvos||(e.fatSalvos=[]);const x=F.salvoId&&!F.novo&&L.find(z=>z.id===F.salvoId);
+        if(x)Object.assign(x,reg,{atualizadoEm:agora(),criadoEm:x.criadoEm||x.em});else{const id=uid();L.push({id,criadoEm:agora(),...reg});F.salvoId=id;if(L.length>60)L.splice(0,L.length-60)}}},
+    ['Escrita fiscal',`${salvar?'Salvou ':''}Declaração de faturamento${salvar?' "'+F.desc+'"':''} ${fmtComp(F.de)} a ${fmtComp(F.ate)}: ${brl(fdTotal(F))}${alt.length?' · '+alt.length+' mês(es) ajustado(s): '+alt.map(c=>fmtComp(c)+' '+brl(F.orig[c])+' → '+brl(F.vals[c])).join('; '):''}`,e.razao]);
+  pdfDeclFat(e,F);closeModal();if(salvar){toast('Faturamento salvo no histórico.');render()}}
 function pdfDeclFat(e,F){const w=window.open('','_blank');if(!w){toast('Permita pop-ups para gerar o PDF.',true);return}
   const cs=relMeses(F.de,F.ate);const tot=fdTotal(F);const C=cfg();const marca=C.marca||'Meu Fiscal';const per=cs.length===1?fmtComp(F.de):`${fmtComp(F.de)} a ${fmtComp(F.ate)}`;
   const mesExt=c=>['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+c.slice(5,7)-1]+' de '+c.slice(0,4);
   const dataExt=d=>{const [a,m,dd]=d.split('-');return `${+dd} de ${mesExt(a+'-'+m)}`};
-  const end=[[e.logradouro||e.endereco,e.numero].filter(Boolean).join(', '),e.bairro,e.municipio?e.municipio+(e.uf?'/'+e.uf:''):'',e.cep?'CEP '+String(e.cep).replace(/^(\d{5})(\d{3})$/,'$1-$2'):''].filter(Boolean).join(' · ');
+  const end=endTexto(e);
   const crc=F.cont.crc?(/^crc/i.test(F.cont.crc)?F.cont.crc:'CRC '+F.cont.crc):'';
   const metade=Math.ceil(cs.length/2);const duasCol=cs.length>12;const comp_=metade>9;
   const linha=c=>`<tr><td>${esc(mesExt(c).replace(/^./,x=>x.toUpperCase()))}</td><td class="r">${brl(F.vals[c])}</td></tr>`;
@@ -9196,7 +9205,7 @@ function pdfDeclFat(e,F){const w=window.open('','_blank');if(!w){toast('Permita 
   .pg{max-width:680px;margin:0 auto;text-align:center}
   .topo{display:flex;align-items:center;justify-content:center;gap:10px;padding-bottom:12px;border-bottom:2px solid #059669}
   .logo{width:30px;height:30px;border-radius:8px;background:#0f172a;color:#34d399;display:grid;place-items:center;font-weight:700;font-size:13px}.marca{font-weight:700;font-size:14px;letter-spacing:-.01em}.marca small{display:block;font-weight:500;font-size:9.5px;color:#64748b;letter-spacing:.02em}
-  h1{font-size:20px;letter-spacing:.06em;text-transform:uppercase;margin:26px 0 4px;font-weight:700}.per{color:#059669;font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 22px}
+  h1{font-size:20px;letter-spacing:.06em;text-transform:uppercase;margin:6px 0 4px;font-weight:700;padding-top:14px;border-top:3px solid #059669;display:inline-block}.per{color:#059669;font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 22px}
   .emp{display:inline-block;border:1px solid #e2e8f0;border-radius:10px;padding:12px 22px;background:#f8fafc;margin-bottom:20px}.emp b{font-size:13.5px;display:block}.emp span{color:#475569;font-size:10.5px;display:block}
   .txt{text-align:justify;text-align-last:center;max-width:600px;margin:0 auto 18px;font-size:12px}
   table{border-collapse:collapse;margin:0 auto;font-size:11.5px}table.uma{width:62%}.cols{display:flex;gap:18px;justify-content:center}.cols table{width:48%}
@@ -9206,9 +9215,8 @@ function pdfDeclFat(e,F){const w=window.open('','_blank');if(!w){toast('Permita 
   .ext{color:#475569;font-style:italic;margin:6px 0 0;font-size:10.5px}.local{margin:26px 0 0}
   .ass{display:flex;gap:40px;justify-content:center;margin-top:58px}.ass div{flex:1;max-width:280px;border-top:1px solid #0f172a;padding-top:6px;font-size:10.5px;line-height:1.45}.ass b{font-size:11px;display:block}
   .rod{margin-top:34px;padding-top:8px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:8.5px}
-  .compacto td{padding:3.5px 10px;font-size:10.5px}.compacto h1{margin-top:16px}.compacto .per{margin-bottom:14px}.compacto .emp{margin-bottom:12px;padding:9px 20px}.compacto .txt{margin-bottom:12px}.compacto .local{margin-top:16px}.compacto .ass{margin-top:44px}.compacto .rod{margin-top:20px}
+  .compacto td{padding:3.5px 10px;font-size:10.5px}.compacto h1{margin-top:0}.compacto .per{margin-bottom:14px}.compacto .emp{margin-bottom:12px;padding:9px 20px}.compacto .txt{margin-bottom:12px}.compacto .local{margin-top:16px}.compacto .ass{margin-top:44px}.compacto .rod{margin-top:20px}
   @media screen{body{background:#f1f5f9}.pg{background:#fff;padding:40px 48px;margin:24px auto;box-shadow:0 2px 16px rgba(15,23,42,.08);border-radius:8px}}</style></head><body><div class="pg">
-  <div class="topo"><div class="logo">mf</div><div class="marca">${esc(marca)}<small>${esc(F.cont.nome)}${crc?' · '+esc(crc):''}</small></div></div>
   <h1>Declaração de Faturamento</h1><p class="per">${esc(per)} · ${cs.length} ${cs.length===1?'mês':'meses'}</p>
   ${F.dest?`<p style="margin:-8px 0 16px">À ${esc(F.dest)}</p>`:''}
   <div class="emp"><b>${esc(e.razao)}</b><span>CNPJ ${fmtCNPJ(e.cnpj||'')}${e.ie?' · IE '+esc(e.ie):''}</span>${end?`<span>${esc(end)}</span>`:''}</div>
@@ -9227,6 +9235,32 @@ RELS.fat12.t='Declaração de faturamento (banco)';
 const relCorpoV41=relCorpo;relCorpo=function(){let h=relCorpoV41();if(UI.snRel==='fat12')h=h.replace(/<button class="btn" data-act="rel-pdf"[^>]*>[\s\S]*?<\/button>/,`<button class="btn primary" data-act="fat-decl">${svg('download')}Montar declaração e PDF</button>`);return h};
 abaRelatorios=relCorpo;
 /* ==== v41 (fim) ==== */
+/* ==== v42: endereço do cadastro · histórico de declarações de faturamento ==== */
+function endCampos(e){const o=e&&typeof e.endereco==='object'&&e.endereco?e.endereco:{};const t=v=>String(v??'').trim();
+  return {log:t(o.logradouro||e?.logradouro||(typeof e?.endereco==='string'?e.endereco:'')),num:t(o.numero||e?.numero),comp:t(o.complemento||e?.complemento),bairro:t(o.bairro||e?.bairro),cep:soDig(o.cep||e?.cep||''),mun:t(e?.municipio||o.municipio),uf:t(e?.uf||o.uf)}}
+function endTexto(e){const a=endCampos(e);return [[a.log,a.num,a.comp].filter(Boolean).join(', '),a.bairro,a.mun?a.mun+(a.uf?'/'+a.uf:''):'',a.cep.length===8?'CEP '+a.cep.replace(/^(\d{5})(\d{3})$/,'$1-$2'):''].filter(Boolean).join(' · ')}
+/* importar de um faturamento salvo */
+function fdCarregar(e,x){const base=novoFD(e,x.de,x.ate);Object.keys(base.vals).forEach(c=>{if(x.vals&&c in x.vals)base.vals[c]=+x.vals[c]||0});
+  return {...base,socio:{...(x.socio||base.socio)},cont:{...(x.cont||base.cont)},cidade:x.cidade||base.cidade,data:hoje(),dest:x.dest||'',fin:x.fin||'',desc:x.desc||'',salvoId:x.id}}
+document.addEventListener('change',ev=>{const t=ev.target;if(!t.matches||!t.matches('[data-fd-imp]'))return;const F=UI.fatDecl;const e=emp(F.eid);
+  if(!t.value){UI.fatDecl=novoFD(e,F.de,F.ate);openModal(fatDeclForm(),true);return}const x=(e.fatSalvos||[]).find(z=>z.id===t.value);if(!x)return;UI.fatDecl=fdCarregar(e,x);openModal(fatDeclForm(),true);toast('Dados importados de "'+x.desc+'". Ajuste o que precisar e gere de novo.')});
+/* histórico na tela do relatório */
+function histFatHtml(e){const L=(e.fatSalvos||[]).slice().reverse();const ed=podeMod('guias','editar');
+  return `<div class="panel" style="margin-top:14px"><div class="panel-head"><h2>Histórico de faturamentos salvos</h2><span class="small muted">${L.length} registro(s)</span></div>
+   ${L.length?`<div class="table-wrap"><table><thead><tr><th>Descrição</th><th>Período</th><th class="r">Total</th><th>Destinatário</th><th>Salvo</th><th></th></tr></thead><tbody>${L.map(x=>`<tr>
+     <td><b>${esc(x.desc)}</b>${x.fin?`<div class="small muted">${esc(x.fin)}</div>`:''}${x.ajustados?`<div class="small" style="color:var(--warn)">${x.ajustados} mês(es) ajustado(s)</div>`:''}</td>
+     <td class="small" style="white-space:nowrap">${fmtComp(x.de)} a ${fmtComp(x.ate)}<div class="muted">${relMeses(x.de,x.ate).length} meses</div></td><td class="r num">${brl(x.total)}</td><td class="small">${esc(x.dest||'—')}</td>
+     <td class="small">${fmtData(String(x.atualizadoEm||x.em).slice(0,10))}<div class="muted">${esc(x.por||'')}${x.atualizadoEm?' · atualizado':''}</div></td>
+     <td class="r" style="white-space:nowrap"><button class="btn sm" data-act="fh-pdf" data-id="${x.id}" title="Gera o PDF igual ao salvo">PDF</button> ${ed?`<button class="btn sm" data-act="fh-abrir" data-id="${x.id}" title="Abre no editor para atualizar ou criar um novo a partir dele">Atualizar</button> <button class="btn sm ghost" data-act="fh-excluir" data-id="${x.id}">Excluir</button>`:''}</td></tr>`).join('')}</tbody></table></div>`
+     :'<p class="small muted" style="margin:0">Nenhum faturamento salvo. Ao montar a declaração, use "Salvar no histórico e gerar PDF" e dê uma descrição (o banco, a finalidade). Depois é só atualizar a partir dele.</p>'}</div>`}
+const relCorpoV42=relCorpo;relCorpo=function(){const h=relCorpoV42();if(UI.snRel!=='fat12')return h;const e=emp(UI.fsn.emp);return e?h.replace(/<\/div><\/div>$/,'')+histFatHtml(e)+'</div></div>':h};
+abaRelatorios=relCorpo;
+const fhAchar=id=>{const e=emp(UI.fsn.emp);return [e,(e?.fatSalvos||[]).find(x=>x.id===id)]};
+ACT['fh-abrir']=el=>{const [e,x]=fhAchar(el.dataset.id);if(!x)return;UI.fatDecl=fdCarregar(e,x);openModal(fatDeclForm(),true)};
+ACT['fh-pdf']=el=>{const [e,x]=fhAchar(el.dataset.id);if(!x)return;const F={...fdCarregar(e,x),data:x.data||hoje()};pdfDeclFat(e,F)};
+ACT['fh-excluir']=el=>{const [e,x]=fhAchar(el.dataset.id);if(!x)return;confirmar('Excluir do histórico',`<p>Excluir "<b>${esc(x.desc)}</b>" (${fmtComp(x.de)} a ${fmtComp(x.ate)}, ${brl(x.total)})? Os PDFs já entregues não são afetados.</p>`,'Excluir',()=>{
+  mut('empresas',()=>{e.fatSalvos=(e.fatSalvos||[]).filter(z=>z.id!==x.id)},['Escrita fiscal','Excluiu do histórico a declaração de faturamento "'+x.desc+'"',e.razao]);toast('Excluído do histórico.')})};
+/* ==== v42 (fim) ==== */
 
 
 
