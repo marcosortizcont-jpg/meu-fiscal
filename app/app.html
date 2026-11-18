@@ -5992,11 +5992,11 @@ function aSimples(){
   const g=S.guias.find(x=>x.empresaId===e.id&&x.comp===comp&&x.tipo==='DAS');
   return `${head(APP_FISCAL?'Apuração do Simples Nacional':'Apuração do Simples','Lançamentos de receita por anexo, cálculo do DAS com RBT12, Fator R e segregação, memória de cálculo e relatórios em PDF.',seletor)}${snAbas()}
    ${a.avisos.map(([c,t])=>`<div class="banner ${c||'info'}" style="display:block;margin-bottom:10px">${esc(t)}</div>`).join('')}
-   <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Receita do mês</span><b>${brl(a.receita)}</b></div><div class="kpi"><span class="eyebrow">RBT12${a.proporcional?' (proporcional)':''}</span><b>${brl(a.rbt12)}</b></div>
+   <div class="crm-kpis"><div class="kpi"><span class="eyebrow">Receita do mês</span><b>${brl(a.receita)}</b></div><div class="kpi"><span class="eyebrow">RBT12${a.rbtInformado?' (informado)':a.proporcional?' (proporcional)':''}</span><b>${brl(a.rbt12)}</b></div>
     <div class="kpi"><span class="eyebrow">DAS calculado</span><b>${brl(a.total)}</b></div><div class="kpi"><span class="eyebrow">Alíquota final</span><b>${pct(a.receita?a.total/a.receita:0)}</b></div></div>
    ${painelLanc}
    <div class="panel"><div class="panel-head"><h2>Memória de cálculo</h2><div class="actions"><button class="btn" data-act="sn-pdf">${svg('download')}Memória (PDF)</button><button class="btn" data-act="sn-livro">${svg('download')}Registro de receitas (PDF)</button>${ed&&a.total>0?`<button class="btn primary" data-act="sn-guia">${g?'Atualizar guia DAS':'Gerar guia DAS'}</button>`:''}</div></div>
-    <div class="dl"><dt>RBT12 (receita dos 12 meses anteriores)</dt><dd class="num">${brl(a.rbt12)} <button class="btn sm ghost" data-act="sn-rbt" aria-expanded="${!!UI.snRbt}">${UI.snRbt?'Ocultar meses':'Ver os 12 meses'}</button></dd>
+    <div class="dl"><dt>RBT12 (receita dos 12 meses anteriores)</dt><dd class="num">${brl(a.rbt12)}${a.rbtInformado?' <span class="pill info">informado</span>':''} <button class="btn sm ghost" data-act="sn-rbt" aria-expanded="${!!UI.snRbt}">${UI.snRbt?'Ocultar meses':'Ver os 12 meses'}</button>${podeMod('guias','editar')?` <button class="btn sm ghost" data-act="rbt-inf">Editar RBT12 / importar PGDAS-D</button>`:''}</dd>
     ${UI.snRbt?`<dt></dt><dd><div class="table-wrap"><table><tbody>${Array.from({length:12},(_,i)=>addMes(comp,-(12-i))).map(c=>`<tr><td>${fmtComp(c)}</td><td class="r num">${receitaMes(e.id,c)!=null?brl(receitaMes(e.id,c)):'<span class="muted">sem receita</span>'}</td></tr>`).join('')}</tbody></table></div></dd>`:''}
     ${a.usaFatorR||e.fatorR?`<dt>Folha 12 meses (FS12)</dt><dd><input type="number" step="0.01" min="0" data-sn-folha value="${a.folhaManual?a.folha12:''}" placeholder="${brl(a.folha12)} (estimada)" style="width:200px" ${ed?'':'disabled'}> <span class="small muted">salários, 13º, FGTS, INSS patronal e pró-labore</span></dd>
     <dt>Fator R</dt><dd><b class="num">${pct(a.fatorR)}</b> ${a.fatorR>=FATOR_R?pill('28% ou mais: Anexo III','ok'):pill('Abaixo de 28%: Anexo V','warn')}</dd>`:''}
@@ -8333,7 +8333,7 @@ const onUploadV34=onUpload;onUpload=async function(inp){if(inp.dataset.up==='das
 function fisAvisos(e,comp,view){if(!e||!podeMod('guias','ver'))return '';const B=[];const ed=podeMod('guias','editar');
   const ret=S.docsaida.filter(d=>d.empresaId===e.id&&d.retido).length;if(ret)B.push(['crit',`${ret} nota(s) chegaram depois do fechamento e estão fora da receita.`,`<button class="btn sm" data-act="fis-pend" data-emp="${e.id}">Decidir</button>`]);
   if(e.regime==='SN'){const a=apurarSN(e,comp);
-    if(a.rbtFaltando)B.push(['crit',`RBT12 incompleto para ${fmtComp(comp)}: faltam ${a.rbtFaltando.length} mês(es) (${a.rbtFaltando.map(fmtComp).join(', ')}).`,ed?`<button class="btn sm" data-act="rbt-hist" data-id="${e.id}">Informar histórico</button>`:''])
+    if(a.rbtFaltando)B.push(['crit',`RBT12 incompleto para ${fmtComp(comp)}: faltam ${a.rbtFaltando.length} mês(es) (${a.rbtFaltando.map(fmtComp).join(', ')}).`,ed?`<label class="btn sm primary">${svg('upload')}Importar PGDAS-D<input type="file" hidden accept=".pdf" data-up="pgdas-pdf"></label> <button class="btn sm" data-act="rbt-inf">Informar RBT12</button> <button class="btn sm" data-act="rbt-hist" data-id="${e.id}">Mês a mês</button>`:''])
     if(a.divergente)B.push(['crit',`Receita informada ${brl(a.divergente.informada)} × notas/lançamentos ${brl(a.divergente.soma)} em ${fmtComp(comp)}.`,ed?`<button class="btn sm" data-act="rec-usar-lanc">Usar as notas</button><button class="btn sm ghost" data-act="rec-usar-inf">Manter a informada</button>`:''])
     const s=stComp(e,comp);if(s.g&&s.k==='desatualizada'&&s.g.status!=='rascunho')B.push(['crit',`${s.t.split(' · ')[0]}: guia ${brl(s.g.valor)} × apuração atual ${brl(s.calc)}. ${s.g.status==='paga'?'Avalie DAS complementar ou pedido de restituição e retifique o PGDAS-D.':'Retifique o PGDAS-D, gere a guia nova e avise o cliente.'}`,''])}
   if(view==='f-saidas'||view==='f-apur'){lacunasDe(e.id,comp).forEach(l=>B.push(['warn',`Números faltando em ${fmtComp(comp)} (${MOD_NOME[l.mod]||(l.mod==='NFSE'?'NFS-e':'mod. '+l.mod)} série ${esc(l.serie||'—')}): ${faixas(l.nums)}. Importe os XML que faltam ou confirme se foram inutilizados/cancelados.`,ed?`<button class="btn sm ghost" data-act="lac-ok" data-k="${esc(l.chave)}" data-n="${l.nums.join(',')}">Estão inutilizados</button>`:'']))}
@@ -9293,6 +9293,72 @@ FORM['guia-excluir-senha']=async(fd,form)=>{const ids=form.dataset.ids.split(','
   try{const r=await MF.api('POST','/api/guias/excluir',{ids,senha:String(fd.get('senha')||''),motivo:String(fd.get('motivo')||'')});
     S.guias=S.guias.filter(g=>!r.excluidas.includes(g.id));closeModal();try{invalidarHist()}catch(x){}render();toast(r.excluidas.length+' guia(s) excluída(s). Registro feito no histórico.')}
   catch(er){toast(er.message,true);bt.disabled=false;const i=form.querySelector('[name=senha]');if(i){i.value='';i.focus()}}};
+/* ==== v43: RBT12 editável na apuração e importação do PGDAS-D (PDF da declaração ou extrato) ==== */
+const rbtInf=(e,comp)=>{const f=snFat(e.id,comp);return f&&f.rbt12Inf!=null&&f.rbt12Inf!==''?+f.rbt12Inf:null};
+const rbt12DeV43=rbt12De;rbt12De=function(e,comp){const v=rbtInf(e,comp);return v!=null?{valor:v,proporcional:false,informado:true}:rbt12DeV43(e,comp)};
+const rbtFaltandoV43=rbtFaltando;rbtFaltando=function(e,comp){return rbtInf(e,comp)!=null?[]:rbtFaltandoV43(e,comp)};
+const apurarSNV43=apurarSN;apurarSN=function(e,comp){const a=apurarSNV43(e,comp);if(rbtInf(e,comp)!=null){a.rbtInformado=true;a.proporcional=false}return a};
+function rbtInfForm(e,comp){const v=rbtInf(e,comp);const calc=rbt12DeV43(e,comp);const sem=rbtFaltandoV43(e,comp);
+  return mHead('RBT12 de '+fmtComp(comp)+' · '+(e.fantasia||e.razao))+`<form data-form="rbt-inf"><div class="modal-body">
+   <div class="banner info" style="display:block;margin-bottom:12px"><b>Mais rápido:</b> importe o PDF do último PGDAS-D (declaração ou extrato). O sistema lê o RBT12 e os 12 meses anteriores e preenche o histórico. <label class="btn sm primary" style="margin-left:6px">${svg('upload')}Importar PGDAS-D (PDF)<input type="file" hidden accept=".pdf" data-up="pgdas-pdf"></label></div>
+   <p class="small muted" style="margin-top:0">Ou informe o RBT12 de ${fmtComp(comp)} (receita bruta dos 12 meses anteriores, como no PGDAS-D). Ele substitui a soma dos meses só nesta competência: serve para corrigir um histórico preenchido errado.</p>
+   <div class="grid-f"><label class="f"><span>RBT12 informado (R$)</span><input name="rbt" inputmode="decimal" value="${v!=null?fmtValIn(v):''}" placeholder="ex.: 185.432,10"></label>
+    <div class="f"><span>Calculado pelos meses</span><div class="num" style="padding:9px 0">${brl(calc.valor)}${calc.proporcional?' (proporcional)':''}${sem.length?` <span class="small" style="color:var(--crit)">· faltam ${sem.length} mês(es)</span>`:''}</div></div>
+    ${sem.length?`<label class="f chk full"><input type="checkbox" name="repartir"> Repartir a diferença nos ${sem.length} mês(es) sem dado (${sem.map(fmtComp).join(', ')}), para os próximos meses também calcularem sozinhos</label>`:''}</div>
+   <p class="small muted">Para corrigir mês a mês, use "Informar mês a mês".</p></div>
+  <div class="modal-foot" style="flex-wrap:wrap;gap:8px">${v!=null?'<button type="button" class="btn ghost" data-act="rbt-inf-limpar">Voltar ao calculado</button>':''}<button type="button" class="btn" data-act="rbt-hist" data-id="${e.id}">Informar mês a mês</button><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Salvar RBT12</button></div></form>`}
+ACT['rbt-inf']=()=>{const e=emp(UI.fsn.emp);if(!e)return;if(travaComp(e.id,UI.fsn.comp)){toast('Competência fechada: reabra para alterar o RBT12.',true);return}openModal(rbtInfForm(e,UI.fsn.comp),true)};
+FORM['rbt-inf']=fd=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const txt=String(fd.get('rbt')||'').trim();if(!txt){toast('Informe o valor do RBT12 ou importe o PGDAS-D.',true);return}const v=valBR(txt);
+  if(v>4800000)toast('RBT12 acima de R$ 4,8 milhões: a empresa excede o limite do Simples Nacional.',true);
+  const sem=rbtFaltandoV43(e,comp);let rep=0;
+  mut('faturamento',()=>{let f=snFat(e.id,comp);if(!f){f={id:uid(),empresaId:e.id,comp,receita:null,origem:'declarado'};S.faturamento.push(f)}f.rbt12Inf=v;f.rbt12InfEm=agora();
+    if(fd.get('repartir')&&sem.length){const conhecidos=r2(Array.from({length:12},(_,i)=>addMes(comp,-(i+1))).filter(c=>!sem.includes(c)).reduce((a,c)=>a+(receitaMes(e.id,c)||0),0));
+      const resto=Math.max(0,r2(v-conhecidos));const parte=r2(Math.floor(resto/sem.length*100)/100);sem.forEach((c,i)=>{let g=snFat(e.id,c);if(!g){g={id:uid(),empresaId:e.id,comp:c};S.faturamento.push(g)}g.receita=i<sem.length-1?parte:r2(resto-parte*(sem.length-1));g.origem='historico';g.repartidoRbt=true;rep++})}},
+    ['Apuração',`RBT12 informado de ${fmtComp(comp)}: ${brl(v)}${rep?' · diferença repartida em '+rep+' mês(es) sem dado':''}`,e.razao]);
+  closeModal();toast('RBT12 salvo'+(rep?' e repartido nos meses sem dado':'')+'. A apuração foi recalculada.')};
+ACT['rbt-inf-limpar']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const f=snFat(e.id,comp);if(!f)return;mut('faturamento',()=>{delete f.rbt12Inf;delete f.rbt12InfEm;if(f.receita==null&&f.folha12==null)S.faturamento=S.faturamento.filter(x=>x!==f)},['Apuração','RBT12 de '+fmtComp(comp)+' voltou ao calculado',e.razao]);closeModal();toast('RBT12 voltou a ser calculado pelos meses.')};
+
+/* ---------- leitura do PDF do PGDAS-D ---------- */
+async function textoPdfTodo(file){const lib=await carregarPDF();const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;let t='';
+  for(let i=1;i<=Math.min(doc.numPages,20);i++){const pg=await doc.getPage(i);const c=await pg.getTextContent();t+=c.items.map(x=>x.str).join(' ')+'\n'}return t}
+function lerPgdas(txt){const T=txt.replace(/\s+/g,' ');const num=s=>valBR(s);const R={};
+  const cn=T.match(/CNPJ(?: Básico| Matriz)?:?\s*(\d{2}\.?\d{3}\.?\d{3}(?:\/?\d{4}-?\d{2})?)/i);R.cnpj=cn?soDig(cn[1]):'';
+  const pa=T.match(/Per[ií]odo de Apura[çc][ãa]o(?: \(PA\))?:?\s*(\d{2})\/(\d{4})/i);R.pa=pa?pa[2]+'-'+pa[1]:'';
+  const nm=T.match(/Nome empresarial:?\s*(.+?)\s+(?:Data de abertura|Optante|Regime|Data de in[ií]cio|CNPJ)/i);R.nome=nm?nm[1].trim():'';
+  const vals=re=>{const m=T.match(re);if(!m)return null;const ns=(T.slice(m.index+m[0].length,m.index+m[0].length+120).match(/-?[\d.]+,\d{2}/g)||[]).map(num);return ns.length?ns:null};
+  const rb=vals(/\(RBT12\)/i);R.rbt12=rb?(rb.length>=3?rb[2]:rb[0]):null;
+  const rpa=vals(/\(RPA\)(?: - Compet[êe]ncia)?/i);R.rpa=rpa?(rpa.length>=3?rpa[2]:rpa[0]):null;
+  const sec=(ini,fim)=>{const m=T.match(ini);if(!m)return '';const r=T.slice(m.index+m[0].length);const b=r.search(fim);return b<0?r.slice(0,1500):r.slice(0,b)};
+  const pares=s=>{const o={};let m;const re=/(\d{2})\/(\d{4})\s+(-?[\d.]+,\d{2})/g;while((m=re.exec(s)))o[m[2]+'-'+m[1]]=num(m[3]);return o};
+  R.mi=pares(sec(/2\.2\.1\)?\s*Mercado Interno/i,/2\.2\.2\)?|2\.3\)?|Folha de Sal/i));R.me=pares(sec(/2\.2\.2\)?\s*Mercado Externo/i,/2\.3\)?|Folha de Sal|2\.4\)?/i));
+  R.folha=pares(sec(/2\.3\)?\s*Folha de Sal[áa]rios/i,/2\.4\)?|2\.5\)?|Fator R|3\)\s/i));
+  R.meses=Object.keys({...R.mi,...R.me}).sort().reduce((o,c)=>(o[c]=r2((R.mi[c]||0)+(R.me[c]||0)),o),{});
+  if(R.pa&&R.rpa!=null)R.meses[R.pa]=R.rpa;return R}
+const onUploadV43=onUpload;onUpload=async function(inp){if(inp.dataset.up!=='pgdas-pdf')return onUploadV43(inp);const files=[...inp.files];inp.value='';return importarPgdas(files)};
+async function importarPgdas(files){const f=files[0];if(!f)return;const e=emp(UI.fsn.emp);if(!e)return;
+  let R;try{R=lerPgdas(await textoPdfTodo(f))}catch(er){toast('Não consegui ler o PDF: '+er.message,true);return}
+  if(!R.pa||(!Object.keys(R.meses).length&&R.rbt12==null)){toast('Não encontrei o período de apuração nem as receitas anteriores. Use o PDF da declaração (PGDAS-D) ou do extrato do Simples, não o DAS.',true);return}
+  const cnOk=!R.cnpj||soDig(e.cnpj).startsWith(R.cnpj.slice(0,8));UI.pgdasImp={eid:e.id,R,arq:f.name};openModal(pgdasPrevia(e,R,cnOk),true)}
+function pgdasPrevia(e,R,cnOk){const cs=Object.keys(R.meses).sort();const comp=UI.fsn.comp;const prox=addMes(R.pa,1);const somaAnt=r2(cs.filter(c=>c<R.pa).reduce((a,c)=>a+R.meses[c],0));
+  const linhas=cs.map(c=>{const f=snFat(e.id,c);const atual=receitaMes(e.id,c);const lanc=f&&f.origem==='lancamentos';const dif=atual!=null&&Math.abs(atual-R.meses[c])>=.01;
+    return `<tr><td>${fmtComp(c)}${c===R.pa?' <span class="small muted">(PA)</span>':''}</td><td class="r num">${brl(R.meses[c])}</td><td class="r num ${dif?'':'muted'}">${atual==null?'<span class="muted">sem dado</span>':brl(atual)}</td><td class="small">${lanc?(dif?'<span style="color:var(--warn)">notas/lançamentos divergem: mantido</span>':'notas/lançamentos'):dif?'<b>vai corrigir</b>':atual==null?'vai preencher':'igual'}</td></tr>`}).join('');
+  return mHead('Importar PGDAS-D · '+(e.fantasia||e.razao))+`<form data-form="pgdas-imp"><div class="modal-body">
+   ${cnOk?'':`<div class="banner crit" style="display:block;margin-bottom:10px">O CNPJ do PDF (${esc(R.cnpj)}) não é o desta empresa (${fmtCNPJ(e.cnpj)}). Confira o arquivo.</div>`}
+   <p class="small" style="margin-top:0">PA <b>${fmtComp(R.pa)}</b>${R.nome?' · '+esc(R.nome):''} · RBT12 declarado <b>${R.rbt12!=null?brl(R.rbt12):'—'}</b>${R.rbt12!=null&&Math.abs(R.rbt12-somaAnt)>=.01&&cs.filter(c=>c<R.pa).length>=12?` <span class="small" style="color:var(--warn)">(soma dos meses: ${brl(somaAnt)})</span>`:''}</p>
+   <div class="table-wrap" style="max-height:330px;overflow:auto"><table><thead><tr><th>Mês</th><th class="r">No PGDAS-D</th><th class="r">No sistema</th><th></th></tr></thead><tbody>${linhas||'<tr><td colspan="4" class="muted">O PDF não trouxe os meses anteriores.</td></tr>'}</tbody></table></div>
+   <label class="f chk full" style="margin-top:10px"><input type="checkbox" name="meses" checked ${cs.length?'':'disabled'}> Gravar os meses no histórico (os que vêm de notas e lançamentos não são alterados)</label>
+   ${R.rbt12!=null?`<label class="f chk full"><input type="checkbox" name="rbt" ${comp===R.pa?'checked':''}> Fixar o RBT12 declarado (${brl(R.rbt12)}) na competência ${fmtComp(R.pa)}</label>`:''}
+   ${Object.keys(R.folha).length?`<label class="f chk full"><input type="checkbox" name="folha" checked> Gravar a folha de salários dos 12 meses (FS12 ${brl(r2(Object.values(R.folha).reduce((a,b)=>a+b,0)))}) para o Fator R de ${fmtComp(R.pa)}</label>`:''}
+   <p class="small muted">Com o histórico gravado, ${fmtComp(prox)} e os meses seguintes já calculam o RBT12 sozinhos.</p></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary" ${cnOk?'':'disabled'}>Importar</button></div></form>`}
+FORM['pgdas-imp']=fd=>{const I=UI.pgdasImp;if(!I)return;const e=emp(I.eid),R=I.R;let n=0,mant=0;
+  mut('faturamento',()=>{const pega=c=>{let f=snFat(e.id,c);if(!f){f={id:uid(),empresaId:e.id,comp:c,receita:null};S.faturamento.push(f)}return f};
+    if(fd.get('meses'))Object.entries(R.meses).forEach(([c,v])=>{const f=snFat(e.id,c);if(f&&f.origem==='lancamentos'){if(Math.abs((+f.receita||0)-v)>=.01)mant++;return}const g=pega(c);g.receita=v;g.origem='pgdas';g.pgdasArq=I.arq;n++});
+    if(fd.get('rbt')&&R.rbt12!=null){const g=pega(R.pa);g.rbt12Inf=R.rbt12;g.rbt12InfEm=agora();g.rbt12Origem='pgdas'}
+    if(fd.get('folha')){const g=pega(R.pa);g.folha12=r2(Object.values(R.folha).reduce((a,b)=>a+b,0))}},
+    ['Apuração',`Importou PGDAS-D de ${fmtComp(R.pa)} (${I.arq}): ${n} mês(es) no histórico${fd.get('rbt')?' · RBT12 '+brl(R.rbt12):''}${mant?' · '+mant+' mês(es) de notas mantidos':''}`,e.razao]);
+  UI.pgdasImp=null;closeModal();toast(`PGDAS-D importado: ${n} mês(es) gravados${mant?`; ${mant} mês(es) vindos de notas e lançamentos ficaram como estão (divergem do PGDAS-D)`:''}.`,!!mant)};
+/* ==== v43 (fim) ==== */
 /* CRC nos arquivos SPED: campo de até 15 posições, só letras e números ("CRC/MS 016636/O-0" → "MS016636O0") */
 function crcSped(c){return String(c||'').toUpperCase().replace(/^\s*CRC/,'').replace(/[^A-Z0-9]/g,'').slice(0,15)}
 
