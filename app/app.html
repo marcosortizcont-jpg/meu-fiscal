@@ -9149,9 +9149,11 @@ function fatDeclForm(){const F=UI.fatDecl;const e=emp(F.eid);const cs=relMeses(F
    <h3 style="margin:16px 0 6px;font-size:14px">Assinaturas</h3>
    <div class="grid-f"><label class="f"><span>Sócio administrador</span>${(e.socios||[]).length>1?`<select data-fd-socio>${e.socios.map((s,i)=>`<option value="${i}" ${s.nome===F.socio.nome?'selected':''}>${esc(s.nome)}${s.administrador?' (adm.)':''}</option>`).join('')}</select>`:''}<input name="socioNome" value="${esc(F.socio.nome)}" required placeholder="Nome completo"></label>
     <label class="f"><span>CPF do sócio</span><input name="socioCpf" inputmode="numeric" maxlength="14" value="${F.socio.cpf?fmtCPF(F.socio.cpf):''}" required></label>
+    <label class="f"><span>Cargo do sócio</span><input name="socioCargo" list="fd-cargos" maxlength="60" value="${esc(F.socio.cargo||'Sócio administrador')}"><datalist id="fd-cargos"><option>Sócio administrador</option><option>Administrador</option><option>Titular</option><option>Empresário individual</option><option>Diretor</option><option>Procurador</option></datalist></label>
     <label class="f"><span>Contador responsável</span><input name="contNome" value="${esc(F.cont.nome)}" required></label>
     <label class="f"><span>CPF do contador</span><input name="contCpf" inputmode="numeric" maxlength="14" value="${F.cont.cpf?fmtCPF(F.cont.cpf):''}" required></label>
     <label class="f"><span>CRC</span><input name="contCrc" value="${esc(F.cont.crc)}" required placeholder="CRC/MS 000000/O-0"></label>
+    <label class="f"><span>Cargo do contador</span><input name="contCargo" maxlength="60" value="${esc(F.cont.cargo||'Contador')}"></label>
     <label class="f"><span>Local</span><input name="cidade" value="${esc(F.cidade)}"></label><label class="f"><span>Data</span><input type="date" name="data" value="${F.data}"></label>
     <label class="f"><span>Destinatário (opcional)</span><input name="dest" value="${esc(F.dest)}" placeholder="ex.: Banco do Brasil S.A."></label>
     <label class="f full"><span>Finalidade (opcional)</span><input name="fin" value="${esc(F.fin)}" placeholder="ex.: abertura de conta, análise de crédito, cadastro"></label>
@@ -9160,7 +9162,7 @@ function fatDeclForm(){const F=UI.fatDecl;const e=emp(F.eid);const cs=relMeses(F
    <p class="small muted">CPFs que faltavam no cadastro ficam salvos para as próximas declarações.</p></div>
   <div class="modal-foot" style="flex-wrap:wrap;gap:8px"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button type="button" class="btn" data-act="fd-gerar" data-salvar="0">${svg('download')}Só gerar PDF</button><button type="button" class="btn primary" data-act="fd-gerar" data-salvar="1">${svg('download')}${F.salvoId?'Salvar e gerar PDF':'Salvar no histórico e gerar PDF'}</button></div></form>`}
 function fdLerCampos(){const f=document.querySelector('form[data-form="fat-decl"]');const F=UI.fatDecl;if(!f||!F)return;const g=n=>f.querySelector(`[name="${n}"]`)?.value??'';
-  F.socio={nome:g('socioNome').trim(),cpf:soDig(g('socioCpf'))};F.cont={nome:g('contNome').trim(),cpf:soDig(g('contCpf')),crc:g('contCrc').trim()};F.cidade=g('cidade').trim();F.data=g('data')||hoje();F.dest=g('dest').trim();F.fin=g('fin').trim();F.desc=g('desc').trim();F.novo=!!f.querySelector('[name=novo]')?.checked;
+  F.socio={nome:g('socioNome').trim(),cpf:soDig(g('socioCpf')),cargo:g('socioCargo').trim()||'Sócio administrador'};F.cont={nome:g('contNome').trim(),cpf:soDig(g('contCpf')),crc:g('contCrc').trim(),cargo:g('contCargo').trim()||'Contador'};F.cidade=g('cidade').trim();F.data=g('data')||hoje();F.dest=g('dest').trim();F.fin=g('fin').trim();F.desc=g('desc').trim();F.novo=!!f.querySelector('[name=novo]')?.checked;
   f.querySelectorAll('[data-fd-mes]').forEach(i=>{F.vals[i.dataset.fdMes]=valBR(i.value)})}
 function fdPeriodo(de,ate){const F=UI.fatDecl;const e=emp(F.eid);if(!/^\d{4}-\d{2}$/.test(de)||!/^\d{4}-\d{2}$/.test(ate))return;if(de>ate)[de,ate]=[ate,de];
   if(relMeses(de,ate).length>36){toast('Período de até 36 meses.',true);de=addMes(ate,-35)}fdLerCampos();UI.fatDecl=novoFD(e,de,ate,UI.fatDecl);openModal(fatDeclForm(),true)}
@@ -9224,7 +9226,7 @@ function pdfDeclFat(e,F){const w=window.open('','_blank');if(!w){toast('Permita 
   ${tabela}
   <div class="tot"><span>Total do período</span><b>${brl(tot)}</b></div><p class="ext">(${esc(extensoBRL(tot))})</p>
   <p class="local">${esc(F.cidade)}, ${esc(dataExt(F.data))}.</p>
-  <div class="ass"><div><b>${esc(F.socio.nome)}</b>CPF ${fmtCPF(F.socio.cpf)}<br>Sócio administrador</div><div><b>${esc(F.cont.nome)}</b>CPF ${fmtCPF(F.cont.cpf)}<br>Contador${crc?' · '+esc(crc):''}</div></div>
+  <div class="ass"><div><b>${esc(F.socio.nome)}</b>CPF ${fmtCPF(F.socio.cpf)}<br>${esc(F.socio.cargo||'Sócio administrador')}</div><div><b>${esc(F.cont.nome)}</b>CPF ${fmtCPF(F.cont.cpf)}<br>${esc(F.cont.cargo||'Contador')}${crc?' · '+esc(crc):''}</div></div>
   <div class="rod">Documento emitido por ${esc(marca)} em ${new Date().toLocaleString('pt-BR')}. As informações são de responsabilidade dos signatários.</div>
   </div><script>document.fonts&&document.fonts.ready?document.fonts.ready.then(()=>setTimeout(()=>print(),250)):setTimeout(()=>print(),600)<\/script></body></html>`);w.document.close()}
 function fatDeclAbrir(){const e=emp(UI.fsn.emp);if(!e)return;const {ate}=periodoNf();const fim=ate>=compAtual()?addMes(compAtual(),-1):ate;UI.fatDecl=novoFD(e,addMes(fim,-11),fim);openModal(fatDeclForm(),true)}
