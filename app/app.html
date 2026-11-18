@@ -9359,6 +9359,51 @@ FORM['pgdas-imp']=fd=>{const I=UI.pgdasImp;if(!I)return;const e=emp(I.eid),R=I.R
     ['Apuração',`Importou PGDAS-D de ${fmtComp(R.pa)} (${I.arq}): ${n} mês(es) no histórico${fd.get('rbt')?' · RBT12 '+brl(R.rbt12):''}${mant?' · '+mant+' mês(es) de notas mantidos':''}`,e.razao]);
   UI.pgdasImp=null;closeModal();toast(`PGDAS-D importado: ${n} mês(es) gravados${mant?`; ${mant} mês(es) vindos de notas e lançamentos ficaram como estão (divergem do PGDAS-D)`:''}.`,!!mant)};
 /* ==== v43 (fim) ==== */
+/* ==== v44: PGDAS-D traz as atividades do PA (anexo, ST, monofásico, retenção) e confere o DAS declarado × calculado ==== */
+const INI_ATIV=/(Revenda de mercadorias|Venda de mercadorias industrializadas|Prestação de [Ss]erviços|Locação de bens móveis|Escritórios de serviços contábeis|Atividades? com incidência simultânea|Transporte|Serviços de comunicação)/;
+function lerPgdasAtiv(T){const out=[];const re=/Receita Bruta Informada:\s*R\$\s*([\d.]+,\d{2})\s*IRPJ CSLL COFINS PIS\/Pasep INSS\/CPP ICMS IPI ISS Total\s*((?:-?[\d.]+,\d{2}\s*){9})/g;let m,ult=0;const blocos=[];
+  while((m=re.exec(T)))blocos.push({i:m.index,f:re.lastIndex,valor:valBR(m[1]),nums:(m[2].match(/-?[\d.]+,\d{2}/g)||[]).map(valBR)});
+  blocos.forEach((b,k)=>{const antes=T.slice(k?blocos[k-1].f:0,b.i);const j=antes.search(new RegExp(INI_ATIV.source+'(?![\\s\\S]*'+INI_ATIV.source+')'));const desc=(j>=0?antes.slice(j):antes.slice(-300)).replace(/^.*?Atividade \(R\$\):\s*/,'').trim();
+    const fim=k<blocos.length-1?blocos[k+1].i:T.length;let resto=T.slice(b.f,fim);const corte=resto.search(/Totais do Estabelecimento|Valor do Débito por Tributo|2\.8\)|CNPJ Estabelecimento/);if(corte>=0)resto=resto.slice(0,corte);
+    const tem=(s,r)=>r.test(s);const d=desc.toLowerCase();
+    let anexo=/revenda de mercadorias/.test(d)?'I':/industrializad/.test(d)?'II':/anexo iv/.test(d)?'IV':/anexo v\b/.test(d)?'V':/fator r/.test(d)&&!/não sujeit/.test(d)?'R':'III';
+    const flags0={exportacao:/para o exterior/.test(d)&&!/exceto para o exterior/.test(d),semIss:/locação de bens móveis/.test(d)};
+    const parc=[];const rp=/Parcela\s*\d+:\s*R\$\s*([\d.]+,\d{2})([\s\S]*?)(?=Parcela\s*\d+:|$)/g;let p;while((p=rp.exec(resto)))parc.push({valor:valBR(p[1]),txt:p[2]});
+    if(!parc.length)parc.push({valor:b.valor,txt:resto});
+    parc.forEach(pc=>{const t=(desc+' '+pc.txt);const st=/Substituição tributária de:[^.]*ICMS/i.test(pc.txt)||(/com substituição tributária/i.test(d)&&!/Substituição tributária de:/i.test(pc.txt)&&anexo!=='III');
+      out.push({desc:desc.slice(0,220),anexo,valor:pc.valor,st,monofasico:/Tributação monofásica de:[^.]*(PIS|COFINS)/i.test(pc.txt),issRetido:/Retenção de:?[^.]*ISS|ISS retido|retenção\/substituição tributária de ISS/i.test(t)&&!/sem retenção/i.test(t),exportacao:flags0.exportacao,semIss:flags0.semIss,trib:parc.length===1?b.nums.slice(0,8):null})})});
+  return out}
+const lerPgdasV44=lerPgdas;lerPgdas=function(txt){const R=lerPgdasV44(txt);const T=txt.replace(/\s+/g,' ');R.ativ=lerPgdasAtiv(T);
+  const dt=[...T.matchAll(/Total do Débito Declarado \(exigível \+ suspenso\)[^\d]*IRPJ CSLL COFINS PIS\/Pasep INSS\/CPP ICMS IPI ISS Total\s*((?:-?[\d.]+,\d{2}\s*){9})/g)];
+  if(dt.length){const v=Array(9).fill(0);const gi=T.search(/Total Geral da Empresa/);const usar=gi>=0&&dt.some(m=>m.index>gi)?[dt.filter(m=>m.index>gi)[0]]:dt;usar.forEach(m=>(m[1].match(/-?[\d.]+,\d{2}/g)||[]).map(valBR).forEach((x,i)=>v[i]+=x));R.decl={trib:Object.fromEntries(TRIB.map((t,i)=>[t,r2(v[i])])),total:r2(v[8])}}
+  else{const tt=T.match(/Valor Total do Débito Declarado \(R\$\)\s*[\d.]+,\d{2}\s*([\d.]+,\d{2})/);if(tt)R.decl={trib:null,total:valBR(tt[1])}}
+  return R};
+const rotAtiv=a=>`Anexo ${a.anexo==='R'?'III/V (Fator R)':a.anexo}${Object.keys(SEGREG).filter(k=>a[k]).map(k=>' · '+SEGREG[k].rot).join('')}`;
+/* prévia: atividades do PA e conferência */
+const pgdasPreviaV44=pgdasPrevia;pgdasPrevia=function(e,R,cnOk){let h=pgdasPreviaV44(e,R,cnOk);if(!R.ativ?.length)return h;const tem=snRec(e.id,R.pa).filter(r=>r.origem!=='pgdas');
+  const bloco=`<div class="panel" style="margin:10px 0;padding:10px 12px"><b>Receita de ${fmtComp(R.pa)} por atividade (${R.ativ.length})</b>
+    <div class="table-wrap"><table><tbody>${R.ativ.map(a=>`<tr><td class="small">${esc(a.desc.slice(0,110))}${a.desc.length>110?'…':''}<div style="color:var(--brand,#059669)">${esc(rotAtiv(a))}</div></td><td class="r num">${brl(a.valor)}</td></tr>`).join('')}</tbody></table></div>
+    ${R.decl?`<p class="small" style="margin:6px 0 0">DAS declarado: <b>${brl(R.decl.total)}</b></p>`:''}
+    <label class="f chk full" style="margin-top:6px"><input type="checkbox" name="ativ" ${tem.length?'':'checked'}> ${tem.length?`Substituir as ${tem.length} receita(s) já lançadas em ${fmtComp(R.pa)} pelas do PGDAS-D`:`Lançar a receita de ${fmtComp(R.pa)} com essas atividades`} e conferir o DAS</label></div>`;
+  return h.replace('<div class="table-wrap" style="max-height:330px',bloco+'<div class="table-wrap" style="max-height:330px')};
+const formPgdasV44=FORM['pgdas-imp'];FORM['pgdas-imp']=(fd,form)=>{const I=UI.pgdasImp;if(!I)return;const e=emp(I.eid),R=I.R;const lancar=fd.get('ativ')&&R.ativ?.length;
+  if(lancar&&travaComp(e.id,R.pa)){toast(fmtComp(R.pa)+' está fechada: reabra a competência para lançar a receita.',true);return}
+  formPgdasV44(fd,form);
+  mut(['receitas','faturamento'],()=>{let f=snFat(e.id,R.pa);if(!f){f={id:uid(),empresaId:e.id,comp:R.pa,receita:null};S.faturamento.push(f)}if(R.decl)f.dasDeclarado={...R.decl,arq:I.arq,em:agora()};
+    if(lancar){S.receitas=S.receitas.filter(r=>!(r.empresaId===e.id&&r.comp===R.pa));
+      R.ativ.forEach((a,i)=>{const d={id:uid(),empresaId:e.id,comp:R.pa,data:ultDiaMes(R.pa),valor:a.valor,descricao:('PGDAS-D · '+a.desc).slice(0,160),anexo:a.anexo==='R'?'III':a.anexo,fatorR:a.anexo==='R',origem:'pgdas',criadoEm:agora()};Object.keys(SEGREG).forEach(k=>d[k]=!!a[k]);S.receitas.push(d)});sincFat(e.id,R.pa)}},
+    ['Apuração',`PGDAS-D ${fmtComp(R.pa)}: ${lancar?R.ativ.length+' atividade(s) lançada(s)':'conferência'}${R.decl?' · DAS declarado '+brl(R.decl.total):''}`,e.razao]);
+  if(R.decl){const a=apurarSN(e,R.pa);const dif=r2(a.total-R.decl.total);toast(`PGDAS-D de ${fmtComp(R.pa)}: DAS declarado ${brl(R.decl.total)} · calculado ${brl(a.total)}${Math.abs(dif)<.05?' — confere.':' — diferença de '+brl(dif)+'. Veja a conferência na apuração.'}`,Math.abs(dif)>=.05)}};
+/* conferência na tela da apuração */
+function conferePgdasHtml(e,comp){const f=snFat(e.id,comp);const D=f?.dasDeclarado;if(!D)return '';const a=apurarSN(e,comp);const dif=r2(a.total-D.total);const ok=Math.abs(dif)<.05;
+  return `<div class="panel"><div class="panel-head"><h2>Conferência com o PGDAS-D transmitido</h2>${pill(ok?'Confere':'Diferença de '+brl(dif),ok?'ok':'warn')}</div>
+   <div class="table-wrap"><table><thead><tr><th>Tributo</th><th class="r">Declarado (PGDAS-D)</th><th class="r">Calculado aqui</th><th class="r">Diferença</th></tr></thead><tbody>
+   ${D.trib?TRIB.map(t=>{const x=r2((a.tot[t]||0)-(D.trib[t]||0));return `<tr><td>${t==='CPP'?'INSS/CPP':t==='PIS'?'PIS/Pasep':t}</td><td class="r num">${brl(D.trib[t]||0)}</td><td class="r num">${brl(a.tot[t]||0)}</td><td class="r num" ${Math.abs(x)>=.05?'style="color:var(--warn);font-weight:600"':''}>${Math.abs(x)<.005?'—':brl(x)}</td></tr>`}).join(''):''}
+   <tr><td><b>Total do DAS</b></td><td class="r num"><b>${brl(D.total)}</b></td><td class="r num"><b>${brl(a.total)}</b></td><td class="r num"><b>${ok?'—':brl(dif)}</b></td></tr></tbody></table></div>
+   <p class="small muted">Importado de ${esc(D.arq||'PGDAS-D')} em ${fmtData(String(D.em).slice(0,10))}. ${ok?'Os valores do sistema batem com a declaração.':'Confira o anexo, a segregação (ST, monofásico, retenção) e o RBT12 dos lançamentos do mês.'}</p></div>`}
+const aSimplesV44=aSimples;aSimples=function(){const h=aSimplesV44();const e=emp(UI.fsn.emp);if(!e||e.regime!=='SN')return h;const c=conferePgdasHtml(e,UI.fsn.comp);if(!c)return h;
+  const k='<div class="panel"><div class="panel-head"><h2>Memória de cálculo</h2>';return h.includes(k)?h.replace(k,c+k):h+c};
+/* ==== v44 (fim) ==== */
 /* CRC nos arquivos SPED: campo de até 15 posições, só letras e números ("CRC/MS 016636/O-0" → "MS016636O0") */
 function crcSped(c){return String(c||'').toUpperCase().replace(/^\s*CRC/,'').replace(/[^A-Z0-9]/g,'').slice(0,15)}
 
