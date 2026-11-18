@@ -9111,6 +9111,122 @@ async function capturaAuto(forcar){if(MODO!=='api'||!APP_FISCAL||!podeMod('guias
 const openModalV40=openModal;openModal=function(...a){if(UI.capQuieto)return;return openModalV40(...a)};
 (function vigiarCaptura(){setTimeout(()=>capturaAuto(false),20000);setInterval(()=>capturaAuto(false),30*60000)})();
 /* ==== v40 (fim) ==== */
+/* ==== v41: Declaração de faturamento para banco · período livre, meses editáveis, sócio e contador com CPF, PDF novo ==== */
+const valBR=v=>{const s=String(v??'').trim().replace(/[R$\s]/g,'');if(!s)return 0;const n=s.includes(',')?+s.replace(/\./g,'').replace(',','.'):+s;return Number.isFinite(n)?r2(n):0};
+const fmtValIn=v=>(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+function extensoBRL(v){v=Math.round((+v||0)*100);const reais=Math.floor(v/100),cent=v%100;
+  const U=['','um','dois','três','quatro','cinco','seis','sete','oito','nove','dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove'];
+  const D=['','','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa'];const C=['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos'];
+  const ate999=n=>{if(n===100)return 'cem';const c=Math.floor(n/100),r=n%100;const p=[];if(c)p.push(C[c]);if(r){if(r<20)p.push(U[r]);else{const d=Math.floor(r/10),u=r%10;p.push(D[d]+(u?' e '+U[u]:''))}}return p.join(' e ')};
+  const grupos=[];let n=reais;while(n>0){grupos.push(n%1000);n=Math.floor(n/1000)}
+  const esc_=[['',''],['mil','mil'],['milhão','milhões'],['bilhão','bilhões']];const partes=[];
+  grupos.forEach((g,i)=>{if(!g)return;let t=i===1&&g===1?'mil':ate999(g)+(i?' '+(g===1?esc_[i][0]:esc_[i][1]):'');partes.unshift({t,g,i})});
+  let txt='';partes.forEach((p,k)=>{if(k===0){txt=p.t;return}const ult=k===partes.length-1;txt+=(ult&&(p.g<100||p.g%100===0)?' e ':', ')+p.t});
+  if(reais){txt+=(reais%1000000===0&&reais>=1000000?' de':'')+(reais===1?' real':' reais')}
+  if(cent){txt+=(reais?' e ':'')+ate999(cent)+(cent===1?' centavo':' centavos')}
+  return txt||'zero real'}
+function socioAdm(e){const ss=e.socios||[];return ss.find(s=>s.administrador)||ss[0]||null}
+function contadorDados(){const C=cfg();const ct=C.contrato||{};const doc=soDig(C.cpfContador||ct.contadorDoc||'');
+  return {nome:ct.contadorNome||C.responsavelTecnico||'',cpf:doc.length===11?doc:'',crc:C.crc||''}}
+function novoFD(e,de,ate,ant){const vals={},orig={};relMeses(de,ate).forEach(c=>{orig[c]=fatMes(e,c).total;vals[c]=ant&&c in ant.vals?ant.vals[c]:orig[c]});
+  const s=socioAdm(e);const ct=contadorDados();
+  return ant?{...ant,de,ate,vals,orig}:{eid:e.id,de,ate,vals,orig,socio:{nome:s?.nome||'',cpf:soDig(s?.cpf||'')},cont:ct,cidade:e.municipio?e.municipio+(e.uf?'/'+e.uf:''):(cfg().cidade||'Campo Grande/MS'),data:hoje(),dest:'',fin:''}}
+function fdTotal(F){return r2(Object.keys(F.vals).filter(c=>c>=F.de&&c<=F.ate).reduce((a,c)=>a+(+F.vals[c]||0),0))}
+function fatDeclForm(){const F=UI.fatDecl;const e=emp(F.eid);const cs=relMeses(F.de,F.ate);const tot=fdTotal(F);const ed=cs.filter(c=>Math.abs((+F.vals[c]||0)-(+F.orig[c]||0))>=.005).length;
+  return mHead('Declaração de faturamento · '+(e.fantasia||e.razao))+`<form data-form="fat-decl"><div class="modal-body">
+   <div class="grid-f"><label class="f"><span>De</span><input type="month" name="de" value="${F.de}" data-fd-per></label><label class="f"><span>Até</span><input type="month" name="ate" value="${F.ate}" max="${compAtual()}" data-fd-per></label>
+    <div class="f full"><span>Atalhos</span><div class="actions">${[[3,'3 meses'],[6,'6 meses'],[12,'12 meses'],[24,'24 meses']].map(([n,t])=>`<button type="button" class="btn sm" data-act="fd-atalho" data-n="${n}">Últimos ${t}</button>`).join('')}<button type="button" class="btn sm" data-act="fd-atalho" data-n="ano">Ano de ${F.ate.slice(0,4)}</button><button type="button" class="btn sm" data-act="fd-atalho" data-n="anoant">Ano de ${+F.ate.slice(0,4)-1}</button></div></div></div>
+   <div class="table-wrap" style="margin-top:12px;max-height:340px;overflow:auto"><table><thead><tr><th>Mês</th><th class="r">Escriturado</th><th class="r" style="width:190px">Valor na declaração</th><th></th></tr></thead><tbody>${cs.map(c=>{const dif=Math.abs((+F.vals[c]||0)-(+F.orig[c]||0))>=.005;return `<tr>
+     <td>${fmtComp(c)}</td><td class="r num small muted">${brl(F.orig[c])}</td><td class="r"><input class="num" style="text-align:right;max-width:170px${dif?';border-color:var(--warn)':''}" inputmode="decimal" data-fd-mes="${c}" value="${fmtValIn(F.vals[c])}"></td>
+     <td>${dif?`<button type="button" class="btn sm ghost" data-act="fd-desfaz" data-c="${c}" title="Voltar ao valor escriturado">Desfazer</button>`:''}</td></tr>`}).join('')}
+</tbody></table></div>
+   <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-top:8px;padding:8px 12px;border-radius:8px;background:var(--bg2,rgba(0,0,0,.03))"><span><b>Total (${cs.length} ${cs.length===1?'mês':'meses'})</b> <span class="small muted">escriturado ${brl(r2(cs.reduce((a,c)=>a+(+F.orig[c]||0),0)))}</span></span><b data-fd-tot style="font-size:16px">${brl(tot)}</b></div>
+   <p class="small muted" data-fd-ext style="margin:6px 0 0">${esc(extensoBRL(tot))}</p>
+   ${ed?`<div class="banner warn" style="display:block;margin-top:8px">${ed} mês(es) com valor diferente do escriturado. A alteração fica registrada no histórico e vale só para esta declaração.</div>`:''}
+   <h3 style="margin:16px 0 6px;font-size:14px">Assinaturas</h3>
+   <div class="grid-f"><label class="f"><span>Sócio administrador</span>${(e.socios||[]).length>1?`<select data-fd-socio>${e.socios.map((s,i)=>`<option value="${i}" ${s.nome===F.socio.nome?'selected':''}>${esc(s.nome)}${s.administrador?' (adm.)':''}</option>`).join('')}</select>`:''}<input name="socioNome" value="${esc(F.socio.nome)}" required placeholder="Nome completo"></label>
+    <label class="f"><span>CPF do sócio</span><input name="socioCpf" inputmode="numeric" maxlength="14" value="${F.socio.cpf?fmtCPF(F.socio.cpf):''}" required></label>
+    <label class="f"><span>Contador responsável</span><input name="contNome" value="${esc(F.cont.nome)}" required></label>
+    <label class="f"><span>CPF do contador</span><input name="contCpf" inputmode="numeric" maxlength="14" value="${F.cont.cpf?fmtCPF(F.cont.cpf):''}" required></label>
+    <label class="f"><span>CRC</span><input name="contCrc" value="${esc(F.cont.crc)}" required placeholder="CRC/MS 000000/O-0"></label>
+    <label class="f"><span>Local</span><input name="cidade" value="${esc(F.cidade)}"></label><label class="f"><span>Data</span><input type="date" name="data" value="${F.data}"></label>
+    <label class="f"><span>Destinatário (opcional)</span><input name="dest" value="${esc(F.dest)}" placeholder="ex.: Banco do Brasil S.A."></label>
+    <label class="f full"><span>Finalidade (opcional)</span><input name="fin" value="${esc(F.fin)}" placeholder="ex.: abertura de conta, análise de crédito, cadastro"></label></div>
+   <p class="small muted">CPFs que faltavam no cadastro ficam salvos para as próximas declarações.</p></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">${svg('download')}Gerar PDF</button></div></form>`}
+function fdLerCampos(){const f=document.querySelector('form[data-form="fat-decl"]');const F=UI.fatDecl;if(!f||!F)return;const g=n=>f.querySelector(`[name="${n}"]`)?.value??'';
+  F.socio={nome:g('socioNome').trim(),cpf:soDig(g('socioCpf'))};F.cont={nome:g('contNome').trim(),cpf:soDig(g('contCpf')),crc:g('contCrc').trim()};F.cidade=g('cidade').trim();F.data=g('data')||hoje();F.dest=g('dest').trim();F.fin=g('fin').trim();
+  f.querySelectorAll('[data-fd-mes]').forEach(i=>{F.vals[i.dataset.fdMes]=valBR(i.value)})}
+function fdPeriodo(de,ate){const F=UI.fatDecl;const e=emp(F.eid);if(!/^\d{4}-\d{2}$/.test(de)||!/^\d{4}-\d{2}$/.test(ate))return;if(de>ate)[de,ate]=[ate,de];
+  if(relMeses(de,ate).length>36){toast('Período de até 36 meses.',true);de=addMes(ate,-35)}fdLerCampos();UI.fatDecl=novoFD(e,de,ate,UI.fatDecl);openModal(fatDeclForm(),true)}
+ACT['fd-atalho']=el=>{const F=UI.fatDecl;const n=el.dataset.n;const ult=compAtual()>F.ate?F.ate:addMes(compAtual(),-1);
+  if(n==='ano')return fdPeriodo(F.ate.slice(0,4)+'-01',F.ate.slice(0,4)+'-12'>ult?ult:F.ate.slice(0,4)+'-12');if(n==='anoant'){const a=+F.ate.slice(0,4)-1;return fdPeriodo(a+'-01',a+'-12')}
+  fdPeriodo(addMes(ult,-(+n-1)),ult)};
+ACT['fd-desfaz']=el=>{fdLerCampos();const F=UI.fatDecl;F.vals[el.dataset.c]=F.orig[el.dataset.c];openModal(fatDeclForm(),true)};
+document.addEventListener('change',ev=>{const t=ev.target;if(!t.closest||!t.closest('form[data-form="fat-decl"]'))return;
+  if(t.matches('[data-fd-per]')){const f=t.form;fdPeriodo(f.de.value,f.ate.value)}
+  else if(t.matches('[data-fd-socio]')){const e=emp(UI.fatDecl.eid);const s=e.socios[+t.value];const f=t.form;f.socioNome.value=s?.nome||'';f.socioCpf.value=s?.cpf?fmtCPF(s.cpf):''}
+  else if(t.matches('[data-fd-mes]')){t.value=fmtValIn(valBR(t.value));fdLerCampos();openModal(fatDeclForm(),true);const n=document.querySelector(`[data-fd-mes="${t.dataset.fdMes}"]`);n?.closest('tr')?.nextElementSibling?.querySelector('[data-fd-mes]')?.focus()}});
+document.addEventListener('input',ev=>{const t=ev.target;if(!t.matches||!t.matches('[data-fd-mes]'))return;const f=t.form;let tot=0;f.querySelectorAll('[data-fd-mes]').forEach(i=>tot+=valBR(i.value));tot=r2(tot);
+  const b=f.querySelector('[data-fd-tot]');if(b)b.textContent=brl(tot);const x=f.querySelector('[data-fd-ext]');if(x)x.textContent=extensoBRL(tot)});
+FORM['fat-decl']=(fd,form)=>{fdLerCampos();const F=UI.fatDecl;const e=emp(F.eid);
+  if(!F.socio.nome||!cpfValido(F.socio.cpf)){toast('Informe o nome e um CPF válido do sócio administrador.',true);return}
+  if(!F.cont.nome||!cpfValido(F.cont.cpf)){toast('Informe o nome e um CPF válido do contador.',true);return}
+  if(!F.cont.crc){toast('Informe o registro no CRC.',true);return}
+  const cs=relMeses(F.de,F.ate);const alt=cs.filter(c=>Math.abs((+F.vals[c]||0)-(+F.orig[c]||0))>=.005);
+  /* guarda os CPFs que faltavam e registra a emissão (com os ajustes) no histórico */
+  const ss=e.socios||[];const s=ss.find(x=>normP(x.nome)===normP(F.socio.nome));const salvarSoc=s&&soDig(s.cpf||'')!==F.socio.cpf&&!soDig(s.cpf||'');const salvarCont=!soDig(cfg().cpfContador||'');
+  mut(salvarSoc||salvarCont?['empresas','config']:['empresas'],()=>{if(salvarSoc)s.cpf=F.socio.cpf;if(salvarCont){if(!S.config[0])S.config.push({id:uid()});S.config[0].cpfContador=F.cont.cpf}
+      e.declFat=[...(e.declFat||[]).slice(-19),{em:agora(),por:ME.nome||'',de:F.de,ate:F.ate,total:fdTotal(F),ajustes:alt.map(c=>({c,de:F.orig[c],para:F.vals[c]})),dest:F.dest}]},
+    ['Escrita fiscal',`Declaração de faturamento ${fmtComp(F.de)} a ${fmtComp(F.ate)}: ${brl(fdTotal(F))}${alt.length?' · '+alt.length+' mês(es) ajustado(s): '+alt.map(c=>fmtComp(c)+' '+brl(F.orig[c])+' → '+brl(F.vals[c])).join('; '):''}`,e.razao]);
+  pdfDeclFat(e,F);closeModal()};
+function pdfDeclFat(e,F){const w=window.open('','_blank');if(!w){toast('Permita pop-ups para gerar o PDF.',true);return}
+  const cs=relMeses(F.de,F.ate);const tot=fdTotal(F);const C=cfg();const marca=C.marca||'Meu Fiscal';const per=cs.length===1?fmtComp(F.de):`${fmtComp(F.de)} a ${fmtComp(F.ate)}`;
+  const mesExt=c=>['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'][+c.slice(5,7)-1]+' de '+c.slice(0,4);
+  const dataExt=d=>{const [a,m,dd]=d.split('-');return `${+dd} de ${mesExt(a+'-'+m)}`};
+  const end=[[e.logradouro||e.endereco,e.numero].filter(Boolean).join(', '),e.bairro,e.municipio?e.municipio+(e.uf?'/'+e.uf:''):'',e.cep?'CEP '+String(e.cep).replace(/^(\d{5})(\d{3})$/,'$1-$2'):''].filter(Boolean).join(' · ');
+  const crc=F.cont.crc?(/^crc/i.test(F.cont.crc)?F.cont.crc:'CRC '+F.cont.crc):'';
+  const metade=Math.ceil(cs.length/2);const duasCol=cs.length>12;const comp_=metade>9;
+  const linha=c=>`<tr><td>${esc(mesExt(c).replace(/^./,x=>x.toUpperCase()))}</td><td class="r">${brl(F.vals[c])}</td></tr>`;
+  const tabela=duasCol?`<div class="cols"><table><thead><tr><th>Mês</th><th class="r">Faturamento</th></tr></thead><tbody>${cs.slice(0,metade).map(linha).join('')}</tbody></table><table><thead><tr><th>Mês</th><th class="r">Faturamento</th></tr></thead><tbody>${cs.slice(metade).map(linha).join('')}</tbody></table></div>`
+    :`<table class="uma"><thead><tr><th>Mês de referência</th><th class="r">Faturamento bruto</th></tr></thead><tbody>${cs.map(linha).join('')}</tbody></table>`;
+  w.document.write(`<!doctype html><html lang="pt-BR" class="${comp_?'compacto':''}"><head><meta charset="utf-8"><title>Declaração de faturamento · ${esc(e.razao)}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"><style>
+  @page{size:A4;margin:18mm 18mm 16mm}*{box-sizing:border-box}body{font:11.5px/1.55 Inter,Arial,sans-serif;color:#0f172a;margin:0;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .pg{max-width:680px;margin:0 auto;text-align:center}
+  .topo{display:flex;align-items:center;justify-content:center;gap:10px;padding-bottom:12px;border-bottom:2px solid #059669}
+  .logo{width:30px;height:30px;border-radius:8px;background:#0f172a;color:#34d399;display:grid;place-items:center;font-weight:700;font-size:13px}.marca{font-weight:700;font-size:14px;letter-spacing:-.01em}.marca small{display:block;font-weight:500;font-size:9.5px;color:#64748b;letter-spacing:.02em}
+  h1{font-size:20px;letter-spacing:.06em;text-transform:uppercase;margin:26px 0 4px;font-weight:700}.per{color:#059669;font-weight:600;font-size:12px;letter-spacing:.04em;text-transform:uppercase;margin:0 0 22px}
+  .emp{display:inline-block;border:1px solid #e2e8f0;border-radius:10px;padding:12px 22px;background:#f8fafc;margin-bottom:20px}.emp b{font-size:13.5px;display:block}.emp span{color:#475569;font-size:10.5px;display:block}
+  .txt{text-align:justify;text-align-last:center;max-width:600px;margin:0 auto 18px;font-size:12px}
+  table{border-collapse:collapse;margin:0 auto;font-size:11.5px}table.uma{width:62%}.cols{display:flex;gap:18px;justify-content:center}.cols table{width:48%}
+  th{background:#0f172a;color:#fff;font-weight:600;font-size:10px;letter-spacing:.05em;text-transform:uppercase;padding:7px 12px;text-align:left}th.r{text-align:right}
+  td{padding:5.5px 12px;border-bottom:1px solid #e2e8f0;text-align:left}td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}tbody tr:nth-child(even) td{background:#f8fafc}
+  .tot{margin:14px auto 0;display:inline-flex;align-items:baseline;gap:14px;border:1.5px solid #059669;border-radius:10px;padding:10px 22px;background:#ecfdf5}.tot span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#047857;font-weight:600}.tot b{font-size:16px}
+  .ext{color:#475569;font-style:italic;margin:6px 0 0;font-size:10.5px}.local{margin:26px 0 0}
+  .ass{display:flex;gap:40px;justify-content:center;margin-top:58px}.ass div{flex:1;max-width:280px;border-top:1px solid #0f172a;padding-top:6px;font-size:10.5px;line-height:1.45}.ass b{font-size:11px;display:block}
+  .rod{margin-top:34px;padding-top:8px;border-top:1px solid #e2e8f0;color:#94a3b8;font-size:8.5px}
+  .compacto td{padding:3.5px 10px;font-size:10.5px}.compacto h1{margin-top:16px}.compacto .per{margin-bottom:14px}.compacto .emp{margin-bottom:12px;padding:9px 20px}.compacto .txt{margin-bottom:12px}.compacto .local{margin-top:16px}.compacto .ass{margin-top:44px}.compacto .rod{margin-top:20px}
+  @media screen{body{background:#f1f5f9}.pg{background:#fff;padding:40px 48px;margin:24px auto;box-shadow:0 2px 16px rgba(15,23,42,.08);border-radius:8px}}</style></head><body><div class="pg">
+  <div class="topo"><div class="logo">mf</div><div class="marca">${esc(marca)}<small>${esc(F.cont.nome)}${crc?' · '+esc(crc):''}</small></div></div>
+  <h1>Declaração de Faturamento</h1><p class="per">${esc(per)} · ${cs.length} ${cs.length===1?'mês':'meses'}</p>
+  ${F.dest?`<p style="margin:-8px 0 16px">À ${esc(F.dest)}</p>`:''}
+  <div class="emp"><b>${esc(e.razao)}</b><span>CNPJ ${fmtCNPJ(e.cnpj||'')}${e.ie?' · IE '+esc(e.ie):''}</span>${end?`<span>${esc(end)}</span>`:''}</div>
+  <p class="txt">Declaramos, para os devidos fins${F.fin?' de '+esc(F.fin):''}, que a empresa acima identificada obteve, no período de <b>${esc(mesExt(F.de))}</b> a <b>${esc(mesExt(F.ate))}</b>, o faturamento bruto mensal abaixo discriminado, conforme os registros fiscais e contábeis.</p>
+  ${tabela}
+  <div class="tot"><span>Total do período</span><b>${brl(tot)}</b></div><p class="ext">(${esc(extensoBRL(tot))})</p>
+  <p class="local">${esc(F.cidade)}, ${esc(dataExt(F.data))}.</p>
+  <div class="ass"><div><b>${esc(F.socio.nome)}</b>CPF ${fmtCPF(F.socio.cpf)}<br>Sócio administrador · ${esc(e.razao)}</div><div><b>${esc(F.cont.nome)}</b>CPF ${fmtCPF(F.cont.cpf)}<br>Contador${crc?' · '+esc(crc):''}</div></div>
+  <div class="rod">Documento emitido por ${esc(marca)} em ${new Date().toLocaleString('pt-BR')}. As informações são de responsabilidade dos signatários.</div>
+  </div><script>document.fonts&&document.fonts.ready?document.fonts.ready.then(()=>setTimeout(()=>print(),250)):setTimeout(()=>print(),600)<\/script></body></html>`);w.document.close()}
+function fatDeclAbrir(){const e=emp(UI.fsn.emp);if(!e)return;const {ate}=periodoNf();const fim=ate>=compAtual()?addMes(compAtual(),-1):ate;UI.fatDecl=novoFD(e,addMes(fim,-11),fim);openModal(fatDeclForm(),true)}
+ACT['fat-decl']=()=>fatDeclAbrir();
+const relPdfV41=ACT['rel-pdf'];ACT['rel-pdf']=el=>{if(UI.snRel==='fat12')return fatDeclAbrir();return relPdfV41(el)};
+RELS.fat12.t='Declaração de faturamento (banco)';
+/* botão próprio na tela do relatório */
+const relCorpoV41=relCorpo;relCorpo=function(){let h=relCorpoV41();if(UI.snRel==='fat12')h=h.replace(/<button class="btn" data-act="rel-pdf"[^>]*>[\s\S]*?<\/button>/,`<button class="btn primary" data-act="fat-decl">${svg('download')}Montar declaração e PDF</button>`);return h};
+abaRelatorios=relCorpo;
+/* ==== v41 (fim) ==== */
 
 
 

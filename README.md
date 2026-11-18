@@ -18,6 +18,15 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### Declaração de faturamento (banco)
+
+Em Livros e relatórios → Faturamento → **Declaração de faturamento (banco)**, o botão **Montar declaração e PDF** abre o editor:
+
+- **Período:** livre, de 1 a 36 meses, com atalhos (últimos 3, 6, 12 ou 24 meses, ano corrente e ano anterior).
+- **Meses editáveis:** cada mês vem com o valor escriturado e pode ser ajustado ou desfeito. O total e o valor por extenso atualizam na hora. Os ajustes valem só para aquela declaração e ficam no histórico (`empresa.declFat` e auditoria).
+- **Assinaturas:** sócio administrador (nome e CPF) e contador (nome, CPF e CRC). Destinatário, finalidade, local e data são opcionais. CPFs que faltavam no cadastro ficam salvos.
+- **PDF:** layout centralizado em uma página; com mais de 12 meses a tabela vai para duas colunas.
+
 ### Serviços prestados e tomados (NFS-e, todos os regimes)
 
 O menu Movimento do fiscal ganhou duas telas: **Serviços prestados** (`#f-nfse-p`) e **Serviços tomados** (`#f-nfse-t`). Elas aceitam XML de NFS-e do padrão nacional e do ABRASF, avulso ou em ZIP, inclusive de vários clientes no mesmo arquivo.
