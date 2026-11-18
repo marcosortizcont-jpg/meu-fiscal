@@ -18,6 +18,18 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### Livros e relatórios (todos os regimes)
+
+A tela **Livros e relatórios** do fiscal (`#f-rel`) abre para qualquer empresa e mostra só o que vale para o regime dela. Usa o período de/até do topo; tudo sai em tela, planilha (CSV) ou PDF com cabeçalho da empresa e assinaturas.
+
+- **Livros fiscais:** Registro de Saídas, Registro de Entradas, Registro de Apuração do ICMS (P9, só LP/LR com IE), Serviços Prestados (ISS) e Serviços Tomados. Opção de termos de abertura e encerramento no PDF.
+- **Apurações:** Simples Nacional (DAS por tributo), PIS e Cofins (cumulativo, não cumulativo ou partilha do DAS), IRPJ e CSLL (trimestral, estimativa ou partilha do DAS), ISS, ICMS DIFAL e antecipação, base do PGDAS-D.
+- **Faturamento:** mensal com acumulado no ano, relação dos 12 meses com declaração assinada, por cliente, por dia e por modelo.
+- **Movimento:** entradas × saídas por mês, por CFOP, compras por fornecedor, resumos por CFOP/CST/NCM, itens e lançamentos por acumulador.
+- **Impostos:** guias pagas e a pagar (com código do DARF), resumo por tributo e retenções.
+
+No painel, a aba de relatórios do Simples usa a mesma tela.
+
 ### Regimes do lucro e encargos patronais
 
 - Regimes **Lucro Presumido C/ IE, LP S/ IE, Lucro Real C/ IE e LR S/ IE** (`reg2-lp-*`, `reg2-lr-*`), com pacote de obrigações: contabilidade, eSocial, DCTFWeb, FGTS, Reinf, PIS/COFINS, EFD-Contribuições, IRPJ/CSLL, ECD, ECF, ISS próprio e, com IE, ICMS próprio e EFD ICMS/IPI. Catálogo ganhou ICMS próprio, ISS próprio e DeSTDA (no pacote do SN C/ IE). Migração única (`config.regimesV3`) cria os regimes e remapeia as empresas LP/LR; empresas sem regime válido voltam ao regime do cadastro.

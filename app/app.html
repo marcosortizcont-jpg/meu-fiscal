@@ -6293,7 +6293,7 @@ function abaRelatorios(){const k=UI.snRel||'cfop';const R=RELS[k];const d=dadosR
 document.addEventListener('change',ev=>{const el=ev.target;if(el.hasAttribute&&el.hasAttribute('data-snrel')){UI.snRel=el.value;render()}});
 ACT['rel-csv']=()=>{const k=UI.snRel||'cfop';const d=dadosRelatorio(k);const e=emp(UI.fsn.emp);const q=v=>typeof v==='number'?String(r2(v)).replace('.',','):'"'+String(v??'').replace(/"/g,'""')+'"';
   const cab=k==='itens'?['Data','Nota','Código','Produto','NCM','CFOP','CST/CSOSN','Quantidade','Valor','ICMS','ST','CST PIS','CST Cofins']:k==='saidas'?['Data','Espécie','Série','Número','CFOP','Valor contábil','Base ICMS','ICMS','IPI']:k==='entradas'?['Data','Série','Número','Fornecedor','CFOP','Valor contábil','Base ICMS','ICMS']:d.cols;
-  baixar(`${RELS[k].t.toLowerCase().replace(/[^a-z0-9]+/gi,'-')}-${soDig(e.cnpj)}.csv`,'﻿'+[cab.map(q).join(';'),...d.csv.map(l=>l.map(q).join(';'))].join('\r\n'),'text/csv;charset=utf-8')};
+  baixar(`${RELS[k].t.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/gi,'-')}-${soDig(e.cnpj)}.csv`,'﻿'+[cab.map(q).join(';'),...d.csv.map(l=>l.map(q).join(';'))].join('\r\n'),'text/csv;charset=utf-8')};
 ACT['rel-pdf']=()=>{const k=UI.snRel||'cfop';const d=dadosRelatorio(k);const e=emp(UI.fsn.emp);const {de,ate}=periodoNf();
   janelaPdf(RELS[k].t,`<h1>${esc(RELS[k].t)}</h1><p class="sub">${esc(e.razao)} · CNPJ ${fmtCNPJ(e.cnpj||'')} · Período ${fmtComp(de)}${ate!==de?' a '+fmtComp(ate):''}</p>
    <table><tr>${d.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr>${d.linhas.map(l=>`<tr>${l.map((v,i)=>`<td class="${i&&/^-?R\$/.test(String(v))?'r':''}">${esc(String(v))}</td>`).join('')}</tr>`).join('')}${d.total?`<tr class="tot">${d.total.map(v=>`<td class="r">${esc(String(v))}</td>`).join('')}</tr>`:''}</table>${d.obs?`<p class="nota">${esc(d.obs)}</p>`:''}
@@ -8804,6 +8804,188 @@ const dpFolhaPgV37=dpFolhaPg;dpFolhaPg=function(e,comp){let h=dpFolhaPgV37(e,com
     <tr><td><b>Total patronal</b></td><td class="small muted">${esc(pt.obs||'')}</td><td class="r num"><b>${brl(pt.total||0)}</b></td></tr></tbody></table></div></div>`;
   return h.includes('<div class="panel"><div class="panel-head"><h2>Encargos e guias do mês</h2>')?h.replace('<div class="panel"><div class="panel-head"><h2>Encargos e guias do mês</h2>',painel+'<div class="panel"><div class="panel-head"><h2>Encargos e guias do mês</h2>'):h+painel};
 /* ==== v37 (fim) ==== */
+/* ==== v38: Livros e relatórios para todos os regimes (padrão dos sistemas contábeis) ==== */
+const relMeses=(de,ate)=>{const a=[];for(let c=de;c<=ate&&a.length<120;c=addMes(c,1))a.push(c);return a};
+const ehSN=e=>e&&e.regime==='SN',ehMEI=e=>e&&e.regime==='MEI',ehLucro=e=>e&&['LP','LR'].includes(e.regime);
+const docMes=d=>String(d.competencia||d.emissao).slice(0,7);
+const lancMes=l=>String(l.competencia||l.data).slice(0,7);
+const valItem=it=>(+it.vProd||0)-(+it.vDesc||0)+(+it.vFrete||0)+(+it.vSeg||0)+(+it.vOutro||0);
+const cfopEnt=c=>c?({5:'1',6:'2',7:'3'}[String(c)[0]]||String(c)[0])+String(c).slice(1):'';
+const saidasDe=(e,de,ate)=>S.docsaida.filter(d=>d.empresaId===e.id&&!d.retido&&d.situacao==='autorizada'&&d.tpNF!=='0'&&docMes(d)>=de&&docMes(d)<=ate);
+const entradasDe=(e,de,ate)=>S.nfentrada.filter(n=>n.empresaId===e.id&&n.situacao!=='cancelada'&&String(n.emissao).slice(0,7)>=de&&String(n.emissao).slice(0,7)<=ate);
+const relLancs=(e,de,ate,tipos)=>S.lancfiscais.filter(l=>l.empresaId===e.id&&!l.cancelado&&tipos.includes(l.tipo)&&lancMes(l)>=de&&lancMes(l)<=ate);
+const valNfe=n=>n.itens?.length?r2(n.itens.reduce((a,it)=>a+valItem(it)+(+it.vST||0)+(+it.vIPI||0),0)):(+n.valor||0);
+/* monta {cols,linhas,total,csv} a partir de linhas cruas e do tipo de cada coluna: t texto, m dinheiro, n número, p percentual, c competência, d data */
+function tabRel(cols,tipos,rows,o={}){const fmt=(v,t)=>v==null||v===''?'':t==='m'?brl(+v||0):t==='p'?(+v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2})+'%':t==='c'?fmtComp(v):t==='d'?fmtData(String(v).slice(0,10)):String(v);
+  const tot=o.semTotal?null:tipos.map((t,i)=>i===0?'Total':(t==='m'||(t==='n'&&!o.semSomaN))&&!(o.naoSomar||[]).includes(i)?(t==='m'?brl(r2(rows.reduce((a,r)=>a+(+r[i]||0),0))):String(rows.reduce((a,r)=>a+(+r[i]||0),0))):'');
+  if(tot&&o.total)o.total(tot,rows);
+  return {cols,linhas:rows.map(r=>r.map((v,i)=>fmt(v,tipos[i]))),total:rows.length?tot:null,csv:rows.map(r=>r.map((v,i)=>tipos[i]==='m'||tipos[i]==='p'?r2(+v||0):tipos[i]==='d'?String(v||'').slice(0,10):v)),obs:o.obs||''}}
+
+/* ---------- faturamento ---------- */
+function fatMes(e,c){const rs=S.receitas.filter(r=>r.empresaId===e.id&&r.comp===c);let merc=0,serv=0,dev=0;
+  if(rs.length)rs.forEach(r=>{const v=+r.valor||0;if(v<0)dev+=-v;else if(['I','II'].includes(r.anexo)||r.meiCat==='comercio'||r.meiCat==='industria')merc+=v;else serv+=v});
+  else{const v=receitaMes(e.id,c)||0;if(['I','II'].includes(e.anexo)||contribICMS(e))merc=v;else serv=v}
+  const notas=S.docsaida.filter(d=>d.empresaId===e.id&&!d.retido&&d.situacao==='autorizada'&&d.tpNF!=='0'&&docMes(d)===c).length+relLancs(e,c,c,['saida','servico']).length;
+  return {merc:r2(merc),serv:r2(serv),dev:r2(dev),total:r2(merc+serv-dev),notas}}
+function relFatMensal(e,de,ate){const ini=de===ate?ate.slice(0,4)+'-01':de;let ac=0,anoAc=null;
+  const rows=relMeses(ini,ate).map(c=>{const f=fatMes(e,c);if(anoAc!==c.slice(0,4)){anoAc=c.slice(0,4);ac=0}ac=r2(ac+f.total);return [c,f.notas,f.merc,f.serv,f.dev,f.total,ac]});
+  return tabRel(['Competência','Documentos','Mercadorias','Serviços','Devoluções','Faturamento','Acumulado no ano'],['c','n','m','m','m','m','m'],rows,{naoSomar:[6],
+    obs:(de===ate?'Com um mês só no período, o relatório mostra o ano até o mês escolhido. ':'')+'Faturamento pelas receitas apuradas (notas autorizadas, lançamentos e receitas informadas); devoluções abatem. Mercadorias = Anexos I/II ou CFOP de venda; serviços = demais.'})}
+function relFat12(e,de,ate){const ini=addMes(ate,-11);const rows=relMeses(ini,ate).map(c=>[c,fatMes(e,c).total]);
+  return tabRel(['Mês','Faturamento bruto'],['c','m'],rows,{obs:'Relação de faturamento dos últimos 12 meses até '+fmtComp(ate)+', no formato pedido por bancos, fornecedores e licitações. O PDF sai com a declaração e as assinaturas do responsável e do contador.'})}
+function relFatCliente(e,de,ate){const m={};const add=(nome,doc,v,n=1)=>{const k=soDig(doc)||nome||'—';const x=m[k]||(m[k]={nome:nome||'Consumidor não identificado',doc:doc?fmtDoc(soDig(doc)):'',q:0,v:0});x.q+=n;x.v+=v};
+  saidasDe(e,de,ate).forEach(d=>add(d.destinatario?.nome,d.destinatario?.doc,+d.totais?.vNF||0));relLancs(e,de,ate,['saida','servico']).forEach(l=>add(l.part?.nome,l.part?.doc,+l.valor||0));
+  const xs=Object.values(m).sort((a,b)=>b.v-a.v);const tot=xs.reduce((a,x)=>a+x.v,0);
+  return tabRel(['Cliente','CNPJ/CPF','Documentos','Valor','Participação'],['t','t','n','m','p'],xs.map(x=>[x.nome,x.doc,x.q,r2(x.v),tot?x.v/tot*100:0]),{naoSomar:[4],obs:'Notas de saída autorizadas e lançamentos de saída e serviço do período, agrupados pelo CNPJ/CPF do cliente.'})}
+
+/* ---------- movimento ---------- */
+function relMovimento(e,de,ate){const rows=relMeses(de===ate?ate.slice(0,4)+'-01':de,ate).map(c=>{
+    let entM=0,entUso=0,tom=0,saiM=0,saiS=0;entradasDe(e,c,c).forEach(n=>{const v=valNfe(n);if(['uso','ativo'].includes(n.destino))entUso+=v;else entM+=v});
+    relLancs(e,c,c,['entrada','outro']).forEach(l=>entM+=+l.valor||0);relLancs(e,c,c,['tomado']).forEach(l=>tom+=+l.valor||0);
+    saidasDe(e,c,c).forEach(d=>{if(d.modelo==='NFSE')saiS+=+d.totais?.vNF||0;else saiM+=+d.totais?.vNF||0});relLancs(e,c,c,['saida']).forEach(l=>saiM+=+l.valor||0);relLancs(e,c,c,['servico']).forEach(l=>saiS+=+l.valor||0);
+    const te=r2(entM+entUso+tom),ts=r2(saiM+saiS);return [c,r2(entM),r2(entUso),r2(tom),te,r2(saiM),r2(saiS),ts,r2(ts-te)]});
+  return tabRel(['Competência','Compras p/ revenda e insumos','Uso, consumo e ativo','Serviços tomados','Total de entradas','Vendas de mercadorias','Serviços prestados','Total de saídas','Saídas − entradas'],['c','m','m','m','m','m','m','m','m'],rows,
+    {obs:(de===ate?'Com um mês só no período, o relatório mostra o ano até o mês escolhido. ':'')+'Valor contábil dos documentos (NF-e de entrada, NF-e/NFC-e/NFS-e de saída e lançamentos manuais). A destinação das entradas vem da tela Notas de entrada.'})}
+function relMovCfop(e,de,ate){const m={};const add=(cf,op,id,v,bc,icms,ipi)=>{const k=op+'|'+(cf||'—');const x=m[k]||(m[k]={cf:cf||'—',op,ids:new Set(),v:0,bc:0,icms:0,ipi:0});x.ids.add(id);x.v+=v;x.bc+=bc;x.icms+=icms;x.ipi+=ipi};
+  entradasDe(e,de,ate).forEach(n=>(n.itens?.length?n.itens:[{cfop:'',vProd:n.valor}]).forEach(it=>add(cfopEnt(it.cfop),'Entrada',n.id,valItem(it)+(+it.vST||0)+(+it.vIPI||0),+it.vBC||0,+it.vICMS||0,+it.vIPI||0)));
+  S.docsaida.filter(d=>d.empresaId===e.id&&!d.retido&&d.situacao==='autorizada'&&docMes(d)>=de&&docMes(d)<=ate).forEach(d=>(d.itens?.length?d.itens:[{cfop:d.modelo==='NFSE'?'Serviço':'',vProd:d.totais?.vNF||0}]).forEach(it=>add(it.cfop,d.tpNF==='0'?'Entrada':'Saída',d.id,valItem(it)+(+it.vST||0)+(+it.vIPI||0),+it.vBC||0,+it.vICMS||0,+it.vIPI||0)));
+  relLancs(e,de,ate,['saida','servico','entrada','outro','tomado']).forEach(l=>add(l.tipo==='servico'?'Serviço':l.tipo==='tomado'?'Serv. tomado':l.cfop,['saida','servico'].includes(l.tipo)?'Saída':'Entrada',l.id,+l.valor||0,+l.bcIcms||0,+l.icms||0,+l.ipi||0));
+  const xs=Object.values(m).sort((a,b)=>a.op.localeCompare(b.op)||String(a.cf).localeCompare(String(b.cf)));
+  return tabRel(['CFOP','Operação','Documentos','Valor contábil','Base ICMS','ICMS','IPI'],['t','t','n','m','m','m','m'],xs.map(x=>[x.cf,x.op,x.ids.size,r2(x.v),r2(x.bc),r2(x.icms),r2(x.ipi)]),{naoSomar:[2],
+    obs:'Resumo de entradas e saídas por CFOP, como no livro de apuração. CFOP de entrada convertido do CFOP do fornecedor (5→1, 6→2, 7→3).'})}
+function relFornecedor(e,de,ate){const m={};const add=(nome,doc,v,icms,n=1)=>{const k=soDig(doc)||nome||'—';const x=m[k]||(m[k]={nome:nome||'—',doc:doc?fmtDoc(soDig(doc)):'',q:0,v:0,icms:0});x.q+=n;x.v+=v;x.icms+=icms};
+  entradasDe(e,de,ate).forEach(n=>add(n.emitente?.nome,n.emitente?.doc,valNfe(n),(n.itens||[]).reduce((a,it)=>a+(+it.vICMS||0),0)));relLancs(e,de,ate,['entrada','outro','tomado']).forEach(l=>add(l.part?.nome,l.part?.doc,+l.valor||0,+l.icms||0));
+  const xs=Object.values(m).sort((a,b)=>b.v-a.v);const tot=xs.reduce((a,x)=>a+x.v,0);
+  return tabRel(['Fornecedor','CNPJ/CPF','Documentos','Valor','ICMS','Participação'],['t','t','n','m','m','p'],xs.map(x=>[x.nome,x.doc,x.q,r2(x.v),r2(x.icms),tot?x.v/tot*100:0]),{naoSomar:[5],obs:'NF-e de entrada e lançamentos de entrada e serviços tomados, por fornecedor.'})}
+
+/* ---------- livros de serviços ---------- */
+function relServicos(e,de,ate){const rows=[];
+  S.docsaida.filter(d=>d.empresaId===e.id&&!d.retido&&d.situacao==='autorizada'&&d.modelo==='NFSE'&&docMes(d)>=de&&docMes(d)<=ate).forEach(d=>{const v=+d.totais?.vNF||0;const iss=+d.iss?.valor||0;const base=+d.iss?.base||v;
+    rows.push([d.emissao,'NFS-e',d.numero||'',d.destinatario?.nome||'',d.destinatario?.doc?fmtDoc(d.destinatario.doc):'',v,base,base?iss/base*100:+d.iss?.aliq||0,iss,d.iss?.retido?'Sim':'Não'])});
+  relLancs(e,de,ate,['servico']).forEach(l=>{const iss=+l.ret?.iss||0;rows.push([l.data,ESPECIES[l.especie]||'Serviço',l.numero||'',l.part?.nome||'',l.part?.doc?fmtDoc(l.part.doc):'',+l.valor||0,+l.valor||0,'',iss,iss?'Sim':'—'])});
+  rows.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+  return tabRel(['Data','Espécie','Número','Tomador','CNPJ/CPF','Valor do serviço','Base do ISS','Alíquota','ISS','Retido pelo tomador'],['d','t','t','t','t','m','m','p','m','t'],rows,{naoSomar:[7],
+    obs:'Registro de serviços prestados (NFS-e autorizadas e lançamentos de serviço). ISS retido pelo tomador não é recolhido pela empresa'+(ehSN(e)?'; no Simples, a receita com retenção é segregada no PGDAS-D.':'.')})}
+function relTomados(e,de,ate){const rows=relLancs(e,de,ate,['tomado']).map(l=>{const r=l.ret||{};return [l.data,ESPECIES[l.especie]||'',l.numero||'',l.part?.nome||'',l.part?.doc?fmtDoc(l.part.doc):'',+l.valor||0,+r.iss||0,+r.inss||0,+r.irrf||0,r2((+r.pis||0)+(+r.cofins||0)+(+r.csll||0))]}).sort((a,b)=>String(a[0]).localeCompare(String(b[0])));
+  return tabRel(['Data','Espécie','Número','Prestador','CNPJ/CPF','Valor','ISS retido','INSS retido','IRRF','PIS/Cofins/CSLL'],['d','t','t','t','t','m','m','m','m','m'],rows,{obs:'Serviços tomados lançados na escrita. As retenções são recolhidas pela empresa como responsável: ISS ao município, INSS e IRRF/CSRF pela DCTFWeb (eventos R-2010 e R-4020 da EFD-Reinf).'})}
+
+/* ---------- ICMS ---------- */
+function relApIcms(e,de,ate){if(!contribICMS(e))return tabRel(['Aviso'],['t'],[],{obs:'Empresa sem inscrição estadual: não escritura o livro de apuração do ICMS.'});
+  if(ehSN(e)||ehMEI(e))return tabRel(['Aviso'],['t'],[],{obs:'No Simples Nacional o ICMS próprio é recolhido no DAS (veja "Apuração do Simples Nacional"). Fora do DAS ficam só ST, DIFAL e antecipação (relatório "ICMS DIFAL e antecipação").'});
+  const rows=relMeses(de,ate).map(c=>{const a=icmsProprio(e,c);return [c,a.deb,a.cred,a.ant,a.aj,r2(a.deb-a.cred-a.ant+a.aj),a.devedor,a.credorTransp]});
+  return tabRel(['Competência','Débitos (saídas)','Créditos (entradas e devoluções)','Saldo credor anterior','Ajustes','Saldo do período','ICMS a recolher','Credor a transportar'],['c','m','m','m','m','m','m','m'],rows,{naoSomar:[3,5,7],
+    obs:'Livro Registro de Apuração do ICMS (modelo P9): débitos pelas saídas com destaque, créditos pelas entradas para revenda e insumo e pelas devoluções; uso, consumo e ativo não geram crédito aqui. O detalhe por CFOP está em "Movimento por CFOP".'})}
+function relDifal(e,de,ate){if(!contribICMS(e))return tabRel(['Aviso'],['t'],[],{obs:'Empresa sem inscrição estadual: não há DIFAL nem antecipação do ICMS.'});
+  const rows=[];entradasDe(e,de,ate).forEach(n=>{const d=difalNota(e,n);if(!(d.difal>0||d.antec>0||d.interestadual))return;rows.push([n.emissao,n.numero||'',n.emitente?.nome||'',n.emitente?.uf||'',{revenda:'Revenda',insumo:'Insumo',uso:'Uso e consumo',ativo:'Ativo imobilizado'}[n.destino||'revenda']||n.destino,valNfe(n),d.difal,d.antec])});
+  rows.sort((a,b)=>String(a[0]).localeCompare(String(b[0])));const c=icmsCfg(e);
+  return tabRel(['Emissão','Número','Fornecedor','UF','Destinação','Valor da nota','DIFAL','Antecipação'],['d','t','t','t','t','m','m','m'],rows,{obs:`Entradas interestaduais. DIFAL sobre uso, consumo e ativo; antecipação sobre revenda (${c.antecipaModo==='nao'?'desligada':c.antecipaModo==='pct'?c.antecipaPct+'% da operação':'pela diferença de alíquota'}). Alíquota interna ${c.interna}%, base dupla.`})}
+
+/* ---------- ISS ---------- */
+function relIss(e,de,ate){const sn=ehSN(e)||ehMEI(e);const rows=relMeses(de,ate).map(c=>{const p=issProprio(e,c);let retTom=0,baseRet=0;
+    S.docsaida.filter(d=>d.empresaId===e.id&&!d.retido&&d.modelo==='NFSE'&&d.situacao==='autorizada'&&docMes(d)===c&&d.iss?.retido).forEach(d=>{baseRet+=+d.totais?.vNF||0;retTom+=+d.iss?.valor||0});
+    retTom+=retSofridas(e.id,[c]).iss;const subst=relLancs(e,c,c,['tomado']).reduce((a,l)=>a+(+l.ret?.iss||0),0);
+    const r=[c,p.base,sn?0:p.valor,r2(baseRet),r2(retTom),r2(subst)];if(ehSN(e))r[2]=r2(apurarSN(e,c).tot.ISS||0);r.push(r2((sn?0:p.valor)+subst));return r});
+  return tabRel(['Competência','Serviços prestados (base)',ehSN(e)?'ISS no DAS':'ISS próprio','Serviços com ISS retido','ISS retido pelos tomadores','ISS retido de prestadores','ISS a recolher (guia municipal)'],['c','m','m','m','m','m','m'],rows,
+    {obs:sn?'No Simples o ISS próprio vai no DAS; a guia municipal fica só com o ISS que a empresa reteve de prestadores (substituição tributária).':'ISS próprio pelas NFS-e sem retenção, mais o ISS retido de prestadores, que a empresa recolhe como substituta.'})}
+
+/* ---------- PIS e COFINS ---------- */
+function relPisCofins(e,de,ate){const cs=relMeses(de,ate);
+  if(ehMEI(e))return tabRel(['Aviso'],['t'],[],{obs:'O MEI recolhe valores fixos no DAS-MEI: não há apuração de PIS e Cofins.'});
+  if(ehSN(e)){const rows=cs.map(c=>{const a=apurarSN(e,c);return [c,a.receita,a.tot.PIS,a.ded.PIS,a.tot.COFINS,a.ded.COFINS,r2(a.tot.PIS+a.tot.COFINS)]});
+    return tabRel(['Competência','Receita','PIS no DAS','PIS segregado (monofásico/ST)','Cofins no DAS','Cofins segregada','PIS + Cofins'],['c','m','m','m','m','m','m'],rows,{obs:'Simples Nacional: PIS e Cofins pela partilha do DAS. A coluna "segregado" é o valor que deixou de ser pago por receita monofásica ou com ST.'})}
+  const rows=cs.map(c=>{const a=apurarLucro(e,c);const exc=r2(a.isentaPC+a.icmsExc);return [c,a.rb,exc,a.basePC,r2(a.pis+a.credPis),a.credPis,a.ret.pis,a.pisDev,r2(a.cofins+a.credCof),a.credCof,a.ret.cofins,a.cofDev]});
+  const lr=e.regime==='LR';
+  return tabRel(['Competência','Receita bruta','Exclusões','Base de cálculo',`PIS (${lr?'1,65%':'0,65%'})`,'Créditos PIS','PIS retido','PIS a recolher',`Cofins (${lr?'7,6%':'3%'})`,'Créditos Cofins','Cofins retida','Cofins a recolher'],['c','m','m','m','m','m','m','m','m','m','m','m'],rows,
+    {obs:(lr?'Lucro Real, regime não cumulativo: créditos sobre entradas para revenda e insumo (sem o ICMS) e outros créditos informados; receitas financeiras a 0,65% e 4%. ':'Lucro Presumido, regime cumulativo. ')+'Exclusões: receitas monofásicas e de exportação e o ICMS destacado (Tema 69 do STF). DARF '+(lr?DARF.PIS.nc+' / '+DARF.COFINS.nc:DARF.PIS.cum+' / '+DARF.COFINS.cum)+'.'})}
+
+/* ---------- IRPJ e CSLL ---------- */
+function relIrpjCsll(e,de,ate){const cs=relMeses(de,ate);
+  if(ehMEI(e))return tabRel(['Aviso'],['t'],[],{obs:'O MEI não apura IRPJ nem CSLL: os tributos estão no DAS-MEI.'});
+  if(ehSN(e)){const rows=cs.map(c=>{const a=apurarSN(e,c);return [c,a.receita,a.tot.IRPJ,a.tot.CSLL,r2(a.tot.IRPJ+a.tot.CSLL)]});
+    return tabRel(['Competência','Receita','IRPJ no DAS','CSLL no DAS','Total'],['c','m','m','m','m'],rows,{obs:'Simples Nacional: IRPJ e CSLL pela partilha do DAS. Lucro distribuído aos sócios é isento até o limite da presunção ou do lucro contábil.'})}
+  const est=e.regime==='LR'&&lpCfg(e).lrForma==='estimativa';const vistos=new Set();const rows=[];
+  cs.forEach(c=>{const a=apurarIrpjCsll(e,c);const k=est?c:a.T.ini;if(vistos.has(k))return;vistos.add(k);const lim=est?20000:60000;const ad=r2(Math.max(0,a.baseIr-lim)*.1);
+    rows.push([est?fmtComp(c):a.T.nome+(a.T.fim>ate?' (parcial)':''),a.rec,a.baseIr,r2(a.baseIr*.15),ad,a.ret.irrf,a.irDev,a.baseCs,a.csll,a.ret.csll,a.csDev,fmtData(a.venc)])});
+  const lr=e.regime==='LR';
+  return tabRel(['Período','Receita bruta',lr&&!est?'Lucro real (base IRPJ)':'Base presumida IRPJ','IRPJ 15%','Adicional 10%','IRRF retido','IRPJ a recolher',lr&&!est?'Base CSLL':'Base presumida CSLL','CSLL 9%','CSLL retida','CSLL a recolher','Vencimento'],['t','m','m','m','m','m','m','m','m','m','m','t'],rows,
+    {obs:lr?(est?'Lucro Real anual com estimativas mensais sobre a receita (adicional acima de R$ 20 mil/mês); o ajuste anual sai na ECF. ':'Lucro Real trimestral: lucro contábil do trimestre, mais adições, menos exclusões e compensação de prejuízo limitada a 30%. ')+'DARF '+(est?DARF.IRPJ.lrEst+' / '+DARF.CSLL.lrEst:DARF.IRPJ.lrTri+' / '+DARF.CSLL.lrTri)+'.'
+      :'Lucro Presumido trimestral: presunção por atividade sobre a receita bruta, mais outras receitas e financeiras integrais; adicional de 10% acima de R$ 60 mil no trimestre e acréscimo de 10% na presunção sobre a receita acima de R$ 5 milhões no ano (LC 224/2025). DARF '+DARF.IRPJ.lp+' / '+DARF.CSLL.lp+'. Acima de R$ 2 mil, pode ser pago em até 3 quotas.'})}
+
+/* ---------- Simples Nacional ---------- */
+function relDas(e,de,ate){if(!ehSN(e))return tabRel(['Aviso'],['t'],[],{obs:'Relatório só para empresas do Simples Nacional.'});
+  const rows=relMeses(de,ate).map(c=>{const a=apurarSN(e,c);return [c,a.receita,a.rbt12,a.receita?a.total/a.receita*100:0,...TRIB.map(t=>a.tot[t]),a.total]});
+  return tabRel(['Competência','Receita','RBT12','Alíquota efetiva',...TRIB,'Total do DAS'],['c','m','m','p',...TRIB.map(()=>'m'),'m'],rows,{naoSomar:[2,3],obs:'Demonstrativo do Simples Nacional: partilha do DAS por tributo, conforme o anexo e a faixa da RBT12 de cada mês. A segregação por receita (monofásico, ST, retenção, exportação) já está descontada.'})}
+
+/* ---------- impostos ---------- */
+const codGuia=g=>g.memoria?.codigo||({DAS:'PGDAS-D','DAS-MEI':'PGMEI',FGTS:'FGTS Digital',DCTFWeb:'DARF DCTFWeb'}[g.tipo]||'');
+function guiasDe(e,de,ate){return S.guias.filter(g=>g.empresaId===e.id&&g.comp>=de&&g.comp<=ate).sort((a,b)=>a.comp.localeCompare(b.comp)||String(a.tipo).localeCompare(String(b.tipo)))}
+function relPagos(e,de,ate){const G=guiasDe(e,de,ate).filter(g=>g.status!=='rascunho');let pago=0,aberto=0;
+  const rows=G.map(g=>{const s=statusGuia(g);const v=+g.valor||0;if(['paga','informada'].includes(s.k))pago+=v;else aberto+=v;return [g.comp,g.tipo,codGuia(g),g.depto||'',g.venc,v,s.t,g.pagaEm?String(g.pagaEm).slice(0,10):'']});
+  return tabRel(['Competência','Tributo','Código / sistema','Departamento','Vencimento','Valor','Situação','Pago em'],['c','t','t','t','d','m','t','d'],rows,{obs:`Guias liberadas no período (por competência). Pago: ${brl(r2(pago))} · em aberto: ${brl(r2(aberto))}. Rascunhos não entram.`})}
+function relImpResumo(e,de,ate){const m={};guiasDe(e,de,ate).filter(g=>g.status!=='rascunho').forEach(g=>{const s=statusGuia(g).k;const x=m[g.tipo]||(m[g.tipo]={t:g.tipo,cod:codGuia(g),q:0,v:0,p:0,a:0,at:0});x.q++;const v=+g.valor||0;x.v+=v;if(['paga','informada'].includes(s))x.p+=v;else{x.a+=v;if(s==='atraso')x.at+=v}});
+  const xs=Object.values(m).sort((a,b)=>b.v-a.v);
+  return tabRel(['Tributo','Código / sistema','Guias','Valor total','Pago','Em aberto','Em atraso'],['t','t','n','m','m','m','m'],xs.map(x=>[x.t,x.cod,x.q,r2(x.v),r2(x.p),r2(x.a),r2(x.at)]),{obs:'Resumo das guias do período por tributo, para conferência com o extrato de pagamentos (Situação Fiscal / e-CAC).'})}
+
+/* ---------- registro dos relatórios ---------- */
+const naoMEI=e=>!ehMEI(e),comIE=e=>contribICMS(e),soSN=e=>ehSN(e),snOuMei=e=>ehSN(e)||ehMEI(e),lucroIE=e=>!ehSN(e)&&!ehMEI(e)&&contribICMS(e);
+Object.assign(RELS,{
+  apicms:{t:'Livro Registro de Apuração do ICMS (P9)',fn:relApIcms,livro:'apuracao',so:lucroIE},
+  servicos:{t:'Livro de Registro de Serviços Prestados (ISS)',fn:relServicos,livro:'servicos'},
+  tomados:{t:'Livro de Registro de Serviços Tomados',fn:relTomados,livro:'tomados'},
+  das:{t:'Apuração do Simples Nacional (DAS por tributo)',fn:relDas,so:soSN},
+  piscofins:{t:'Apuração do PIS e da Cofins',fn:relPisCofins,so:naoMEI},
+  irpjcsll:{t:'Apuração do IRPJ e da CSLL',fn:relIrpjCsll,so:naoMEI},
+  iss:{t:'Apuração do ISS',fn:relIss},
+  difal:{t:'ICMS DIFAL e antecipação (entradas)',fn:relDifal,so:comIE},
+  fatmensal:{t:'Faturamento mensal',fn:relFatMensal},
+  fat12:{t:'Relação de faturamento (12 meses)',fn:relFat12,decl:true},
+  fatcliente:{t:'Faturamento por cliente',fn:relFatCliente},
+  movimento:{t:'Movimento de entradas e saídas',fn:relMovimento},
+  movcfop:{t:'Movimento por CFOP (entradas e saídas)',fn:relMovCfop},
+  fornecedor:{t:'Compras por fornecedor',fn:relFornecedor},
+  pagos:{t:'Impostos pagos e a pagar',fn:relPagos},
+  impresumo:{t:'Resumo de impostos por tributo',fn:relImpResumo}});
+RELS.anexo.so=snOuMei;
+const GRUPOS_REL=[['Livros fiscais',['saidas','entradas','apicms','servicos','tomados']],
+  ['Apurações',['das','piscofins','irpjcsll','iss','difal','anexo']],
+  ['Faturamento',['fatmensal','fat12','fatcliente','cliente','dia','modelo']],
+  ['Movimento',['movimento','movcfop','fornecedor','cfop','cst','ncm','itens','lancamentos']],
+  ['Impostos e retenções',['pagos','impresumo','retencoes']]];
+const relDisp=(k,e)=>RELS[k]&&(!RELS[k].so||RELS[k].so(e));
+const dadosRelatorioV38=dadosRelatorio;
+dadosRelatorio=function(k){const R=RELS[k];if(R&&R.fn){const e=emp(UI.fsn.emp);const {de,ate}=periodoNf();return e?R.fn(e,de,ate):{cols:[],linhas:[],csv:[]}}return dadosRelatorioV38(k)};
+const DOC_FILTRO=['cfop','cst','ncm','cliente','dia','modelo','itens'];
+function relCorpo(){const e=emp(UI.fsn.emp);if(!e)return vazio('Escolha uma empresa.');let k=UI.snRel;if(!relDisp(k,e))k=UI.snRel=(ehLucro(e)?'piscofins':ehSN(e)?'das':'fatmensal');
+  const R=RELS[k];const d=dadosRelatorio(k);const {de,ate}=periodoNf();const nf=UI.fnf||{};const filtrando=DOC_FILTRO.includes(k)&&(nf.mod||nf.cfop||nf.cst||nf.dest||nf.sit||nf.q);
+  const menu=GRUPOS_REL.map(([g,ks])=>{const its=ks.filter(x=>relDisp(x,e));return its.length?`<div class="rel-grp"><span>${g}</span>${its.map(x=>`<button type="button" data-act="rel-ir" data-k="${x}" ${x===k?'aria-current="true"':''}>${esc(RELS[x].t)}</button>`).join('')}</div>`:''}).join('');
+  const dir=c=>/Valor|Base|ICMS|IPI|ST$|PIS|Cofins|CSLL|IRPJ|ISS|Receita|Faturamento|Acumulado|Total|Débitos|Créditos|Saldo|Ajustes|Adicional|IRRF|INSS|Mercadorias|Serviços|Devoluções|Compras|Vendas|Uso|Pago|aberto|atraso|Participação|Alíquota|RBT12|DIFAL|Antecipação|Documentos|Notas|Guias|Lançamentos|Qtd|CPP|retid|Credor|recolher|−/.test(c)&&!/^(Tomador|Prestador|Fornecedor|Cliente|Tributo|Código)/.test(c);
+  return `<style>.rel-hub{display:grid;grid-template-columns:250px minmax(0,1fr);gap:16px;align-items:start}.rel-nav{position:sticky;top:8px}.rel-grp{display:flex;flex-direction:column;margin-bottom:12px}.rel-grp>span{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:600;margin:0 0 4px 8px}
+   .rel-grp button{all:unset;cursor:pointer;padding:6px 8px;border-radius:6px;font-size:13px;line-height:1.3}.rel-grp button:hover{background:var(--hover,rgba(0,0,0,.05))}.rel-grp button[aria-current]{background:var(--brand-soft,rgba(16,185,129,.12));font-weight:600}
+   .rel-hub td:first-child{white-space:nowrap}@media(max-width:860px){.rel-hub{grid-template-columns:1fr}.rel-nav{position:static}}</style>
+   <div class="rel-hub"><nav class="panel rel-nav" aria-label="Relatórios">${menu}</nav>
+   <div class="panel" style="min-width:0"><div class="panel-head" style="flex-wrap:wrap;gap:8px"><h2>${esc(R.t)}</h2><div class="actions">
+     ${R.livro?`<label class="small muted" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-rel-termo ${UI.relTermo?'checked':''}> Termos de abertura e encerramento</label>`:''}
+     <button class="btn" data-act="rel-csv" ${d.linhas.length?'':'disabled'}>${svg('download')}Planilha</button><button class="btn" data-act="rel-pdf" ${d.linhas.length?'':'disabled'}>${svg('download')}PDF</button></div></div>
+    <p class="small muted" style="margin-top:0">${esc(e.razao)} · ${esc(nomeRegime(e))} · período ${fmtComp(de)}${ate!==de?' a '+fmtComp(ate):''}.${DOC_FILTRO.includes(k)?' Somente notas autorizadas'+(filtrando?'; os filtros da tela Notas fiscais de saída estão valendo.':'.'):''}</p>
+    ${d.linhas.length?`<div class="table-wrap"><table><thead><tr>${d.cols.map((c,i)=>`<th class="${i&&dir(c)?'r':''}">${esc(c)}</th>`).join('')}</tr></thead><tbody>${d.linhas.slice(0,500).map(l=>`<tr>${l.map((v,i)=>`<td class="${i&&(/^-?R\$/.test(String(v))||/^-?[\d.,]+%?$/.test(String(v)))?'r num':''}">${esc(String(v))}</td>`).join('')}</tr>`).join('')}${d.total?`<tr>${d.total.map((v,i)=>`<td class="${i?'r num':''}"><b>${esc(String(v))}</b></td>`).join('')}</tr>`:''}</tbody></table></div>${d.linhas.length>500?`<p class="small muted">A tela mostra 500 linhas; a planilha e o PDF trazem todas (${d.linhas.length}).</p>`:''}`
+      :`<p class="muted" style="margin:18px 0">${d.obs&&d.cols[0]==='Aviso'?esc(d.obs):'Nada no período escolhido. Ajuste o período no topo (de/até) ou lance os documentos.'}</p>`}
+    ${d.obs&&d.cols[0]!=='Aviso'?`<p class="small muted">${esc(d.obs)}</p>`:''}</div></div>`}
+abaRelatorios=relCorpo;
+function fRelatorios(){return head('Livros e relatórios','Livros fiscais, apurações (Simples, PIS/Cofins, IRPJ/CSLL, ICMS, ISS), faturamento, movimento de entradas e saídas e impostos pagos, para qualquer regime. Em tela, planilha ou PDF.')+relCorpo()}
+ACT['rel-ir']=el=>{UI.snRel=el.dataset.k;render()};
+document.addEventListener('change',ev=>{const el=ev.target;if(el.hasAttribute&&el.hasAttribute('data-rel-termo')){UI.relTermo=el.checked}});
+const relPdfV38=ACT['rel-pdf'];
+ACT['rel-pdf']=()=>{const k=UI.snRel;const R=RELS[k];const e=emp(UI.fsn.emp);if(!R||!e)return relPdfV38();const d=dadosRelatorio(k);const {de,ate}=periodoNf();const C=cfg();
+  const per=`${fmtComp(de)}${ate!==de?' a '+fmtComp(ate):''}`;const contador=`${esc(C.responsavelTecnico||C.escritorio||'Contador responsável')}${C.crc?' · '+(/^CRC/i.test(C.crc)?'':'CRC ')+esc(C.crc):''}`;
+  const cab=`<h1>${esc(R.t)}</h1><p class="sub">${esc(e.razao)} · CNPJ ${fmtCNPJ(e.cnpj||'')}${e.ie?' · IE '+esc(e.ie):''} · ${esc(nomeRegime(e))} · ${R.decl?'12 meses até '+fmtComp(ate):'Período '+per}</p>`;
+  const tab=`<table><tr>${d.cols.map(c=>`<th>${esc(c)}</th>`).join('')}</tr>${d.linhas.map(l=>`<tr>${l.map((v,i)=>`<td class="${i&&/^-?R\$|^-?[\d.,]+%$/.test(String(v))?'r':''}">${esc(String(v))}</td>`).join('')}</tr>`).join('')}${d.total?`<tr class="tot">${d.total.map(v=>`<td class="r">${esc(String(v))}</td>`).join('')}</tr>`:''}</table>`;
+  if(R.decl){const tot=d.csv.reduce((a,r)=>a+(+r[1]||0),0);
+    janelaPdf(R.t,cab+tab+`<p style="margin-top:18px">Declaramos, para os devidos fins, que a empresa acima teve, nos 12 meses de ${fmtComp(addMes(ate,-11))} a ${fmtComp(ate)}, faturamento bruto de <b>${brl(r2(tot))}</b>, conforme os registros fiscais escriturados.</p><p>${esc(e.municipio||'')}${e.municipio?', ':''}${fmtData(hoje())}.</p>
+      <div class="ass"><div>${esc(e.razao)}<br>Responsável legal</div><div>${contador}<br>Contador</div></div>`);return}
+  const termo=t=>`<div style="page-break-after:always;padding-top:120px;text-align:center"><h1>Termo de ${t}</h1><p style="max-width:560px;margin:18px auto;text-align:justify">${t==='abertura'?'Este livro contém':'Este livro conteve'} o <b>${esc(R.t)}</b> da empresa <b>${esc(e.razao)}</b>, CNPJ ${fmtCNPJ(e.cnpj||'')}${e.ie?', inscrição estadual '+esc(e.ie):''}${e.im?', inscrição municipal '+esc(e.im):''}, ${e.endereco||e.logradouro?'estabelecida em '+esc([e.endereco||e.logradouro,e.numero,e.bairro,e.municipio&&e.municipio+'/'+(e.uf||'')].filter(Boolean).join(', '))+', ':''}referente ao período de ${per}, escriturado por processamento eletrônico de dados.</p><p>${fmtData(hoje())}</p><div class="ass"><div>${esc(e.razao)}<br>Responsável legal</div><div>${contador}</div></div></div>`;
+  const comTermo=R.livro&&UI.relTermo;
+  janelaPdf(R.t,(comTermo?termo('abertura'):'')+cab+tab+(d.obs?`<p class="nota">${esc(d.obs)}</p>`:'')+(R.livro||['piscofins','irpjcsll','das','iss'].includes(k)?`<div class="ass"><div>${esc(e.razao)}</div><div>${contador}</div></div>`:'')+(comTermo?'<div style="page-break-before:always"></div>'+termo('encerramento').replace('page-break-after:always;',''):''))};
+/* ==== v38 (fim) ==== */
 
 
 
@@ -8830,7 +9012,7 @@ if(APP_SIS){
     ['Movimento',[['f-saidas','Notas fiscais de saída','upload','Importação de XML (NF-e, NFC-e, NFS-e), receita por CFOP e CST'],['f-entradas','Notas fiscais de entrada','filetext','Busca automática na SEFAZ e XML dos fornecedores'],['f-lanc','Lançamentos fiscais','receipt','Saídas, serviços, entradas, serviços tomados com retenções e outros documentos, com acumuladores']]],
     ['Apuração',[['f-apur','Simples Nacional e MEI','calc','Receitas por anexo, RBT12, Fator R e DAS'],['f-lucro','Lucro Presumido e Real','calc','PIS/COFINS, IRPJ/CSLL, ICMS e ISS próprios, com guias'],['f-icms','ICMS nas entradas','receipt','DIFAL de uso, consumo e ativo e antecipação nas compras de outros estados']]],
     ['Obrigações',[['f-arq','Arquivos fiscais','download','EFD ICMS/IPI, EFD-Contribuições, EFD-Reinf e DeSTDA'],['f-ibs','IBS e CBS nas notas','checksq','Conferência da reforma tributária nas NF-e e NFC-e']]],
-    ['Relatórios',[['f-rel','Livros e relatórios','chart','Livros de saídas e entradas, resumos e base do PGDAS-D']]],
+    ['Relatórios',[['f-rel','Livros e relatórios','chart','Livros fiscais, apurações, faturamento, movimento e impostos pagos, para todos os regimes']]],
   ];
   const NAV_F=APP_DP?NAV_DP:APP_CONTABIL?NAV_CTB:NAV_FISCAL;
   const F_VIEWS=NAV_F.flatMap(g=>g[1].map(i=>i[0]));
@@ -8901,7 +9083,7 @@ if(APP_SIS){
     const foraSN=t=>head(t,'')+vazio(`${esc(e.fantasia||e.razao)} está no regime ${esc(nomeRegime(e))}. Esta rotina vale para empresas do Simples Nacional e MEI; os demais regimes entram nas próximas etapas.`,`<button class="btn" data-act="ctb-trocar">Trocar empresa</button>`);
     if(UI.view==='f-apur'){UI.snAba='apur';return simples?aSimples():foraSN('Apuração do Simples Nacional')}
     if(UI.view==='f-saidas'){UI.snAba='notas';return simples?aSimplesAba():foraSN('Notas fiscais de saída')}
-    if(UI.view==='f-rel'){UI.snAba='rel';return simples?aSimplesAba():foraSN('Livros e relatórios')}
+    if(UI.view==='f-rel'){UI.snAba='rel';return fRelatorios()}
     if(UI.view==='f-lanc')return ctbLanc();
     if(UI.view==='f-lucro')return fLucro();
     if(UI.view==='f-icms')return fIcmsEntradas();
