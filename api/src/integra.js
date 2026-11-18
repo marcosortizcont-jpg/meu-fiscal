@@ -236,11 +236,78 @@ export function registrarIntegra(r, { db, exigir, log, pode, wa }) {
   }
   const emitirDasMei = o => emitirGuia({ ...o, servico: 'mei' });
 
+  /* ---------- SICALC: DARF de PIS, Cofins, IRPJ, CSLL (Lucro Presumido e Real) pela API, sem o captcha do SICALC Web ---------- */
+  // Parte a confirmar na primeira chamada real (o Integra estava inativo quando foi escrito): formato de dataPA no trimestral e o campo "cota".
+  // Tudo o que depende do leiaute do SICALC está concentrado em pedidoSicalc() e lerDarf().
+  const TRIMESTRAIS = new Set(['2089', '2372', '0220', '6012', '3373', '2030']);   // IRPJ/CSLL do LP e do LR trimestral
+  const SIAFI_IBGE = { '5002704': '9051' };                                         // Campo Grande/MS; os demais vêm do cadastro (campo SIAFI)
+  const isoHora = d => `${d}T00:00:00`;
+  function pedidoSicalc({ e, g, siafi, dataConsolidacao }) {
+    const cod = String(g.memoria?.codigo || '').replace(/\D/g, '').padStart(4, '0');
+    const tri = TRIMESTRAIS.has(cod) && !g.memoria?.estimativa;
+    const mesPA = g.comp;   // nos trimestrais, a guia fica na competência do último mês do trimestre
+    const dados = { uf: String(e.uf || '').toUpperCase(), municipio: String(siafi), codigoReceita: cod, codigoReceitaExtensao: String(g.memoria?.extensao || '01'),
+      tipoPA: tri ? 'TR' : 'ME', dataPA: `${mesPA.slice(5, 7)}/${mesPA.slice(0, 4)}`, vencimento: isoHora(g.vencOriginal || g.venc),
+      valorImposto: (Math.round((+g.principal || +g.valor) * 100) / 100).toFixed(2), dataConsolidacao: isoHora(dataConsolidacao),
+      observacao: `${g.tipo} ${fmtComp(g.comp)}${g.quota ? ' · ' + g.quota + 'a quota' : ''} · Meu Fiscal` };
+    if (g.quota) dados.cota = String(g.quota);
+    return { idSistema: 'SICALC', idServico: 'CONSOLIDARGERARDARF51', versaoSistema: '2.9', dados };
+  }
+  function lerDarf(d) {
+    const pdf64 = acharPdf(d) || (typeof acharCampo(d, /^darf$/i) === 'string' ? acharCampo(d, /^darf$/i) : null);
+    const principal = num(acharCampo(d, /^(valorPrincipal\w*|principal)$/i)), multa = num(acharCampo(d, /^(valorMulta\w*|multa)$/i)), juros = num(acharCampo(d, /^(valorJuros\w*|juros)$/i));
+    const total = num(acharCampo(d, /^(valorTotal\w*|total)$/i)) || principal + multa + juros;
+    return { pdf64, numero: String(acharCampo(d, /^(numeroDocumento|numeroDarf|numero)$/i) || ''), valores: { principal: principal || total - multa - juros, multa, juros, total },
+      venc: dataIso(acharCampo(d, /^(dataVencimento|dataValidade|dataLimite\w*|dataArrecadacao|dataConsolidacao)$/i)) };
+  }
+  async function emitirDarf({ esc, guiaId, dataPagamento, siafi, liberar = true, origem, quem }) {
+    const c = await cfgIntegra(esc); if (!pronto(c)) throw new ErroHttp(412, 'A integração com a Receita (Integra Contador) ainda não foi configurada em Configurações.');
+    const g0 = await A.registro(esc, 'guias', guiaId); if (!g0) throw new ErroHttp(404, 'Guia não encontrada. Gere as guias da competência antes.');
+    if (!['PIS', 'COFINS', 'IRPJ', 'CSLL'].includes(g0.tipo) || !g0.memoria?.codigo) throw new ErroHttp(400, 'Pelo SICALC saem só os DARF de PIS, Cofins, IRPJ e CSLL com código de receita. ICMS e ISS são guias estaduais e municipais.');
+    if (g0.status === 'paga') throw new ErroHttp(409, 'Esta guia já consta como paga.');
+    const e = await A.empresa(esc, g0.empresaId); if (!e) throw new ErroHttp(404, 'Empresa não encontrada.');
+    if (e.exemplo && !FALSO) throw new ErroHttp(400, 'Empresa de exemplo: não vai à Receita. Use uma empresa real.');
+    if (soDig(e.cnpj).length !== 14) throw new ErroHttp(400, 'A empresa está sem CNPJ válido no cadastro.');
+    const mun = String(siafi || e.siafi || SIAFI_IBGE[String(e.ibge || '')] || '').replace(/\D/g, '');
+    if (!mun) throw new ErroHttp(400, 'Informe o código SIAFI do município da empresa (4 dígitos, o mesmo do SICALC).');
+    if (!/^[A-Z]{2}$/.test(String(e.uf || '').toUpperCase())) throw new ErroHttp(400, 'A empresa está sem UF no cadastro.');
+    const L = agoraLocal(); const vencOrig = g0.vencOriginal || g0.venc;
+    let consolida = dataPagamento && dataPagamento !== 'venc' ? dataPagamento : null;
+    if (consolida && consolida < L.data) throw new ErroHttp(400, 'A data de pagamento não pode ser anterior a hoje.');
+    if (!consolida) consolida = vencOrig >= L.data ? vencOrig : L.data;     // vencida sem data: atualiza para hoje
+    if (consolida < vencOrig) consolida = vencOrig;                          // pagamento antecipado: DARF normal, válido até o vencimento
+    const g = { ...g0, vencOriginal: vencOrig, principal: g0.principal || g0.valor };
+    let rr;
+    try {
+      if (FALSO) {
+        if (soDig(e.cnpj).endsWith('0000')) throw new ErroHttp(502, 'Sem procuração eletrônica do cliente para o escritório no e-CAC. (simulação)');
+        const p = +g.principal; const dias = Math.max(0, Math.round((Date.parse(consolida) - Date.parse(vencOrig)) / 86400000));
+        const multa = Math.round(p * Math.min(0.2, dias * 0.0033) * 100) / 100, juros = dias ? Math.round(p * 0.01 * 100) / 100 : 0;
+        const ped = pedidoSicalc({ e, g, siafi: mun, dataConsolidacao: consolida });
+        rr = { pdf: Buffer.from(`%PDF-1.4\n% DARF ${g.tipo} ${JSON.stringify(ped.dados)} (simulado)\n%%EOF\n`), numero: '07' + Date.now().toString().slice(-15), venc: consolida, valores: { principal: p, multa, juros, total: Math.round((p + multa + juros) * 100) / 100 }, pedido: ped };
+      } else {
+        const ped = pedidoSicalc({ e, g, siafi: mun, dataConsolidacao: consolida });
+        const { dados } = await chamar(c, 'Emitir', e.cnpj, ped); const x = lerDarf(dados);
+        if (!x.pdf64) throw new ErroHttp(502, `O SICALC não devolveu o DARF de ${g.tipo} ${fmtComp(g.comp)}. Confira o código ${g.memoria.codigo}, o período e o valor.`);
+        rr = { pdf: Buffer.from(x.pdf64, 'base64'), numero: x.numero, venc: x.venc || consolida, valores: x.valores };
+      }
+    } catch (er) { await registrarExec(esc, { origem: origem.tipo, empresaId: g.empresaId, comp: g.comp, ok: false, mensagem: '[DARF ' + g.tipo + '] ' + er.message }); throw er; }
+    const arquivo = await A.guardarArquivo(esc, String(g.empresaId), rr.pdf, `DARF ${g.tipo}${g.quota ? ' quota ' + g.quota : ''} ${g.comp.slice(5, 7)}-${g.comp.slice(0, 4)} ${soDig(e.cnpj)}.pdf`, 'application/pdf', 'receita');
+    const quando = new Date().toISOString();
+    const nova = { ...g, valor: Math.round(rr.valores.total * 100) / 100, venc: rr.venc, arquivo, numeroDocumento: rr.numero, valores: rr.valores, servico: 'sicalc',
+      emitidaEm: quando, emitidaPor: quem || 'Integra Contador', ...(consolida > vencOrig ? { atualizadaPara: consolida } : { atualizadaPara: null }),
+      ...(liberar ? { status: 'liberada', liberadaEm: g.liberadaEm || quando } : {}) };
+    await A.gravar(esc, 'guias', nova.id, String(g.empresaId), nova);
+    await registrarExec(esc, { origem: origem.tipo, empresaId: g.empresaId, comp: g.comp, ok: true, valor: nova.valor, mensagem: `[DARF ${g.tipo} ${g.memoria.codigo}] emitido · pagamento até ${fmtData(nova.venc)}` });
+    await log('darf_sicalc_emitido', { usuarioId: origem.uid || null, detalhe: `${e.razao || ''} · ${g.tipo} ${g.memoria.codigo} · ${g.comp} · ${brl(nova.valor)}` });
+    return { guia: nova, empresa: e, pdf: rr.pdf, arquivo };
+  }
+
   const MSG_PADRAO = 'Olá, {nome}! Segue a guia {guia} de {competencia} da {empresa}: {valor}, com vencimento em {vencimento}. Ela também está no Portal do Cliente, em Guias e impostos.';
   const montarMsg = (modelo, x) => String(modelo || MSG_PADRAO).replace(/\{(\w+)\}/g, (_, k) => ({ nome: x.nome, empresa: x.empresa, competencia: fmtComp(x.comp), valor: brl(x.valor), vencimento: fmtData(x.venc), guia: x.guia }[k] ?? _));
   async function entregar({ esc, e, empresaId, emissao, canais, modelo }) {
     const res = {}; const g = emissao.guia;
-    const legenda = montarMsg(modelo, { nome: String(e.socios?.[0]?.nome || e.fantasia || e.razao || '').split(' ')[0], empresa: e.fantasia || e.razao, comp: g.comp, valor: g.valor, venc: g.venc, guia: g.programa ? 'da parcela do ' + g.programa : g.tipo === 'DAS-MEI' ? 'DAS do MEI' : g.tipo === 'DAS' ? 'DAS do Simples Nacional' : 'DARF da DCTFWeb' });
+    const legenda = montarMsg(modelo, { nome: String(e.socios?.[0]?.nome || e.fantasia || e.razao || '').split(' ')[0], empresa: e.fantasia || e.razao, comp: g.comp, valor: g.valor, venc: g.venc, guia: g.programa ? 'da parcela do ' + g.programa : g.tipo === 'DAS-MEI' ? 'DAS do MEI' : g.tipo === 'DAS' ? 'DAS do Simples Nacional' : g.servico === 'sicalc' ? 'DARF de ' + (g.tipo === 'COFINS' ? 'Cofins' : g.tipo) + (g.quota ? ' (' + g.quota + 'ª quota)' : '') : 'DARF da DCTFWeb' });
     const anexo = { id: emissao.arquivo.id, nome: emissao.arquivo.nome, tipo: 'application/pdf', conteudo: emissao.pdf };
     if (canais.includes('whatsapp')) {
       try { const r2 = await wa.enviarArquivos({ esc, empresaId: String(empresaId), fone: e.telefone, anexos: [anexo], legenda, u: { id: null, nome: 'Envio automático de guias' } }); res.whatsapp = 'enviado para ' + r2.para; }
@@ -474,6 +541,23 @@ export function registrarIntegra(r, { db, exigir, log, pode, wa }) {
     if (canais.length) { const c = await cfgIntegra(u.escritorio_id); entrega = await entregar({ esc: u.escritorio_id, e: em.empresa, empresaId: b.empresaId, emissao: em, canais, modelo: c?.auto?.mensagem }); }
     return { ok: true, guia: em.guia, reaproveitada: em.reaproveitada, entrega };
   };
+  r.post('/api/integra/darf', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' });
+    if (!pode(u, 'guias', 'editar')) throw new ErroHttp(403, 'Seu acesso não permite emitir guias.');
+    if (limitar(`guia-rf:${u.id}`, 80, 3600).bloqueado) throw new ErroHttp(429, 'Muitas emissões seguidas. Aguarde alguns minutos.');
+    const b = ctx.corpo || {}; const ids = (Array.isArray(b.guias) ? b.guias : [b.guiaId]).map(String).filter(Boolean).slice(0, 20);
+    if (!ids.length) throw new ErroHttp(400, 'Escolha a guia.');
+    const dp = b.dataPagamento && /^\d{4}-\d{2}-\d{2}$/.test(b.dataPagamento) ? b.dataPagamento : null;
+    const res = [];
+    for (const id of ids) {
+      try { const em = await emitirDarf({ esc: u.escritorio_id, guiaId: id, dataPagamento: dp, siafi: b.siafi, liberar: b.liberar !== false, origem: { tipo: 'painel', uid: u.id }, quem: u.nome });
+        let entrega = {}; const canais = (Array.isArray(b.canais) ? b.canais : []).filter(x => ['whatsapp', 'email'].includes(x));
+        if (canais.length) { const c = await cfgIntegra(u.escritorio_id); entrega = await entregar({ esc: u.escritorio_id, e: em.empresa, empresaId: em.guia.empresaId, emissao: em, canais, modelo: c?.auto?.mensagem }); }
+        res.push({ id, ok: true, guia: em.guia, entrega }); }
+      catch (er) { res.push({ id, ok: false, erro: er.message }); if (ids.length === 1) throw er; }
+    }
+    return { ok: res.every(x => x.ok), resultados: res };
+  });
   r.post('/api/integra/guia', rotaEmitir);
   r.post('/api/integra/das-mei', rotaEmitir);
   r.post('/api/integra/executar', async ctx => {

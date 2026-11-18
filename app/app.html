@@ -8471,7 +8471,7 @@ ACT['lp-guias']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const a=apurarLucr
   toast(L.length-bloq.length+' guia(s) em rascunho.'+(bloq.length?' Não alteradas (já liberadas/pagas): '+bloq.map(x=>x.tipo).join(', ')+'.':''),!!bloq.length)};
 // a Central passa a mostrar a apuração do LP/LR
 const stCompV35=stComp;stComp=function(e,comp){const s=stCompV35(e,comp);if(!['LP','LR'].includes(e.regime))return s;
-  const a=apurarLucro(e,comp);const gs=S.guias.filter(g=>g.empresaId===e.id&&g.comp===comp&&['PIS','COFINS','ICMS','ISS','IRPJ','CSLL'].includes(g.tipo));const tot=r2(gs.reduce((x,g)=>x+(+g.valor||0),0));
+  const a=apurarLucro(e,comp);const gs=S.guias.filter(g=>g.empresaId===e.id&&g.comp===comp&&['PIS','COFINS','ICMS','ISS','IRPJ','CSLL'].includes(g.tipo));const tot=r2(gs.reduce((x,g)=>x+(+(g.valores?.principal??g.principal??g.valor)||0),0));// principal: multa, juros e quotas não contam como divergência
   const calc=r2(a.pisDev+a.cofDev+a.icms.devedor+a.iss.valor+(triDe(comp).fim===comp||lpCfg(e).lrForma==='estimativa'&&e.regime==='LR'?(()=>{const i=apurarIrpjCsll(e,comp);return i.irDev+i.csDev})():0));
   s.fat=a.rb||null;s.calc=calc;s.g=gs.length?{valor:tot,status:gs.every(g=>g.status==='paga')?'paga':gs.some(g=>g.status==='rascunho')?'rascunho':'liberada',venc:gs[0].venc,tipo:'Guias'}:null;
   if(!a.rb&&!gs.length){s.k='vazia';s.t='Sem movimento lançado';s.c='crit'}else if(!gs.length){s.k='lancada';s.t='Receitas lançadas';s.c='warn'}else if(Math.abs(tot-calc)>=.01){s.k='desatualizada';s.t='Guias divergem da apuração';s.c='warn'}else{s.k=gs.every(g=>g.status==='paga')?'paga':gs.some(g=>g.status==='rascunho')?'apurada':'liberada';s.t=s.k==='paga'?'Guias pagas':s.k==='apurada'?'Apurada':'Guias liberadas';s.c=s.k==='apurada'||s.k==='paga'?'ok':'info'}
@@ -8986,6 +8986,57 @@ ACT['rel-pdf']=()=>{const k=UI.snRel;const R=RELS[k];const e=emp(UI.fsn.emp);if(
   const comTermo=R.livro&&UI.relTermo;
   janelaPdf(R.t,(comTermo?termo('abertura'):'')+cab+tab+(d.obs?`<p class="nota">${esc(d.obs)}</p>`:'')+(R.livro||['piscofins','irpjcsll','das','iss'].includes(k)?`<div class="ass"><div>${esc(e.razao)}</div><div>${contador}</div></div>`:'')+(comTermo?'<div style="page-break-before:always"></div>'+termo('encerramento').replace('page-break-after:always;',''):''))};
 /* ==== v38 (fim) ==== */
+/* ==== v39: DARF de PIS, Cofins, IRPJ e CSLL pelo SICALC (Integra Contador) · quotas do IRPJ/CSLL ==== */
+const DARF_FED=['PIS','COFINS','IRPJ','CSLL'];
+const SIAFI_IBGE={'5002704':'9051'};
+const siafiDe=e=>e.siafi||SIAFI_IBGE[String(e.ibge||'')]||'';
+const darfOk=g=>DARF_FED.includes(g.tipo)&&g.memoria?.codigo&&g.status!=='paga';
+const ultUtil=c=>ajustaVenc(ultDiaMes(c),'antecipa');
+const triCod=g=>['2089','2372','0220','6012'].includes(String(g.memoria?.codigo||''));
+function guiasLucro(e,comp){return S.guias.filter(g=>g.empresaId===e.id&&g.comp===comp&&[...DARF_FED,'ISS','ICMS'].includes(g.tipo)).sort((a,b)=>[...DARF_FED,'ICMS','ISS'].indexOf(a.tipo)-[...DARF_FED,'ICMS','ISS'].indexOf(b.tipo)||(a.quota||0)-(b.quota||0))}
+function painelGuiasLucro(e,comp){const gs=guiasLucro(e,comp);if(!gs.length)return '';const ed=podeMod('guias','editar');const fed=gs.filter(g=>darfOk(g)&&!g.arquivo);
+  const podeQuota=g=>ed&&triCod(g)&&!g.quota&&!g.arquivo&&g.status!=='paga'&&(+g.valor||0)>=2000;
+  return `<div class="panel"><div class="panel-head" style="flex-wrap:wrap;gap:8px"><h2>Guias geradas</h2><div class="actions">${ed&&fed.length?`<button class="btn primary sm" data-act="darf-abrir" data-ids="${fed.map(g=>g.id).join(',')}">${svg('download')}Emitir ${fed.length>1?fed.length+' DARF':'DARF'} pelo SICALC</button>`:''}</div></div>
+   <div class="table-wrap"><table><thead><tr><th>Tributo</th><th>Código</th><th class="r">Valor</th><th>Vencimento</th><th>Situação</th><th>DARF</th><th></th></tr></thead><tbody>${gs.map(g=>{const s=statusGuia(g);return `<tr>
+    <td><b>${esc(g.tipo==='COFINS'?'Cofins':g.tipo)}</b>${g.quota?` <span class="small muted">${g.quota}ª quota</span>`:''}</td><td class="small mono">${esc(g.memoria?.codigo||(g.tipo==='ICMS'?'Estadual':g.tipo==='ISS'?'Municipal':''))}</td>
+    <td class="r num">${brl(g.valor)}${g.valores?.multa||g.valores?.juros?`<div class="small muted">multa ${brl(g.valores.multa||0)} · juros ${brl(g.valores.juros||0)}</div>`:''}</td><td class="num">${fmtData(g.venc)}${g.atualizadaPara?'<div class="small muted">atualizado</div>':''}</td><td>${pill(s.t,s.c)}</td>
+    <td class="small">${g.arquivo?.url?`<a href="${esc(g.arquivo.url)}" target="_blank" rel="noopener">${g.servico==='sicalc'?'DARF '+esc(g.numeroDocumento||'')+'':'PDF'}</a>`:'<span class="muted">—</span>'}</td>
+    <td class="r" style="white-space:nowrap">${ed&&darfOk(g)?`<button class="btn sm" data-act="darf-abrir" data-ids="${g.id}">${g.arquivo?'Reemitir':'Emitir'}</button>`:''}${podeQuota(g)?` <button class="btn sm" data-act="darf-quotas" data-id="${g.id}" title="Dividir em até 3 quotas (mínimo R$ 1.000 cada)">Quotas</button>`:''}</td></tr>`}).join('')}</tbody></table></div>
+   <p class="small muted">PIS, Cofins, IRPJ e CSLL saem pelo SICALC do Integra Contador: o DARF oficial (com código de barras) fica anexado à guia e vai para "Guias e impostos" do portal. Vencidas saem com multa e juros até a data escolhida. ICMS e ISS: anexe a guia estadual ou municipal no módulo de Guias.</p></div>`}
+const fLucroV39=fLucro;fLucro=function(){const h=fLucroV39();const e=emp(UI.fsn.emp);if(!e||!['LP','LR'].includes(e.regime))return h;const comp=UI.fsn.comp;
+  const novo=painelGuiasLucro(e,comp);const re=/<div class="panel"><div class="panel-head"><h2>Guias geradas<\/h2>[\s\S]*?<\/p><\/div>/;return re.test(h)?h.replace(re,novo):h+novo};
+ACT['darf-abrir']=el=>{const ids=el.dataset.ids.split(',').filter(Boolean);const gs=ids.map(id=>S.guias.find(g=>g.id===id)).filter(Boolean);if(!gs.length)return;const e=emp(gs[0].empresaId);
+  const venc=gs.map(g=>g.vencOriginal||g.venc).sort()[0];const vencida=venc<hoje();
+  openModal(mHead('Emitir DARF pelo SICALC · '+(e.fantasia||e.razao))+`<form data-form="darf" data-ids="${esc(ids.join(','))}"><div class="modal-body">
+   <div class="table-wrap"><table><tbody>${gs.map(g=>`<tr><td>${esc(g.tipo)}${g.quota?' · '+g.quota+'ª quota':''}</td><td class="small mono">${esc(g.memoria.codigo)}</td><td class="small">${fmtComp(g.comp)}</td><td class="r num">${brl(g.principal||g.valor)}</td><td class="num">${fmtData(g.vencOriginal||g.venc)}</td></tr>`).join('')}</tbody></table></div>
+   <div class="grid-f" style="margin-top:10px"><label class="f"><span>Data de pagamento ${vencida?'(há guia vencida: sai com multa e juros)':'(vazio = até o vencimento)'}</span><input type="date" name="data" min="${hoje()}" value="${vencida?hoje():''}"></label>
+    <label class="f"><span>Município (código SIAFI do SICALC)</span><input name="siafi" inputmode="numeric" maxlength="4" value="${esc(siafiDe(e))}" placeholder="ex.: 9051 = Campo Grande/MS" required></label>
+    <label class="f chk"><input type="checkbox" name="liberar" checked> Liberar no portal do cliente</label>
+    <div class="f"><span class="small" style="font-weight:600;color:var(--muted)">Enviar também</span><div class="tipos-chk"><label><input type="checkbox" name="wa"> WhatsApp</label><label><input type="checkbox" name="em"> E-mail</label></div></div></div>
+   <p class="small muted">Precisa do Integra Contador ativo e da procuração eletrônica do cliente para o escritório no e-CAC. O código SIAFI do município fica salvo no cadastro.</p></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Emitir na Receita</button></div></form>`)};
+FORM['darf']=async(fd,form)=>{const ids=form.dataset.ids.split(',');const g0=S.guias.find(g=>g.id===ids[0]);const e=emp(g0?.empresaId);const siafi=soDig(fd.get('siafi'));
+  if(!/^\d{4}$/.test(siafi)){toast('O código SIAFI do município tem 4 dígitos (consulte na tabela do SICALC).',true);return}
+  if(MODO!=='api'){toast('A emissão pela Receita funciona na versão publicada.',true);return}
+  if(e&&e.siafi!==siafi)mut('empresas',()=>{e.siafi=siafi},['Cadastro','Código SIAFI do município: '+siafi,e.razao]);
+  const bt=form.querySelector('button.primary');bt.disabled=true;bt.textContent='Emitindo na Receita…';
+  try{const r=await MF.api('POST','/api/integra/darf',{guias:ids,dataPagamento:fd.get('data')||null,siafi,liberar:!!fd.get('liberar'),canais:[fd.get('wa')?'whatsapp':null,fd.get('em')?'email':null].filter(Boolean)});
+    r.resultados.forEach(x=>{if(x.ok){const i=S.guias.findIndex(g=>g.id===x.id);if(i>=0)S.guias[i]=x.guia}});closeModal();
+    const ok=r.resultados.filter(x=>x.ok),f=r.resultados.filter(x=>!x.ok);
+    toast(`${ok.length} DARF emitido(s)${ok.length?': '+ok.map(x=>x.guia.tipo+' '+brl(x.guia.valor)).join(', '):''}.${f.length?' Falhas: '+f.map(x=>(S.guias.find(g=>g.id===x.id)?.tipo||'')+' '+x.erro).join(' · '):''}`,!!f.length);invalidar('integra');render()}
+  catch(er){toast(er.message,true);bt.disabled=false;bt.textContent='Emitir na Receita'}};
+/* quotas do IRPJ e da CSLL trimestrais: até 3, mínimo R$ 1.000 cada (2ª e 3ª com juros, calculados pelo SICALC na emissão) */
+ACT['darf-quotas']=el=>{const g=S.guias.find(x=>x.id===el.dataset.id);if(!g)return;const n=Math.min(3,Math.floor((+g.valor||0)/1000));if(n<2){toast('Abaixo de R$ 2.000 o pagamento é em quota única.',true);return}
+  const base=r2(Math.floor(g.valor/n*100)/100);const vals=Array.from({length:n},(_,i)=>i<n-1?base:r2(g.valor-base*(n-1)));const vencs=vals.map((_,i)=>ultUtil(addMes(g.comp,i+1)));
+  confirmar('Dividir '+g.tipo+' em quotas',`<p>${esc(g.tipo)} ${fmtComp(g.comp)} de ${brl(g.valor)} em ${n} quotas:</p><ul class="small">${vals.map((v,i)=>`<li>${i+1}ª quota: ${brl(v)} · vence ${fmtData(vencs[i])}${i?' · com juros (1% na 2ª; Selic + 1% na 3ª)':''}</li>`).join('')}</ul>`,'Dividir',()=>{
+    mut('guias',()=>{const tot=g.valor;Object.assign(g,{quota:1,quotas:n,principal:vals[0],valor:vals[0],venc:vencs[0],vencOriginal:vencs[0],valorTotalTributo:tot});
+      for(let i=1;i<n;i++)S.guias.push({...g,id:uid(),quota:i+1,principal:vals[i],valor:vals[i],venc:vencs[i],vencOriginal:vencs[i],arquivo:null,status:'rascunho',criadaEm:agora()})},['Guias',`Dividiu ${g.tipo} ${fmtComp(g.comp)} em ${n} quotas`,emp(g.empresaId)?.razao||''])})};
+/* gerar as guias de novo desfaz as quotas ainda não emitidas, para não sobrar quota com valor antigo */
+const lpGuiasV39=ACT['lp-guias'];ACT['lp-guias']=el=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const Q=S.guias.filter(g=>g.empresaId===e?.id&&g.comp===comp&&g.quota);
+  if(Q.length&&Q.some(g=>g.arquivo||g.status!=='rascunho')){toast('Há quotas de IRPJ/CSLL já emitidas nesta competência: não regerei essas guias.',true);return lpGuiasV39(el)}
+  if(Q.length)mut('guias',()=>{S.guias=S.guias.filter(g=>!(Q.includes(g)&&g.quota>1));Q.filter(g=>g.quota===1).forEach(g=>{delete g.quota;delete g.quotas;delete g.principal;delete g.vencOriginal})},['Guias','Desfez as quotas de '+fmtComp(comp)+' para regerar',e.razao]);
+  return lpGuiasV39(el)};
+/* ==== v39 (fim) ==== */
 
 
 

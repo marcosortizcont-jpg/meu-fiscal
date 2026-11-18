@@ -18,6 +18,17 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### DARF pelo SICALC (Lucro Presumido e Real)
+
+Em **Lucro Presumido e Real → Guias geradas**, cada guia de PIS, Cofins, IRPJ e CSLL tem **Emitir**, e há um botão para emitir todas de uma vez. A emissão usa o serviço SICALC do Integra Contador (`CONSOLIDARGERARDARF51`, rota `POST /api/integra/darf`), sem o captcha do SICALC Web.
+
+- O DARF oficial em PDF fica anexado à guia, que vai para "Guias e impostos" do portal (opcional) e pode ser enviada por WhatsApp e e-mail.
+- Guia vencida sai com multa e juros até a data de pagamento escolhida. Com data anterior ao vencimento, sai o DARF normal.
+- **Quotas:** IRPJ e CSLL trimestrais a partir de R$ 2 mil podem ser divididos em até 3 quotas (mínimo R$ 1 mil cada), e cada quota tem o seu DARF.
+- O município vai pelo código SIAFI (Campo Grande/MS = 9051 já vem preenchido). O código digitado fica salvo no cadastro.
+- ICMS e ISS não saem pelo SICALC: são guias estaduais e municipais.
+- **A confirmar na primeira chamada real** (o Integra estava inativo quando foi escrito): o formato de `dataPA` nos trimestrais e o campo `cota`. Os dois ficam em `pedidoSicalc()`, no `api/src/integra.js`. Com `INTEGRA_FALSO=1` a emissão é simulada.
+
 ### Livros e relatórios (todos os regimes)
 
 A tela **Livros e relatórios** do fiscal (`#f-rel`) abre para qualquer empresa e mostra só o que vale para o regime dela. Usa o período de/até do topo; tudo sai em tela, planilha (CSV) ou PDF com cabeçalho da empresa e assinaturas.
