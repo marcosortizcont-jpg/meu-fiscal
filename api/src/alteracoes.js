@@ -104,4 +104,38 @@ export function registrarRotasAlteracoes(r, { db, exigir, log, pode, alt }) {
     await log('documento_excluido', { usuarioId: u.id, ip: ctx.ip, detalhe: `${c} · ${reg.dados.nome || reg.dados.arquivo?.nome || id}` });
     return { ok: true };
   });
+
+  /* ---------- excluir guias geradas (confirmação com senha; não exclui guia paga) ---------- */
+  r.post('/api/guias/excluir', async ctx => {
+    const u = await exigir(ctx, { site: 'painel' });
+    if (!pode(u, 'guias', 'editar')) throw new ErroHttp(403, 'Seu acesso não permite excluir guias.');
+    if (limitar(`excluir-guia:${u.id}`, 10, 900).bloqueado) throw new ErroHttp(429, 'Muitas tentativas. Aguarde alguns minutos.');
+    const ids = (Array.isArray(ctx.corpo.ids) ? ctx.corpo.ids : []).map(String).filter(Boolean).slice(0, 50);
+    if (!ids.length) throw new ErroHttp(400, 'Escolha as guias.');
+    const motivo = String(ctx.corpo.motivo || '').trim().slice(0, 300);
+    if (motivo.length < 5) throw new ErroHttp(400, 'Informe o motivo da exclusão.');
+    const [eu] = await db.query('SELECT senha_hash FROM usuarios WHERE id = $1', [u.id]);
+    if (!await conferirSenha(String(ctx.corpo.senha || ''), eu?.senha_hash)) {
+      await log('excluir_guia_senha_errada', { usuarioId: u.id, ip: ctx.ip, detalhe: ids.join(',') });
+      throw new ErroHttp(403, 'Senha incorreta. Nada foi excluído.');
+    }
+    const regs = await db.query(`SELECT id, empresa_id, dados FROM registros WHERE escritorio_id = $1 AND colecao = 'guias' AND id = ANY($2::text[])`, [u.escritorio_id, ids]);
+    if (!regs.length) throw new ErroHttp(404, 'Guias não encontradas.');
+    const pagas = regs.filter(x => x.dados?.status === 'paga');
+    if (pagas.length) throw new ErroHttp(409, `Guia paga não pode ser excluída (${pagas.map(x => x.dados.tipo).join(', ')}). Estorne o pagamento antes.`);
+    const desc = g => `${g.tipo || 'Guia'} ${String(g.comp || '').split('-').reverse().join('/')} · R$ ${(+g.valor || 0).toFixed(2).replace('.', ',')}${g.status ? ' · ' + g.status : ''}`;
+    await db.tx(async q => {
+      for (const x of regs) {
+        await q(`DELETE FROM registros WHERE escritorio_id = $1 AND colecao = 'guias' AND id = $2`, [u.escritorio_id, x.id]);
+        const arq = x.dados?.arquivo?.id;
+        if (arq && /^[0-9a-f-]{36}$/.test(arq)) {
+          const [uso] = await q(`SELECT 1 AS ok FROM registros WHERE escritorio_id = $1 AND dados::text LIKE $2 LIMIT 1`, [u.escritorio_id, '%' + arq + '%']);
+          if (!uso) { await q('DELETE FROM arquivos_conteudo WHERE id = $1', [arq]); await q('DELETE FROM arquivos WHERE id = $1 AND escritorio_id = $2', [arq, u.escritorio_id]); }
+        }
+        await alt.registrar(q, u, ctx.ip, { colecao: 'guias', id: x.id, empresaId: x.empresa_id, acao: 'excluiu', antes: x.dados, resumo: `Guia excluída: ${desc(x.dados)} · motivo: ${motivo} (confirmado com senha)` });
+      }
+    });
+    await log('guia_excluida', { usuarioId: u.id, ip: ctx.ip, detalhe: regs.map(x => desc(x.dados)).join(' | ') + ' · motivo: ' + motivo });
+    return { ok: true, excluidas: regs.map(x => x.id) };
+  });
 }
