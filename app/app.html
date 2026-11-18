@@ -9224,7 +9224,7 @@ function pdfDeclFat(e,F){const w=window.open('','_blank');if(!w){toast('Permita 
   ${tabela}
   <div class="tot"><span>Total do período</span><b>${brl(tot)}</b></div><p class="ext">(${esc(extensoBRL(tot))})</p>
   <p class="local">${esc(F.cidade)}, ${esc(dataExt(F.data))}.</p>
-  <div class="ass"><div><b>${esc(F.socio.nome)}</b>CPF ${fmtCPF(F.socio.cpf)}<br>Sócio administrador · ${esc(e.razao)}</div><div><b>${esc(F.cont.nome)}</b>CPF ${fmtCPF(F.cont.cpf)}<br>Contador${crc?' · '+esc(crc):''}</div></div>
+  <div class="ass"><div><b>${esc(F.socio.nome)}</b>CPF ${fmtCPF(F.socio.cpf)}<br>Sócio administrador</div><div><b>${esc(F.cont.nome)}</b>CPF ${fmtCPF(F.cont.cpf)}<br>Contador${crc?' · '+esc(crc):''}</div></div>
   <div class="rod">Documento emitido por ${esc(marca)} em ${new Date().toLocaleString('pt-BR')}. As informações são de responsabilidade dos signatários.</div>
   </div><script>document.fonts&&document.fonts.ready?document.fonts.ready.then(()=>setTimeout(()=>print(),250)):setTimeout(()=>print(),600)<\/script></body></html>`);w.document.close()}
 function fatDeclAbrir(){const e=emp(UI.fsn.emp);if(!e)return;const {ate}=periodoNf();const fim=ate>=compAtual()?addMes(compAtual(),-1):ate;UI.fatDecl=novoFD(e,addMes(fim,-11),fim);openModal(fatDeclForm(),true)}
