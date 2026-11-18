@@ -8517,7 +8517,7 @@ ACT['destda']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const R=S.nfentrada.
   const ini=comp+'-01',fim=ultDiaMes(comp);const tot=k=>r2(R.reduce((a,x)=>a+x[k],0));const vNF=r2(R.filter(x=>x.difal||x.antec).reduce((a,x)=>a+(+x.n.valor||0),0));
   const sit={0:r2(R.filter(x=>x.n.destino==='ativo').reduce((a,x)=>a+x.difal,0)),1:r2(R.filter(x=>x.n.destino==='uso').reduce((a,x)=>a+x.difal,0)),3:tot('antec')};
   const cfgE=cfg();const L=[['0000','LFPD',spedD(ini),spedD(fim),e.razao,soDig(e.cnpj),e.uf||'MS',soDig(e.ie||''),soDig(e.codMun||e.ibge||''),soDig(e.im||''),'','', '2000','0','30','Brasil',e.fantasia||'','','',''],
-    ['0001','0'],['0030','1','7','9','9','1','1','1','1','1','9','1','1','0','1',(sit[3]>0?'0':'1'),'1','1'],['0100',cfgE.escritorio||cfgE.marca||'','900',soDig(cfgE.cnpj||''),soDig(cfgE.cpfContador||''),cfgE.crc||'','','','','','',cfgE.uf||'MS',soDig(cfgE.codMun||''),'','',soDig(cfgE.telefone||''),'',cfgE.email||'']];
+    ['0001','0'],['0030','1','7','9','9','1','1','1','1','1','9','1','1','0','1',(sit[3]>0?'0':'1'),'1','1'],['0100',cfgE.escritorio||cfgE.marca||'','900',soDig(cfgE.cnpj||''),soDig(cfgE.cpfContador||''),crcSped(cfgE.crc),'','','','','',cfgE.uf||'MS',soDig(cfgE.codMun||''),'','',soDig(cfgE.telefone||''),'',cfgE.email||'']];
   const G=[['G001','0'],['G020','1',spedD(ini),spedD(fim)]];const totDA=r2(sit[0]+sit[1]+sit[3]);
   if(totDA>0){G.push(['G600',vNF,0,totDA]);[0,1,3].forEach(k=>{if(sit[k]>0)G.push(['G605',String(k),sit[k],0,sit[k]])})}
   const l0=L.length+1;L.push(['0990',String(l0)]);const lG=G.length+1;G.push(['G990',String(lG)]);
@@ -8576,7 +8576,7 @@ function linhasEfdIcms(e,comp){const ini=comp+'-01',fim=ultDiaMes(comp);const C=
   const ap=icmsProprio(e,comp);const venc=ajustaVenc(addMes(comp,1)+'-'+pad(Math.min(lpCfg(e).icmsDia,28)),'antecipa');
   B0.push(['0000','020','0',spedD(ini),spedD(fim),e.razao,soDig(e.cnpj),'',e.uf||'MS',soDig(e.ie||''),soDig(e.codMun||e.ibge||''),soDig(e.im||''),'','A',e.industria?'0':'1'],['0001','0'],
     ['0005',e.fantasia||e.razao,endCampos(e).cep,endCampos(e).log,endCampos(e).num,endCampos(e).comp,endCampos(e).bairro,soDig(e.telefone||''),'',e.email||''],
-    ['0100',C.responsavelTecnico||C.escritorio||'',soDig(C.cpfContador||''),C.crc||'',soDig(C.cnpj||''),soDig(C.cep||''),C.endereco||'',C.numero||'','',C.bairro||'',soDig(C.telefone||''),'',C.email||'',soDig(C.codMun||'')]);
+    ['0100',C.responsavelTecnico||C.escritorio||'',soDig(C.cpfContador||''),crcSped(C.crc),soDig(C.cnpj||''),soDig(C.cep||''),C.endereco||'',C.numero||'','',C.bairro||'',soDig(C.telefone||''),'',C.email||'',soDig(C.codMun||'')]);
   Object.values(parts).forEach(p=>B0.push(['0150',p.cod,p.nome,'01058',p.doc.length===14?p.doc:'',p.doc.length===11?p.doc:'',soDig(p.ie||''),p.codMun||'','','','','','']));
   [...unid].forEach(u=>B0.push(['0190',u,u]));Object.values(itens).forEach(i=>B0.push(['0200',i.cod,i.desc,'','',i.un,'00',i.ncm||'','','','','',i.cest||'']));
   const E=[['E001','0'],['E100',spedD(ini),spedD(fim)],['E110',ap.deb,0,ap.aj>0?ap.aj:0,0,ap.cred,0,ap.aj<0?-ap.aj:0,0,ap.ant,ap.devedor,0,ap.devedor,ap.credorTransp,0]];
@@ -8590,7 +8590,7 @@ function fecharSped(linhas,fechos,ordem,extras={}){const por={};linhas.forEach(l
   return [...out,...nove].map(l=>'|'+l.map(spedV).join('|')+'|').join('\r\n')+'\r\n'}
 function linhasEfdContrib(e,comp){const ini=comp+'-01',fim=ultDiaMes(comp);const C=ESC_CFG();const lr=e.regime==='LR';const a=apurarLucro(e,comp);const parts={};
   const L0=[['0000','006','0','','',spedD(ini),spedD(fim),e.razao,soDig(e.cnpj),e.uf||'MS',soDig(e.codMun||e.ibge||''),'','00',e.industria?'0':'2'],['0001','0'],
-    ['0100',C.responsavelTecnico||C.escritorio||'',soDig(C.cpfContador||''),C.crc||'',soDig(C.cnpj||''),soDig(C.cep||''),C.endereco||'',C.numero||'','',C.bairro||'',soDig(C.telefone||''),'',C.email||'',soDig(C.codMun||'')],
+    ['0100',C.responsavelTecnico||C.escritorio||'',soDig(C.cpfContador||''),crcSped(C.crc),soDig(C.cnpj||''),soDig(C.cep||''),C.endereco||'',C.numero||'','',C.bairro||'',soDig(C.telefone||''),'',C.email||'',soDig(C.codMun||'')],
     ['0110',lr?'1':'2',lr?'1':'','1',lr?'':'2'],['0140','',e.razao,soDig(e.cnpj),e.uf||'MS',soDig(e.ie||''),soDig(e.codMun||e.ibge||''),soDig(e.im||''),'']];
   const F=[['F001','0'],['F010',soDig(e.cnpj)]];
   // receitas consolidadas por CST, modelo e CFOP
@@ -9262,6 +9262,8 @@ ACT['fh-pdf']=el=>{const [e,x]=fhAchar(el.dataset.id);if(!x)return;const F={...f
 ACT['fh-excluir']=el=>{const [e,x]=fhAchar(el.dataset.id);if(!x)return;confirmar('Excluir do histórico',`<p>Excluir "<b>${esc(x.desc)}</b>" (${fmtComp(x.de)} a ${fmtComp(x.ate)}, ${brl(x.total)})? Os PDFs já entregues não são afetados.</p>`,'Excluir',()=>{
   mut('empresas',()=>{e.fatSalvos=(e.fatSalvos||[]).filter(z=>z.id!==x.id)},['Escrita fiscal','Excluiu do histórico a declaração de faturamento "'+x.desc+'"',e.razao]);toast('Excluído do histórico.')})};
 /* ==== v42 (fim) ==== */
+/* CRC nos arquivos SPED: campo de até 15 posições, só letras e números ("CRC/MS 016636/O-0" → "MS016636O0") */
+function crcSped(c){return String(c||'').toUpperCase().replace(/^\s*CRC/,'').replace(/[^A-Z0-9]/g,'').slice(0,15)}
 
 
 
