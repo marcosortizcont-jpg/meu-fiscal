@@ -8599,17 +8599,31 @@ function linhasEfdContrib(e,comp){const ini=comp+'-01',fim=ultDiaMes(comp);const
     (d.itens||[]).forEach(it=>{if(!cfopReceita(it.cfop))return;const mono=monoItem(it),exp=/^[37]/.test(it.cfop);const cst=exp?'08':mono?'04':'01';const k=cst+'|'+(d.modelo||'55')+'|'+it.cfop;const x=g[k]||(g[k]={cst,mod:d.modelo||'55',cfop:it.cfop,v:0,icms:0});x.v+=(+it.vProd||0)-(+it.vDesc||0)+(+it.vFrete||0)+(+it.vSeg||0)+(+it.vOutro||0);x.icms+=+it.vICMS||0})});
   const aP=lr?.0165:.0065,aC=lr?.076:.03;let totP=0,totC=0,bcTot=0,recTot=0;
   Object.values(g).forEach(x=>{const trib=x.cst==='01';const bc=trib?r2(Math.max(0,x.v-x.icms)):0;const p=r2(bc*aP),c=r2(bc*aC);totP+=p;totC+=c;bcTot+=bc;recTot+=x.v;
-    if(lr)F.push(['F100','1','','',spedD(fim),r2(x.v),x.cst,bc,trib?(aP*100).toFixed(4).replace('.',','):'',p,x.cst,bc,trib?(aC*100).toFixed(4).replace('.',','):'',c,'','','','','Receitas '+(x.mod==='SE'||!x.mod?'de serviços':'NF '+x.mod)+' CFOP '+x.cfop]);
+    if(lr)F.push(['F100','1','','',spedD(fim),r2(x.v),x.cst,bc,trib?(aP*100).toFixed(4).replace('.',','):'',p,x.cst,bc,trib?(aC*100).toFixed(4).replace('.',','):'',c,'','','','','Receitas '+(x.mod==='SE'||!x.mod?'de serviços (NFS-e)':'NF '+x.mod)+(x.cfop?' CFOP '+x.cfop:'')]);
     else F.push(['F550',r2(x.v),x.cst,r2(x.icms),bc,trib?(aP*100).toFixed(4).replace('.',','):'',p,x.cst,r2(x.icms),bc,trib?(aC*100).toFixed(4).replace('.',','):'',c,x.mod==='SE'?'':x.mod,x.cfop,'',''])});
+  // receitas da apuração sem documento fiscal no mês (lançamentos e receitas informadas): entram consolidadas para o arquivo bater com a apuração
+  {const recRest=r2(Math.max(0,(+a.rb||0)-recTot)),bcRest=r2(Math.min(recRest,Math.max(0,(+a.basePC||0)-bcTot)));
+   if(recRest>=.01){const p=r2(bcRest*aP),c=r2(bcRest*aC);const cst=bcRest>0?'01':'06';totP+=p;totC+=c;bcTot+=bcRest;recTot+=recRest;
+    if(lr)F.push(['F100','1','','',spedD(fim),recRest,cst,bcRest,bcRest?(aP*100).toFixed(4).replace('.',','):'',p,cst,bcRest,bcRest?(aC*100).toFixed(4).replace('.',','):'',c,'','','','','Receitas sem documento fiscal (lançamentos do mês)']);
+    else F.push(['F550',recRest,cst,r2(recRest-bcRest),bcRest,bcRest?(aP*100).toFixed(4).replace('.',','):'',p,cst,r2(recRest-bcRest),bcRest,bcRest?(aC*100).toFixed(4).replace('.',','):'',c,'','','',''])}}
   if(lr&&(a.credPis||a.credCof)){const bcC=r2(a.credPis/.0165);F.push(['F100','0','','',spedD(fim),bcC,'50',bcC,'1,6500',a.credPis,'50',bcC,'7,6000',a.credCof,'01','0','','','Créditos sobre aquisições para revenda/insumos do mês'])}
-  totP=r2(totP);totC=r2(totC);const M=[['M001','0']];
-  const cod=lr?'01':'51';
-  if(lr&&a.credPis){M.push(['M100','101','0',r2(a.credPis/.0165),'1,6500','','',a.credPis,0,0,0,a.credPis,'0',Math.min(a.credPis,totP),r2(Math.max(0,a.credPis-totP))]);M.push(['M105','01','50',r2(a.credPis/.0165),'',r2(a.credPis/.0165),r2(a.credPis/.0165),'','',''])}
-  M.push(['M200',lr?totP:0,lr?Math.min(a.credPis,totP):0,0,lr?r2(Math.max(0,totP-a.credPis)):0,lr?a.ret.pis:0,0,lr?a.pisDev:0,lr?0:totP,lr?0:a.ret.pis,0,lr?0:a.pisDev,a.pisDev]);
-  M.push(['M210',cod,r2(recTot),bcTot,0,0,bcTot,(aP*100).toFixed(4).replace('.',','),'','',totP,0,0,0,0,totP]);
-  if(lr&&a.credCof){M.push(['M500','101','0',r2(a.credCof/.076),'7,6000','','',a.credCof,0,0,0,a.credCof,'0',Math.min(a.credCof,totC),r2(Math.max(0,a.credCof-totC))]);M.push(['M505','01','50',r2(a.credCof/.076),'',r2(a.credCof/.076),r2(a.credCof/.076),'','',''])}
-  M.push(['M600',lr?totC:0,lr?Math.min(a.credCof,totC):0,0,lr?r2(Math.max(0,totC-a.credCof)):0,lr?a.ret.cofins:0,0,lr?a.cofDev:0,lr?0:totC,lr?0:a.ret.cofins,0,lr?0:a.cofDev,a.cofDev]);
-  M.push(['M610',cod,r2(recTot),bcTot,0,0,bcTot,(aC*100).toFixed(4).replace('.',','),'','',totC,0,0,0,0,totC]);
+  totP=r2(totP);totC=r2(totC);bcTot=r2(bcTot);recTot=r2(recTot);
+  // arredondamento: a contribuição total tem de ser base × alíquota (M210/M610); a diferença de centavos vai para a maior linha
+  {const RL=F.filter(l=>(l[0]==='F550'&&+l[4]>0)||(l[0]==='F100'&&l[1]==='1'&&+l[7]>0));if(RL.length){const big=RL.reduce((m,l)=>(+(l[0]==='F550'?l[4]:l[7])>+(m[0]==='F550'?m[4]:m[7])?l:m),RL[0]);
+    const iP=big[0]==='F550'?6:9,iC=big[0]==='F550'?11:13;const dP=r2(r2(bcTot*aP)-totP),dC=r2(r2(bcTot*aC)-totC);if(Math.abs(dP)<1){big[iP]=r2(+big[iP]+dP);totP=r2(totP+dP)}if(Math.abs(dC)<1){big[iC]=r2(+big[iC]+dC);totC=r2(totC+dC)}}}
+  const M=[['M001','0']];
+  const cod=lr?'01':'51';const aliqP=(aP*100).toFixed(4).replace('.',','),aliqC=(aC*100).toFixed(4).replace('.',',');
+  // M200/M600 fechados pelos valores do próprio arquivo: retenção limitada à contribuição; M205/M605 com o código da DCTF
+  const credP=lr?r2(Math.min(+a.credPis||0,totP)):0,credC=lr?r2(Math.min(+a.credCof||0,totC)):0;
+  const devP=r2(totP-credP),devC=r2(totC-credC);const retP=r2(Math.min(+a.ret?.pis||0,devP)),retC=r2(Math.min(+a.ret?.cofins||0,devC));const recP=r2(devP-retP),recC=r2(devC-retC);
+  if(lr&&a.credPis){M.push(['M100','101','0',r2(a.credPis/.0165),'1,6500','','',a.credPis,0,0,0,a.credPis,'0',credP,r2(Math.max(0,a.credPis-credP))]);M.push(['M105','01','50',r2(a.credPis/.0165),'',r2(a.credPis/.0165),r2(a.credPis/.0165),'','',''])}
+  M.push(lr?['M200',totP,credP,0,devP,retP,0,recP,0,0,0,0,recP]:['M200',0,0,0,0,0,0,0,totP,retP,0,recP,recP]);
+  if(recP>0)M.push(['M205',lr?'08':'12',lr?'691201':'810902',recP]);
+  if(bcTot>0||totP>0)M.push(['M210',cod,recTot,bcTot,0,0,bcTot,aliqP,'','',totP,0,0,0,0,totP]);
+  if(lr&&a.credCof){M.push(['M500','101','0',r2(a.credCof/.076),'7,6000','','',a.credCof,0,0,0,a.credCof,'0',credC,r2(Math.max(0,a.credCof-credC))]);M.push(['M505','01','50',r2(a.credCof/.076),'',r2(a.credCof/.076),r2(a.credCof/.076),'','',''])}
+  M.push(lr?['M600',totC,credC,0,devC,retC,0,recC,0,0,0,0,recC]:['M600',0,0,0,0,0,0,0,totC,retC,0,recC,recC]);
+  if(recC>0)M.push(['M605',lr?'08':'12',lr?'585601':'217201',recC]);
+  if(bcTot>0||totC>0)M.push(['M610',cod,recTot,bcTot,0,0,bcTot,aliqC,'','',totC,0,0,0,0,totC]);
   const blocos=[...L0,['A001','1'],['C001','1'],['D001','1'],...F,['I001','1'],...M,['P001','1'],['1001','1']];
   return fecharSped(blocos,{'0':'0990',A:'A990',C:'C990',D:'D990',F:'F990',I:'I990',M:'M990',P:'P990','1':'1990'},['0','A','C','D','F','I','M','P','1'])}
 /* ---------- EFD-Reinf (XML dos eventos, para assinar e transmitir) ---------- */
