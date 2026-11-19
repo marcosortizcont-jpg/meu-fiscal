@@ -144,7 +144,7 @@ td.r,th.r{text-align:right}
 .banner{border-radius:var(--r);padding:12px 16px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;border:1px solid}
 .banner.warn{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,transparent);color:var(--ink)}
 .banner.crit{background:var(--crit-soft);border-color:color-mix(in srgb,var(--crit) 35%,transparent)}
-.banner.info{background:var(--info-soft);border-color:color-mix(in srgb,var(--info) 30%,transparent)}
+.banner.info{background:var(--info-soft);border-color:color-mix(in srgb,var(--info) 30%,transparent)}.banner.ok{background:var(--ok-soft);border-color:color-mix(in srgb,var(--ok) 35%,transparent);color:var(--ink)}
 .alerts{display:flex;flex-direction:column}
 .alert{display:grid;grid-template-columns:4px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line)}
 .alert:last-child{border-bottom:0}
@@ -7325,7 +7325,7 @@ function ctbCentral(){const comp=UI.fsn.comp;const f=UI.fcent||(UI.fcent={q:'',r
      <select data-cent="st" style="width:auto">${ops.map(([v,t])=>`<option value="${v}" ${f.st===v?'selected':''}>${t}</option>`).join('')}</select>
      ${resps.length?`<select data-cent="resp" style="width:auto"><option value="">Todos os responsáveis</option>${resps.map(o=>`<option value="${o.id}" ${f.resp===o.id?'selected':''}>${esc(o.nome)}</option>`).join('')}</select>`:''}</div>
    ${L.length?`<div class="table-wrap"><table><thead><tr><th style="width:28px"><input type="checkbox" data-cent-todos ${L.length&&L.every(x=>sel.has(x.e.id))?'checked':''} aria-label="Selecionar todas"></th><th>Empresa</th><th>Regime</th><th class="r">Notas</th><th class="r">Lanç.</th><th class="r">Receita do mês</th><th class="r">DAS calculado</th><th>Guia</th><th>Situação</th><th></th></tr></thead><tbody>${L.map(({e,s})=>`<tr>
-     <td>${e.regime==='SN'?`<input type="checkbox" data-cent-sel="${e.id}" ${sel.has(e.id)?'checked':''} aria-label="Selecionar">`:''}</td>
+     <td>${['SN','LP','LR'].includes(e.regime)?`<input type="checkbox" data-cent-sel="${e.id}" ${sel.has(e.id)?'checked':''} aria-label="Selecionar">`:''}</td>
      <td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted mono">${fmtCNPJ(e.cnpj||'')}</div></td><td class="small">${e.regime==='MEI'?'MEI':e.regime==='SN'?'SN · Anexo '+esc(e.fatorR?'III/V':e.anexo||'—'):esc(nomeRegime(e))}</td>
      <td class="r num">${s.docs||''}</td><td class="r num">${s.lanc||''}</td><td class="r num">${s.fat!=null?brl(s.fat):'—'}</td><td class="r num">${s.calc!=null?brl(s.calc):e.regime==='MEI'?brl(DAS_MEI[e.meiAtividade||'servicos']):'—'}</td>
      <td class="small">${s.g?`${brl(s.g.valor)}<div class="muted">${pill(statusGuia(s.g).t,statusGuia(s.g).c)}</div>`:'—'}</td><td>${pill(s.t,s.c)}</td>
@@ -9404,6 +9404,92 @@ function conferePgdasHtml(e,comp){const f=snFat(e.id,comp);const D=f?.dasDeclara
 const aSimplesV44=aSimples;aSimples=function(){const h=aSimplesV44();const e=emp(UI.fsn.emp);if(!e||e.regime!=='SN')return h;const c=conferePgdasHtml(e,UI.fsn.comp);if(!c)return h;
   const k='<div class="panel"><div class="panel-head"><h2>Memória de cálculo</h2>';return h.includes(k)?h.replace(k,c+k):h+c};
 /* ==== v44 (fim) ==== */
+/* ==== v45: competência apurada SEM MOVIMENTO (Simples, Lucro Presumido e Real) e arquivos sem movimento ==== */
+const semMovDe=(e,comp)=>snFat(e.id,comp)?.semMov||null;
+function movimentoDe(e,comp){const m=[];const noMes=d=>String(d||'').slice(0,7)===comp;
+  const rec=snRec(e.id,comp).filter(r=>r.origem!=='semmov'&&(+r.valor||0)!==0).length;if(rec)m.push(rec+' receita(s)');
+  const ds=S.docsaida.filter(d=>d.empresaId===e.id&&noMes(d.competencia||d.emissao)&&d.situacao!=='cancelada').length;if(ds)m.push(ds+' nota(s) de saída');
+  const de=S.nfentrada.filter(n=>n.empresaId===e.id&&noMes(n.dhSaiEnt||n.emissao)&&n.situacao!=='cancelada').length;if(de)m.push(de+' nota(s) de entrada');
+  const lf=S.lancfiscais.filter(l=>l.empresaId===e.id&&!l.cancelado&&noMes(l.competencia||l.data)).length;if(lf)m.push(lf+' lançamento(s) fiscal(is)');
+  const f=snFat(e.id,comp);if(!rec&&f&&f.origem!=='semmov'&&(+f.receita||0)>0)m.push('receita de '+brl(f.receita));
+  const gs=S.guias.filter(g=>g.empresaId===e.id&&g.comp===comp&&(+g.valor||0)>0&&!['DAS-MEI','FGTS','DCTFWeb','INSS','IRPJ','CSLL'].includes(g.tipo)).length;if(gs)m.push(gs+' guia(s) com valor');
+  return m}
+const semMovAplica=e=>['SN','LP','LR'].includes(e.regime);
+const gerarApuracaoV45=gerarApuracao;gerarApuracao=function(e,comp,lote){const sm=semMovDe(e,comp);if(sm&&e.regime==='SN'&&!movimentoDe(e,comp).length)return {ok:false,msg:fmtComp(comp)+' está apurada sem movimento: DAS zero, sem guia. Desfaça o "sem movimento" para apurar com receita.'};return gerarApuracaoV45(e,comp,lote)};
+/* situação: verde "Apurada sem movimento" */
+const stCompV45=stComp;stComp=function(e,comp){const s=stCompV45(e,comp);const sm=semMovDe(e,comp);if(!sm||!semMovAplica(e))return s;
+  const mov=movimentoDe(e,comp);if(mov.length){s.k='desatualizada';s.t='Marcada sem movimento, mas tem lançamento';s.c='warn';s.semMovConflito=mov;return s}
+  s.semMov=sm;s.fat=0;const tri=irTriSemMov(e,comp);
+  if(tri){const gs=S.guias.filter(g=>g.empresaId===e.id&&g.comp===comp&&['IRPJ','CSLL'].includes(g.tipo));const tot=r2(gs.reduce((x,g)=>x+(+(g.valores?.principal??g.principal??g.valor)||0),0));s.calc=tri.total;
+    if(!gs.length){s.k='lancada';s.t='Sem movimento no mês · falta IRPJ/CSLL do trimestre';s.c='warn';return s}
+    if(Math.abs(tot-tri.total)>=.01){s.k='desatualizada';s.t='Sem movimento · IRPJ/CSLL divergem';s.c='warn';return s}
+    s.k=gs.every(g=>g.status==='paga')?'paga':'apurada';s.t='Apurada sem movimento · IRPJ/CSLL do trimestre';s.c='ok';return s}
+  s.k='apurada';s.t='Apurada sem movimento';s.c='ok';s.calc=0;return s};
+/* IRPJ/CSLL do trimestre que fecha num mês sem movimento (vem dos meses anteriores do trimestre) */
+function irTriSemMov(e,comp){if(!['LP','LR'].includes(e.regime))return null;if(e.regime==='LR'&&lpCfg(e).lrForma==='estimativa')return null;if(triDe(comp).fim!==comp)return null;
+  const i=apurarIrpjCsll(e,comp);const total=r2((+i.irDev||0)+(+i.csDev||0));return total>0?{total,ir:i.irDev,cs:i.csDev,T:i.T}:null}
+function semMovTexto(e,comp){const dez=comp.slice(5)==='12';const ie=contribICMS(e);
+  if(e.regime==='SN')return [`DAS de ${fmtComp(comp)} = R$ 0,00: não há guia. Transmita o PGDAS-D com receita zero (é obrigatório mesmo sem movimento).`,ie?'DeSTDA sem movimento: gere em Arquivos fiscais e transmita no SEDIF.':null,'O mês entra no RBT12 como receita zero.'].filter(Boolean);
+  const tri=irTriSemMov(e,comp);
+  return [`PIS, Cofins${ie?', ICMS':''} e ISS de ${fmtComp(comp)} zerados: nenhuma guia desses tributos.`,
+    tri?`IRPJ e CSLL do ${tri.T.nome}: ${brl(tri.total)} sobre as receitas dos outros meses do trimestre. Gere essas guias normalmente em "Gerar guias".`:triDe(comp).fim===comp?'IRPJ e CSLL do trimestre zerados.':null,
+    `EFD-Contribuições sem dados com o registro 0120 (motivo 04 · sem receitas nem créditos). ${dez?'Dezembro: entrega obrigatória, informando os meses sem movimento do ano.':'De janeiro a novembro a entrega é dispensada; se transmitir, o arquivo já sai certo. Em dezembro é obrigatória.'}`,
+    ie?'EFD ICMS/IPI sem movimento (blocos sem dados e apuração E110 zerada): obrigatória todo mês.':null,
+    'EFD-Reinf: fechamento R-2099 sem movimento (só é preciso no primeiro mês sem movimento; depois, quando voltar a ter).',
+    'DCTFWeb sem movimento: é gerada a partir da Reinf/eSocial sem movimento e transmitida no e-CAC (ou pelo Integra Contador, quando ativo).'].filter(Boolean)}
+function semMovForm(L,comp){const um=L.length===1;const e=L[0];
+  return mHead(um?'Apurar sem movimento · '+(e.fantasia||e.razao):'Apurar sem movimento · '+L.length+' empresas')+`<form data-form="sem-mov" data-ids="${L.map(x=>x.id).join(',')}"><div class="modal-body">
+   <p style="margin-top:0">Competência <b>${fmtComp(comp)}</b>${um?' · '+esc(nomeRegime(e)):''}. A competência fica <b>verde, "Apurada sem movimento"</b>, e os arquivos saem no formato sem movimento.</p>
+   ${um?`<ul class="small" style="padding-left:18px;margin:0 0 10px">${semMovTexto(e,comp).map(t=>`<li style="margin-bottom:4px">${esc(t)}</li>`).join('')}</ul>`
+     :`<div class="table-wrap" style="max-height:260px;overflow:auto"><table><tbody>${L.map(x=>`<tr><td><b>${esc(x.fantasia||x.razao)}</b></td><td class="small">${esc(nomeRegime(x))}</td></tr>`).join('')}</tbody></table></div>`}
+   <label class="f"><span>Observação (opcional)</span><input name="obs" maxlength="200" placeholder="ex.: cliente confirmou por WhatsApp que não teve venda"></label>
+   <p class="small muted">Se depois entrar uma nota ou lançamento no mês, a competência volta a pedir apuração e avisa a diferença.</p></div>
+  <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Confirmar sem movimento</button></div></form>`}
+function semMovValidar(e,comp){if(!semMovAplica(e))return 'MEI paga o DAS-MEI fixo mesmo sem movimento.';if(travaComp(e.id,comp))return 'competência fechada';const m=movimentoDe(e,comp);return m.length?'tem '+m.join(', '):''}
+ACT['sem-mov']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;if(!e)return;const p=semMovValidar(e,comp);if(p){toast(`Não dá para apurar ${fmtComp(comp)} sem movimento: ${p}.`,true);return}openModal(semMovForm([e],comp),true)};
+FORM['sem-mov']=fd=>{const comp=UI.fsn.comp;const ids=fd.get?String(document.querySelector('form[data-form="sem-mov"]')?.dataset.ids||'').split(','):[];const obs=String(fd.get('obs')||'').trim();
+  const ok=[],pul=[];ids.map(emp).filter(Boolean).forEach(e=>{const p=semMovValidar(e,comp);p?pul.push((e.fantasia||e.razao)+': '+p):ok.push(e)});if(!ok.length){toast('Nada marcado. '+pul.join(' · '),true);return}
+  mut(['faturamento','guias'],()=>ok.forEach(e=>{let f=snFat(e.id,comp);if(!f){f={id:uid(),empresaId:e.id,comp,receita:0,origem:'semmov'};S.faturamento.push(f)}else if(f.receita==null){f.receita=0;f.origemAntes=f.origem||null;f.origem='semmov'}
+      f.semMov={em:agora(),por:ME.nome||'',obs};S.guias=S.guias.filter(g=>!(g.empresaId===e.id&&g.comp===comp&&g.status==='rascunho'&&!(+g.valor>0)))}),
+    ['Apuração',`Apurou ${fmtComp(comp)} sem movimento: ${ok.map(e=>e.fantasia||e.razao).join(', ')}${obs?' · '+obs:''}`,ok.length===1?ok[0].razao:'']);
+  closeModal();toast(`${ok.length} empresa(s) apurada(s) sem movimento em ${fmtComp(comp)}.${pul.length?' Ficaram de fora: '+pul.join(' · '):''}`,!!pul.length)};
+ACT['sem-mov-desfazer']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;const f=snFat(e?.id,comp);if(!f?.semMov)return;
+  confirmar('Desfazer sem movimento',`<p>${fmtComp(comp)} volta a ficar pendente de apuração.</p>`,'Desfazer',()=>mut('faturamento',()=>{delete f.semMov;if(f.origem==='semmov'){if(f.origemAntes!==undefined&&f.origemAntes!==null){f.origem=f.origemAntes;f.receita=null}else S.faturamento=S.faturamento.filter(x=>x!==f)}delete f.origemAntes},['Apuração','Desfez "sem movimento" de '+fmtComp(comp),e.razao]))};
+/* botão no card da competência e faixa nas telas de apuração */
+const ctbCardCompV45=ctbCardComp;ctbCardComp=function(){let h=ctbCardCompV45();const F=UI.fsn||{};const e=emp(F.emp);if(!APP_FISCAL||!e||!semMovAplica(e)||!podeMod('guias','editar'))return h;const s=stComp(e,F.comp||compAtual());
+  if(s.semMov)h=h.replace(/<button class="btn sm primary" data-act="ctb-apurar">[^<]*<\/button>/,'');
+  const b=s.semMov?`<button class="btn sm ghost" data-act="sem-mov-desfazer" style="margin-top:6px;width:100%">Desfazer sem movimento</button>`:s.k==='vazia'?`<button class="btn sm" data-act="sem-mov" style="margin-top:6px;width:100%">Apurar sem movimento</button>`:'';
+  return b?h.replace(/<\/div>$/,b+'</div>'):h};
+const faixaSemMov=e=>{const comp=UI.fsn.comp;const s=stComp(e,comp);if(s.semMov)return `<div class="banner ok" style="display:block;margin-bottom:14px"><b>${fmtComp(comp)} apurada sem movimento</b> por ${esc(s.semMov.por||'')} em ${fmtData(String(s.semMov.em).slice(0,10))}${s.semMov.obs?' · '+esc(s.semMov.obs):''}. ${esc(semMovTexto(e,comp)[0])} <a href="#f-arq">Arquivos fiscais</a></div>`;
+  if(s.semMovConflito)return `<div class="banner warn" style="display:block;margin-bottom:14px">${fmtComp(comp)} foi marcada sem movimento, mas tem ${esc(s.semMovConflito.join(', '))}. Apure normalmente ou <button class="btn sm" data-act="sem-mov-desfazer">desfaça o "sem movimento"</button>.</div>`;
+  if(s.k==='vazia'&&podeMod('guias','editar'))return `<div class="banner info" style="display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:14px"><span>Nenhum movimento em ${fmtComp(comp)}. Se a empresa não teve receitas, compras nem serviços no mês:</span><button class="btn sm primary" data-act="sem-mov">Apurar sem movimento</button></div>`;return ''};
+const injFaixa=(h,e)=>{const f=faixaSemMov(e);if(!f)return h;return h.replace(/(<\/h1>[\s\S]*?<\/div>)/,'$1'+f)};
+const aSimplesV45=aSimples;aSimples=function(){const h=aSimplesV45();const e=emp(UI.fsn.emp);return e&&e.regime==='SN'?injFaixa(h,e):h};
+const fLucroV45=fLucro;fLucro=function(){const h=fLucroV45();const e=emp(UI.fsn.emp);return e&&['LP','LR'].includes(e.regime)?injFaixa(h,e):h};
+/* Central: seleção para todos os regimes e lote "sem movimento" */
+const ctbCentralV45=ctbCentral;ctbCentral=function(){let h=ctbCentralV45();const comp=UI.fsn.comp;const sel=UI.centSel||new Set();const vaz=[...sel].map(emp).filter(e=>e&&semMovAplica(e)&&stComp(e,comp).k==='vazia');
+  h=h.replace(/<td>(<\/td>\s*<td><b>)/g,'<td></td><td><b>');
+  if(podeMod('guias','editar'))h=h.replace('data-act="cent-lote"',`data-act="cent-lote"`).replace(/(<button class="btn primary" data-act="cent-lote"[^>]*>[^<]*<\/button>)/,`<button class="btn" data-act="cent-semmov" ${vaz.length?'':'disabled'} title="Marca as empresas selecionadas que não têm nenhum movimento">Sem movimento nas selecionadas (${vaz.length})</button> $1`);
+  return h};
+ACT['cent-semmov']=()=>{const comp=UI.fsn.comp;const L=[...(UI.centSel||[])].map(emp).filter(e=>e&&semMovAplica(e)&&stComp(e,comp).k==='vazia');if(!L.length){toast('Selecione empresas sem movimento lançado.',true);return}openModal(semMovForm(L,comp),true)};
+/* ---------- arquivos sem movimento ---------- */
+const linhasEfdContribV45=linhasEfdContrib;linhasEfdContrib=function(e,comp){let t=linhasEfdContribV45(e,comp);const sm=semMovDe(e,comp);
+  const semDados=!/\r\n\|(F100|F550|M100|M500)\|/.test('\r\n'+t)&&!/\r\n\|(A100|C100|C180|D100)\|/.test('\r\n'+t);if(!sm&&!semDados)return t;
+  const L=t.split('\r\n').filter(Boolean).map(l=>l.slice(1,-1).split('|'));const ano=comp.slice(0,4);
+  const meses=comp.slice(5)==='12'?Array.from({length:12},(_,i)=>ano+'-'+pad(i+1)).filter(c=>c===comp||semMovDe(e,c)):[comp];
+  const corpo=L.filter(l=>!/^(9|0990|A990|C990|D990|F990|I990|M990|P990|1990)/.test(l[0])&&l[0]!=='F010'&&l[0]!=='0120');
+  const out=[];corpo.forEach(l=>{if(l[0]==='F001')l[1]='1';out.push(l);if(l[0]==='0110')meses.forEach(c=>out.push(['0120',c.slice(5)+c.slice(0,4),'04']))});
+  return fecharSped(out,{'0':'0990',A:'A990',C:'C990',D:'D990',F:'F990',I:'I990',M:'M990',P:'P990','1':'1990'},['0','A','C','D','F','I','M','P','1'])};
+const eventosReinfV45=eventosReinf;eventosReinf=function(e,comp){const R=eventosReinfV45(e,comp);if(R.ev.length||!semMovDe(e,comp))return R;
+  const raiz=soDig(e.cnpj).slice(0,8);const c=cfg();
+  R.ev.push(['R-2099 · sem movimento',`<Reinf xmlns="http://www.reinf.esocial.gov.br/schemas/evt2099FechamentoPeriodo/v2_01_02"><evtFechaEvPer id="${idReinf(e.cnpj,1)}"><ideEvento><perApur>${comp}</perApur><tpAmb>1</tpAmb><procEmi>1</procEmi><verProc>MeuFiscal</verProc></ideEvento><ideContri><tpInsc>1</tpInsc><nrInsc>${raiz}</nrInsc></ideContri><ideRespInf><nmResp>${xe(c.responsavelTecnico||'')}</nmResp><cpfResp>${soDig(c.cpfContador||'')}</cpfResp><telefone>${soDig(c.telefone||'')}</telefone><email>${xe(c.email||'')}</email></ideRespInf><infoFech><evtServTm>N</evtServTm><evtServPr>N</evtServPr><evtAssDespRec>N</evtAssDespRec><evtAssDespRep>N</evtAssDespRep><evtComProd>N</evtComProd><evtCPRB>N</evtCPRB><evtAquis>N</evtAquis></infoFech></evtFechaEvPer></Reinf>`]);R.semMov=true;return R};
+const fArquivosV45=fArquivos;fArquivos=function(){let h=fArquivosV45();const e=emp(UI.fsn.emp);if(!e)return h;const comp=UI.fsn.comp;const sm=semMovDe(e,comp);if(!sm||movimentoDe(e,comp).length)return h;
+  const nota=`<div class="banner ok" style="display:block;margin-bottom:14px"><b>${fmtComp(comp)} apurada sem movimento.</b> Os arquivos abaixo saem no formato sem movimento:<ul class="small" style="margin:6px 0 0;padding-left:18px">${semMovTexto(e,comp).map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div>`;
+  h=h.replace(/(<div style="display:grid;grid-template-columns:repeat\(auto-fit,minmax\(300px,1fr\)\);gap:14px">)/,nota+'$1');
+  h=h.replace(/Baixar 1 evento\(s\)/,'Baixar R-2099 sem movimento');
+  if(e.regime==='SN')h=h.replace(/(<\/div>)$/,`<div class="panel" style="margin-top:14px"><h2 style="margin-top:0">PGDAS-D sem movimento</h2><p class="small muted">Transmita a declaração de ${fmtComp(comp)} no PGDAS-D informando receita zero em todas as atividades: não gera DAS. Quando o Integra Contador estiver ativo, a transmissão poderá sair daqui.</p></div>$1`);
+  return h};
+/* ==== v45 (fim) ==== */
 /* CRC nos arquivos SPED: campo de até 15 posições, só letras e números ("CRC/MS 016636/O-0" → "MS016636O0") */
 function crcSped(c){return String(c||'').toUpperCase().replace(/^\s*CRC/,'').replace(/[^A-Z0-9]/g,'').slice(0,15)}
 

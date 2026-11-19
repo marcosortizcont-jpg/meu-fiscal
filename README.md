@@ -18,6 +18,26 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### Competência sem movimento
+
+Para Simples, Lucro Presumido e Lucro Real. O MEI fica de fora porque paga o DAS-MEI fixo.
+
+**Onde marcar:** em **Apurar sem movimento**, que aparece no card da competência e numa faixa nas telas de apuração quando o mês não tem nada lançado. Na Central da competência também há o lote **"Sem movimento nas selecionadas"**.
+
+**Como funciona:**
+- O mês fica verde, "Apurada sem movimento". A marca fica em `faturamento.semMov` e o mês entra no RBT12 como receita zero.
+- Se entrar nota, receita ou lançamento depois, a competência volta a pedir apuração com aviso.
+- **Desfazer sem movimento** reverte a marca.
+
+**O que muda por regime:**
+- **Simples:** DAS zero, sem guia, e o botão de gerar DAS fica bloqueado. A tela de arquivos lembra de transmitir o PGDAS-D com receita zero.
+- **Lucro Presumido/Real:** PIS, Cofins, ICMS e ISS do mês ficam zerados. No mês que fecha o trimestre, o IRPJ/CSLL dos outros meses continua sendo apurado e gerado normalmente.
+
+**Arquivos gerados para o mês sem movimento:**
+- **EFD-Contribuições sem dados:** blocos com IND_MOV 1, M200/M600 zerados e registro 0120 com motivo 04. Em dezembro lista todos os meses sem movimento do ano.
+- **EFD ICMS/IPI:** blocos sem dados e E110 zerado.
+- **EFD-Reinf:** R-2099 com todos os indicadores "N".
+
 ### Declaração de faturamento (banco)
 
 Em Livros e relatórios → Faturamento → **Declaração de faturamento (banco)**, o botão **Montar declaração e PDF** abre o editor:
