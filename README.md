@@ -18,6 +18,27 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### Sistemas por colaborador (permissões)
+
+As permissões ganharam três módulos novos: `sis_fiscal` (Escrita Fiscal), `sis_contabil` (Contabilidade) e `sis_dp` (Folha de Pagamento).
+
+**Onde se configura:** no cadastro e na edição do colaborador, na seção **Sistemas liberados**. Cada sistema tem os níveis padrão da função, sem acesso, visualizar, editar ou excluir. A lista da equipe mostra os sistemas de cada pessoa.
+
+**Padrões por função:**
+
+| Função | Escrita Fiscal | Contabilidade | Folha (DP) |
+|---|---|---|---|
+| Analista Fiscal | completo | consulta | consulta |
+| Analista de DP | consulta | sem acesso | completo |
+| Analista Contábil | consulta | completo | consulta |
+| Legalização e Comercial | sem acesso | sem acesso | sem acesso |
+
+**Regras de acesso aos dados:**
+- O nível do sistema vale como mínimo para os dados que ele usa. A Escrita Fiscal eleva "Apuração, guias e notas" (`guias`), e a Folha eleva "Demandas, admissões e folha" (`dem`). A regra fica em `elevarPorSistema`, em `permissoes.js`.
+- Os dados da contabilidade (`planocontas`, `lanccontabeis`, `extratos`) passaram a ser governados por `sis_contabil`.
+
+**O que a pessoa vê:** cada sistema só abre para quem tem acesso. As abas do topo e os atalhos do painel mostram só os sistemas liberados. Quem não tem acesso vê o aviso e atalhos para os sistemas que pode abrir.
+
 ### Competência sem movimento
 
 Para Simples, Lucro Presumido e Lucro Real. O MEI fica de fora porque paga o DAS-MEI fixo.

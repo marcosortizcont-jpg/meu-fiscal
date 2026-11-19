@@ -2246,7 +2246,9 @@ document.addEventListener('click',ev=>{const a=ev.target.closest('.nav a, .mode-
 const MOD_DA_VIEW={'a-carteira':'carteira','a-obrig':'obrig','a-guias':'guias','a-docs':'docs','a-chat':'chat','a-fiscal':'fiscal','a-cert':'cert','a-hon':'hon','a-dem':'dem','a-equipe':'equipe','a-config':'config'};
 const NIVEL_NOME={nenhum:'Sem acesso',ver:'Visualizar',editar:'Visualizar e editar',excluir:'Visualizar, editar e excluir'};
 const NIVEL_RANK={nenhum:0,ver:1,editar:2,excluir:3};
-function podeMod(m,n){if(!ME.perm)return true;return (NIVEL_RANK[ME.perm[m]||'nenhum']||0)>=(NIVEL_RANK[n||'ver']||1)}
+function podeMod(m,n){if(!ME.perm)return true;if(ME.perm[m]===undefined&&/^sis_/.test(m))return true;if(m==='guias'&&typeof APP_CONTABIL!=='undefined'&&APP_CONTABIL&&ME.perm.sis_contabil!==undefined)m='sis_contabil';return (NIVEL_RANK[ME.perm[m]||'nenhum']||0)>=(NIVEL_RANK[n||'ver']||1)}
+function semSistema(o,mod){const ss=[['sis_fiscal','Escrita Fiscal',typeof URL_FISCAL!=='undefined'?URL_FISCAL+'/escrita':''],['sis_contabil','Contabilidade',typeof URL_CONTABIL!=='undefined'?URL_CONTABIL+'/contabil':''],['sis_dp','Folha de Pagamento',typeof URL_DP!=='undefined'?URL_DP+'/folha':'']].filter(([k])=>podeMod(k,'ver'));
+  return vazio(`Seu acesso não inclui ${o}. Peça ao administrador do escritório para liberar "${mod}" em Equipe e permissões.`,ss.map(([k,t,u])=>`<a class="btn" href="${esc(u)}">Abrir ${esc(t)}</a>`).join(' ')+` <a class="btn" href="${esc(typeof URL_PAINEL!=='undefined'?URL_PAINEL:'/')}">Ir para o painel</a>`)}
 const ehMaster=()=>!ME.perm||ME.papel==='master';
 function aplicarPermissoes(){for(let i=NAV_A.length-1;i>=0;i--){const m=MOD_DA_VIEW[NAV_A[i][0]];if(m&&!podeMod(m,'ver'))NAV_A.splice(i,1)}}
 // sem aviso de "só consulta": quem não pode editar simplesmente não vê os botões de edição
@@ -2635,7 +2637,7 @@ function aEquipe(){
   const d=apiDado('equipe-admin','/api/admin/usuarios');
   if(d.carregando)return cab+abas+`<div class="panel">${carregandoBox()}</div>`;if(d.erro)return cab+abas+`<div class="panel"><p class="small muted">${esc(d.erro)}</p></div>`;
   const eq=d.dados.usuarios.filter(u=>u.ambiente==='equipe');const ST={ativo:['Ativo','ok'],convidado:['Convite pendente','info'],bloqueado:['Desativado','crit']};
-  return cab+abas+`<div class="panel"><div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>Função</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead><tbody>${eq.map(u=>{const [st,cl]=ST[u.status]||['—',''];const ajust=Object.keys(u.permissoes||{}).length;return `<tr><td><b>${esc(u.nome)}</b>${u.id===ME.id?' <span class="tag">você</span>':''}<div class="sub">${esc(u.email)}</div></td><td>${esc(u.funcao||(u.papel==='master'?'Master':'—'))}${ajust?`<div class="sub">${ajust} permissão(ões) ajustada(s)</div>`:''}<div class="sub">Atendimento: ${u.deptosEfetivos===null||u.deptosEfetivos===undefined?'todos os setores':u.deptosEfetivos.length?esc(u.deptosEfetivos.join(', ')):'só o que for transferido'}</div></td><td>${pill(st,cl)}</td><td class="small">${u.ultimo_login_em?fmtDH(u.ultimo_login_em):'Nunca'}</td>
+  return cab+abas+`<div class="panel"><div class="table-wrap"><table><thead><tr><th>Colaborador</th><th>Função</th><th>Situação</th><th>Último acesso</th><th></th></tr></thead><tbody>${eq.map(u=>{const [st,cl]=ST[u.status]||['—',''];const ajust=Object.keys(u.permissoes||{}).length;return `<tr><td><b>${esc(u.nome)}</b>${u.id===ME.id?' <span class="tag">você</span>':''}<div class="sub">${esc(u.email)}</div></td><td>${esc(u.funcao||(u.papel==='master'?'Master':'—'))}${ajust?`<div class="sub">${ajust} permissão(ões) ajustada(s)</div>`:''}${u.efetivas?`<div class="sub">Sistemas: ${[['sis_fiscal','Fiscal'],['sis_contabil','Contábil'],['sis_dp','DP']].filter(([k])=>u.efetivas[k]&&u.efetivas[k]!=='nenhum').map(([k,t])=>t+(u.efetivas[k]==='ver'?' (consulta)':'')).join(', ')||'nenhum'}</div>`:''}<div class="sub">Atendimento: ${u.deptosEfetivos===null||u.deptosEfetivos===undefined?'todos os setores':u.deptosEfetivos.length?esc(u.deptosEfetivos.join(', ')):'só o que for transferido'}</div></td><td>${pill(st,cl)}</td><td class="small">${u.ultimo_login_em?fmtDH(u.ultimo_login_em):'Nunca'}</td>
    <td class="r">${ehMaster()?`<div class="actions" style="justify-content:flex-end"><button class="btn sm" data-act="colab-form" data-id="${u.id}">Editar</button><button class="btn sm" data-act="usuario-senha" data-id="${u.id}" data-nome="${esc(u.nome)}">Definir senha</button>${u.status==='convidado'?`<button class="btn sm" data-act="usuario-convite" data-id="${u.id}">Novo link</button>`:''}${u.id!==ME.id?(u.status==='bloqueado'?`<button class="btn sm" data-act="usuario-status" data-id="${u.id}" data-v="ativo">Reativar</button>`:`<button class="btn sm danger" data-act="usuario-status" data-id="${u.id}" data-v="bloqueado">Desativar</button>`):''}</div>`:''}</td></tr>`}).join('')}</tbody></table></div></div>
   <div class="panel"><h2>O que cada função pode fazer por padrão</h2><p class="sub">O master pode ajustar módulo a módulo para cada pessoa em "Editar".</p><div class="table-wrap"><table class="matriz-perm"><thead><tr><th>Módulo</th>${Object.keys(d.dados.funcoes).map(f=>`<th>${esc(f)}</th>`).join('')}</tr></thead><tbody>${d.dados.modulos.map(([m,r])=>`<tr><td>${esc(r)}</td>${Object.values(d.dados.funcoes).map(p=>`<td>${nivelPill(p[m])}</td>`).join('')}</tr>`).join('')}</tbody></table></div></div>`;
 }
@@ -2651,8 +2653,12 @@ ACT['colab-form']=el=>{
    <label class="f"><span>Função</span><select name="funcao" data-change="funcao-perm">${Object.keys(d.funcoes).map(f=>`<option ${f===func?'selected':''}>${esc(f)}</option>`).join('')}</select></label>
    ${u?'':campoSenha8('senha-colab','senha','Senha inicial (vazio = convite por link)',false)}
    ${camposDeptos(u,func)}
-  </div><div class="form-sec"><h3>Permissões por módulo</h3><p class="sub">"Padrão" segue a função escolhida. Ajuste só o que for diferente para esta pessoa.</p>
-  <div class="table-wrap"><table class="matriz-perm"><thead><tr><th>Módulo</th><th>Padrão da função</th><th>Para esta pessoa</th></tr></thead><tbody>${d.modulos.map(([m,r])=>`<tr><td>${esc(r)}</td><td data-padrao="${m}">${nivelPill(d.funcoes[func][m])}</td><td><select name="perm_${m}" style="width:auto"><option value="">Padrão</option>${['nenhum','ver','editar','excluir'].map(n=>`<option value="${n}" ${aj[m]===n?'selected':''}>${NIVEL_NOME[n]}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div></div>
+  </div><div class="form-sec"><h3>Sistemas liberados</h3><p class="sub">Quais sistemas esta pessoa abre (Escrita Fiscal, Contabilidade e Folha) e o que pode fazer em cada um. "Padrão" segue a função.</p>
+  <div class="sis-perm">${d.modulos.filter(([m])=>m.startsWith('sis_')).map(([m,r])=>{const info={sis_fiscal:['Escrita Fiscal','Notas, apurações (Simples, Lucro Presumido e Real), guias, arquivos SPED e livros.'],sis_contabil:['Contabilidade','Plano de contas, lançamentos, extratos e balancetes.'],sis_dp:['Folha de Pagamento (DP)','Funcionários, folha, encargos e guias de FGTS/INSS.']}[m]||[r,''];
+    return `<label class="sis-card"><b>${esc(info[0])}</b><span class="sub">${esc(info[1])}</span><span class="sub">Padrão da função: <span data-padrao="${m}">${nivelPill(d.funcoes[func][m])}</span></span><select name="perm_${m}"><option value="">Padrão da função</option>${['nenhum','ver','editar','excluir'].map(n=>`<option value="${n}" ${aj[m]===n?'selected':''}>${NIVEL_NOME[n]}</option>`).join('')}</select></label>`}).join('')}</div>
+  <p class="sub" style="margin-top:6px">Liberar a Escrita Fiscal também libera os dados de "Apuração, guias e notas" no mesmo nível, e a Folha os de "Demandas, admissões e folha".</p></div>
+  <div class="form-sec"><h3>Módulos do painel</h3><p class="sub">"Padrão" segue a função escolhida. Ajuste só o que for diferente para esta pessoa.</p>
+  <div class="table-wrap"><table class="matriz-perm"><thead><tr><th>Módulo</th><th>Padrão da função</th><th>Para esta pessoa</th></tr></thead><tbody>${d.modulos.filter(([m])=>!m.startsWith('sis_')).map(([m,r])=>`<tr><td>${esc(r)}</td><td data-padrao="${m}">${nivelPill(d.funcoes[func][m])}</td><td><select name="perm_${m}" style="width:auto"><option value="">Padrão</option>${['nenhum','ver','editar','excluir'].map(n=>`<option value="${n}" ${aj[m]===n?'selected':''}>${NIVEL_NOME[n]}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table></div></div></div>
   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">${u?'Salvar':'Cadastrar colaborador'}</button></div></form>`,true);
 };
 document.addEventListener('change',ev=>{if(ev.target.dataset.change!=='funcao-perm')return;const d=APIC['equipe-admin']?.dados;if(!d)return;const f=d.funcoes[ev.target.value];document.querySelectorAll('[data-padrao]').forEach(td=>{td.innerHTML=nivelPill(f[td.dataset.padrao])})});
@@ -7010,7 +7016,7 @@ const dpColabV28=dpColab;dpColab=function(e){const orig=S.funcionarios;S.funcion
 
 /* ---------- telas ---------- */
 function dpConteudo(){
-  if(!podeMod('dem','ver'))return vazio('Seu acesso não inclui o departamento pessoal. Peça ao administrador para liberar o módulo "Demandas, admissões e folha".');
+  if(!podeMod('sis_dp','ver')||!podeMod('dem','ver'))return semSistema('a Folha de Pagamento','Sistema · Folha de Pagamento (DP)');
   const e=emp(UI.fsn?.emp);const comp=UI.fsn?.comp||compAtual();
   if(!e)return vazio('Nenhuma empresa ativa na carteira. As empresas são cadastradas no painel contábil.',`<a class="btn primary" href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Abrir o painel</a>`);
   return ({'d-colab':dpColabs,'d-adm':dpAdms,'d-mov':dpMovs,'d-folha':dpFolhaPg,'d-rel':dpRel}[UI.view]||dpColabs)(e,comp)}
@@ -7514,7 +7520,7 @@ ACT['cb-integrar']=()=>{const e=emp(UI.fsn.emp),comp=UI.fsn.comp;if(!e)return;co
 
 /* ---------- telas ---------- */
 const cbEd=()=>podeMod('guias','editar');
-function cbConteudo(){if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui a contabilidade. Peça ao administrador para liberar o módulo "Apuração, guias e notas".');
+function cbConteudo(){if(!podeMod('sis_contabil','ver'))return semSistema('a Contabilidade','Sistema · Contabilidade');
   const e=emp(UI.fsn?.emp);if(!e)return vazio('Nenhuma empresa ativa na carteira. As empresas são cadastradas no painel contábil.',`<a class="btn primary" href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Abrir o painel</a>`);
   return ({'c-plano':cbPlano,'c-lanc':cbLanc,'c-banco':cbBanco,'c-balancete':cbBalancete,'c-dre':cbDre,'c-balanco':cbBalanco,'c-fluxo':cbFluxo,'c-razao':cbRazao}[UI.view]||cbLanc)(e)}
 function cbCardStatus(e,comp){const s=cbStatus(e,comp);return {pill:pill(s.t,s.c),acao:cbEd()&&s.k!=='vazia'?`<button class="btn sm primary" data-act="cb-integrar">${s.k==='ok'?'Integrar de novo':'Gerar integração'}</button>`:''}}
@@ -9490,6 +9496,8 @@ const fArquivosV45=fArquivos;fArquivos=function(){let h=fArquivosV45();const e=e
   if(e.regime==='SN')h=h.replace(/(<\/div>)$/,`<div class="panel" style="margin-top:14px"><h2 style="margin-top:0">PGDAS-D sem movimento</h2><p class="small muted">Transmita a declaração de ${fmtComp(comp)} no PGDAS-D informando receita zero em todas as atividades: não gera DAS. Quando o Integra Contador estiver ativo, a transmissão poderá sair daqui.</p></div>$1`);
   return h};
 /* ==== v45 (fim) ==== */
+/* cartões de sistemas no cadastro da equipe */
+(()=>{const st=document.createElement('style');st.textContent=`.sis-perm{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}.sis-card{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line,#e2e8f0);border-radius:10px;padding:12px;background:var(--bg2,transparent)}.sis-card b{font-size:14px}.sis-card select{margin-top:6px}`;document.head.appendChild(st)})();
 /* CRC nos arquivos SPED: campo de até 15 posições, só letras e números ("CRC/MS 016636/O-0" → "MS016636O0") */
 function crcSped(c){return String(c||'').toUpperCase().replace(/^\s*CRC/,'').replace(/[^A-Z0-9]/g,'').slice(0,15)}
 
@@ -9506,8 +9514,9 @@ if(!APP_SIS){
   /* painel: Apuração do Simples, notas de saída e notas de entrada passam a existir só no sistema contábil */
   for(const v of ['a-simples','a-nfe']){const i=NAV_A.findIndex(n=>n[0]===v);if(i>=0)NAV_A.splice(i,1)}
   const sidebarV27=sidebar;
-  sidebar=function(){const h=sidebarV27();if(UI.modo!=='painel'||!podeMod('guias','ver'))return h;
-    return h.replace('</nav>',`<a href="${esc(URL_FISCAL)}" target="_blank" rel="noopener" class="nav-ext">${svg('receipt')}<span class="lbl">Sistema fiscal</span><span class="ext" aria-hidden="true">↗</span></a><a href="${esc(URL_CONTABIL)}" target="_blank" rel="noopener" class="nav-ext nav-ext2">${svg('calc')}<span class="lbl">Sistema contábil</span><span class="ext" aria-hidden="true">↗</span></a>${podeMod('dem','ver')?`<a href="${esc(URL_DP)}" target="_blank" rel="noopener" class="nav-ext nav-ext2">${svg('users')}<span class="lbl">Departamento pessoal</span><span class="ext" aria-hidden="true">↗</span></a>`:''}</nav>`)};
+  sidebar=function(){const h=sidebarV27();if(UI.modo!=='painel'||!(podeMod('sis_fiscal','ver')||podeMod('sis_contabil','ver')||podeMod('sis_dp','ver')))return h;
+    const L=[podeMod('sis_fiscal','ver')?['receipt','Sistema fiscal',URL_FISCAL]:null,podeMod('sis_contabil','ver')?['calc','Sistema contábil',URL_CONTABIL]:null].filter(Boolean);
+    return h.replace('</nav>',`${L.map(([i,t,u],k)=>`<a href="${esc(u)}" target="_blank" rel="noopener" class="nav-ext${k?' nav-ext2':''}">${svg(i)}<span class="lbl">${t}</span><span class="ext" aria-hidden="true">↗</span></a>`).join('')}${podeMod('sis_dp','ver')?`<a href="${esc(URL_DP)}" target="_blank" rel="noopener" class="nav-ext${L.length?' nav-ext2':''}">${svg('users')}<span class="lbl">Departamento pessoal</span><span class="ext" aria-hidden="true">↗</span></a>`:''}</nav>`)};
   (()=>{const st=document.createElement('style');st.textContent=`.nav-ext{margin-top:10px;border-top:1px solid rgba(148,163,184,.16);padding-top:12px!important}.nav-ext2{margin-top:0;border-top:0;padding-top:9px!important}.nav-ext .ext{margin-left:auto;opacity:.6;font-size:.85em}`;document.head.appendChild(st)})();
 }
 if(APP_SIS){
@@ -9537,7 +9546,7 @@ if(APP_SIS){
 
   function ctbTopo(){return `<header class="ctb-top">
     <a class="ctb-marca" href="#${V_PADRAO}"><span class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></span><b><span class="wm-meu">meu</span>fiscal</b><span class="ctb-sis">${APP_DP?'DP':APP_CONTABIL?'Contábil':'Fiscal'}</span></a>
-    <nav class="ctb-mods" aria-label="Módulos">${MODS.map(([k,t,url])=>k===MOD_ATIVO?`<a href="#${V_PADRAO}" class="on" aria-current="true">${t}</a>`:url?`<a href="${esc(url)}" title="Abre o sistema de ${esc(t)}">${t}</a>`:`<span class="off" title="Em desenvolvimento">${t}<small>em breve</small></span>`).join('')}</nav>
+    <nav class="ctb-mods" aria-label="Módulos">${MODS.filter(([k])=>k===MOD_ATIVO||!{fiscal:'sis_fiscal',contabil:'sis_contabil',folha:'sis_dp'}[k]||podeMod({fiscal:'sis_fiscal',contabil:'sis_contabil',folha:'sis_dp'}[k],'ver')).map(([k,t,url])=>k===MOD_ATIVO?`<a href="#${V_PADRAO}" class="on" aria-current="true">${t}</a>`:url?`<a href="${esc(url)}" title="Abre o sistema de ${esc(t)}">${t}</a>`:`<span class="off" title="Em desenvolvimento">${t}<small>em breve</small></span>`).join('')}</nav>
     <div class="ctb-usr"><a href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Painel ↗</a><a href="#a-perfil">${esc(ME.nome||'Meu perfil')}</a><a href="#" data-act="mf-sair">Sair</a></div></header>`}
   function ctbContexto(){const F=ctbEstado();const e=emp(F.emp);const meses=[];for(let i=-1;i<36;i++)meses.push(addMes(compAtual(),-i));
     const per=COM_PERIODO.includes(UI.view);
@@ -9581,8 +9590,8 @@ if(APP_SIS){
     if(!F_VIEWS.includes(UI.view))UI.view=V_PADRAO;
     if(APP_DP)return dpConteudo();
     if(APP_CONTABIL)return cbConteudo();
-    if(UI.view==='f-central')return podeMod('guias','ver')?ctbCentral():vazio('Seu acesso não inclui a escrita fiscal.');
-    if(!podeMod('guias','ver'))return vazio('Seu acesso não inclui a escrita fiscal. Peça ao administrador do escritório para liberar o módulo "Apuração, guias e notas".');
+    if(!podeMod('sis_fiscal','ver')||!podeMod('guias','ver'))return semSistema('a Escrita Fiscal','Sistema · Escrita Fiscal');
+    if(UI.view==='f-central')return ctbCentral();
     const F=ctbEstado();const e=emp(F.emp);
     if(!e)return vazio('Nenhuma empresa ativa na carteira. As empresas são cadastradas no painel contábil.',`<a class="btn primary" href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Abrir o painel</a>`);
     const simples=e.regime==='SN'||e.regime==='MEI';

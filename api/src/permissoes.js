@@ -5,6 +5,9 @@
 // e ainda ajustar pessoa a pessoa (usuarios.permissoes).
 
 export const MODULOS = [
+  ['sis_fiscal', 'Sistema · Escrita Fiscal'],
+  ['sis_contabil', 'Sistema · Contabilidade'],
+  ['sis_dp', 'Sistema · Folha de Pagamento (DP)'],
   ['carteira', 'Carteira de clientes'],
   ['obrig', 'Obrigações, catálogo e regimes'],
   ['guias', 'Apuração, guias e notas'],
@@ -24,11 +27,11 @@ const RANK = { nenhum: 0, ver: 1, editar: 2, excluir: 3 };
 
 export const FUNCOES = {
   'Master': Object.fromEntries(MODULOS.map(([m]) => [m, 'excluir'])),
-  'Analista Fiscal': { carteira: 'ver', obrig: 'editar', guias: 'editar', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
-  'Analista de DP': { carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
-  'Analista Contábil': { carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
-  'Legalização': { carteira: 'editar', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'editar', cofre: 'editar', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
-  'Comercial': { carteira: 'ver', obrig: 'nenhum', guias: 'nenhum', docs: 'nenhum', chat: 'editar', fiscal: 'nenhum', cert: 'nenhum', cofre: 'nenhum', dem: 'ver', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'excluir' },
+  'Analista Fiscal': { sis_fiscal: 'excluir', sis_contabil: 'ver', sis_dp: 'ver', carteira: 'ver', obrig: 'editar', guias: 'editar', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Analista de DP': { sis_fiscal: 'ver', sis_contabil: 'nenhum', sis_dp: 'excluir', carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Analista Contábil': { sis_fiscal: 'ver', sis_contabil: 'excluir', sis_dp: 'ver', carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Legalização': { sis_fiscal: 'nenhum', sis_contabil: 'nenhum', sis_dp: 'nenhum', carteira: 'editar', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'editar', cofre: 'editar', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Comercial': { sis_fiscal: 'nenhum', sis_contabil: 'nenhum', sis_dp: 'nenhum', carteira: 'ver', obrig: 'nenhum', guias: 'nenhum', docs: 'nenhum', chat: 'editar', fiscal: 'nenhum', cert: 'nenhum', cofre: 'nenhum', dem: 'ver', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'excluir' },
 };
 export const FUNCAO_PADRAO = 'Analista Fiscal';
 
@@ -36,7 +39,7 @@ export const FUNCAO_PADRAO = 'Analista Fiscal';
 export const MODULO_DA_COLECAO = {
   empresas: 'carteira', leads: 'comercial',
   catalogo: 'obrig', regimes: 'obrig', obrigacoes: 'obrig', fechamentos: 'obrig',
-  guias: 'guias', faturamento: 'guias', despesas: 'guias', lancamentos: 'guias', parceiros: 'guias', notas: 'guias', tomadores: 'guias', servicos: 'guias', nfentrada: 'guias', receitas: 'guias', docsaida: 'guias', lancfiscais: 'guias', planocontas: 'guias', lanccontabeis: 'guias', extratos: 'guias',
+  guias: 'guias', faturamento: 'guias', despesas: 'guias', lancamentos: 'guias', parceiros: 'guias', notas: 'guias', tomadores: 'guias', servicos: 'guias', nfentrada: 'guias', receitas: 'guias', docsaida: 'guias', lancfiscais: 'guias', planocontas: 'sis_contabil', lanccontabeis: 'sis_contabil', extratos: 'sis_contabil',
   documentos: 'docs', checklist: 'docs', docsinternos: 'docs',
   conversas: 'chat', contatos: 'chat',
   cnds: 'fiscal', ecac: 'fiscal',
@@ -65,8 +68,15 @@ export function permissoesEfetivas(u, funcoesEsc) {
   const base = todas[u.funcao] || todas[FUNCAO_PADRAO];
   const ajustes = u.permissoes && typeof u.permissoes === 'object' ? u.permissoes : {};
   const out = {};
-  for (const [m] of MODULOS) out[m] = NIVEIS.includes(ajustes[m]) ? ajustes[m] : base[m];
-  return out;
+  for (const [m] of MODULOS) out[m] = NIVEIS.includes(ajustes[m]) ? ajustes[m] : (base[m] || 'nenhum');
+  return elevarPorSistema(out);
+}
+// Quem tem um sistema liberado trabalha com os dados dele: a escrita fiscal usa os dados de "Apuração, guias e notas"
+// e o DP os de "Demandas, admissões e folha". O nível do sistema vale como mínimo para esses módulos.
+const ELEVA = { sis_fiscal: 'guias', sis_dp: 'dem' };
+export function elevarPorSistema(p) {
+  for (const [s, m] of Object.entries(ELEVA)) if ((RANK[p[s]] || 0) > (RANK[p[m]] || 0)) p[m] = p[s];
+  return p;
 }
 export const pode = (u, modulo, nivel = 'ver') => {
   if (u.ambiente !== 'equipe') return false;
