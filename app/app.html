@@ -9498,6 +9498,125 @@ const fArquivosV45=fArquivos;fArquivos=function(){let h=fArquivosV45();const e=e
 /* ==== v45 (fim) ==== */
 /* cartões de sistemas no cadastro da equipe */
 (()=>{const st=document.createElement('style');st.textContent=`.sis-perm{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}.sis-card{display:flex;flex-direction:column;gap:4px;border:1px solid var(--line,#e2e8f0);border-radius:10px;padding:12px;background:var(--bg2,transparent)}.sis-card b{font-size:14px}.sis-card select{margin-top:6px}`;document.head.appendChild(st)})();
+/* ==== v46: DP · gerador de pró-labore e holerite avulso (cálculo de INSS, IRRF e FGTS) com histórico ==== */
+if(!COLS.includes('holerites'))COLS.push('holerites');if(!Array.isArray(S.holerites))S.holerites=[];
+NAV_DP.forEach(g=>{if(g[0]==='Folha'&&!g[1].some(x=>x[0]==='d-avulso'))g[1].push(['d-avulso','Pró-labore e holerite avulso','receipt','Preencha pessoa, empresa, valor e competência: calcula INSS, IRRF e FGTS, gera o PDF e guarda no histórico'])});
+const MES_NOME=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
+const compHol=c=>MES_NOME[+c.slice(5,7)-1]+'-'+c.slice(2,4);
+const MOV_AV=[['he50','Horas extras 50% (h)'],['he100','Horas extras 100% (h)'],['faltas','Faltas (dias)'],['comissoes','Comissões (R$)'],['gratif','Gratificação (R$)'],['outrosProv','Outros proventos (R$)'],['adiant','Adiantamento (R$)'],['outrosDesc','Outros descontos (R$)']];
+/* cálculo: reaproveita o motor da folha com um colaborador e um lançamento temporários */
+function calcAvulso(H){const e=emp(H.empresaId);if(!e)return null;const ref=Math.min(30,Math.max(1,+H.dias||30));
+  const f={id:'avulso-calc',nome:H.nome,cpf:soDig(H.cpf||''),cargo:H.cargo||'',cbo:H.cbo||'',matricula:H.codigo||'',vinculo:H.tipo==='prolabore'?'socio':'empregado',salario:+H.valor||0,depIR:+H.depIR||0,depSF:H.tipo==='holerite'?(+H.depSF||0):0,jornada:44,
+    admissao:ref<30?H.comp+'-'+pad(31-ref):addMes(H.comp,-1)+'-01'};
+  const m={empresaId:e.id,comp:H.comp,funcId:f.id,...Object.fromEntries(MOV_AV.map(([k])=>[k,+H.mov?.[k]||0])),outrosProvDesc:H.mov?.outrosProvDesc||'',outrosDescDesc:H.mov?.outrosDescDesc||''};
+  if(H.tipo==='prolabore'){['he50','he100','faltas','comissoes'].forEach(k=>m[k]=0)}
+  S.dpmov.push(m);let x;try{x=dpCalcFunc(e,f,H.comp)}finally{S.dpmov=S.dpmov.filter(z=>z!==m)}
+  x.admissao=H.admissao||'';x.aliqIr=x.irrf>0?(x.irrfInfo?.aliq||0):0;if(!(x.irrf>0&&x.irrfInfo?.simplificado))x.baseIrrf=r2(Math.max(0,(x.trib||0)-(x.inss||0)-(+H.depIR||0)*DP26.dep));x.cpp=H.tipo==='prolabore'?r2(Math.min(+H.valor||0,1e12)*.20):0;return x}
+/* ---------- formulário ---------- */
+function holForm(H){const e=emp(H.empresaId)||emp(UI.fsn.emp);const es=S.empresas.filter(x=>x.status!=='inativo').sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
+  const pess=H.tipo==='prolabore'?(e?.socios||[]).map((s,i)=>['s'+i,s.nome+(s.administrador?' (adm.)':'')]):S.funcionarios.filter(f=>f.empresaId===e?.id&&!f.desligado).map(f=>['f'+f.id,f.nome+(f.cargo?' · '+f.cargo:'')]);
+  return mHead(H.id?'Editar '+(H.tipo==='prolabore'?'pró-labore':'holerite'):'Pró-labore / holerite avulso')+`<form data-form="hol" data-id="${H.id||''}"><div class="modal-body">
+   <div class="seg" role="radiogroup" style="display:flex;gap:6px;margin-bottom:12px">${[['prolabore','Pró-labore (sócio)'],['holerite','Holerite (funcionário)']].map(([k,t])=>`<label class="btn sm ${H.tipo===k?'primary':''}"><input type="radio" name="tipo" value="${k}" ${H.tipo===k?'checked':''} hidden data-hol-tipo>${t}</label>`).join('')}</div>
+   <div class="grid-f"><label class="f" style="grid-column:span 2"><span>Empresa (cliente) *</span><select name="empresaId" data-hol-emp>${es.map(x=>`<option value="${x.id}" ${x.id===e?.id?'selected':''}>${esc(x.fantasia||x.razao)} · ${fmtCNPJ(x.cnpj||'')}</option>`).join('')}</select></label>
+    <label class="f"><span>Competência *</span><input type="month" name="comp" value="${H.comp}" required></label>
+    <label class="f" style="grid-column:span 2"><span>${H.tipo==='prolabore'?'Sócio':'Funcionário'} cadastrado</span><select data-hol-pessoa><option value="">— digitar os dados abaixo —</option>${pess.map(([k,t])=>`<option value="${k}" ${H.pessoaRef===k?'selected':''}>${esc(t)}</option>`).join('')}</select></label>
+    <label class="f"><span>${H.tipo==='prolabore'?'Valor do pró-labore':'Salário base'} (R$) *</span><input name="valor" inputmode="decimal" value="${H.valor?fmtValIn(H.valor):''}" required data-hol-calc></label>
+    <label class="f" style="grid-column:span 2"><span>Nome *</span><input name="nome" value="${esc(H.nome||'')}" required data-hol-calc></label>
+    <label class="f"><span>CPF</span><input name="cpf" inputmode="numeric" maxlength="14" value="${H.cpf?fmtCPF(H.cpf):''}"></label>
+    <label class="f" style="grid-column:span 2"><span>Cargo</span><input name="cargo" value="${esc(H.cargo||(H.tipo==='prolabore'?'Diretor(a) administrativo(a)':''))}"></label>
+    <label class="f"><span>CBO</span><input name="cbo" value="${esc(H.cbo||(H.tipo==='prolabore'?'123105':''))}" maxlength="7"></label>
+    <label class="f"><span>Admissão / entrada</span><input type="date" name="admissao" value="${H.admissao||''}"></label>
+    <label class="f"><span>Código</span><input name="codigo" value="${esc(H.codigo||'1')}" maxlength="8"></label>
+    <label class="f"><span>Referência (dias)</span><input type="number" name="dias" min="1" max="30" value="${H.dias||30}" data-hol-calc></label>
+    <label class="f"><span>Dependentes p/ IRRF</span><input type="number" name="depIR" min="0" max="20" value="${H.depIR||0}" data-hol-calc></label>
+    <label class="f"><span>Centro de custo</span><input name="cc" value="${esc(H.cc||'01 GERAL')}"></label>
+    <label class="f"><span>Departamento</span><input name="depto" value="${esc(H.depto||'1')}"></label>
+    <label class="f"><span>Filial</span><input name="filial" value="${esc(H.filial||'1')}"></label></div>
+   <details style="margin-top:10px" ${MOV_AV.some(([k])=>+H.mov?.[k])?'open':''}><summary class="small" style="cursor:pointer;font-weight:600">Outros proventos e descontos (opcional)</summary>
+    <div class="grid-f" style="margin-top:8px">${MOV_AV.filter(([k])=>H.tipo==='holerite'||!['he50','he100','faltas','comissoes'].includes(k)).map(([k,t])=>`<label class="f"><span>${t}</span><input name="mov_${k}" inputmode="decimal" value="${+H.mov?.[k]?fmtValIn(H.mov[k]).replace(/,00$/,''):''}" data-hol-calc></label>`).join('')}
+     <label class="f"><span>Descrição de outros proventos</span><input name="mov_outrosProvDesc" value="${esc(H.mov?.outrosProvDesc||'')}"></label><label class="f"><span>Descrição de outros descontos</span><input name="mov_outrosDescDesc" value="${esc(H.mov?.outrosDescDesc||'')}"></label></div></details>
+   <div id="hol-previa" style="margin-top:12px">${holPrevia(H)}</div>
+   <label class="f" style="margin-top:10px"><span>Descrição no histórico</span><input name="desc" maxlength="120" value="${esc(H.desc||'')}" placeholder="vazio = ${H.tipo==='prolabore'?'Pró-labore':'Holerite'} ${fmtComp(H.comp)} · nome"></label></div>
+  <div class="modal-foot" style="flex-wrap:wrap;gap:8px"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button type="button" class="btn" data-act="hol-gerar" data-salvar="0">${svg('download')}Só gerar PDF</button><button type="button" class="btn primary" data-act="hol-gerar" data-salvar="1">${svg('download')}${H.id?'Salvar e gerar PDF':'Salvar no histórico e gerar PDF'}</button></div></form>`}
+function holPrevia(H){if(!(+H.valor>0)||!H.empresaId)return '<p class="small muted">Informe o valor para ver o cálculo.</p>';const x=calcAvulso(H);if(!x)return '';
+  return `<div class="table-wrap"><table><thead><tr><th>Cód.</th><th>Descrição</th><th class="r">Ref.</th><th class="r">Vencimentos</th><th class="r">Descontos</th></tr></thead><tbody>${x.rubricas.map(r=>`<tr><td>${r.cod}</td><td>${esc(r.desc)}</td><td class="r small">${esc(r.ref||'')}</td><td class="r num">${r.tipo==='P'?brl(r.valor):''}</td><td class="r num">${r.tipo==='D'?brl(r.valor):''}</td></tr>`).join('')}
+   <tr><td></td><td><b>Totais</b></td><td></td><td class="r num"><b>${brl(x.proventos)}</b></td><td class="r num"><b>${brl(x.descontos)}</b></td></tr><tr><td></td><td colspan="3"><b>Valor líquido</b></td><td class="r num"><b>${brl(x.liquido)}</b></td></tr></tbody></table></div>
+   <p class="small muted" style="margin:6px 0 0">Base INSS ${brl(x.baseInss)} · Base IRRF ${brl(x.baseIrrf)} (faixa ${pct(x.aliqIr)}${x.irrf>0&&x.irrfInfo?.simplificado?', desconto simplificado':''}) · FGTS ${brl(x.fgts)}${H.tipo==='prolabore'?` · Encargo da empresa: CPP 20% = ${brl(x.cpp)} (não sai no recibo; no Simples só nos Anexos IV)`:''}. Tabelas de ${DP26.ano}.</p>`}
+function holLer(){const f=document.querySelector('form[data-form="hol"]');if(!f)return null;const g=n=>f.querySelector(`[name="${n}"]`)?.value??'';const H=UI.holEd||{};
+  Object.assign(H,{tipo:f.querySelector('[name=tipo]:checked')?.value||H.tipo,empresaId:g('empresaId'),comp:g('comp')||H.comp,valor:valBR(g('valor')),nome:g('nome').trim(),cpf:soDig(g('cpf')),cargo:g('cargo').trim(),cbo:g('cbo').trim(),admissao:g('admissao'),codigo:g('codigo').trim(),
+    dias:+g('dias')||30,depIR:+g('depIR')||0,cc:g('cc').trim(),depto:g('depto').trim(),filial:g('filial').trim(),desc:g('desc').trim(),
+    mov:{...Object.fromEntries(MOV_AV.map(([k])=>[k,valBR(g('mov_'+k))])),outrosProvDesc:g('mov_outrosProvDesc').trim(),outrosDescDesc:g('mov_outrosDescDesc').trim()}});return UI.holEd=H}
+function holNovo(base){const e=emp(UI.fsn.emp);return {tipo:'prolabore',empresaId:e?.id||'',comp:UI.fsn.comp||addMes(compAtual(),-1),dias:30,depIR:0,cc:'01 GERAL',depto:'1',filial:'1',codigo:'1',mov:{},...(base||{})}}
+function holAbrir(H){UI.holEd=H;openModal(holForm(H),true);if(H.tipo==='prolabore'&&!H.nome&&!H.id){const s=socioAdm(emp(H.empresaId)||{});if(s){const i=(emp(H.empresaId).socios||[]).indexOf(s);const sel=document.querySelector('[data-hol-pessoa]');if(sel){sel.value='s'+i;sel.dispatchEvent(new Event('change',{bubbles:true}))}}}}
+ACT['hol-novo']=()=>holAbrir(holNovo());
+document.addEventListener('change',ev=>{const t=ev.target;if(!t.closest||!t.closest('form[data-form="hol"]'))return;
+  if(t.matches('[data-hol-tipo],[data-hol-emp]')){const H=holLer();H.pessoaRef='';if(t.matches('[data-hol-tipo]')){H.nome='';H.cpf='';H.cargo='';H.cbo='';H.admissao=''}holAbrir(H);return}
+  if(t.matches('[data-hol-pessoa]')){const H=holLer();const v=t.value;H.pessoaRef=v;const e=emp(H.empresaId);
+    if(v.startsWith('s')){const s=(e?.socios||[])[+v.slice(1)];if(s)Object.assign(H,{nome:s.nome||'',cpf:soDig(s.cpf||''),admissao:s.entrada||s.desde||H.admissao||'',valor:H.valor||+s.proLabore||+s.prolabore||0})}
+    else if(v.startsWith('f')){const f=S.funcionarios.find(x=>x.id===v.slice(1));if(f)Object.assign(H,{nome:f.nome,cpf:soDig(f.cpf||''),cargo:f.cargo||'',cbo:f.cbo||'',admissao:f.admissao||'',codigo:f.matricula||H.codigo,valor:+f.salario||H.valor,depIR:+f.depIR||0,depSF:+f.depSF||0,funcId:f.id})}
+    holAbrir(H);return}
+  if(t.matches('[data-hol-calc],[name=comp]')){const H=holLer();const p=document.getElementById('hol-previa');if(p)p.innerHTML=holPrevia(H)}});
+document.addEventListener('input',ev=>{const t=ev.target;if(!t.matches||!t.matches('form[data-form="hol"] [data-hol-calc]'))return;clearTimeout(UI._holT);UI._holT=setTimeout(()=>{const H=holLer();const p=document.getElementById('hol-previa');if(p)p.innerHTML=holPrevia(H)},300)});
+FORM['hol']=()=>holGerar(false);ACT['hol-gerar']=el=>holGerar(el.dataset.salvar==='1');
+function holGerar(salvar){const H=holLer();if(!H)return;const e=emp(H.empresaId);if(!e){toast('Escolha a empresa.',true);return}if(!H.nome){toast('Informe o nome.',true);return}if(!(H.valor>0)){toast('Informe o valor.',true);return}
+  if(H.cpf&&!cpfValido(H.cpf)){toast('CPF inválido.',true);return}const x=calcAvulso(H);
+  if(salvar){if(!podeMod('dem','editar')){toast('Seu acesso não permite salvar.',true);return}
+    const reg={empresaId:e.id,comp:H.comp,tipo:H.tipo,nome:H.nome,cpf:H.cpf,cargo:H.cargo,cbo:H.cbo,admissao:H.admissao,codigo:H.codigo,dias:H.dias,depIR:H.depIR,depSF:H.depSF||0,cc:H.cc,depto:H.depto,filial:H.filial,valor:H.valor,mov:H.mov,pessoaRef:H.pessoaRef||'',funcId:H.funcId||'',
+      desc:H.desc||`${H.tipo==='prolabore'?'Pró-labore':'Holerite'} ${fmtComp(H.comp)} · ${H.nome}`,calc:{rubricas:x.rubricas,proventos:x.proventos,descontos:x.descontos,liquido:x.liquido,baseInss:x.baseInss,baseIrrf:x.baseIrrf,baseFgts:x.baseFgts,fgts:x.fgts,aliqIr:x.aliqIr,salario:x.salario},atualizadoEm:agora(),por:ME.nome||''};
+    mut('holerites',()=>{const ex=H.id&&S.holerites.find(z=>z.id===H.id);if(ex)Object.assign(ex,reg);else{H.id=uid();S.holerites.push({id:H.id,criadoEm:agora(),...reg})}},['Pessoal',`${H.id?'Salvou':'Gerou'} ${reg.desc}: líquido ${brl(x.liquido)}`,e.razao])}
+  pdfHolerite(e,H,x);closeModal();if(salvar){toast('Salvo no histórico.');render()}}
+/* ---------- PDF no layout do recibo (2 vias por folha) ---------- */
+function pdfHolerite(e,H,x){const w=window.open('','_blank');if(!w){toast('Permita pop-ups para gerar o PDF.',true);return}
+  const v=n=>(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});const P=x.rubricas;
+  const via=(seg)=>`<div class="via"><div class="corpo">
+   <table class="cab"><tr><td class="rz">${esc(e.razao)}</td><td class="cn">CNPJ:&nbsp; ${fmtCNPJ(e.cnpj||'')}</td></tr></table>
+   <table class="cab2"><tr><td>CC : ${esc(H.cc||'01 GERAL')}</td><td class="c">Folha Mensal</td><td class="c">${H.tipo==='prolabore'?'Mensalidade':'Mensal'}</td><td class="r">${compHol(H.comp)}</td></tr></table>
+   <table class="func"><tr class="mini"><td style="width:38px">CÓDIGO</td><td>NOME DO FUNCIONÁRIO</td><td class="c" style="width:90px">CBO</td><td class="c" style="width:110px">Departamento</td><td class="r" style="width:110px">Filial</td></tr>
+    <tr><td class="c">${esc(H.codigo||'1')}</td><td>${esc(String(H.nome).toUpperCase())}</td><td class="c">${esc(H.cbo||'')}</td><td class="c">${esc(H.depto||'1')}</td><td class="r">${esc(H.filial||'1')}</td></tr>
+    <tr><td></td><td>${esc(String(H.cargo||'').toUpperCase())}</td><td class="c" colspan="2">Admissão:</td><td class="r">${H.admissao?fmtData(H.admissao):''}</td></tr></table>
+   <table class="rub"><thead><tr><th style="width:44px">${seg?'Cód.':'Código'}</th><th>Descrição</th><th style="width:62px">${seg?'Informado':'Referência'}</th><th style="width:96px">${seg?'Proventos':'Vencimentos'}</th><th style="width:96px">Descontos</th></tr></thead>
+    <tbody>${P.map(r=>`<tr><td class="r">${r.cod}</td><td>${esc(String(r.desc).toUpperCase())}</td><td class="r">${esc(String(r.ref||'').replace(/ dias$/,',00').replace(/^(\d+)$/,'$1,00'))}</td><td class="r">${r.tipo==='P'?v(r.valor):''}</td><td class="r">${r.tipo==='D'?v(r.valor):''}</td></tr>`).join('')}<tr class="enche"><td></td><td></td><td></td><td></td><td></td></tr></tbody></table>
+   <table class="tot"><tr><td class="vazio" rowspan="2"></td><td class="lbl">Total dos Vencimentos<div>${v(x.proventos)}</div></td><td class="lbl">Total dos Descontos<div>${v(x.descontos)}</div></td></tr>
+    <tr><td class="liq">Valor Líquido <span>⇨</span></td><td class="liqv">${v(x.liquido)}</td></tr></table>
+   <table class="bases"><tr class="mini"><td>Salário Base</td><td>Base Cálc. INSS</td><td>Base Cálc.FGTS</td><td>FGTS do Mês</td><td>Base Cálc. IRRF</td><td>Faixa IRRF</td></tr>
+    <tr><td>${v(x.salario)}</td><td>${v(x.baseInss)}</td><td>${v(x.baseFgts)}</td><td>${v(x.fgts)}</td><td>${v(x.baseIrrf)}</td><td>${v((x.aliqIr||0)*100)}%</td></tr></table></div>
+   <div class="lado"><div class="assn"><span>ASSINATURA DO FUNCIONÁRIO</span></div><div class="dt"><span class="bar">/</span><span class="bar">/</span><span class="dtl">DATA</span></div></div></div>`;
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc((H.tipo==='prolabore'?'PRO-LABORE ':'HOLERITE ')+String(H.nome).toUpperCase()+' '+H.comp.slice(5,7)+H.comp.slice(2,4))}</title><style>
+  @page{size:A4;margin:12mm 10mm}*{box-sizing:border-box}body{margin:0;font:10.5px/1.25 Calibri,Carlito,Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .via{display:flex;gap:8px;height:128mm;margin-bottom:14mm}.via:last-child{margin-bottom:0}.corpo{flex:1;display:flex;flex-direction:column}
+  table{width:100%;border-collapse:collapse}td,th{padding:1px 4px;vertical-align:top}.r{text-align:right}.c{text-align:center}
+  .cab{border:1px solid #000;border-bottom:0}.cab td{font-size:11.5px;padding:3px 4px}.cab .cn{width:42%;font-size:12px}
+  .cab2{border:1px solid #000;margin-bottom:5px}.cab2 td{padding:5px 6px;font-size:11px}.cab2 td:last-child{font-size:12.5px}
+  .func{border:1px solid #000;margin-bottom:3px}.func td{font-size:11.5px;padding:0 4px}.mini td{font-size:7px!important;padding-top:2px;text-transform:none}
+  .rub{border:1px solid #000;flex:1;height:100%}.rub thead th{border:1px solid #000;font-weight:400;font-size:11px;padding:2px 4px}.rub td{border-left:1px solid #000;border-right:1px solid #000;font-size:11.5px;padding:0 4px}
+  .rub tr.enche td{height:100%}.rub{display:table}
+  .tot{border:1px solid #000;border-top:0}.tot td{border-left:1px solid #000}.tot .vazio{border-left:0;width:62%}.tot .lbl{font-size:7.5px;text-align:center;width:19%}.tot .lbl div{font-size:11.5px;text-align:right}
+  .tot .liq{font-size:8px;font-weight:700;border-top:1px solid #000;padding:3px 4px}.tot .liq span{float:right;font-size:15px;line-height:10px}.tot .liqv{border-top:1px solid #000;text-align:right;font-weight:700;font-size:12.5px}
+  .bases{border:1px solid #000;border-top:0}.bases td{text-align:center;font-size:11.5px;padding:0 4px}
+  .lado{width:28mm;border:1px solid #000;display:flex;flex-direction:column}.assn{flex:1.6;display:flex;align-items:center;justify-content:center;border-bottom:0}.assn span,.dtl{writing-mode:vertical-rl;transform:rotate(180deg);font-size:7px}
+  .assn{position:relative}.assn:before{content:'';position:absolute;left:50%;top:10%;bottom:10%;border-left:1px solid #000;margin-left:-8px}
+  .dt{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;position:relative}.dt .bar{font-size:18px;transform:rotate(25deg)}.dt:before{content:'';position:absolute;left:50%;top:10%;bottom:10%;border-left:1px solid #000;margin-left:6px}
+  @media screen{body{background:#e2e8f0}.folha{background:#fff;width:210mm;margin:16px auto;padding:12mm 10mm;box-shadow:0 2px 12px rgba(0,0,0,.15)}}</style></head><body><div class="folha">${via(false)}${via(true)}</div>
+  <script>setTimeout(()=>print(),400)<\/script></body></html>`);w.document.close()}
+/* ---------- tela e histórico ---------- */
+function dpAvulso(e,comp){const ed=podeMod('dem','editar');const todas=!!UI.holTodas;const L=S.holerites.filter(h=>todas||h.empresaId===e.id).sort((a,b)=>String(b.atualizadoEm||b.criadoEm).localeCompare(String(a.atualizadoEm||a.criadoEm)));
+  return head('Pró-labore e holerite avulso','Escolha empresa, pessoa, valor e competência: o sistema calcula INSS, IRRF e FGTS com as tabelas de '+DP26.ano+' e gera o recibo em PDF (2 vias). Os gerados ficam salvos aqui.',ed?`<button class="btn primary" data-act="hol-novo">${svg('plus')}Novo pró-labore / holerite</button>`:'')+
+  `<div class="panel"><div class="panel-head"><h2>Histórico${todas?' · todas as empresas':' · '+esc(e.fantasia||e.razao)}</h2><label class="small" style="display:flex;gap:6px;align-items:center"><input type="checkbox" data-act="hol-todas" ${todas?'checked':''}> Todas as empresas</label></div>
+   ${L.length?`<div class="table-wrap"><table><thead><tr><th>Descrição</th>${todas?'<th>Empresa</th>':''}<th>Tipo</th><th>Competência</th><th class="r">Bruto</th><th class="r">Líquido</th><th>Salvo</th><th></th></tr></thead><tbody>${L.map(h=>{const x=emp(h.empresaId);return `<tr>
+    <td><b>${esc(h.desc||h.nome)}</b><div class="small muted">${esc(h.nome)}${h.cpf?' · CPF '+fmtCPF(h.cpf):''}</div></td>${todas?`<td class="small">${esc(x?.fantasia||x?.razao||'—')}</td>`:''}
+    <td class="small">${h.tipo==='prolabore'?'Pró-labore':'Holerite'}</td><td class="small">${fmtComp(h.comp)}</td><td class="r num">${brl(h.calc?.proventos||h.valor)}</td><td class="r num"><b>${brl(h.calc?.liquido||0)}</b></td>
+    <td class="small">${fmtData(String(h.atualizadoEm||h.criadoEm).slice(0,10))}<div class="muted">${esc(h.por||'')}</div></td>
+    <td class="r" style="white-space:nowrap"><button class="btn sm" data-act="hol-pdf" data-id="${h.id}">PDF</button>${ed?` <button class="btn sm" data-act="hol-abrir" data-id="${h.id}" title="Abrir para alterar">Editar</button> <button class="btn sm" data-act="hol-copiar" data-id="${h.id}" title="Novo a partir deste, na competência seguinte">Repetir</button> <button class="btn sm ghost" data-act="hol-excluir" data-id="${h.id}">Excluir</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`
+     :vazio('Nenhum pró-labore ou holerite avulso salvo'+(todas?'':' para esta empresa')+'.')}
+   <p class="small muted">O recibo avulso não entra no cálculo da folha nem no eSocial: para isso, cadastre a pessoa em Colaboradores e sócios. "Repetir" cria o do mês seguinte com os mesmos dados.</p></div>`}
+const holDe=id=>S.holerites.find(h=>h.id===id);
+ACT['hol-todas']=el=>{UI.holTodas=el.checked;render()};
+ACT['hol-pdf']=el=>{const h=holDe(el.dataset.id);if(!h)return;const H={...h};pdfHolerite(emp(h.empresaId)||{razao:'',cnpj:''},H,calcAvulso(H)||{...h.calc,rubricas:h.calc.rubricas})};
+ACT['hol-abrir']=el=>{const h=holDe(el.dataset.id);if(h)holAbrir(JSON.parse(JSON.stringify(h)))};
+ACT['hol-copiar']=el=>{const h=holDe(el.dataset.id);if(!h)return;const c=JSON.parse(JSON.stringify(h));delete c.id;c.comp=addMes(h.comp,1);c.desc='';holAbrir(c)};
+ACT['hol-excluir']=el=>{const h=holDe(el.dataset.id);if(!h)return;confirmar('Excluir do histórico',`<p>Excluir "<b>${esc(h.desc||h.nome)}</b>"? Os PDFs já entregues não são afetados.</p>`,'Excluir',()=>mut('holerites',()=>{S.holerites=S.holerites.filter(z=>z.id!==h.id)},['Pessoal','Excluiu '+(h.desc||h.nome),emp(h.empresaId)?.razao||'']))};
+const dpConteudoV46=dpConteudo;dpConteudo=function(){if(UI.view==='d-avulso'&&podeMod('sis_dp','ver')&&podeMod('dem','ver')){const e=emp(UI.fsn?.emp);if(e)return dpAvulso(e,UI.fsn?.comp||compAtual())}return dpConteudoV46()};
+/* ==== v46 (fim) ==== */
 /* CRC nos arquivos SPED: campo de até 15 posições, só letras e números ("CRC/MS 016636/O-0" → "MS016636O0") */
 function crcSped(c){return String(c||'').toUpperCase().replace(/^\s*CRC/,'').replace(/[^A-Z0-9]/g,'').slice(0,15)}
 

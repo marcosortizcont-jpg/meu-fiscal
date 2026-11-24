@@ -44,7 +44,7 @@ export const MODULO_DA_COLECAO = {
   conversas: 'chat', contatos: 'chat',
   cnds: 'fiscal', ecac: 'fiscal',
   certificados: 'cert',
-  tickets: 'dem', admissoes: 'dem', funcionarios: 'dem', folhas: 'dem', dpmov: 'dem', dpfolhas: 'dem', dpeventos: 'dem',
+  tickets: 'dem', admissoes: 'dem', funcionarios: 'dem', folhas: 'dem', dpmov: 'dem', dpfolhas: 'dem', dpeventos: 'dem', holerites: 'dem',
   faturas: 'hon',
   config: 'config', operadores: 'config',
 };

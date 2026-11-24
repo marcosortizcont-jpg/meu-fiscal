@@ -18,6 +18,27 @@ meufiscal-painel.vercel.app ──┘  SSE direto (CORS estrito) ◄── LISTE
 
 Os dois sites são gerados do mesmo app (`app/app.html`). Cada build fixa o site (`cliente` ou `painel`) e a URL da API. Não há dependências npm em nenhuma das partes: só Node 20+.
 
+### DP · Pró-labore e holerite avulso
+
+Fica em Folha → **Pró-labore e holerite avulso** (`#d-avulso`) e salva na coleção `holerites`, que usa o módulo `dem` e fica oculta ao cliente.
+
+**O que se preenche:**
+- Tipo: pró-labore (sócio) ou holerite (funcionário).
+- Empresa e competência.
+- Pessoa: escolhida entre os sócios e funcionários cadastrados, ou digitada.
+- Valor, dias, dependentes para o IRRF e, opcionalmente, outros proventos e descontos.
+
+**Cálculo:** usa o motor da folha (`dpCalcFunc`):
+- Pró-labore: INSS de 11% como contribuinte individual (até o teto).
+- Holerite: INSS progressivo, IRRF com a redução da Lei 15.270/2025, FGTS, horas extras com DSR e faltas.
+- Para o pró-labore, a prévia mostra o encargo patronal (CPP de 20%).
+
+**PDF:** no layout de recibo da folha mensal, com 2 vias por página e a faixa lateral de assinatura e data.
+
+**Histórico:** guarda descrição, nome, competência, bruto, líquido, quem gerou e quando. Para cada registro há PDF, Editar, Repetir (cria o do mês seguinte) e Excluir.
+
+O recibo avulso não entra na folha nem no eSocial.
+
 ### Sistemas por colaborador (permissões)
 
 As permissões ganharam três módulos novos: `sis_fiscal` (Escrita Fiscal), `sis_contabil` (Contabilidade) e `sis_dp` (Folha de Pagamento).
