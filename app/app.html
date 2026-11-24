@@ -9502,7 +9502,7 @@ const fArquivosV45=fArquivos;fArquivos=function(){let h=fArquivosV45();const e=e
 if(!COLS.includes('holerites'))COLS.push('holerites');if(!Array.isArray(S.holerites))S.holerites=[];
 NAV_DP.forEach(g=>{if(g[0]==='Folha'&&!g[1].some(x=>x[0]==='d-avulso'))g[1].push(['d-avulso','Pró-labore e holerite avulso','receipt','Preencha pessoa, empresa, valor e competência: calcula INSS, IRRF e FGTS, gera o PDF e guarda no histórico'])});
 const MES_NOME=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
-const compHol=c=>MES_NOME[+c.slice(5,7)-1]+'-'+c.slice(2,4);
+const compHol=c=>MES_NOME[+c.slice(5,7)-1]+'/'+c.slice(0,4);
 const MOV_AV=[['he50','Horas extras 50% (h)'],['he100','Horas extras 100% (h)'],['faltas','Faltas (dias)'],['comissoes','Comissões (R$)'],['gratif','Gratificação (R$)'],['outrosProv','Outros proventos (R$)'],['adiant','Adiantamento (R$)'],['outrosDesc','Outros descontos (R$)']];
 /* cálculo: reaproveita o motor da folha com um colaborador e um lançamento temporários */
 function calcAvulso(H){const e=emp(H.empresaId);if(!e)return null;const ref=Math.min(30,Math.max(1,+H.dias||30));
@@ -9582,7 +9582,7 @@ function pdfHolerite(e,H,x){const w=window.open('','_blank');if(!w){toast('Permi
     <tr><td>${v(x.salario)}</td><td>${v(x.baseInss)}</td><td>${v(x.baseFgts)}</td><td>${v(x.fgts)}</td><td>${v(x.baseIrrf)}</td><td>${v((x.aliqIr||0)*100)}%</td></tr></table></div>
    <div class="lado"><div class="assn"><span>ASSINATURA DO FUNCIONÁRIO</span></div><div class="dt"><span class="bar">/</span><span class="bar">/</span><span class="dtl">DATA</span></div></div></div>`;
   w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc((H.tipo==='prolabore'?'PRO-LABORE ':'HOLERITE ')+String(H.nome).toUpperCase()+' '+H.comp.slice(5,7)+H.comp.slice(2,4))}</title><style>
-  @page{size:A4;margin:12mm 10mm}*{box-sizing:border-box}body{margin:0;font:10.5px/1.25 Calibri,Carlito,Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  @page{size:A4;margin:0}*{box-sizing:border-box}body{margin:0;font:10.5px/1.25 Calibri,Carlito,Arial,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .via{display:flex;gap:8px;height:128mm;margin-bottom:14mm}.via:last-child{margin-bottom:0}.corpo{flex:1;display:flex;flex-direction:column}
   table{width:100%;border-collapse:collapse}td,th{padding:1px 4px;vertical-align:top}.r{text-align:right}.c{text-align:center}
   .cab{border:1px solid #000;border-bottom:0}.cab td{font-size:11.5px;padding:3px 4px}.cab .cn{width:42%;font-size:12px}
@@ -9596,7 +9596,7 @@ function pdfHolerite(e,H,x){const w=window.open('','_blank');if(!w){toast('Permi
   .lado{width:28mm;border:1px solid #000;display:flex;flex-direction:column}.assn{flex:1.6;display:flex;align-items:center;justify-content:center;border-bottom:0}.assn span,.dtl{writing-mode:vertical-rl;transform:rotate(180deg);font-size:7px}
   .assn{position:relative}.assn:before{content:'';position:absolute;left:50%;top:10%;bottom:10%;border-left:1px solid #000;margin-left:-8px}
   .dt{flex:1;display:flex;align-items:center;justify-content:center;gap:4px;position:relative}.dt .bar{font-size:18px;transform:rotate(25deg)}.dt:before{content:'';position:absolute;left:50%;top:10%;bottom:10%;border-left:1px solid #000;margin-left:6px}
-  @media screen{body{background:#e2e8f0}.folha{background:#fff;width:210mm;margin:16px auto;padding:12mm 10mm;box-shadow:0 2px 12px rgba(0,0,0,.15)}}</style></head><body><div class="folha">${via(false)}${via(true)}</div>
+  .folha{width:210mm;padding:12mm 10mm}@media screen{body{background:#e2e8f0}.folha{background:#fff;margin:16px auto;box-shadow:0 2px 12px rgba(0,0,0,.15)}}</style></head><body><div class="folha">${via(false)}${via(true)}</div>
   <script>setTimeout(()=>print(),400)<\/script></body></html>`);w.document.close()}
 /* ---------- tela e histórico ---------- */
 function dpAvulso(e,comp){const ed=podeMod('dem','editar');const todas=!!UI.holTodas;const L=S.holerites.filter(h=>todas||h.empresaId===e.id).sort((a,b)=>String(b.atualizadoEm||b.criadoEm).localeCompare(String(a.atualizadoEm||a.criadoEm)));
