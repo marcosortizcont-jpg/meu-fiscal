@@ -115,6 +115,15 @@ export function conferirEscrita(u, op, atual) {
   if (!regra) throw new Error('O Portal do Cliente não pode alterar esta área.');
   const minhas = new Set(u.empresas.map(e => e.id));
   if (atual && !minhas.has(atual.empresa_id)) throw new Error('Registro de outra empresa.');
+  // faturamento: o cliente informa a receita do mês, mas não mexe no que o escritório apurou (histórico do RBT12, PGDAS-D, sem movimento)
+  if (c === 'faturamento') {
+    const ESC = ['semMov', 'rbt12Inf', 'rbt12InfEm', 'rbt12Origem', 'dasDeclarado', 'folha12', 'repartidoRbt', 'pgdasArq', 'origemAntes'];
+    const d = atual?.dados || {};
+    if (atual && (['historico', 'pgdas', 'semmov', 'lancamentos'].includes(d.origem) || ESC.some(k => d[k] != null)))
+      throw new Error('Esta competência foi apurada pelo escritório. Fale com a equipe para alterar.');
+    if (op.op === 'salvar' && ESC.some(k => op.dados[k] != null)) throw new Error('Este campo é definido pelo escritório.');
+    if (op.op === 'salvar' && !['declarado', 'cliente', undefined, null, ''].includes(op.dados.origem)) throw new Error('Origem inválida para o portal.');
+  }
   if (op.op === 'apagar') { if (!regra.apagar) throw new Error('Este registro não pode ser excluído pelo portal.'); return; }
 
   const novaEmpresa = empresaDe(c, op.dados);

@@ -329,18 +329,19 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
     const esc = String(ctx.params.esc || ''); if (!/^[0-9a-f-]{36}$/.test(esc)) throw new ErroHttp(404, 'Não encontrado.');
     const c = await cfgBanco(esc); const tk = String(ctx.req.headers['asaas-access-token'] || '');
     if (!c?.webhook_token || tk.length !== c.webhook_token.length || !crypto.timingSafeEqual(Buffer.from(tk), Buffer.from(c.webhook_token))) throw new ErroHttp(401, 'Token inválido.');
-    const ev = ctx.corpo || {}; const p = ev.payment || {}; const fid = String(p.externalReference || '');
-    if (!fid) return { ok: true };
-    if (['PAYMENT_RECEIVED', 'PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED_IN_CASH'].includes(ev.event)) {
-      await pagamentoConfirmado(esc, fid, { valor: p.value, liquido: p.netValue, data: p.paymentDate || p.clientPaymentDate || p.confirmedDate, forma: { BOLETO: 'Boleto', PIX: 'PIX', CREDIT_CARD: 'Cartão de crédito' }[p.billingType] || p.billingType || 'Banco' });
-      return { ok: true };
-    }
-    if (fid.startsWith('ativ-')) return { ok: true };
+    // o aviso só diz "olhe a cobrança X": a referência vem do nosso registro e a situação e o valor são consultados no banco
+    const ev = ctx.corpo || {}; const p = ev.payment || {}; const pid = String(p.id || '');
+    if (!pid || !/^[A-Za-z0-9_-]{4,64}$/.test(pid)) return { ok: true };
+    if (limitar(`asaas-aviso:${esc}`, 600, 600).bloqueado) throw new ErroHttp(429, 'Muitos avisos.');
+    const fid = await B.refDe(esc, 'asaas', pid); if (!fid) return { ok: true };
+    let st; try { st = await B.consultar(esc, 'asaas', pid); } catch (er) { if (ev.event === 'PAYMENT_DELETED') st = { pago: false, situacao: 'DELETED' }; else { console.error('[asaas] aviso', er.message); throw new ErroHttp(502, 'Não consegui confirmar no banco.'); } }
+    if (st.pago) { await pagamentoConfirmado(esc, fid, { ...st, liquido: p.netValue }); return { ok: true }; }
+    if (fid.startsWith('ativ-') || fid.startsWith('cert-')) return { ok: true };
     const f = await A.registro(esc, 'faturas', fid); if (!f) return { ok: true };
-    if (['PAYMENT_REFUNDED', 'PAYMENT_CHARGEBACK_REQUESTED'].includes(ev.event) && f.status === 'paga') {
+    if (['REFUNDED', 'REFUND_REQUESTED', 'CHARGEBACK_REQUESTED', 'CHARGEBACK_DISPUTE'].includes(st.situacao) && f.status === 'paga') {
       await A.gravar(esc, 'faturas', f.id, f.empresaId, { ...f, status: 'aberta', estornadaEm: new Date().toISOString() });
-    } else if (ev.event === 'PAYMENT_DELETED' && f.boleto?.id === p.id) {
-      const { boleto, ...resto } = f; await A.gravar(esc, 'faturas', f.id, f.empresaId, resto);
+    } else if (st.situacao === 'DELETED' || (ev.event === 'PAYMENT_DELETED' && f.boleto?.id === pid && !st.pago)) {
+      if (f.boleto?.id === pid) { const { boleto, ...resto } = f; await A.gravar(esc, 'faturas', f.id, f.empresaId, resto); }
     }
     return { ok: true };
   }, { semCabecalhoSite: true, limite: 64 * 1024 });
