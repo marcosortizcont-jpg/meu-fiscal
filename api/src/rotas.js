@@ -19,6 +19,7 @@ import { registrarCrmTheo } from './crm-theo.js';
 import { registrarAtivacao } from './ativacao.js';
 import { registrarContratos, PLANOS_COMISSAO } from './contrato.js';
 import { registrarCnpj } from './cnpj.js';
+import { registrarSocietario } from './societario.js';
 import { registrarNfse } from './nfse.js';
 import { registrarNfeEntrada } from './nfe-entrada.js';
 import { registrarCaptura } from './captura.js';
@@ -283,7 +284,8 @@ export function registrarRotas(r, { db, hub }) {
           if (!atual && !op.dados.exemplo) { op.dados.status = 'aguardando_pagamento'; op.dados.ativacao = { status: 'pendente', metodo: op.dados.plano?.metodo || 'escolha', valor: Number(op.dados.plano?.valor || 0), desconto: 0, total: Number(op.dados.plano?.valor || 0), planoNome: op.dados.plano?.nome || '' }; op.dados.criadoPor = u.id; op.dados.criadoPorNome = u.nome; delete op.dados.contrato; }
           else if (atual) {
             if (atual.dados?.status === 'aguardando_pagamento') op.dados.status = 'aguardando_pagamento';
-            else if (op.dados.status === 'aguardando_pagamento') op.dados.status = atual.dados?.status || 'ativo';
+            else if (atual.dados?.status === 'em_abertura') op.dados.status = 'em_abertura';   // só o Societário (servidor) conclui a abertura
+            else if (op.dados.status === 'aguardando_pagamento' || op.dados.status === 'em_abertura') op.dados.status = atual.dados?.status || 'ativo';
             if (atual.dados?.ativacao !== undefined) op.dados.ativacao = atual.dados.ativacao; else delete op.dados.ativacao;
             if (atual.dados?.voucherAplicado !== undefined) op.dados.voucherAplicado = atual.dados.voucherAplicado; else delete op.dados.voucherAplicado;
             // contrato e autoria do cadastro (base da comissão) também são do servidor
@@ -669,6 +671,7 @@ export function registrarRotas(r, { db, hub }) {
   registrarCaptura(r, { db, exigir, log, pode });
   const contratos = registrarContratos(r, { db, exigir, log, pode }); ganchos.aoAtivar = contratos.aoAtivar; ganchos.faturaPaga = contratos.aoFaturaPaga;
   registrarAtivacao(r, { db, exigir, log, pode, wa, fin, ganchos });
+  registrarSocietario(r, { db, exigir, log, pode, contratos });
   registrarDocumentos(r, { db, exigir, log, pode, wa });
   registrarCrmTheo(r, { db, exigir, log, pode, wa });
   registrarRotasAlteracoes(r, { db, exigir, log, pode, alt });

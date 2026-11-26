@@ -25,7 +25,7 @@ const MESES_SA = MESES.map(norm);
 export const vencimentoDasMei = comp => ajustarUtil(`${addMes(comp, 1)}-20`, 'prorroga');
 const ehMei = e => !!e && (e.regimeId === 'reg2-mei' || e.regime === 'MEI');
 const ehSimples = e => !!e && (String(e.regimeId || '').startsWith('reg2-sn') || e.regime === 'SN');
-const ativa = e => e && e.status !== 'inativo';
+const ativa = e => e && e.status !== 'inativo' && e.status !== 'em_abertura';
 
 /* ---------- catálogo das guias emitidas pela API ---------- */
 export const PROGRAMAS = {
@@ -626,7 +626,7 @@ export function registrarIntegra(r, { db, exigir, log, pode, wa }) {
     if (consultando.has(esc)) throw new ErroHttp(409, 'Já existe uma consulta de procurações em andamento. Aguarde terminar.');
     consultando.add(esc);
     try {
-      const es = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas' AND coalesce(dados->>'status','') NOT IN ('inativo','aguardando_pagamento') AND coalesce(dados->>'exemplo','') <> 'true'`, [esc])).map(x => x.dados)
+      const es = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas' AND coalesce(dados->>'status','') NOT IN ('inativo','aguardando_pagamento','em_abertura') AND coalesce(dados->>'exemplo','') <> 'true'`, [esc])).map(x => x.dados)
         .filter(e => !somente || somente.includes(String(e.id)))
         .filter(e => !idadeDias || !e.procuracao?.consultadoEm || (Date.now() - new Date(e.procuracao.consultadoEm)) > idadeDias * 86400e3);
       const r0 = { total: es.length, ativa: 0, vencida: 0, inexistente: 0, erro: 0 };

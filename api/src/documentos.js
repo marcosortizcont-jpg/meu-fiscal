@@ -52,7 +52,7 @@ export function registrarDocumentos(r, { db, exigir, log, pode, wa }) {
       const regs = await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'checklist' AND dados->>'comp' = $2`, [c.escritorio_id, comp]);
       let n = 0;
       for (const { dados: e } of emps) {
-        if (!e || e.exemplo || ['inativo', 'cancelado'].includes(e.status)) continue;
+        if (!e || e.exemplo || ['inativo', 'cancelado', 'em_abertura'].includes(e.status)) continue;
         const itens = [...(e.checklist || []).filter(it => devido(it, comp)), ...(e.docAvulsos || []).filter(x => x.comp === comp)]
           .filter(it => { const x = regs.find(r => r.dados.empresaId === e.id && r.dados.itemId === it.id); const k = x ? (x.dados.status || 'enviado') : 'pendente'; return ['pendente', 'recusado', 'pendencia'].includes(k); }).map(it => it.nome).slice(0, 30);
         if (!itens.length) continue;

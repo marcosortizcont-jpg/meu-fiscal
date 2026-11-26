@@ -2796,14 +2796,14 @@ aCarteira=function(){
   const regimes=[...new Set(S.empresas.map(nomeRegime))].sort();
   const grupos=[...new Set(S.empresas.map(e=>e.grupo).filter(Boolean))].sort();
   const es=empresasFiltradas(); const ativos=Object.entries(f).filter(([k,v])=>v).length;
-  const ST={inativa:pill('Inativa',''),bloqueio:pill('Bloqueio parcial','crit'),em_dia:pill('Em dia','ok')};
+  const ST={abertura:pill('Em abertura','info'),inativa:pill('Inativa',''),bloqueio:pill('Bloqueio parcial','crit'),em_dia:pill('Em dia','ok')};
   return `${head('Carteira de clientes','Toque no nome da empresa para abrir o cadastro completo: dados, acesso ao portal, documentos, certificado, senhas dos portais, responsáveis e obrigações.',ed?`<button class="btn primary" data-act="cart-abrir" data-id="">${svg('plus')}Nova empresa</button>`:'')}${soConsulta('carteira')}${painelLeads()}
   <div class="panel nao-imprimir"><div class="barra-filtros">
     <label class="f busca"><span>Pesquisar</span><input type="search" id="busca-cart" data-live="1" value="${esc(f.q)}" placeholder="Nome, razão social, CNPJ, grupo, cidade ou e-mail"></label>
     ${selF('regime','Regime tributário',regimes.map(r=>[r,r]),f.regime,'fcart')}
     ${selF('resp','Responsável',eq.map(p=>[p.id,p.nome]),f.resp,'fcart')}
     ${selF('grupo','Grupo de empresas',[...grupos.map(g=>[g,g]),['__sem','Sem grupo']],f.grupo,'fcart')}
-    ${selF('situacao','Situação',[['em_dia','Em dia'],['critico','Com pendência crítica'],['bloqueio','Bloqueio por mensalidade'],['inativa','Inativa']],f.situacao,'fcart')}
+    ${selF('situacao','Situação',[['em_dia','Em dia'],['critico','Com pendência crítica'],['bloqueio','Bloqueio por mensalidade'],['abertura','Em abertura'],['inativa','Inativa']],f.situacao,'fcart')}
   </div><div class="filtro-resumo"><span class="small muted">${es.length} de ${S.empresas.length} empresa${S.empresas.length!==1?'s':''}</span>${ativos?`<button class="btn sm ghost" data-act="fcart-limpar">Limpar filtros</button>`:''}</div></div>
   <div class="panel"><div class="table-wrap"><table class="tabela-cart"><thead><tr><th>Empresa</th><th>CNPJ</th><th>Regime</th><th>Grupo</th><th>Responsável fiscal</th><th>Situação</th><th></th></tr></thead><tbody>${es.map(e=>{const s=situacaoEmp(e);const c=s==='critico'?motor(e.id,'a').filter(a=>a.nivel==='crit').length:0;return `<tr><td><button class="nome-link" data-act="cart-abrir" data-id="${e.id}">${esc(e.fantasia||e.razao)}</button><div class="small muted">${esc(e.razao)}</div></td><td class="mono small" data-r="CNPJ">${fmtCNPJ(e.cnpj)}</td><td class="small" data-r="Regime">${esc(nomeRegime(e))}</td><td class="small" data-r="Grupo">${e.grupo?`<button class="nome-link" style="font-weight:500" data-act="fcart-grupo" data-v="${esc(e.grupo)}">${esc(e.grupo)}</button>`:'<span class="muted">—</span>'}</td><td class="small" data-r="Responsável">${esc(nomeEquipe(respDe(e,'Fiscal')))||'<span class="muted">—</span>'}</td><td>${s==='critico'?pill(c+' crítico'+(c>1?'s':''),'crit'):ST[s]}</td><td class="r"><div class="actions" style="justify-content:flex-end;flex-wrap:nowrap"><button class="btn sm" data-act="cart-abrir" data-id="${e.id}">Abrir</button>${ehMaster()&&MODO==='api'?`<button class="btn sm danger" data-act="emp-excluir" data-id="${e.id}">Excluir</button>`:''}</div></td></tr>`}).join('')||`<tr><td colspan="7" class="muted">${S.empresas.length?'Nenhuma empresa com esses filtros.':'Nenhuma empresa cadastrada.'}</td></tr>`}</tbody></table></div></div>`;
 };
@@ -6496,7 +6496,7 @@ function painelContrato(e){
    <div class="actions">${c?.arquivoId?linkArq({url:c.url,nome:c.nome},'Baixar contrato (PDF)'):''}${c?.assinado?linkArq({url:c.assinado.url,nome:c.assinado.nome},'Ver contrato assinado'):''}
     ${ed?`<button class="btn sm" data-act="contrato-gerar" data-id="${e.id}">${c?.arquivoId?'Gerar de novo':'Gerar contrato'}</button><button class="btn sm ${c?.status==='aguardando_assinatura'?'primary':''}" data-act="contrato-assinado" data-id="${e.id}">${c?.status==='assinado'?'Trocar contrato assinado':'Anexar contrato assinado'}</button>`:''}</div></div>`}
 const detalheEmpresaV15=detalheEmpresa;
-detalheEmpresa=function(){const h=detalheEmpresaV15();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
+detalheEmpresa=function(){const h=detalheEmpresaV15();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||e.status==='em_abertura'||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
   return h};   // o contrato fica na aba "Plano e contrato"
 ACT['contrato-gerar']=async el=>{const e=emp(el.dataset.id);const run=async()=>{el.disabled=true;try{await MF.api('POST',`/api/contratos/${encodeURIComponent(e.id)}/gerar`,{});toast('Contrato gerado. Baixe o PDF para coletar as assinaturas.')}catch(er){toast(er.message,true)}el.disabled=false};
   if(e.contrato?.status==='assinado')return confirmar('Gerar o contrato de novo',`O contrato de <b>${esc(e.razao)}</b> já está assinado. Gerar de novo cria uma nova versão em PDF (o assinado continua guardado). Use só se o plano ou os dados mudaram.`,'Gerar nova versão',run);run()};
@@ -6512,7 +6512,7 @@ const aConfigV16=aConfig;
 aConfig=function(){let h=aConfigV16();if(!ehMaster())return h;const c=cfgContratoC();
   const falta=[!(c.contadorNome||cfg().responsavelTecnico||cfg().escritorio)&&'nome',!cfg().crc&&'CRC',!soDig(c.contadorDoc||'')&&'CPF/CNPJ',!(c.contadorEndereco||'').trim()&&'endereço'].filter(Boolean);
   return h+`<div class="panel"><div class="panel-head"><h2>Contrato de prestação de serviços e comissões</h2>${falta.length?pill('Falta: '+falta.join(', '),'warn'):pill('Pronto para gerar','ok')}</div>
-   <p class="small muted">Dados do contador responsável técnico que entram em todo contrato (Resolução CFC nº 1.590/2020). A Meu Fiscal aparece no contrato só como plataforma. O registro no CRC vem do campo acima.</p>
+   <p class="small muted">Dados do contador responsável técnico que entram em todo contrato (Resolução CFC nº 1.590/2020). O contrato é só entre o contador e o cliente, sem marca de plataforma nem condições comerciais do plano. O registro no CRC vem do campo acima.</p>
    <form data-form="cfg-contrato" class="grid-f"><label class="f"><span>Contador responsável técnico</span><input name="contadorNome" maxlength="100" value="${esc(c.contadorNome||String(cfg().responsavelTecnico||cfg().escritorio||'').replace(/\s*([·|-]\s*)?contabilidade\s*$/i,''))}"></label>
     <label class="f"><span>CPF ou CNPJ do contador</span><input name="contadorDoc" inputmode="numeric" maxlength="18" value="${esc(c.contadorDoc||'')}"></label>
     <label class="f full"><span>Endereço profissional (rua, nº, bairro, cidade/UF, CEP)</span><input name="contadorEndereco" maxlength="200" value="${esc(c.contadorEndereco||'')}"></label>
@@ -6710,7 +6710,7 @@ FORM['servico']=(fd,form)=>{const e=empAtual();const c=String(fd.get('ctrib')||'
 
 /* ---------- painel: configuração da emissão por empresa ---------- */
 const detalheEmpresaV16=detalheEmpresa;
-detalheEmpresa=function(){const h=detalheEmpresaV16();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||MODO!=='api'||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
+detalheEmpresa=function(){const h=detalheEmpresaV16();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||e.status==='em_abertura'||MODO!=='api'||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
   const n=e.nfse||{};const ed=podeMod('carteira','editar');
   const p=`<div class="panel" style="margin-bottom:12px"><div class="panel-head"><h2>Emissão de NFS-e</h2>${pill(n.ambiente==='producao'?'Produção':'Ambiente de teste',n.ambiente==='producao'?'ok':'warn')}</div>
    <form data-form="emp-nfse" data-id="${e.id}" class="grid-f"><label class="f"><span>Ambiente</span><select name="ambiente" ${ed?'':'disabled'}><option value="homologacao" ${n.ambiente!=='producao'?'selected':''}>Teste (produção restrita, sem valor fiscal)</option><option value="producao" ${n.ambiente==='producao'?'selected':''}>Produção (nota com valor fiscal)</option></select></label>
@@ -6731,7 +6731,7 @@ const ST_PROC={ativa:['Ativa','ok'],vence:['Vence em breve','warn'],vencida:['Ve
 const DIAS_AVISO_PROC=30;
 const normP=t=>String(t||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 function sitProc(e){const p=e.procuracao;if(!p||!p.status)return 'nao';if(p.status==='ativa'){const n=diasAte(p.validade);return n<0?'vencida':n<=DIAS_AVISO_PROC?'vence':'ativa'}return p.status}
-const empsProc=()=>S.empresas.filter(e=>!['inativo','aguardando_pagamento'].includes(e.status)&&!e.exemplo);
+const empsProc=()=>S.empresas.filter(e=>!['inativo','aguardando_pagamento','em_abertura'].includes(e.status)&&!e.exemplo);
 const NAV_PROC=['a-procuracoes','Procurações'];
 if(!NAV_A.some(n=>n[0]==='a-procuracoes')){const i=NAV_A.findIndex(n=>n[0]==='a-fiscal');NAV_A.splice(i>=0?i+1:NAV_A.length-1,0,NAV_PROC)}
 MOD_DA_VIEW['a-procuracoes']='carteira';if(!IC.selo)IC.selo='<path d="M12 3l7 3v5c0 4.5-3 8.3-7 10-4-1.7-7-5.5-7-10V6z"/><path d="m9 12 2 2 4-4"/>';NAV_ICON['a-procuracoes']='selo';
@@ -6791,7 +6791,7 @@ const motorV18=motor;motor=function(eid,publico){const A=motorV18(eid,publico);i
   return A};
 // cadastro da empresa: linha da procuração
 const detalheEmpresaV18=detalheEmpresa;
-detalheEmpresa=function(){const h=detalheEmpresaV18();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||MODO!=='api'||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
+detalheEmpresa=function(){const h=detalheEmpresaV18();const e=UI.cart?.id&&emp(UI.cart.id);if(!e||pendAtiv(e)||e.status==='em_abertura'||MODO!=='api'||(UI.cart.aba&&UI.cart.aba!=='dados'))return h;
   const st=sitProc(e);const p=e.procuracao||{};
   const b=`<div class="banner ${st==='ativa'?'ok':st==='nao'?'info':'warn'}" style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px"><div><b>Procuração eletrônica (e-CAC):</b> ${ST_PROC[st][0]}${p.validade?' · válida até '+fmtData(p.validade):''}</div><div class="actions">${podeMod('carteira','editar')?`<button class="btn sm" data-act="proc-consultar" data-id="${e.id}">Consultar</button><button class="btn sm" data-act="proc-pedir" data-id="${e.id}">${['vencida','vence'].includes(st)?'Pedir renovação':'Pedir ao cliente'}</button>`:''}<a class="btn sm ghost" href="#a-procuracoes">Ver todas</a></div></div>`;
   const i=h.indexOf('<div class="tabs" role="tablist">');return i>0?h.slice(0,i)+b+h.slice(i):b+h};
@@ -6835,7 +6835,7 @@ const proxComp=()=>{const [a,m]=compAtual().split('-').map(Number);return m===12
 const TIPO_ALT={upgrade:'Upgrade de plano',reajuste:'Reajuste de honorários',downgrade:'Mudança de plano',cancelado:'Agendamento cancelado'};
 const detalheEmpresaV20=detalheEmpresa;
 detalheEmpresa=function(){
-  const e=UI.cart?.id&&emp(UI.cart.id);const ver=e&&!pendAtiv(e)&&(podeMod('carteira','ver')||podeMod('comercial','ver'));
+  const e=UI.cart?.id&&emp(UI.cart.id);const ver=e&&!pendAtiv(e)&&e.status!=='em_abertura'&&(podeMod('carteira','ver')||podeMod('comercial','ver'));
   let h=detalheEmpresaV20();if(!ver)return h;
   const naPlano=UI.cart.aba==='plano';
   h=h.replace(/(<div class="tabs" role="tablist">\s*<button[^>]*data-v="dados"[^>]*>[\s\S]*?<\/button>)/,m=>m+`<button role="tab" aria-selected="${naPlano}" data-act="cart-aba" data-v="plano">Plano e contrato${e.contrato?.status==='aguardando_assinatura'?' · assinar':''}</button>`);
@@ -9633,7 +9633,7 @@ document.addEventListener('change',ev=>{const s=ev.target;if(!s.matches||!s.matc
   if(f.funcInclusos)f.funcInclusos.value=t.folha;if(f.adicionalFunc&&t.adicional)f.adicionalFunc.value=t.adicional});
 const planoExtras=n=>{const t=planoTab(n);return t?{funcInclusos:t.folha,adicionalFunc:t.adicional}:{}};
 const podePrecos=()=>ehMaster()||podeMod('config','editar');
-const ativosDoPlano=t=>S.empresas.filter(e=>e.status!=='inativo'&&e.status!=='aguardando_pagamento'&&idPlano(e.plano?.nome)===t.id);
+const ativosDoPlano=t=>S.empresas.filter(e=>!['inativo','aguardando_pagamento','em_abertura'].includes(e.status)&&idPlano(e.plano?.nome)===t.id);
 
 const aHonV47=aHon;
 aHon=function(){if(UI.tab.fin2!=='planos'||!podeFinC()){let h=aHonV47();if(podeFinC())h=h.replace(/(<button role="tab" aria-selected="(?:true|false)" data-act="tab" data-k="fin2" data-v="auto">)/,`<button role="tab" aria-selected="false" data-act="tab" data-k="fin2" data-v="planos">Planos e preços</button>$1`);return h}
@@ -9864,7 +9864,7 @@ ACT['proc-excluir']=el=>{const p=procDe(el.dataset.id);if(!p||!podeSoc('excluir'
 /* ---------- alvarás e licenças ---------- */
 function socLicencas(){const F=UI.socL||(UI.socL={emp:'',tipo:'',st:''});const ed=podeSoc('editar');
   const L=S.licencas.filter(l=>(!F.emp||l.empresaId===F.emp)&&(!F.tipo||l.tipo===F.tipo)&&(!F.st||(F.st==='problema'?['crit','warn'].includes(stLic(l)[1]):F.st==='renov'?l.renovando:stLic(l)[1]===F.st))).sort((a,b)=>stLic(a)[2]-stLic(b)[2]);
-  const semLic=S.empresas.filter(e=>e.status!=='inativo'&&e.status!=='aguardando_pagamento'&&!S.licencas.some(l=>l.empresaId===e.id)).length;
+  const semLic=S.empresas.filter(e=>!['inativo','aguardando_pagamento','em_abertura'].includes(e.status)&&!S.licencas.some(l=>l.empresaId===e.id)).length;
   return head('Alvarás e licenças','Alvará de funcionamento, licença sanitária, bombeiros (AVCB/CLCB), licença ambiental e outras, com validade, renovação e documento anexado.',ed?`<button class="btn primary" data-act="lic-nova">${svg('plus')}Nova licença</button>`:'')+
   `<div class="panel"><div class="panel-head" style="gap:8px;flex-wrap:wrap"><select data-socl="emp" style="width:auto;max-width:280px">${empOpts(F.emp,'Todas as empresas')}</select><select data-socl="tipo" style="width:auto"><option value="">Todos os tipos</option>${TIPOS_LIC.map(([k,t])=>`<option value="${k}" ${F.tipo===k?'selected':''}>${t}</option>`).join('')}</select><select data-socl="st" style="width:auto">${[['','Todas as situações'],['problema','Vencidas ou vencendo'],['crit','Vencidas'],['warn','Vencendo ou sem validade'],['renov','Em renovação'],['ok','Vigentes']].map(([k,t])=>`<option value="${k}" ${F.st===k?'selected':''}>${t}</option>`).join('')}</select>${semLic?`<span class="small muted">${plural(semLic,'empresa ativa','empresas ativas')} sem nenhuma licença cadastrada</span>`:''}</div>
    ${L.length?`<div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Licença</th><th>Número</th><th>Validade</th><th>Situação</th><th>Documento</th><th></th></tr></thead><tbody>${L.map(l=>{const e=emp(l.empresaId);const s=stLic(l);
@@ -9959,6 +9959,137 @@ FORM['soc-doc']=async(fd,form)=>{const e=emp(form.dataset.id);const file=fd.get(
   catch(er){toast(er.message,true)}finally{UI.empresaId=antes}};
 const ctbCardCompV47=ctbCardComp;ctbCardComp=function(){return APP_SOC?socCard():ctbCardCompV47()};
 /* ==== v47 (fim) ==== */
+/* ==== v48: Societário ↔ carteira (abertura cadastra o cliente; concluir abertura ativa e gera o contrato) ==== */
+const emAbertura=e=>!!e&&e.status==='em_abertura';
+/* carteira: situação "Em abertura" e sem alertas de rotina enquanto não há CNPJ */
+const situacaoEmpV48=situacaoEmp;situacaoEmp=function(e){return emAbertura(e)?'abertura':situacaoEmpV48(e)};
+const motorV48=motor;motor=function(eid,publico){if(eid&&emAbertura(emp(eid)))return [];const L=motorV48(eid,publico);return eid?L:L.filter(a=>!a.empresaId||!emAbertura(emp(a.empresaId)))};
+const detalheEmpresaV48=detalheEmpresa;
+detalheEmpresa=function(){const h=detalheEmpresaV48();const e=UI.cart?.id&&emp(UI.cart.id);if(!emAbertura(e))return h;const p=S.processos.find(x=>x.empresaId===e.id&&x.tipo==='abertura');
+  const ban=`<div class="banner info" style="display:block;margin-bottom:12px"><b>Empresa em abertura</b> · o processo está no Societário${p?` (${(p.etapas||[]).filter(x=>x.feito).length}/${(p.etapas||[]).length} etapas)`:''}. Quando o CNPJ sair, a equipe conclui a abertura por lá: os dados da Receita entram neste cadastro, o cliente é ativado e o contrato de prestação de serviços é gerado. Até lá não há mensalidade nem rotinas mensais.${typeof URL_SOC!=='undefined'&&podeMod('sis_societario','ver')?` <a href="${esc(URL_SOC)}/societario#s-proc" target="_blank" rel="noopener">Abrir o Societário ↗</a>`:''}</div>`;
+  const i=h.indexOf('</div>',h.indexOf('page-head'));return i>0?h.slice(0,i+6)+ban+h.slice(i+6):ban+h};
+
+/* novo processo de abertura: dados do cliente para a carteira */
+const procFormV48=procForm;
+procForm=function(p){let h=procFormV48(p);if(p.id)return h;
+  const bloco=`<div class="f full" data-proc-cli ${p.tipo==='abertura'?'':'hidden'} style="border:1px solid var(--line,#e2e8f0);border-radius:10px;padding:12px">
+   <label class="chk" style="margin-bottom:8px"><input type="checkbox" name="novoCliente" checked data-proc-novocli> <b>Cadastrar como cliente novo na carteira</b> <span class="small muted">(fica "em abertura", sem cobrança, até a empresa sair)</span></label>
+   <div class="grid-f" data-proc-clicampos>
+    <label class="f"><span>Responsável (sócio) *</span><input name="cliNome" maxlength="80"></label>
+    <label class="f"><span>CPF do responsável</span><input name="cliCpf" inputmode="numeric" maxlength="14"></label>
+    <label class="f"><span>WhatsApp *</span><input name="cliFone" inputmode="tel" maxlength="20"></label>
+    <label class="f"><span>E-mail *</span><input name="cliEmail" type="email" maxlength="120"></label>
+    <label class="f"><span>Regime pretendido</span><select name="cliRegime"><option value="MEI">MEI</option><option value="SN" selected>Simples Nacional sem IE</option><option value="SN-IE">Simples Nacional com IE</option><option value="OUTRO">Outros</option></select></label>
+    <label class="f"><span>Plano depois da abertura</span><select name="cliPlano" data-cli-plano>${(syncPlanos(),PLANOS_CAD).map(([n,g,v])=>`<option value="${esc(n)}" data-v="${v}">${esc(n)} · ${g} · ${brl(v)}</option>`).join('')}<option value="__outro">Outro / sob medida</option></select></label>
+    <label class="f"><span>Honorário mensal (R$) *</span><input name="cliValor" inputmode="decimal" value="${fmtValIn(PLANOS_CAD[0][2])}"></label>
+    <label class="f"><span>Dia do vencimento</span><input name="cliDia" type="number" min="1" max="28" value="${esc((typeof finCfg==='function'&&finCfg()?.vencDia)||10)}"></label>
+   </div></div>`;
+  return h.replace('<label class="f full"><span>Observações</span>',bloco+'<label class="f full"><span>Observações</span>')};
+const cliVisivel=f=>{const b=f.querySelector('[data-proc-cli]');if(!b)return;b.hidden=f.tipo.value!=='abertura'||!!f.empresaId.value;const c=b.querySelector('[data-proc-clicampos]');if(c)c.hidden=!f.novoCliente.checked};
+document.addEventListener('change',ev=>{const s=ev.target;const f=s.form;if(!f||f.dataset.form!=='proc-salvar')return;
+  if(s.name==='tipo'||s.name==='empresaId'||s.name==='novoCliente')cliVisivel(f);
+  if(s.name==='cliPlano'){const o=s.selectedOptions[0];if(o&&o.dataset.v)f.cliValor.value=fmtValIn(o.dataset.v)}});
+const procSalvarV48=FORM['proc-salvar'];
+FORM['proc-salvar']=async(fd,form)=>{
+  const novoCli=!form.dataset.id&&fd.get('tipo')==='abertura'&&!fd.get('empresaId')&&fd.get('novoCliente');
+  if(!novoCli)return procSalvarV48(fd,form);
+  if(!podeSoc('editar')){toast('Seu acesso não permite criar processos.',true);return}
+  const nome=String(fd.get('nome')||'').trim();if(nome.length<3){toast('Informe o nome empresarial pretendido.',true);return}
+  const planoNome=fd.get('cliPlano')==='__outro'?'Sob medida':fd.get('cliPlano');
+  const corpo={nome,responsavel:String(fd.get('cliNome')||'').trim(),cpf:soDig(fd.get('cliCpf')||''),telefone:soDig(fd.get('cliFone')||''),email:String(fd.get('cliEmail')||'').trim(),regime:fd.get('cliRegime'),
+    municipio:String(fd.get('municipio')||'').trim(),uf:String(fd.get('uf')||'').trim().toUpperCase(),plano:{nome:planoNome,valor:valBR(fd.get('cliValor')),diaVenc:Number(fd.get('cliDia'))||10,...(fd.get('cliPlano')!=='__outro'?planoExtras(planoNome):{})}};
+  if(corpo.responsavel.length<3){toast('Informe o responsável pelo cliente.',true);return}
+  if(corpo.telefone.length<10){toast('Informe o WhatsApp com DDD.',true);return}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(corpo.email)){toast('Informe um e-mail válido.',true);return}
+  if(!(corpo.plano.valor>0)){toast('Informe o honorário mensal.',true);return}
+  const pid=uid();corpo.processoId=pid;let e;
+  if(MODO==='api'){try{const r=await MF.api('POST','/api/societario/abertura',corpo);e=r.empresa}catch(er){toast(er.message||'Não foi possível cadastrar o cliente.',true);return}
+    if(e&&!emp(e.id))S.empresas.push(e)}
+  else{e={id:'e-'+uid(),razao:nome,cnpj:'',regime:corpo.regime==='SN-IE'?'SN':corpo.regime,email:corpo.email,telefone:corpo.telefone,municipio:corpo.municipio,uf:corpo.uf,contatos:[{nome:corpo.responsavel,cargo:'Responsável',telefone:corpo.telefone,email:corpo.email}],plano:{...corpo.plano,metodo:'bolepix'},status:'em_abertura',origem:'abertura',processoId:pid,representante:{nome:corpo.responsavel,cpf:corpo.cpf},checklist:[],socios:[]};
+    mut('empresas',()=>S.empresas.push(e),['Carteira','Cadastrou '+nome+' (em abertura)',nome])}
+  const tipo='abertura';
+  const p={id:pid,tipo,status:'andamento',empresaId:e.id,nome,cnpj:'',municipio:corpo.municipio,uf:corpo.uf,responsavel:String(fd.get('responsavel')||'').trim(),prazo:fd.get('prazo')||'',valor:valBR(fd.get('valor')),alteracoes:[],obs:String(fd.get('obs')||'').trim(),
+    inicio:hoje(),criadoEm:agora(),por:ME.nome||'',etapas:ETAPAS_PROC[tipo].map(n=>({id:uid(),nome:n,feito:false})),docs:DOCS_PROC[tipo].map(n=>({id:uid(),nome:n,ok:false})),pend:[],protocolos:[],
+    notas:[{em:agora(),por:ME.nome||'',texto:'Cliente cadastrado na carteira como "em abertura" ('+brl(corpo.plano.valor)+'/mês depois da abertura).'}]};
+  mut('processos',()=>S.processos.push(p),['Societário','Abriu processo de abertura e cadastrou o cliente: '+nome,nome]);procAbrir(pid);toast('Processo criado e cliente cadastrado na carteira (em abertura).')};
+
+/* processo: painel de ligação com a carteira */
+const procHtmlV48=procHtml;
+procHtml=function(p){let h=procHtmlV48(p);const e=p.empresaId&&emp(p.empresaId);const ed=podeSoc('editar');let box='';
+  if(p.tipo==='abertura'&&emAbertura(e))box=`<div class="banner info" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px"><div><b>Cliente na carteira: em abertura.</b> Quando o CNPJ sair, conclua a abertura: os dados da Receita vão para a carteira, o cliente é ativado e o contrato de prestação de serviços é gerado.</div>${ed?`<button type="button" class="btn primary" data-act="soc-concluir" data-id="${p.id}">Concluir abertura</button>`:''}</div>`;
+  else if(p.tipo==='abertura'&&e&&e.aberturaConcluida)box=`<div class="banner ok" style="display:block;margin-bottom:12px"><b>Cliente ativo na carteira</b> desde ${fmtData(String(e.aberturaConcluida.em).slice(0,10))} (${esc(e.aberturaConcluida.por||'')}) · CNPJ ${fmtCNPJ(e.cnpj||'')}${e.contrato?.numero?` · contrato nº ${esc(e.contrato.numero)} ${e.contrato.status==='assinado'?'assinado':e.contrato.status==='pendente'?'<b>não gerado</b>: '+esc(e.contrato.erro||''):'aguardando assinatura'}`:''}.${e.contrato?.url?` <a href="${esc(e.contrato.url)}" target="_blank" rel="noopener">Abrir o contrato</a>`:''}</div>`;
+  else if(p.tipo==='abertura'&&!e&&ed)box=`<div class="banner warn" style="display:block;margin-bottom:12px">Este processo não está ligado a um cliente da carteira. Em "Editar dados", escolha a empresa, ou crie um novo processo de abertura marcando "Cadastrar como cliente novo".</div>`;
+  else if(p.tipo==='alteracao'&&e&&!emAbertura(e)&&ed)box=`<div class="banner info" style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px"><div>Depois do registro, atualize o cadastro de <b>${esc(e.fantasia||e.razao)}</b> na carteira com os dados novos da Receita (endereço, atividade, sócios).</div><button type="button" class="btn" data-act="soc-concluir" data-id="${p.id}">Atualizar a carteira</button></div>`;
+  if(!box)return h;const i=h.indexOf('<div class="modal-body">')+24;return h.slice(0,i)+box+h.slice(i)};
+
+/* concluir abertura (ou atualizar após alteração): dados da Receita conferidos pela equipe */
+function socConcluirHtml(p){const e=emp(p.empresaId)||{};const ab=p.tipo==='abertura';const en=e.endereco||{};const pl=e.plano||{};
+  const v=k=>esc(e[k]||'');const meses=[];for(let i=-3;i<4;i++)meses.push(addMes(compAtual(),i));
+  const comDocs=(p.docs||[]).filter(d=>d.arquivo&&!d.naCarteira).length;
+  return mHead(ab?'Concluir abertura · '+(e.razao||p.nome):'Atualizar a carteira · '+(e.fantasia||e.razao))+`<form data-form="soc-concluir" data-id="${p.id}"><div class="modal-body">
+   <p class="small muted" style="margin-top:0">${ab?'Digite o CNPJ e busque na Receita. Confira os dados: ao confirmar, o cadastro da carteira é completado, o cliente fica <b>ativo</b> e o contrato de prestação de serviços é gerado para assinatura.':'Busque na Receita e confira: os dados abaixo substituem os do cadastro na carteira.'}</p>
+   <div class="grid-f">
+    <div class="f full"><span>CNPJ *</span><span style="display:flex;gap:6px;max-width:420px"><input name="cnpj" required inputmode="numeric" maxlength="18" value="${esc(e.cnpj?fmtCNPJ(e.cnpj):(p.cnpj?fmtCNPJ(p.cnpj):''))}" style="flex:1"><button type="button" class="btn" data-act="soc-receita">Buscar na Receita</button></span><span class="small" id="soc-receita-res"></span></div>
+    <label class="f full"><span>Razão social *</span><input name="razao" required maxlength="160" value="${v('razao')}"></label>
+    <label class="f"><span>Nome fantasia</span><input name="fantasia" maxlength="120" value="${v('fantasia')}"></label>
+    <label class="f"><span>Data de abertura</span><input name="abertura" type="date" value="${v('abertura')}"></label>
+    <label class="f"><span>Natureza jurídica</span><input name="natureza" maxlength="120" value="${v('natureza')}"></label>
+    <label class="f"><span>Regime</span><select name="regime">${[['MEI','MEI'],['SN','Simples Nacional sem IE'],['SN-IE','Simples Nacional com IE'],['OUTRO','Outros']].map(([k,t])=>`<option value="${k}" ${(e.regimeId==='reg2-sn-com-ie'?'SN-IE':e.regime==='MEI'?'MEI':e.regime==='SN'?'SN':'OUTRO')===k?'selected':''}>${t}</option>`).join('')}</select></label>
+    <label class="f"><span>CNAE principal</span><input name="cnae" maxlength="12" value="${v('cnae')}"></label>
+    <label class="f full"><span>Atividade</span><input name="atividade" maxlength="200" value="${v('atividade')}"></label>
+    <label class="f"><span>Inscrição estadual</span><input name="ie" maxlength="20" value="${v('ie')}"></label>
+    <label class="f"><span>Inscrição municipal</span><input name="im" maxlength="20" value="${v('im')}"></label>
+    <label class="f"><span>CEP *</span><input name="cep" required inputmode="numeric" maxlength="9" value="${esc(en.cep||'')}"></label>
+    <label class="f full"><span>Endereço (rua, avenida) *</span><input name="logradouro" required maxlength="90" value="${esc(en.logradouro||'')}"></label>
+    <label class="f"><span>Número</span><input name="numero" maxlength="10" value="${esc(en.numero||'')}"></label>
+    <label class="f"><span>Complemento</span><input name="complemento" maxlength="30" value="${esc(en.complemento||'')}"></label>
+    <label class="f"><span>Bairro</span><input name="bairro" maxlength="60" value="${esc(en.bairro||'')}"></label>
+    <label class="f"><span>Município / UF *</span><span style="display:flex;gap:6px"><input name="municipio" required maxlength="80" value="${esc(e.municipio||p.municipio||'')}"><input name="uf" required maxlength="2" style="width:64px;text-transform:uppercase" value="${esc(e.uf||p.uf||'')}"></span></label>
+    <div class="f full" id="soc-socios">${(e.socios||[]).length?'<span>Sócios</span><span class="small" style="display:block">'+e.socios.map(s=>esc(s.nome)+(s.qualificacao?' ('+esc(s.qualificacao)+')':'')).join('; ')+'</span>':''}</div>
+    ${ab?`<h3 class="full" style="margin:8px 0 0">Honorários e início</h3>
+    <label class="f"><span>Honorário mensal (R$) *</span><input name="valor" inputmode="decimal" required value="${fmtValIn(pl.valor||0)}"></label>
+    <label class="f"><span>Dia do vencimento</span><input name="diaVenc" type="number" min="1" max="28" value="${Number(pl.diaVenc||10)}"></label>
+    <label class="f"><span>Funcionários inclusos</span><input name="funcInclusos" type="number" min="0" value="${Number(pl.funcInclusos||0)}"></label>
+    <label class="f"><span>Início dos serviços (competência)</span><select name="inicioControle">${meses.map(c=>`<option value="${c}" ${c===compAtual()?'selected':''}>${fmtComp(c)}</option>`).join('')}</select></label>`:''}
+    ${comDocs?`<label class="chk full"><input type="checkbox" name="copiarDocs" checked> Guardar na carteira os ${comDocs} documento(s) anexados no processo (Documentos da equipe › Legalização)</label>`:''}
+   </div></div><div class="modal-foot"><button type="button" class="btn" data-act="proc-abrir" data-id="${p.id}">Voltar</button><button class="btn primary">${ab?'Concluir, ativar e gerar contrato':'Atualizar a carteira'}</button></div></form>`}
+ACT['soc-concluir']=el=>{const p=procDe(el.dataset.id);if(!p||!emp(p.empresaId))return;openModal(socConcluirHtml(p),true)};
+ACT['soc-receita']=async el=>{const f=el.form||el.closest('form');const out=document.getElementById('soc-receita-res');const c=soDig(f.cnpj.value);
+  if(c.length!==14||!cnpjValido(c)){out.innerHTML='<b style="color:var(--crit)">CNPJ inválido. Confira os dígitos.</b>';return}
+  if(MODO!=='api'){out.textContent='A busca na Receita funciona na versão publicada.';return}
+  out.textContent='Buscando na Receita Federal…';
+  try{const {dados:d}=await MF.api('GET','/api/cnpj/'+c);const set=(n,v)=>{if(v!=null&&v!==''&&f.elements[n])f.elements[n].value=v};
+    set('razao',d.razao);set('fantasia',d.fantasia);set('abertura',d.abertura);set('natureza',d.natureza);set('cnae',d.cnae);set('atividade',d.atividade);
+    set('cep',(d.endereco?.cep||'').replace(/^(\d{5})(\d{3})$/,'$1-$2'));set('logradouro',d.endereco?.logradouro);set('numero',d.endereco?.numero);set('complemento',d.endereco?.complemento);set('bairro',d.endereco?.bairro);set('municipio',d.municipio);set('uf',d.uf);
+    if(d.regime==='MEI')f.regime.value='MEI';else if(d.regime==='SN'&&f.regime.value!=='SN-IE')f.regime.value='SN';
+    f.dataset.ibge=d.ibge||'';f.dataset.socios=JSON.stringify(d.socios||[]);f.dataset.email=d.email||'';f.dataset.telefone=d.telefone||'';
+    const so=document.getElementById('soc-socios');if(so)so.innerHTML=(d.socios||[]).length?'<span>Sócios (Receita)</span><span class="small" style="display:block">'+d.socios.map(s=>esc(s.nome)+(s.qualificacao?' ('+esc(s.qualificacao)+')':'')).join('; ')+'</span>':'';
+    out.innerHTML=`<b style="color:var(--ok)">Situação na Receita: ${esc(d.situacao||'—')}.</b> Confira os campos antes de confirmar.`}
+  catch(er){out.innerHTML='<b style="color:var(--crit)">'+esc(er.message||'Consulta indisponível.')+'</b>'}};
+function socCopiarDocs(p,e){const L=(p.docs||[]).filter(d=>d.arquivo&&!d.naCarteira);if(!L.length)return 0;
+  mut('docsinternos',()=>L.forEach(d=>S.docsinternos.push({id:uid(),empresaId:e.id,nome:d.nome,depto:'Legalização',arquivo:d.arquivo,em:agora(),uid:ME.id,nomeUsuario:ME.nome||'',noPortal:false,origem:'societario'})),['Documentos','Guardou '+L.length+' documento(s) do processo de '+TIPO_PROC[p.tipo].toLowerCase(),e.razao]);
+  L.forEach(d=>d.naCarteira=true);return L.length}
+FORM['soc-concluir']=async(fd,form)=>{const p=procDe(form.dataset.id);const e=p&&emp(p.empresaId);if(!p||!e||!podeSoc('editar'))return;const ab=p.tipo==='abertura';
+  const g=k=>String(fd.get(k)||'').trim();const cnpj=soDig(g('cnpj'));if(!cnpjValido(cnpj)){toast('CNPJ inválido.',true);return}
+  let socios=[];try{socios=JSON.parse(form.dataset.socios||'[]')}catch(x){}
+  const dados={cnpj,razao:g('razao'),fantasia:g('fantasia'),abertura:g('abertura'),natureza:g('natureza'),regime:g('regime'),cnae:g('cnae'),atividade:g('atividade'),ie:g('ie'),im:g('im'),
+    endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},municipio:g('municipio'),uf:g('uf').toUpperCase(),ibge:form.dataset.ibge||'',socios,email:form.dataset.email||'',telefone:form.dataset.telefone||''};
+  if(dados.razao.length<3){toast('Informe a razão social.',true);return}
+  if(dados.endereco.cep.length!==8||!dados.endereco.logradouro||!dados.municipio||dados.uf.length!==2){toast('Informe o endereço completo (CEP, rua, cidade e UF).',true);return}
+  const copiar=!!fd.get('copiarDocs');
+  if(ab){const plano={valor:valBR(fd.get('valor')),diaVenc:Number(fd.get('diaVenc'))||10,funcInclusos:Math.max(0,Number(fd.get('funcInclusos'))||0)};if(!(plano.valor>0)){toast('Informe o honorário mensal.',true);return}
+    if(MODO!=='api'){toast('A conclusão da abertura funciona na versão publicada.',true);return}
+    let r;try{r=await MF.api('POST',`/api/societario/abertura/${encodeURIComponent(e.id)}/concluir`,{empresa:dados,plano,inicioControle:fd.get('inicioControle'),processoId:p.id})}catch(er){toast(er.message||'Não foi possível concluir.',true);return}
+    if(r.empresa){const i=S.empresas.findIndex(x=>x.id===e.id);if(i>=0)S.empresas[i]=r.empresa}
+    const nd=copiar?socCopiarDocs(p,r.empresa||e):0;
+    procMut(p,()=>{p.cnpj=cnpj;p.nome=dados.razao;const et=(p.etapas||[]).find(x=>/CNPJ emitido/.test(x.nome));if(et&&!et.feito){et.feito=true;et.em=agora();et.por=ME.nome||''}
+      (p.notas||(p.notas=[])).push({em:agora(),por:ME.nome||'',texto:`Abertura concluída: cliente ativo na carteira com o CNPJ ${fmtCNPJ(cnpj)}.${r.contrato?' Contrato nº '+r.contrato.numero+' gerado para assinatura.':' Contrato não gerado: '+(r.erroContrato||'erro')+'.'}${nd?' '+nd+' documento(s) guardados na carteira.':''}`})},'Concluiu a abertura e ativou o cliente');
+    toast(r.contrato?'Cliente ativado e contrato gerado.':'Cliente ativado. Contrato não gerado: '+(r.erroContrato||'erro'),!r.contrato);return}
+  mut('empresas',()=>{Object.assign(e,{cnpj,razao:dados.razao,fantasia:dados.fantasia||e.fantasia,abertura:dados.abertura||e.abertura,natureza:dados.natureza,cnae:dados.cnae,atividade:dados.atividade,ie:soDig(dados.ie),im:dados.im,endereco:{...(e.endereco||{}),...dados.endereco},municipio:dados.municipio,uf:dados.uf,...(dados.ibge?{ibge:dados.ibge}:{}),...(socios.length?{socios:socios.map(s=>({...((e.socios||[]).find(x=>normP(x.nome)===normP(s.nome))||{}),nome:s.nome,qualificacao:s.qualificacao}))}:{})})},['Carteira','Atualizou o cadastro pela alteração no Societário',e.razao]);
+  const nd=copiar?socCopiarDocs(p,e):0;
+  procMut(p,()=>{(p.notas||(p.notas=[])).push({em:agora(),por:ME.nome||'',texto:'Cadastro da carteira atualizado com os dados da Receita.'+(nd?' '+nd+' documento(s) guardados na carteira.':'')})},'Atualizou a carteira');toast('Cadastro da carteira atualizado.')};
+(()=>{const st=document.createElement('style');st.textContent='[hidden]{display:none!important}';document.head.appendChild(st)})();
+/* ==== v48 (fim) ==== */
 /* CRC nos arquivos SPED: campo de até 15 posições, só letras e números ("CRC/MS 016636/O-0" → "MS016636O0") */
 function crcSped(c){return String(c||'').toUpperCase().replace(/^\s*CRC/,'').replace(/[^A-Z0-9]/g,'').slice(0,15)}
 
@@ -9994,7 +10125,7 @@ if(APP_SIS){
   const F_VIEWS=NAV_F.flatMap(g=>g[1].map(i=>i[0]));
   const V_PADRAO=APP_CONTABIL?'c-lanc':F_VIEWS[0];
   const COM_PERIODO=APP_DP||APP_SOC?[]:APP_CONTABIL?CTB_PERIODO:['f-saidas','f-entradas','f-rel','f-lanc','f-nfse-p','f-nfse-t'];
-  const empsCtb=()=>empresasVisiveis().slice().sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
+  const empsCtb=()=>empresasVisiveis().filter(e=>e.status!=='em_abertura').sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
   function ctbEstado(){const es=empsCtb();const F=UI.fsn||(UI.fsn={emp:null,comp:addMes(compAtual(),APP_DP?0:-1)});
     if(!F.comp)F.comp=addMes(compAtual(),APP_DP?0:-1);
     if(!es.some(e=>e.id===F.emp)){const lemb=(()=>{try{return localStorage.getItem('mf-ctb-emp')}catch(e){return null}})();F.emp=(es.find(e=>e.id===lemb)||(APP_DP?es.find(e=>S.funcionarios.some(f=>f.empresaId===e.id&&!f.desligado)):es.find(e=>e.regime==='SN'||e.regime==='MEI'))||es[0])?.id||null}

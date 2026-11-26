@@ -40,7 +40,7 @@ function quebrar(txt, tam, negrito, max) {
 }
 
 // blocos: { t: 'titulo'|'subtitulo'|'h'|'p'|'li'|'espaco'|'assinaturas'|'quadro', texto, itens, negrito }
-export function gerarPdf({ blocos, rodape = '', titulo = 'Documento' }) {
+export function gerarPdf({ blocos, rodape = '', titulo = 'Documento', produtor = 'Meu Fiscal' }) {
   const LARG = 595.28, ALT = 841.89, ME = 56, MD = 56, MT = 60, MB = 60; const UTIL = LARG - ME - MD;
   const paginas = []; let ops = []; let y = ALT - MT;
   const novaPagina = () => { if (ops.length) paginas.push(ops); ops = []; y = ALT - MT; };
@@ -104,7 +104,7 @@ export function gerarPdf({ blocos, rodape = '', titulo = 'Documento' }) {
   });
   objs[catalogo - 1] = `<< /Type /Catalog /Pages ${pags} 0 R >>`;
   objs[pags - 1] = `<< /Type /Pages /Kids [${kids.map(k => k + ' 0 R').join(' ')}] /Count ${kids.length} >>`;
-  const info = add(`<< /Title (${codificar(titulo)}) /Producer (Meu Fiscal) >>`);
+  const info = add(`<< /Title (${codificar(titulo)}) /Producer (${codificar(produtor)}) >>`);
   let out = '%PDF-1.4\n%\xE2\xE3\xCF\xD3\n'; const offs = [];
   objs.forEach((o, i) => { offs.push(Buffer.byteLength(out, 'latin1')); out += `${i + 1} 0 obj\n${o}\nendobj\n`; });
   const xref = Buffer.byteLength(out, 'latin1');

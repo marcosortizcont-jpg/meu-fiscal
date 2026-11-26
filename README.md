@@ -709,3 +709,13 @@ Tudo abaixo rodou contra um PostgreSQL 16 real, com os dois sites em domínios s
 - **Vencimentos**: licenças, certificados digitais, prazos de processos e pendências, por data. **Pendências**: tudo que falta, por responsável. **Documentação**: pasta societária por empresa (documentos da equipe no departamento Legalização, licenças e o que chegou nos processos).
 - As duas coleções não vão para o portal do cliente.
 - Para publicar: Worker `meufiscal-societario` com Workers Builds na pasta `sites/societario`, domínio `societario.omeufiscal.com.br`, e as duas origens novas em `ORIGENS_PAINEL` no Render (já estão no `render.yaml`).
+
+### Societário ligado à carteira
+- Novo processo de **abertura** com "Cadastrar como cliente novo na carteira": o servidor cria a empresa com status `em_abertura` (`POST /api/societario/abertura`). Ela aparece na carteira como "Em abertura", sem mensalidade, sem alertas e fora das rotinas mensais, da Escrita Fiscal e do Integra.
+- **Concluir abertura** (no processo): CNPJ + busca na Receita, conferência dos dados, honorário e competência de início. O servidor (`POST /api/societario/abertura/:id/concluir`) completa o cadastro, ativa o cliente e gera o contrato para assinatura. Os documentos anexados no processo vão para Documentos da equipe › Legalização.
+- O status `em_abertura` só muda pelo servidor (o navegador não ativa sozinho).
+- Processo de **alteração**: "Atualizar a carteira" puxa os dados novos da Receita para o cadastro.
+
+### Contrato de prestação de serviços (padrão)
+- Contrato só entre contador (CONTRATADO) e cliente (CONTRATANTE), nos termos da Resolução CFC nº 1.590/2020: sem marca de plataforma, sem nome do plano e sem condições comerciais (atendimento, assistente virtual, brindes).
+- Serviços padrão por regime (MEI ou empresa; ICMS quando há IE; folha com o limite de pessoas do cadastro); serviços eventuais sempre por orçamento.

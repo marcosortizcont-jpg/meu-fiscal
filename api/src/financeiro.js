@@ -73,7 +73,7 @@ export function registrarFinanceiro(r, { db, exigir, log, pode, wa, ganchos = {}
   async function gerarMensalidades(esc, comp, { quem, empresas: somente } = {}) {
     const conf = cfgFin(await A.configEscritorio(esc));
     const emps = (await db.query(`SELECT dados FROM registros WHERE escritorio_id = $1 AND colecao = 'empresas'`, [esc])).map(x => x.dados)
-      .filter(e => !['inativo', 'aguardando_pagamento'].includes(e.status) && e.plano && Number(e.plano.valor) > 0 && (!somente || somente.includes(e.id)));
+      .filter(e => !['inativo', 'aguardando_pagamento', 'em_abertura'].includes(e.status) && e.plano && Number(e.plano.valor) > 0 && (!somente || somente.includes(e.id)));
     const existentes = new Set((await db.query(`SELECT empresa_id FROM registros WHERE escritorio_id = $1 AND colecao = 'faturas' AND dados->>'comp' = $2 AND coalesce(dados->>'status','') <> 'cancelada'`, [esc, comp])).map(x => x.empresa_id));
     const criadas = [];
     for (const e0 of emps) {

@@ -2,7 +2,7 @@
 //
 // Contrato: gerado em PDF automaticamente quando o cadastro é ativado (pagamento confirmado ou voucher), com os dados
 // do cadastro, do plano e do contador responsável técnico (Configurações › Contrato). O comercial baixa, coleta as
-// assinaturas e anexa o contrato assinado no cadastro. A Meu Fiscal aparece só como plataforma tecnológica.
+// assinaturas e anexa o contrato assinado no cadastro. O contrato é só entre o contador e o cliente (sem marca de plataforma).
 //
 // Comissões: quem cadastrou o cliente recebe um percentual (padrão 30%) do 1º pagamento. A comissão nasce "a pagar"
 // no Financeiro › Comissões; cada usuário vê as próprias em Comercial › Minhas comissões. Fica numa tabela própria
@@ -29,73 +29,99 @@ export function cfgContrato(cfg) {
   return { ...c, contador, crc: String(cfg.crc || '').trim(), marca: marcaDe(cfg), faltam };
 }
 
+// Serviços do contrato: lista padrão por porte e regime, sem textos comerciais do plano.
+function servicosContrato(e, p) {
+  const mei = e.regime === 'MEI';
+  const folha = Math.max(0, Number(e.plano?.funcInclusos ?? p.folha ?? 0) || 0);
+  const icms = !!soDig(e.ie) || e.regimeId === 'reg2-sn-com-ie' || p.grupo === 'Comércio';
+  if (mei) return [
+    'Apuração e emissão mensal do Documento de Arrecadação do Simples Nacional do Microempreendedor Individual (DAS-MEI);',
+    'Elaboração e transmissão da Declaração Anual do Simples Nacional do MEI (DASN-SIMEI);',
+    'Acompanhamento do limite anual de receita bruta e orientação sobre o desenquadramento, quando cabível;',
+    'Orientação sobre o relatório mensal das receitas brutas e sobre a emissão de documentos fiscais;',
+    ...(folha ? ['Rotinas trabalhistas e previdenciárias do empregado do MEI (folha de pagamento, eSocial, DCTFWeb e FGTS Digital);'] : []),
+    'Orientação técnica sobre as obrigações relativas aos serviços contratados.',
+  ];
+  return [
+    'Escrituração contábil de acordo com as Normas Brasileiras de Contabilidade e elaboração das demonstrações contábeis exigidas para o porte e o regime da empresa;',
+    'Escrituração fiscal e apuração mensal dos tributos devidos no regime tributário da empresa, com a emissão das respectivas guias de recolhimento;',
+    ...(icms ? ['Apuração do ICMS e cumprimento das obrigações acessórias estaduais;'] : []),
+    'Elaboração e transmissão das obrigações acessórias federais, estaduais e municipais, mensais e anuais, decorrentes das atividades da empresa;',
+    folha ? `Folha de pagamento, pró-labore, encargos sociais e respectivas obrigações (eSocial, DCTFWeb e FGTS Digital), de até ${folha} ${folha === 1 ? 'pessoa' : 'pessoas'} entre sócios e empregados;`
+      : 'Cálculo do pró-labore dos sócios, dos encargos correspondentes e das respectivas obrigações (eSocial e DCTFWeb);',
+    'Orientação técnica sobre as obrigações contábeis, fiscais e trabalhistas relativas aos serviços contratados.',
+  ];
+}
+
 export function montarContrato({ cfg, e, numero, data, financeiro = {}, alteracao = null }) {
-  const C = cfgContrato(cfg); const p = planoDe(e.plano?.nome || e.ativacao?.planoNome, e.regime, cfg?.planosPrecos); const at = e.ativacao || {};
-  const valor = r2(e.plano?.valor || at.valor || p.preco); const dia = Number(e.plano?.diaVenc) || 10;
+  const C = cfgContrato(cfg); const p = planoDe(e.plano?.nome || e.ativacao?.planoNome, e.regime, cfg?.planosPrecos);
+  const valor = r2(e.plano?.valor || e.ativacao?.valor || p.preco); const dia = Number(e.plano?.diaVenc) || 10;
   const multa = Number(financeiro.multa ?? 2), juros = Number(financeiro.juros ?? 1);
   const en = e.endereco || {};
   const endCliente = [en.logradouro, en.numero || 'S/N', en.complemento, en.bairro, `${e.municipio || ''}/${e.uf || ''}`, en.cep ? 'CEP ' + fmtCep(en.cep) : ''].filter(x => x && x !== '/').join(', ');
   const rep = e.representante || e.contatos?.[0] || {};
+  const folha = Math.max(0, Number(e.plano?.funcInclusos ?? p.folha ?? 0) || 0);
   const B = []; const h = t => B.push({ t: 'h', texto: t }); const p_ = t => B.push({ t: 'p', texto: t }); const li = (t, m) => B.push({ t: 'li', texto: t, marcador: m });
   let n = 0; const cl = t => h(`CLÁUSULA ${++n}ª – ${t}`);
+  const comp = d => `${String(d).slice(5, 7)}/${String(d).slice(0, 4)}`;
 
   B.push({ t: 'titulo', texto: 'CONTRATO DE PRESTAÇÃO DE SERVIÇOS PROFISSIONAIS CONTÁBEIS' });
-  B.push({ t: 'subtitulo', texto: `Contrato nº ${numero} · celebrado nos termos da Resolução CFC nº 1.590/2020${alteracao ? ' · alteração de plano' : ''}` });
+  B.push({ t: 'subtitulo', texto: `Contrato nº ${numero}${alteracao ? ' · termo de alteração' : ''}` });
   h('CONTRATANTE');
-  B.push({ t: 'quadro', itens: [['Razão social', e.razao], ['Nome fantasia', e.fantasia || '—'], ['CNPJ', fmtDoc(e.cnpj)], ['Endereço', endCliente || '—'], ['E-mail / WhatsApp', [e.email, e.telefone].filter(Boolean).join(' · ')],
+  B.push({ t: 'quadro', itens: [['Razão social', e.razao], ['CNPJ', fmtDoc(e.cnpj)], ['Endereço', endCliente || '—'],
     ['Representante legal', [rep.nome, rep.cpf ? 'CPF ' + fmtDoc(rep.cpf) : ''].filter(Boolean).join(', ') || '—']] });
   h('CONTRATADO');
-  B.push({ t: 'quadro', itens: [['Contador', C.contador || '—'], ['Registro', C.crc || '—'], ['CPF/CNPJ', fmtDoc(C.contadorDoc) || '—'], ['Endereço profissional', C.contadorEndereco || '—'],
-    ['Contato', [cfg.email, cfg.telefone].filter(Boolean).join(' · ') || '—']] });
-  p_(`As partes acima qualificadas celebram o presente contrato, que se rege pelas cláusulas a seguir e pela legislação aplicável, em especial o Código Civil, a Resolução CFC nº 1.590/2020 e o Código de Ética Profissional do Contador (NBC PG 01).`);
+  B.push({ t: 'quadro', itens: [['Contador', C.contador || '—'], ['Registro no CRC', C.crc || '—'], ['CPF/CNPJ', fmtDoc(C.contadorDoc) || '—'], ['Endereço profissional', C.contadorEndereco || '—']] });
+  p_('As partes acima qualificadas celebram o presente contrato de prestação de serviços profissionais contábeis, que se rege pelas cláusulas seguintes, pelo Código Civil, pela Resolução CFC nº 1.590/2020 e pelo Código de Ética Profissional do Contador (NBC PG 01).');
+  if (alteracao) p_(`Este instrumento substitui, a partir de ${porExtenso(data)}, o contrato nº ${alteracao.anterior?.numero || '—'}${alteracao.anterior?.valor ? ', cujos honorários mensais eram de ' + brl(alteracao.anterior.valor) : ''}, em razão de ${alteracao.tipo === 'reajuste' ? 'reajuste de honorários' : 'alteração dos serviços contratados'}${alteracao.motivo ? ' (' + alteracao.motivo + ')' : ''}. Até essa data permanecem válidas as condições do contrato anterior.`);
 
-  if (alteracao) p_(`Este contrato substitui, a partir de ${porExtenso(data)}, o contrato nº ${alteracao.anterior?.numero || '—'}${alteracao.anterior?.plano ? ' (plano "' + alteracao.anterior.plano + '", honorários de ' + brl(alteracao.anterior.valor) + ')' : ''}, em razão de ${alteracao.tipo === 'reajuste' ? 'reajuste de honorários' : alteracao.tipo === 'downgrade' ? 'mudança de plano' : 'mudança (upgrade) de plano'}${alteracao.motivo ? ': ' + alteracao.motivo : ''}. Até essa data, continuam valendo as condições do contrato anterior.`);
   cl('DO OBJETO');
-  p_(`O CONTRATADO, contador regularmente registrado no Conselho Regional de Contabilidade, prestará ao CONTRATANTE os serviços profissionais contábeis do plano "${p.nome}"${p.sobMedida ? ' (condições sob medida)' : ''}, descritos na cláusula seguinte, assumindo a responsabilidade técnica por eles.`);
-  cl('DOS SERVIÇOS CONTRATADOS');
-  p_('Serviços permanentes e habituais, executados mensal ou anualmente, inclusos nos honorários mensais:');
-  p.servicos.forEach(s => li(s));
-  p_('Serviços eventuais, não inclusos e cobrados à parte mediante orçamento prévio aceito pelo CONTRATANTE: alterações contratuais e baixa de empresa (salvo quando o plano os incluir), regularização de períodos anteriores ao início deste contrato, retificações motivadas por informações incorretas ou entregues fora do prazo pelo CONTRATANTE, parcelamentos, defesas e recursos administrativos, certidões especiais, perícias, auditorias, consultorias e declarações de imposto de renda de pessoas físicas não previstas no plano.');
-  if (p.folha) p_(`Funcionários e sócios na folha acima do limite do plano serão cobrados em adicional mensal${Number(e.plano?.adicionalFunc) > 0 ? ' de ' + brl(e.plano.adicionalFunc) + ' por pessoa' : ', conforme tabela vigente'}.`);
-  cl('DOS SERVIÇOS EXECUTADOS PELO CONTRATANTE');
-  p_('Cabe ao próprio CONTRATANTE, sem responsabilidade do CONTRATADO:');
-  ['emitir as notas fiscais de suas vendas e serviços, inclusive pelo emissor integrado ao portal;', 'pagar nos vencimentos as guias de tributos, encargos e honorários disponibilizadas no portal;',
-    'enviar mensalmente, pelo portal e até o dia 5 do mês seguinte, os documentos e informações necessários (notas fiscais de entrada e saída, extratos, folha e demais documentos solicitados);',
-    'manter o certificado digital válido e informar alterações cadastrais, societárias, de atividade, de funcionários e de endereço;', 'acompanhar as notificações de órgãos públicos e repassá-las ao CONTRATADO em até 5 (cinco) dias úteis do recebimento;',
-    'guardar os documentos originais pelo prazo legal e responder pela veracidade, integridade e licitude das informações e documentos entregues.'].forEach(t => li(t, '–'));
-  cl('DA PLATAFORMA MEU FISCAL');
-  p_(`Os serviços são prestados por meio da plataforma tecnológica Meu Fiscal${C.marca ? ' (marca ' + C.marca + ')' : ''}, utilizada pelo CONTRATADO como ferramenta de atendimento, envio e guarda de documentos, emissão de guias e relatórios. A plataforma não presta serviços contábeis, não exerce responsabilidade técnica e não substitui o CONTRATADO, que é o único responsável técnico pelos serviços deste contrato. O uso da plataforma também observa os Termos de Uso e a Política de Privacidade aceitos no portal.`);
+  p_('O presente contrato tem por objeto a prestação, pelo CONTRATADO, dos serviços profissionais contábeis relacionados na cláusula seguinte, sob sua responsabilidade técnica, de acordo com as Normas Brasileiras de Contabilidade e a legislação aplicável.');
+  cl('DOS SERVIÇOS');
+  p_('Serviços permanentes e habituais, incluídos nos honorários mensais:');
+  servicosContrato(e, p).forEach(s => li(s));
+  p_('Serviços eventuais, não incluídos nos honorários mensais, que dependem de orçamento prévio aprovado pelo CONTRATANTE: constituição, alteração e baixa de empresa; obtenção e renovação de alvarás, licenças e certidões especiais; regularização de períodos anteriores ao início deste contrato; retificações motivadas por informações incorretas ou entregues fora do prazo pelo CONTRATANTE; parcelamentos, defesas e recursos administrativos; declaração de imposto de renda de pessoa física; perícias, auditorias e consultorias específicas.');
+  if (folha) p_(`Pessoas na folha de pagamento acima do limite indicado acima serão cobradas em adicional mensal${Number(e.plano?.adicionalFunc) > 0 ? ' de ' + brl(e.plano.adicionalFunc) + ' por pessoa' : ', mediante orçamento'}.`);
+
+  cl('DAS OBRIGAÇÕES DO CONTRATANTE');
+  ['entregar ao CONTRATADO, até o dia 5 (cinco) do mês seguinte ao da competência, todos os documentos e informações necessários à execução dos serviços, tais como notas fiscais de entrada e saída, extratos bancários, informações de folha de pagamento e demais documentos solicitados;',
+    'emitir os documentos fiscais de suas operações e recolher, nos vencimentos, os tributos, encargos e honorários;',
+    'manter válido o certificado digital da empresa e comunicar previamente ao CONTRATADO qualquer alteração cadastral, societária, de atividade, de endereço ou de pessoal;',
+    'repassar ao CONTRATADO, em até 5 (cinco) dias úteis do recebimento, as notificações, intimações e comunicações de órgãos públicos;',
+    'guardar os documentos originais pelo prazo legal e responder pela veracidade, integridade e licitude das informações e documentos fornecidos.'].forEach(t => li(t, '–'));
+  p_('A entrega de documentos e informações poderá ser feita fisicamente ou por meio eletrônico indicado pelo CONTRATADO, valendo o registro de envio como comprovante.');
+
+  cl('DAS OBRIGAÇÕES E RESPONSABILIDADES DO CONTRATADO');
+  ['executar os serviços com zelo, diligência e observância das Normas Brasileiras de Contabilidade e da legislação vigente;', 'manter sigilo sobre as informações a que tiver acesso, salvo nos casos previstos em lei;',
+    'disponibilizar ao CONTRATANTE as guias de recolhimento com antecedência razoável do vencimento, desde que os documentos tenham sido entregues no prazo;', 'corrigir, sem custo para o CONTRATANTE, os erros técnicos a que der causa;',
+    'manter regular o seu registro no Conselho Regional de Contabilidade durante toda a vigência do contrato.'].forEach(t => li(t, '–'));
+  p_('O CONTRATADO não responde por multas, juros ou prejuízos decorrentes de documentos ou informações não entregues, entregues fora do prazo, incompletos ou incorretos, nem pelo não recolhimento de tributos ou por decisões tomadas pelo CONTRATANTE contra a sua orientação.');
+
   cl('DO PRAZO');
-  p_(`Este contrato vigora por prazo indeterminado a partir de ${porExtenso(data)}, abrangendo os serviços a partir da competência ${String(e.inicioControle || data).slice(5, 7)}/${String(e.inicioControle || data).slice(0, 4)}. Os fatos anteriores a essa competência não são de responsabilidade do CONTRATADO.`);
-  cl('DOS HONORÁRIOS E DO PAGAMENTO');
-  if (alteracao) p_(`Pelos serviços permanentes e habituais, a partir da competência ${String(data).slice(5, 7)}/${String(data).slice(0, 4)}, o CONTRATANTE pagará honorários mensais de ${brl(valor)}, com vencimento todo dia ${dia} do mês seguinte ao da competência, por boleto ou PIX emitidos pela plataforma.`);
-  else p_(`Pelos serviços permanentes e habituais, o CONTRATANTE pagará honorários mensais de ${brl(valor)}, com vencimento todo dia ${dia} do mês seguinte ao da competência, por boleto ou PIX emitidos pela plataforma. A primeira mensalidade${at.total !== undefined ? ', no valor de ' + brl(at.total) + (at.desconto ? ' (com desconto de ' + brl(at.desconto) + (at.voucher?.codigo ? ', cupom ' + at.voucher.codigo : '') + ')' : '') : ''}, foi paga na ativação do cadastro.`);
-  if (!alteracao && at.voucher && Number(at.voucher.meses) > 1) p_(`O desconto do cupom ${at.voucher.codigo} vale para as ${at.voucher.meses} primeiras mensalidades; depois, volta a valer o valor integral.`);
-  p_(`Os serviços eventuais serão pagos conforme orçamento aprovado. O atraso no pagamento acarreta multa de ${multa}% e juros de ${juros}% ao mês, e o atraso superior a 30 (trinta) dias permite ao CONTRATADO suspender a execução dos serviços após aviso ao CONTRATANTE, sem prejuízo da cobrança.`);
-  cl('DO REAJUSTE');
-  p_(`Os honorários serão reajustados anualmente, no mês de aniversário do contrato, pela variação acumulada do ${C.reajuste} dos últimos 12 meses, ou por outro índice oficial que o substitua. Mudança de plano, de regime tributário, de volume de notas ou de funcionários pode alterar o valor mediante aditivo.`);
-  cl('DAS RESPONSABILIDADES DO CONTRATADO');
-  ['executar os serviços com zelo, diligência e observância das Normas Brasileiras de Contabilidade e da legislação;', 'manter sigilo sobre as informações do CONTRATANTE, salvo obrigação legal;',
-    'disponibilizar as guias no portal com antecedência mínima de 3 (três) dias do vencimento, sempre que os documentos tiverem sido entregues no prazo;', 'responder pelos erros técnicos a que der causa, corrigindo-os sem custo;',
-    'manter seu registro profissional regular no CRC durante toda a vigência do contrato.'].forEach(t => li(t, '–'));
-  p_('O CONTRATADO não responde por multas, juros ou prejuízos decorrentes de documentos ou informações não entregues, entregues fora do prazo, incompletos ou incorretos, nem por guias não pagas ou decisões tomadas pelo CONTRATANTE.');
+  p_(`Este contrato vigora por prazo indeterminado a partir de ${porExtenso(data)} e abrange os serviços a partir da competência ${comp(e.inicioControle || data)}. Os fatos ocorridos antes dessa competência não são de responsabilidade do CONTRATADO.`);
+
+  cl('DOS HONORÁRIOS');
+  p_(`Pelos serviços permanentes e habituais, o CONTRATANTE pagará ao CONTRATADO honorários mensais de ${brl(valor)}${alteracao ? ', a partir da competência ' + comp(data) : ''}, com vencimento no dia ${dia} do mês seguinte ao da competência, por boleto bancário, PIX ou outro meio indicado pelo CONTRATADO.`);
+  p_(`Os serviços eventuais serão pagos conforme o orçamento aprovado. O atraso no pagamento acarreta multa de ${multa}% e juros de ${juros}% ao mês sobre o valor devido. O atraso superior a 30 (trinta) dias permite ao CONTRATADO suspender a execução dos serviços, mediante comunicação prévia por escrito, sem prejuízo da cobrança.`);
+  p_(`Os honorários serão reajustados anualmente, no mês de aniversário do contrato, pela variação acumulada do ${C.reajuste} nos últimos 12 (doze) meses, ou por outro índice oficial que o substitua. Mudanças no volume de documentos, no número de pessoas na folha, no regime tributário ou nos serviços poderão alterar os honorários, mediante termo aditivo.`);
+
   cl('DOS ADITIVOS');
-  p_('Qualquer alteração de plano, de serviços ou de honorários será formalizada por termo aditivo, inclusive por meio eletrônico com registro do aceite na plataforma.');
+  p_('Qualquer alteração dos serviços ou dos honorários será formalizada por termo aditivo ou novo instrumento, assinado pelas partes, inclusive eletronicamente.');
   cl('DA CARTA DE RESPONSABILIDADE DA ADMINISTRAÇÃO');
-  p_('O CONTRATANTE fornecerá anualmente ao CONTRATADO, por ocasião do encerramento do exercício, a Carta de Responsabilidade da Administração, nos termos do art. 3º da Resolução CFC nº 1.590/2020, quando aplicável ao seu porte e regime. A recusa será analisada pelo CONTRATADO, que adotará as salvaguardas cabíveis.');
-  cl('DA LEI Nº 9.613/1998 (PREVENÇÃO À LAVAGEM DE DINHEIRO)');
-  p_('O CONTRATANTE declara ter ciência de que o CONTRATADO está sujeito à Lei nº 9.613/1998 e às normas do CFC sobre prevenção à lavagem de dinheiro e ao financiamento do terrorismo, devendo comunicar ao COAF as operações e propostas de operações previstas na norma, sem que isso configure quebra de sigilo.');
+  p_('O CONTRATANTE fornecerá ao CONTRATADO, ao final de cada exercício, a Carta de Responsabilidade da Administração, nos termos da Resolução CFC nº 1.590/2020, confirmando que as informações e documentos entregues são completos e verdadeiros.');
+  cl('DA PREVENÇÃO À LAVAGEM DE DINHEIRO');
+  p_('O CONTRATANTE declara ciência de que o CONTRATADO está sujeito à Lei nº 9.613/1998 e às normas do Conselho Federal de Contabilidade sobre prevenção à lavagem de dinheiro e ao financiamento do terrorismo, inclusive quanto às comunicações ao COAF nelas previstas, sem que isso configure quebra de sigilo profissional.');
   cl('DA PROTEÇÃO DE DADOS');
-  p_('As partes tratarão os dados pessoais envolvidos apenas para a execução deste contrato e o cumprimento de obrigações legais, conforme a Lei nº 13.709/2018 (LGPD), adotando medidas de segurança adequadas.');
-  cl('DA RESCISÃO E DO DISTRATO');
-  p_(`Qualquer das partes pode rescindir este contrato, sem multa, mediante aviso prévio por escrito de ${C.avisoPrevio} (${C.avisoPrevio === 30 ? 'trinta' : C.avisoPrevio}) dias, inclusive por e-mail ou pela plataforma, período em que os serviços e honorários seguem normalmente. O descumprimento de cláusula ou a inadimplência superior a 60 (sessenta) dias permite a rescisão imediata.`);
-  p_('O encerramento será formalizado por distrato, que indicará a forma e o prazo de devolução dos documentos e arquivos do CONTRATANTE. O CONTRATADO cumprirá as obrigações acessórias cujos fatos geradores ocorreram durante a vigência, ainda que vençam depois, e comunicará ao novo responsável técnico os fatos de que este precise ter conhecimento.');
+  p_('As partes tratarão os dados pessoais envolvidos somente para a execução deste contrato e o cumprimento de obrigações legais e regulatórias, conforme a Lei nº 13.709/2018 (LGPD), adotando medidas de segurança adequadas.');
+  cl('DA RESCISÃO');
+  p_(`Qualquer das partes poderá rescindir este contrato, sem multa, mediante aviso prévio por escrito de ${C.avisoPrevio} (${C.avisoPrevio === 30 ? 'trinta' : C.avisoPrevio}) dias, período em que os serviços e os honorários seguem normalmente. O descumprimento de qualquer cláusula ou a inadimplência superior a 60 (sessenta) dias autoriza a rescisão imediata.`);
+  p_('A rescisão será formalizada por distrato, com a indicação da data de encerramento da responsabilidade técnica e a devolução dos documentos e arquivos do CONTRATANTE mediante protocolo. O CONTRATADO cumprirá as obrigações acessórias cujos fatos geradores tenham ocorrido durante a vigência do contrato e prestará ao profissional que o suceder as informações de que este necessite, nos termos das normas profissionais.');
   cl('DO FORO');
-  p_(`Fica eleito o foro da comarca de ${C.foro} para dirimir as questões deste contrato, com renúncia a qualquer outro, por mais privilegiado que seja.`);
-  p_('E, por estarem de acordo, as partes assinam este contrato em duas vias de igual teor, ou eletronicamente, na presença das testemunhas abaixo.');
+  p_(`Fica eleito o foro da comarca de ${C.foro} para dirimir as questões decorrentes deste contrato, com renúncia a qualquer outro, por mais privilegiado que seja.`);
+  p_('E, por estarem de acordo, as partes assinam o presente instrumento em 2 (duas) vias de igual teor, ou eletronicamente, na presença das testemunhas abaixo.');
   B.push({ t: 'assinaturas', local: `${C.foro.split('/')[0]}, ${porExtenso(data)}.`, itens: [{ nome: String(e.razao || '').toUpperCase(), detalhe: 'CONTRATANTE' + (rep.nome ? ' · ' + rep.nome : '') }, { nome: (C.contador || 'CONTRATADO').toUpperCase(), detalhe: 'CONTRATADO · ' + (C.crc || '') },
     { nome: 'Testemunha 1: ____________________', detalhe: 'CPF:' }, { nome: 'Testemunha 2: ____________________', detalhe: 'CPF:' }] });
-  return gerarPdf({ blocos: B, rodape: `Contrato nº ${numero} · ${e.razao}`, titulo: `Contrato ${numero}` });
+  return gerarPdf({ blocos: B, rodape: `Contrato nº ${numero} · ${e.razao}`, titulo: `Contrato ${numero}`, produtor: C.contador || 'Contrato' });
 }
 
 export function registrarContratos(r, { db, exigir, log, pode }) {
