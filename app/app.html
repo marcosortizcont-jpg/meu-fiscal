@@ -10090,6 +10090,58 @@ FORM['soc-concluir']=async(fd,form)=>{const p=procDe(form.dataset.id);const e=p&
   procMut(p,()=>{(p.notas||(p.notas=[])).push({em:agora(),por:ME.nome||'',texto:'Cadastro da carteira atualizado com os dados da Receita.'+(nd?' '+nd+' documento(s) guardados na carteira.':'')})},'Atualizou a carteira');toast('Cadastro da carteira atualizado.')};
 (()=>{const st=document.createElement('style');st.textContent='[hidden]{display:none!important}';document.head.appendChild(st)})();
 /* ==== v48 (fim) ==== */
+/* ==== v49: Alvarás e licenças por cliente (todos os clientes, vencimento, anexo e controle direto na grade) ==== */
+const stLicV49=stLic;stLic=function(l){return l&&l.naoAplica?['Não se aplica','',99999]:stLicV49(l)};
+const LIC_COLS=['funcionamento','sanitaria','bombeiros','ambiental'];
+const LIC_CURTO={funcionamento:'Funcionamento',sanitaria:'Sanitária',bombeiros:'Bombeiros',ambiental:'Ambiental'};
+const clientesLic=()=>S.empresas.filter(e=>!['inativo','em_abertura'].includes(e.status)).sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
+const licsDe=(eid,tipo)=>S.licencas.filter(l=>l.empresaId===eid&&(!tipo||l.tipo===tipo)).sort((a,b)=>stLic(a)[2]-stLic(b)[2]);
+function licResumoEmp(e){const L=licsDe(e.id).filter(l=>!l.dispensada);const ativos=L.filter(l=>l.validade);const prox=ativos.slice().sort((a,b)=>a.validade.localeCompare(b.validade))[0];
+  const faltam=LIC_COLS.filter(k=>!licsDe(e.id,k).length);const crit=L.some(l=>stLic(l)[1]==='crit');const warn=L.some(l=>stLic(l)[1]==='warn');return {prox,faltam,crit,warn,semDoc:L.filter(l=>!l.arquivo&&(l.numero||l.validade)).length}}
+function licCelula(e,k,ed){const L=licsDe(e.id,k);
+  if(!L.length)return ed?`<div class="lic-cel vazia"><button type="button" class="btn sm" data-act="lic-cel-nova" data-emp="${e.id}" data-tipo="${k}" title="Cadastrar ${esc(nomeLic(k))}">+ Cadastrar</button><button type="button" class="btn sm ghost" data-act="lic-cel-na" data-emp="${e.id}" data-tipo="${k}" title="Marcar que esta empresa não precisa desta licença">N/A</button></div>`:'<span class="small muted">—</span>';
+  const l=L[0];const s=stLic(l);
+  return `<div class="lic-cel"><button type="button" class="lic-st" data-act="lic-abrir" data-id="${l.id}" title="Abrir e editar">${pill(s[0],s[1])}</button>
+   ${l.validade&&!l.dispensada?`<div class="small"><b>${fmtData(l.validade)}</b>${l.numero?` · <span class="mono">${esc(l.numero)}</span>`:''}</div>`:l.numero?`<div class="small mono">${esc(l.numero)}</div>`:''}
+   ${!l.dispensada?`<div class="lic-acoes">${l.arquivo?linkArq(l.arquivo,'Doc'):''}${ed?`<label class="btn sm ghost" style="cursor:pointer" title="${l.arquivo?'Trocar o documento':'Anexar o documento'}">${svg('clip')}${l.arquivo?'':' Anexar'}<input type="file" hidden data-lic-arq data-id="${l.id}" accept=".pdf,.jpg,.jpeg,.png"></label>${['crit','warn','info'].includes(s[1])?`<button type="button" class="btn sm ghost" data-act="lic-renovar" data-id="${l.id}" title="Registrar a licença renovada">Renovada</button>`:''}`:''}</div>`:''}
+   ${L.length>1?`<button type="button" class="btn sm ghost" data-act="lic-ver-emp" data-emp="${e.id}">+${L.length-1} outra${L.length>2?"s":""}</button>`:''}</div>`}
+const socLicencasV49=socLicencas;
+socLicencas=function(){const F=UI.socL||(UI.socL={emp:'',tipo:'',st:''});if(F.modo==='lista')return socLicencasV49().replace('<div class="panel"><div class="panel-head" style="gap:8px;flex-wrap:wrap">',`${licAbas('lista')}<div class="panel"><div class="panel-head" style="gap:8px;flex-wrap:wrap">`);
+  const ed=podeSoc('editar');const n=normP(F.q||'');
+  const es=clientesLic().filter(e=>(!n||normP([e.fantasia,e.razao,e.cnpj,soDig(e.cnpj),e.municipio].join(' ')).includes(n))&&(!F.mun||e.municipio===F.mun)).filter(e=>{if(!F.sit)return true;const r=licResumoEmp(e);
+    return F.sit==='problema'?(r.crit||r.warn):F.sit==='faltando'?r.faltam.length>0:F.sit==='semdoc'?r.semDoc>0:F.sit==='ok'?(!r.crit&&!r.warn&&!r.faltam.length):true});
+  const muns=[...new Set(clientesLic().map(e=>e.municipio).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'pt-BR'));
+  const todos=clientesLic();const tot={faltam:todos.filter(e=>licResumoEmp(e).faltam.length).length,crit:todos.filter(e=>licResumoEmp(e).crit).length,warn:todos.filter(e=>licResumoEmp(e).warn).length};
+  return head('Alvarás e licenças','Todos os clientes da carteira, com a situação de cada licença, o vencimento e o documento. Clique na situação para editar, em "Anexar" para guardar o PDF e em "N/A" quando a empresa não precisa daquela licença.',ed?`<button class="btn primary" data-act="lic-nova">${svg('plus')}Nova licença</button>`:'')+licAbas('empresas')+
+  `<div class="kpis" style="margin-bottom:12px"><div class="kpi"><span class="eyebrow">Clientes</span><b>${todos.length}</b><small>na carteira</small></div><div class="kpi"><span class="eyebrow">Com licença vencida</span><b style="color:var(--crit,#dc2626)">${tot.crit}</b><small>precisam renovar</small></div><div class="kpi"><span class="eyebrow">Vencendo</span><b>${tot.warn}</b><small>dentro do aviso</small></div><div class="kpi"><span class="eyebrow">Sem cadastro completo</span><b>${tot.faltam}</b><small>alguma licença sem informação</small></div></div>
+  <div class="panel"><div class="panel-head" style="gap:8px;flex-wrap:wrap"><input type="search" id="socl-q" data-live data-socl-q value="${esc(F.q||'')}" placeholder="Cliente, CNPJ ou cidade" style="max-width:280px">
+   <select data-socl="sit" style="width:auto">${[['','Todas as situações'],['problema','Vencidas ou vencendo'],['faltando','Com licença sem cadastro'],['semdoc','Sem documento anexado'],['ok','Tudo em dia']].map(([k,t])=>`<option value="${k}" ${F.sit===k?'selected':''}>${t}</option>`).join('')}</select>
+   ${muns.length>1?`<select data-socl="mun" style="width:auto"><option value="">Todas as cidades</option>${muns.map(m=>`<option ${F.mun===m?'selected':''}>${esc(m)}</option>`).join('')}</select>`:''}<span class="small muted">${es.length} de ${todos.length}</span></div>
+   ${es.length?`<div class="table-wrap"><table class="lic-grade"><thead><tr><th>Cliente</th>${LIC_COLS.map(k=>`<th>${LIC_CURTO[k]}</th>`).join('')}<th>Outras</th><th>Próximo vencimento</th></tr></thead><tbody>${es.map(e=>{const r=licResumoEmp(e);const out=S.licencas.filter(l=>l.empresaId===e.id&&!LIC_COLS.includes(l.tipo));const d=r.prox?diasAte(r.prox.validade):null;
+     return `<tr><td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted">${fmtCNPJ(e.cnpj||'')}${e.municipio?' · '+esc(e.municipio)+(e.uf?'/'+esc(e.uf):''):''}</div></td>${LIC_COLS.map(k=>`<td>${licCelula(e,k,ed)}</td>`).join('')}
+      <td>${out.length?`<button type="button" class="btn sm ghost" data-act="lic-ver-emp" data-emp="${e.id}">${out.length} ${out.length===1?'licença':'licenças'}</button>`:''}${ed?` <button type="button" class="btn sm ghost" data-act="lic-cel-nova" data-emp="${e.id}" data-tipo="outro" title="Cadastrar outra licença">+</button>`:''}</td>
+      <td class="small">${r.prox?`<b>${fmtData(r.prox.validade)}</b><div class="muted">${esc(LIC_CURTO[r.prox.tipo]||nomeLic(r.prox.tipo))}</div>${d<0?pill('vencida','crit'):d<=Number(r.prox.alerta||60)?pill(plural(d,'dia'),'warn'):''}`:'<span class="muted">—</span>'}</td></tr>`}).join('')}</tbody></table></div>`:vazio(todos.length?'Nenhum cliente com esses filtros.':'Nenhum cliente ativo na carteira.')}</div>`};
+function licAbas(m){return `<div class="tabs" role="tablist" style="margin-bottom:12px"><button role="tab" aria-selected="${m==='empresas'}" data-act="socl-modo" data-v="empresas">Por cliente</button><button role="tab" aria-selected="${m==='lista'}" data-act="socl-modo" data-v="lista">Lista de licenças (${S.licencas.length})</button></div>`}
+ACT['socl-modo']=el=>{(UI.socL||(UI.socL={})).modo=el.dataset.v;render()};
+ACT['lic-ver-emp']=el=>{const F=UI.socL||(UI.socL={});F.modo='lista';F.emp=el.dataset.emp;F.tipo='';F.st='';render()};
+document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-socl-q]')){(UI.socL||(UI.socL={})).q=s.value;render()}});
+ACT['lic-cel-nova']=el=>{if(!podeSoc('editar'))return;openModal(licForm({tipo:el.dataset.tipo,empresaId:el.dataset.emp}),true)};
+ACT['lic-cel-na']=el=>{if(!podeSoc('editar'))return;const e=emp(el.dataset.emp);const k=el.dataset.tipo;if(!e)return;
+  mut('licencas',()=>S.licencas.push({id:uid(),empresaId:e.id,tipo:k,orgao:'',numero:'',emissao:'',validade:'',alerta:60,dispensada:true,naoAplica:true,criadoEm:agora(),por:ME.nome||''}),['Societário','Marcou '+nomeLic(k)+' como não se aplica',e.razao]);
+  toast(nomeLic(k)+': não se aplica a '+(e.fantasia||e.razao)+'. Para desfazer, clique na situação e exclua ou desmarque "Dispensada".')};
+document.addEventListener('change',async ev=>{const inp=ev.target;if(!inp.matches||!inp.matches('[data-lic-arq]'))return;const l=licDe(inp.dataset.id);const file=inp.files&&inp.files[0];inp.value='';if(!l||!file)return;
+  const v=await validarArquivo(file,['pdf','jpg','jpeg','png']);if(!v.ok){toast(v.msg,true);return}
+  const antes=UI.empresaId;UI.empresaId=null;try{const arq=await enviarArquivo(file);mut('licencas',()=>{l.arquivo=arq;l.atualizadoEm=agora()},['Societário','Anexou o documento de '+nomeLic(l.tipo),(emp(l.empresaId)||{}).razao||'']);toast('Documento anexado.')}catch(er){toast(er.message,true)}finally{UI.empresaId=antes}});
+/* desmarcar "Dispensada" no formulário também tira o "não se aplica" */
+const licSalvarV49=FORM['lic-salvar'];FORM['lic-salvar']=async(fd,form)=>{const ex=form.dataset.id&&licDe(form.dataset.id);if(ex&&ex.naoAplica&&!fd.get('dispensada'))ex.naoAplica=false;return licSalvarV49(fd,form)};
+/* vencimentos: também mostra, cliente a cliente, licenças sem data informada */
+const socVencViewV49=socVencView;
+socVencView=function(){const h=socVencViewV49();const sem=clientesLic().map(e=>({e,L:LIC_COLS.filter(k=>{const l=licsDe(e.id,k)[0];return !l||(!l.dispensada&&!l.validade&&!l.semValidade)})})).filter(x=>x.L.length);
+  if(!sem.length)return h;
+  return h+`<div class="panel"><div class="panel-head"><h2>Sem data de vencimento (${sem.length} ${sem.length===1?'cliente':'clientes'})</h2><a class="btn sm" href="#s-lic">Completar em Alvarás e licenças</a></div><p class="small muted" style="margin-top:0">Licenças não cadastradas ou sem validade: o vencimento delas não entra no controle até serem preenchidas (ou marcadas como "N/A").</p>
+   <div class="list">${sem.slice(0,200).map(({e,L})=>`<div class="row"><div class="grow"><b>${esc(e.fantasia||e.razao)}</b><div class="small muted">${L.map(k=>LIC_CURTO[k]).join(' · ')}</div></div>${podeSoc('editar')?`<button class="btn sm" data-act="lic-cel-nova" data-emp="${e.id}" data-tipo="${L[0]}">Cadastrar</button>`:''}</div>`).join('')}</div></div>`};
+(()=>{const st=document.createElement('style');st.textContent=`.lic-grade td{vertical-align:top;min-width:120px}.lic-grade td:first-child{min-width:180px}.lic-cel{display:flex;flex-direction:column;gap:4px;align-items:flex-start}.lic-cel.vazia{flex-direction:row;gap:4px}.lic-st{background:none;border:0;padding:0;cursor:pointer}.lic-acoes{display:flex;gap:4px;flex-wrap:wrap}.lic-acoes svg{width:14px;height:14px;vertical-align:-2px}`;document.head.appendChild(st)})();
+/* ==== v49 (fim) ==== */
 /* CRC nos arquivos SPED: campo de até 15 posições, só letras e números ("CRC/MS 016636/O-0" → "MS016636O0") */
 function crcSped(c){return String(c||'').toUpperCase().replace(/^\s*CRC/,'').replace(/[^A-Z0-9]/g,'').slice(0,15)}
 
