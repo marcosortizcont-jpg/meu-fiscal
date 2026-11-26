@@ -68,10 +68,10 @@ body.painel .rodape,body.painel p.sub{color:#94A3B8}
 <script>
 (function(){
   const SITE=(window.MF&&window.MF.site)||'cliente', PAINEL=SITE==='painel';
-  const APP=(window.MF&&window.MF.app)||'', FISCAL=APP==='fiscal', CONTABIL=APP==='contabil', DP=APP==='dp', SIS=FISCAL||CONTABIL||DP;
-  const HOME=FISCAL?'/escrita':CONTABIL?'/contabil':DP?'/folha':PAINEL?'/admin/dashboard':'/dashboard', LOGIN=SIS?'/login':PAINEL?'/admin/login':'/login';
+  const APP=(window.MF&&window.MF.app)||'', FISCAL=APP==='fiscal', CONTABIL=APP==='contabil', DP=APP==='dp', SOC=APP==='societario', SIS=FISCAL||CONTABIL||DP||SOC;
+  const HOME=SOC?'/societario':FISCAL?'/escrita':CONTABIL?'/contabil':DP?'/folha':PAINEL?'/admin/dashboard':'/dashboard', LOGIN=SIS?'/login':PAINEL?'/admin/login':'/login';
   const SENHA=/^[A-Za-z0-9]{8}$/;
-  if(PAINEL){document.body.classList.add('painel');document.title=FISCAL?'Fiscal · Meu Fiscal':CONTABIL?'Contábil · Meu Fiscal':DP?'Departamento Pessoal · Meu Fiscal':'Painel Contábil · Meu Fiscal'}
+  if(PAINEL){document.body.classList.add('painel');document.title=SOC?'Societário · Meu Fiscal':FISCAL?'Fiscal · Meu Fiscal':CONTABIL?'Contábil · Meu Fiscal':DP?'Departamento Pessoal · Meu Fiscal':'Painel Contábil · Meu Fiscal'}
   const $=s=>document.querySelector(s), caixa=$('#caixa');
   const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const q=new URLSearchParams(location.search);
@@ -82,12 +82,12 @@ body.painel .rodape,body.painel p.sub{color:#94A3B8}
     return {status:r.status,ok:r.ok,j};
   }
   const aviso=(t,m)=>m?`<div class="aviso ${t}">${m}</div>`:'';
-  const topo=(t,s)=>`<div class="selo-painel"><span class="marca" style="font-size:15px;color:#fff;text-transform:none;letter-spacing:0"><i style="width:30px;height:30px;font-size:12px"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></i><span><span class="wm-meu">meu</span>fiscal</span></span><span>· ${FISCAL?'Sistema Fiscal':CONTABIL?'Sistema Contábil':DP?'Departamento Pessoal':'Painel Contábil'}</span></div><div><h2>${t}</h2>${s?`<p class="sub">${s}</p>`:''}</div>`;
+  const topo=(t,s)=>`<div class="selo-painel"><span class="marca" style="font-size:15px;color:#fff;text-transform:none;letter-spacing:0"><i style="width:30px;height:30px;font-size:12px"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></i><span><span class="wm-meu">meu</span>fiscal</span></span><span>· ${SOC?'Societário':FISCAL?'Sistema Fiscal':CONTABIL?'Sistema Contábil':DP?'Departamento Pessoal':'Painel Contábil'}</span></div><div><h2>${t}</h2>${s?`<p class="sub">${s}</p>`:''}</div>`;
   const campoSenha=(id,rot,ac)=>`<label>${rot}<span class="campo"><input type="password" id="${id}" maxlength="8" autocomplete="${ac}" required><button type="button" class="olho" data-olho="${id}" aria-label="Mostrar senha">${olhoSvg}</button></span><span class="dica"><span>8 letras ou números</span><span id="${id}-n">0/8</span></span></label>`;
   let estado={msg:null};
 
   function telaEntrar(){
-    caixa.innerHTML=`${topo(FISCAL?'Entrar no sistema fiscal':CONTABIL?'Entrar no sistema contábil':DP?'Entrar no departamento pessoal':PAINEL?'Entrar no painel':'Entrar no Portal do Cliente',FISCAL?'Notas, XML, apurações e livros fiscais. Use o mesmo acesso do painel.':CONTABIL?'Lançamentos, conciliação bancária, balancete, DRE e balanço. Use o mesmo acesso do painel.':DP?'Colaboradores, admissões e folha de pagamento. Use o mesmo acesso do painel.':PAINEL?'Acesso da equipe do escritório com e-mail corporativo.':'Use o e-mail cadastrado pelo escritório.')}
+    caixa.innerHTML=`${topo(SOC?'Entrar no societário':FISCAL?'Entrar no sistema fiscal':CONTABIL?'Entrar no sistema contábil':DP?'Entrar no departamento pessoal':PAINEL?'Entrar no painel':'Entrar no Portal do Cliente',SOC?'Abertura, alteração e baixa de empresas, alvarás e licenças. Use o mesmo acesso do painel.':FISCAL?'Notas, XML, apurações e livros fiscais. Use o mesmo acesso do painel.':CONTABIL?'Lançamentos, conciliação bancária, balancete, DRE e balanço. Use o mesmo acesso do painel.':DP?'Colaboradores, admissões e folha de pagamento. Use o mesmo acesso do painel.':PAINEL?'Acesso da equipe do escritório com e-mail corporativo.':'Use o e-mail cadastrado pelo escritório.')}
     ${estado.msg?aviso(estado.msg[0],estado.msg[1]):''}
     <form id="f-entrar" novalidate style="display:flex;flex-direction:column;gap:16px">
       <label>E-mail${PAINEL?' corporativo':''}<input type="email" id="email" autocomplete="username" required value="${esc(estado.email||'')}"></label>

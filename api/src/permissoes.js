@@ -8,6 +8,7 @@ export const MODULOS = [
   ['sis_fiscal', 'Sistema · Escrita Fiscal'],
   ['sis_contabil', 'Sistema · Contabilidade'],
   ['sis_dp', 'Sistema · Folha de Pagamento (DP)'],
+  ['sis_societario', 'Sistema · Societário (legalização)'],
   ['carteira', 'Carteira de clientes'],
   ['obrig', 'Obrigações, catálogo e regimes'],
   ['guias', 'Apuração, guias e notas'],
@@ -27,11 +28,11 @@ const RANK = { nenhum: 0, ver: 1, editar: 2, excluir: 3 };
 
 export const FUNCOES = {
   'Master': Object.fromEntries(MODULOS.map(([m]) => [m, 'excluir'])),
-  'Analista Fiscal': { sis_fiscal: 'excluir', sis_contabil: 'ver', sis_dp: 'ver', carteira: 'ver', obrig: 'editar', guias: 'editar', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
-  'Analista de DP': { sis_fiscal: 'ver', sis_contabil: 'nenhum', sis_dp: 'excluir', carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
-  'Analista Contábil': { sis_fiscal: 'ver', sis_contabil: 'excluir', sis_dp: 'ver', carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
-  'Legalização': { sis_fiscal: 'nenhum', sis_contabil: 'nenhum', sis_dp: 'nenhum', carteira: 'editar', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'editar', cofre: 'editar', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
-  'Comercial': { sis_fiscal: 'nenhum', sis_contabil: 'nenhum', sis_dp: 'nenhum', carteira: 'ver', obrig: 'nenhum', guias: 'nenhum', docs: 'nenhum', chat: 'editar', fiscal: 'nenhum', cert: 'nenhum', cofre: 'nenhum', dem: 'ver', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'excluir' },
+  'Analista Fiscal': { sis_fiscal: 'excluir', sis_contabil: 'ver', sis_dp: 'ver', sis_societario: 'ver', carteira: 'ver', obrig: 'editar', guias: 'editar', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Analista de DP': { sis_fiscal: 'ver', sis_contabil: 'nenhum', sis_dp: 'excluir', sis_societario: 'nenhum', carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Analista Contábil': { sis_fiscal: 'ver', sis_contabil: 'excluir', sis_dp: 'ver', sis_societario: 'ver', carteira: 'ver', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'ver', cert: 'ver', cofre: 'ver', dem: 'editar', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Legalização': { sis_fiscal: 'nenhum', sis_contabil: 'nenhum', sis_dp: 'nenhum', sis_societario: 'excluir', carteira: 'editar', obrig: 'editar', guias: 'ver', docs: 'editar', chat: 'editar', fiscal: 'editar', cert: 'editar', cofre: 'editar', dem: 'editar', hon: 'nenhum', equipe: 'nenhum', config: 'nenhum', comercial: 'nenhum' },
+  'Comercial': { sis_fiscal: 'nenhum', sis_contabil: 'nenhum', sis_dp: 'nenhum', sis_societario: 'ver', carteira: 'ver', obrig: 'nenhum', guias: 'nenhum', docs: 'nenhum', chat: 'editar', fiscal: 'nenhum', cert: 'nenhum', cofre: 'nenhum', dem: 'ver', hon: 'ver', equipe: 'nenhum', config: 'nenhum', comercial: 'excluir' },
 };
 export const FUNCAO_PADRAO = 'Analista Fiscal';
 
@@ -45,6 +46,7 @@ export const MODULO_DA_COLECAO = {
   cnds: 'fiscal', ecac: 'fiscal',
   certificados: 'cert',
   tickets: 'dem', admissoes: 'dem', funcionarios: 'dem', folhas: 'dem', dpmov: 'dem', dpfolhas: 'dem', dpeventos: 'dem', holerites: 'dem',
+  processos: 'sis_societario', licencas: 'sis_societario',
   faturas: 'hon',
   config: 'config', operadores: 'config',
 };

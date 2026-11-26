@@ -40,11 +40,22 @@ export const PLANOS = [
 ];
 
 const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+// tabela de preços editada no Financeiro (config.planosPrecos: { id: { preco, folha, adicional } }) por cima do catálogo
+function comTabela(p, precos) {
+  const o = precos && typeof precos === 'object' ? precos[p.id] : null;
+  if (!o) return p;
+  const r = { ...p };
+  if (Number(o.preco) > 0) r.preco = Math.round(Number(o.preco) * 100) / 100;
+  if (o.folha != null && o.folha !== '' && Number.isFinite(Number(o.folha)) && Number(o.folha) > 0)
+    r.servicos = p.servicos.map(s => s.replace(/até \d+ (pessoas|colaboradores)/, `até ${Math.round(Number(o.folha))} $1`));
+  if (o.folha != null && o.folha !== '' && Number.isFinite(Number(o.folha))) r.folha = Math.max(0, Math.round(Number(o.folha)));
+  return r;
+}
 // acha o plano pelo nome (ou id); planos sob medida ou antigos caem no mais parecido pelo tipo de empresa
-export function planoDe(nome, regime) {
-  const n = norm(nome);
-  const p = PLANOS.find(x => norm(x.nome) === n || x.id === n);
-  if (p) return p;
+export function planoDe(nome, regime, precos) {
+  const n = norm(nome).replace(/\s+/g, '-');
+  const p = PLANOS.find(x => norm(x.nome).replace(/\s+/g, '-') === n || x.id === n);
+  if (p) return comTabela(p, precos);
   if (regime === 'MEI' || /\bmei\b/.test(n)) return { ...PLANOS[/comerc/.test(n) ? 1 : 0], nome: nome || PLANOS[0].nome, sobMedida: true };
   const com = /comerc/.test(n); const nivel = /plus|premium/.test(n) ? 2 : /unique|profiss/.test(n) ? 1 : 0;
   const base = PLANOS.filter(x => x.grupo === (com ? 'Comércio' : 'Serviços'))[nivel];

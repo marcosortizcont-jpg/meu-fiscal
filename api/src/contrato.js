@@ -30,7 +30,7 @@ export function cfgContrato(cfg) {
 }
 
 export function montarContrato({ cfg, e, numero, data, financeiro = {}, alteracao = null }) {
-  const C = cfgContrato(cfg); const p = planoDe(e.plano?.nome || e.ativacao?.planoNome, e.regime); const at = e.ativacao || {};
+  const C = cfgContrato(cfg); const p = planoDe(e.plano?.nome || e.ativacao?.planoNome, e.regime, cfg?.planosPrecos); const at = e.ativacao || {};
   const valor = r2(e.plano?.valor || at.valor || p.preco); const dia = Number(e.plano?.diaVenc) || 10;
   const multa = Number(financeiro.multa ?? 2), juros = Number(financeiro.juros ?? 1);
   const en = e.endereco || {};

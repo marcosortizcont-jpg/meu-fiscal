@@ -4,6 +4,7 @@
 //   node sites/build.mjs fiscal                → sites/fiscal/dist (escrita fiscal: mesmo login e banco do painel)
 //   node sites/build.mjs contabil              → sites/contabil/dist (contabilidade: mesmo login e banco do painel)
 //   node sites/build.mjs dp                    → sites/dp/dist (departamento pessoal: mesmo login e banco do painel)
+//   node sites/build.mjs societario            → sites/societario/dist (societário e legalização: mesmo login e banco do painel)
 //   node sites/build.mjs cliente --configurar  → regrava vercel.json e netlify.toml com a URL da API do .env.production
 // Sem dependências: roda na Vercel, Netlify ou Cloudflare com Node 20+.
 import fs from 'node:fs';
@@ -15,9 +16,9 @@ const AQUI = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.resolve(AQUI, '../app');
 const site = process.argv[2];
 const configurar = process.argv.includes('--configurar');
-if (!['cliente', 'painel', 'fiscal', 'contabil', 'dp'].includes(site)) { console.error('Uso: node sites/build.mjs <cliente|painel|fiscal|contabil|dp> [--configurar]'); process.exit(1); }
+if (!['cliente', 'painel', 'fiscal', 'contabil', 'dp', 'societario'].includes(site)) { console.error('Uso: node sites/build.mjs <cliente|painel|fiscal|contabil|dp|societario> [--configurar]'); process.exit(1); }
 // o sistema contábil fala com a API como "painel" (mesma equipe, mesmas permissões); só a interface muda
-const SISTEMA = site === 'fiscal' || site === 'contabil' || site === 'dp';   // sistemas de escrituração (casco de sistema contábil)
+const SISTEMA = site === 'fiscal' || site === 'contabil' || site === 'dp' || site === 'societario';   // sistemas de escrituração (casco de sistema contábil)
 const SITE_API = SISTEMA ? 'painel' : site;
 const RESTRITO = site !== 'cliente';
 const DIR = path.join(AQUI, site), DIST = path.join(DIR, 'dist');
@@ -28,7 +29,7 @@ for (const arq of ['.env.production', '.env.local']) {
   const p = path.join(DIR, arq); if (!fs.existsSync(p)) continue;
   for (const l of fs.readFileSync(p, 'utf8').split(/\r?\n/)) { const m = l.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/); if (m) env[m[1]] = m[2].replace(/^["']|["']$/g, ''); }
 }
-for (const k of ['API_URL', 'ARQUIVOS_HOST', 'SITE_URL', 'PAINEL_URL', 'CONTABIL_URL', 'DP_URL', 'FISCAL_URL']) if (process.env[k]) env[k] = process.env[k];
+for (const k of ['API_URL', 'ARQUIVOS_HOST', 'SITE_URL', 'PAINEL_URL', 'CONTABIL_URL', 'DP_URL', 'FISCAL_URL', 'SOCIETARIO_URL']) if (process.env[k]) env[k] = process.env[k];
 const API = String(env.API_URL || '').replace(/\/$/, '');
 const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(API);
 if (!/^https:\/\/[^/]+$/.test(API) && !LOCAL) { console.error(`API_URL inválida em sites/${site}/.env.production: "${API}". Ex.: API_URL=https://meufiscal-api.onrender.com`); process.exit(1); }
@@ -72,6 +73,9 @@ const ROTAS = site === 'cliente' ? {
 } : site === 'dp' ? {
   redirects: [['/', '/folha'], ['/admin', '/folha'], ['/admin/:caminho*', '/folha'], ['/dashboard', '/folha']],
   paginas: [['/login', '/login.html'], ['/folha', '/app.html']],
+} : site === 'societario' ? {
+  redirects: [['/', '/societario'], ['/admin', '/societario'], ['/admin/:caminho*', '/societario'], ['/dashboard', '/societario']],
+  paginas: [['/login', '/login.html'], ['/societario', '/app.html']],
 } : {
   redirects: [['/', '/admin/dashboard'], ['/admin', '/admin/dashboard'], ['/login', '/admin/login'], ['/dashboard', '/admin/dashboard']],
   paginas: [['/admin/login', '/login.html'], ['/admin/definir-senha', '/login.html'], ['/admin/dashboard', '/app.html'], ['/admin/cadastro', '/acessos.html']],
@@ -168,9 +172,10 @@ const PAINEL_URL = String(env.PAINEL_URL || 'https://painel.omeufiscal.com.br').
 const CONTABIL_URL = String(env.CONTABIL_URL || 'https://contabil.omeufiscal.com.br').replace(/\/$/, '');
 const DP_URL = String(env.DP_URL || 'https://dp.omeufiscal.com.br').replace(/\/$/, '');
 const FISCAL_URL = String(env.FISCAL_URL || 'https://fiscal.omeufiscal.com.br').replace(/\/$/, '');
-const MFCFG = SISTEMA ? { site: SITE_API, app: site, api: API, painelUrl: PAINEL_URL, contabilUrl: CONTABIL_URL, dpUrl: DP_URL, fiscalUrl: FISCAL_URL } : site === 'painel' ? { site, api: API, contabilUrl: CONTABIL_URL, dpUrl: DP_URL, fiscalUrl: FISCAL_URL } : { site, api: API };
+const SOCIETARIO_URL = String(env.SOCIETARIO_URL || 'https://societario.omeufiscal.com.br').replace(/\/$/, '');
+const MFCFG = SISTEMA ? { site: SITE_API, app: site, api: API, painelUrl: PAINEL_URL, contabilUrl: CONTABIL_URL, dpUrl: DP_URL, fiscalUrl: FISCAL_URL, societarioUrl: SOCIETARIO_URL } : site === 'painel' ? { site, api: API, contabilUrl: CONTABIL_URL, dpUrl: DP_URL, fiscalUrl: FISCAL_URL, societarioUrl: SOCIETARIO_URL } : { site, api: API };
 const cfg = `<script>window.MF=${JSON.stringify(MFCFG)};</script>`;
-const titulo = site === 'cliente' ? 'Portal do Cliente · Meu Fiscal' : site === 'fiscal' ? 'Fiscal · Meu Fiscal' : site === 'contabil' ? 'Contábil · Meu Fiscal' : site === 'dp' ? 'Departamento Pessoal · Meu Fiscal' : 'Painel Contábil · Meu Fiscal';
+const titulo = site === 'cliente' ? 'Portal do Cliente · Meu Fiscal' : site === 'fiscal' ? 'Fiscal · Meu Fiscal' : site === 'contabil' ? 'Contábil · Meu Fiscal' : site === 'dp' ? 'Departamento Pessoal · Meu Fiscal' : site === 'societario' ? 'Societário · Meu Fiscal' : 'Painel Contábil · Meu Fiscal';
 const app = fs.readFileSync(path.join(APP, 'app.html'), 'utf8');
 fs.writeFileSync(path.join(DIST, 'app.html'), `<!doctype html>
 <html lang="pt-BR">
@@ -197,7 +202,7 @@ fs.copyFileSync(path.join(APP, 'mf-api.js'), path.join(DIST, 'mf-api.js'));
 // marca: favicon, ícones de celular e logos (app/marca)
 for (const f of ['favicon.svg', 'favicon.ico', 'apple-touch-icon-180.png', 'icon-192.png', 'icon-512.png', 'logo-horizontal.svg', 'logo-horizontal-negativa.svg'])
   fs.copyFileSync(path.join(APP, 'marca', f), path.join(DIST, f));
-fs.writeFileSync(path.join(DIST, 'manifest.webmanifest'), JSON.stringify({ name: titulo, short_name: site === 'fiscal' ? 'MF Fiscal' : site === 'contabil' ? 'MF Contábil' : site === 'dp' ? 'MF DP' : 'Meu Fiscal', start_url: site === 'cliente' ? '/dashboard' : site === 'fiscal' ? '/escrita' : site === 'contabil' ? '/contabil' : site === 'dp' ? '/folha' : '/admin/dashboard', display: 'standalone', background_color: '#F8FAFC', theme_color: '#0F172A', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }, null, 2));
+fs.writeFileSync(path.join(DIST, 'manifest.webmanifest'), JSON.stringify({ name: titulo, short_name: site === 'fiscal' ? 'MF Fiscal' : site === 'contabil' ? 'MF Contábil' : site === 'dp' ? 'MF DP' : site === 'societario' ? 'MF Societário' : 'Meu Fiscal', start_url: site === 'cliente' ? '/dashboard' : site === 'fiscal' ? '/escrita' : site === 'contabil' ? '/contabil' : site === 'dp' ? '/folha' : site === 'societario' ? '/societario' : '/admin/dashboard', display: 'standalone', background_color: '#F8FAFC', theme_color: '#0F172A', icons: [{ src: '/icon-192.png', sizes: '192x192', type: 'image/png' }, { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }] }, null, 2));
 const MF_OG = '<g fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7" transform="translate(32 32) scale(0.72) translate(-32 -31)"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g>';
 if (site === 'cliente') {
   // página comercial em "/" + termos/privacidade, montadas a partir de app/landing.config.json

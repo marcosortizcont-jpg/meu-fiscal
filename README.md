@@ -695,3 +695,17 @@ Tudo abaixo rodou contra um PostgreSQL 16 real, com os dois sites em domínios s
 - **Aba "Plano e contrato"** no cadastro do cliente (logo depois de Dados gerais): plano atual (nome, honorário, funcionários inclusos, adicional por funcionário, vencimento, vigência), contrato vigente (baixar PDF, gerar de novo, anexar o assinado), contratos anteriores, honorários em aberto no Financeiro e histórico de alterações do plano.
 - **Upgrade, reajuste ou mudança de plano**: o atendente escolhe o novo plano/valor e o motivo; a alteração vale sempre a partir do 1º dia do próximo mês. Na hora, o sistema gera o novo contrato de prestação de serviços (numerado como alteração, com cláusula que substitui o anterior a partir da vigência) para assinatura, guarda o contrato anterior no histórico e agenda o plano novo. O Financeiro já gera as mensalidades a partir da vigência com o valor novo (e atualiza as que já existiam em aberto, sem boleto); no dia 1º o plano agendado vira o plano atual. Dá para cancelar a alteração antes da vigência.
 - Usuários sem permissão de edição não veem mais o aviso de "só consulta": apenas não aparecem os botões de edição.
+
+### Tabela de preços dos planos (Financeiro › Planos e preços)
+- O master (ou quem tem acesso a Configurações) altera preço, funcionários inclusos e adicional por funcionário de cada plano. Fica em `config.planosPrecos`, com histórico em `config.planosPrecosHist`.
+- A tabela vale para o **cadastro de clientes novos** e para a **troca de plano**; o contrato usa os números novos (o texto "até N pessoas" acompanha os funcionários inclusos).
+- Quem já é cliente não muda sozinho: "Reajustar clientes" agenda o novo valor para o 1º dia do mês seguinte, cliente a cliente, com novo contrato para assinatura (mesmo caminho de `/api/planos/:id/alterar`).
+- Os preços da página de vendas continuam em `app/landing.config.json`.
+
+### Sistema Societário (societario.omeufiscal.com.br)
+- Mesmo login e mesmo banco do painel. Permissão própria: "Sistema · Societário" (`sis_societario`); padrão: Legalização exclui, Fiscal, Contábil e Comercial só veem.
+- **Processos** (`processos`): abertura, alteração, baixa e regularização, com etapas prontas por tipo, documentos do cliente (com anexo), pendências (cliente, escritório ou órgão, com prazo), protocolos nos órgãos e anotações.
+- **Alvarás e licenças** (`licencas`): funcionamento, sanitária, bombeiros (AVCB/CLCB), ambiental, publicidade e outras; validade, aviso antecipado, renovação em andamento com protocolo, histórico de renovações e documento anexado.
+- **Vencimentos**: licenças, certificados digitais, prazos de processos e pendências, por data. **Pendências**: tudo que falta, por responsável. **Documentação**: pasta societária por empresa (documentos da equipe no departamento Legalização, licenças e o que chegou nos processos).
+- As duas coleções não vão para o portal do cliente.
+- Para publicar: Worker `meufiscal-societario` com Workers Builds na pasta `sites/societario`, domínio `societario.omeufiscal.com.br`, e as duas origens novas em `ORIGENS_PAINEL` no Render (já estão no `render.yaml`).

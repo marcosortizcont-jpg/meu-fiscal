@@ -2247,7 +2247,7 @@ const MOD_DA_VIEW={'a-carteira':'carteira','a-obrig':'obrig','a-guias':'guias','
 const NIVEL_NOME={nenhum:'Sem acesso',ver:'Visualizar',editar:'Visualizar e editar',excluir:'Visualizar, editar e excluir'};
 const NIVEL_RANK={nenhum:0,ver:1,editar:2,excluir:3};
 function podeMod(m,n){if(!ME.perm)return true;if(ME.perm[m]===undefined&&/^sis_/.test(m))return true;if(m==='guias'&&typeof APP_CONTABIL!=='undefined'&&APP_CONTABIL&&ME.perm.sis_contabil!==undefined)m='sis_contabil';return (NIVEL_RANK[ME.perm[m]||'nenhum']||0)>=(NIVEL_RANK[n||'ver']||1)}
-function semSistema(o,mod){const ss=[['sis_fiscal','Escrita Fiscal',typeof URL_FISCAL!=='undefined'?URL_FISCAL+'/escrita':''],['sis_contabil','Contabilidade',typeof URL_CONTABIL!=='undefined'?URL_CONTABIL+'/contabil':''],['sis_dp','Folha de Pagamento',typeof URL_DP!=='undefined'?URL_DP+'/folha':'']].filter(([k])=>podeMod(k,'ver'));
+function semSistema(o,mod){const ss=[['sis_fiscal','Escrita Fiscal',typeof URL_FISCAL!=='undefined'?URL_FISCAL+'/escrita':''],['sis_contabil','Contabilidade',typeof URL_CONTABIL!=='undefined'?URL_CONTABIL+'/contabil':''],['sis_dp','Folha de Pagamento',typeof URL_DP!=='undefined'?URL_DP+'/folha':''],['sis_societario','Societário',typeof URL_SOC!=='undefined'?URL_SOC+'/societario':'']].filter(([k])=>podeMod(k,'ver'));
   return vazio(`Seu acesso não inclui ${o}. Peça ao administrador do escritório para liberar "${mod}" em Equipe e permissões.`,ss.map(([k,t,u])=>`<a class="btn" href="${esc(u)}">Abrir ${esc(t)}</a>`).join(' ')+` <a class="btn" href="${esc(typeof URL_PAINEL!=='undefined'?URL_PAINEL:'/')}">Ir para o painel</a>`)}
 const ehMaster=()=>!ME.perm||ME.papel==='master';
 function aplicarPermissoes(){for(let i=NAV_A.length-1;i>=0;i--){const m=MOD_DA_VIEW[NAV_A[i][0]];if(m&&!podeMod(m,'ver'))NAV_A.splice(i,1)}}
@@ -2653,8 +2653,8 @@ ACT['colab-form']=el=>{
    <label class="f"><span>Função</span><select name="funcao" data-change="funcao-perm">${Object.keys(d.funcoes).map(f=>`<option ${f===func?'selected':''}>${esc(f)}</option>`).join('')}</select></label>
    ${u?'':campoSenha8('senha-colab','senha','Senha inicial (vazio = convite por link)',false)}
    ${camposDeptos(u,func)}
-  </div><div class="form-sec"><h3>Sistemas liberados</h3><p class="sub">Quais sistemas esta pessoa abre (Escrita Fiscal, Contabilidade e Folha) e o que pode fazer em cada um. "Padrão" segue a função.</p>
-  <div class="sis-perm">${d.modulos.filter(([m])=>m.startsWith('sis_')).map(([m,r])=>{const info={sis_fiscal:['Escrita Fiscal','Notas, apurações (Simples, Lucro Presumido e Real), guias, arquivos SPED e livros.'],sis_contabil:['Contabilidade','Plano de contas, lançamentos, extratos e balancetes.'],sis_dp:['Folha de Pagamento (DP)','Funcionários, folha, encargos e guias de FGTS/INSS.']}[m]||[r,''];
+  </div><div class="form-sec"><h3>Sistemas liberados</h3><p class="sub">Quais sistemas esta pessoa abre (Escrita Fiscal, Contabilidade, Folha e Societário) e o que pode fazer em cada um. "Padrão" segue a função.</p>
+  <div class="sis-perm">${d.modulos.filter(([m])=>m.startsWith('sis_')).map(([m,r])=>{const info={sis_fiscal:['Escrita Fiscal','Notas, apurações (Simples, Lucro Presumido e Real), guias, arquivos SPED e livros.'],sis_contabil:['Contabilidade','Plano de contas, lançamentos, extratos e balancetes.'],sis_dp:['Folha de Pagamento (DP)','Funcionários, folha, encargos e guias de FGTS/INSS.'],sis_societario:['Societário','Abertura, alteração e baixa de empresas, alvarás e licenças, vencimentos e pendências.']}[m]||[r,''];
     return `<label class="sis-card"><b>${esc(info[0])}</b><span class="sub">${esc(info[1])}</span><span class="sub">Padrão da função: <span data-padrao="${m}">${nivelPill(d.funcoes[func][m])}</span></span><select name="perm_${m}"><option value="">Padrão da função</option>${['nenhum','ver','editar','excluir'].map(n=>`<option value="${n}" ${aj[m]===n?'selected':''}>${NIVEL_NOME[n]}</option>`).join('')}</select></label>`}).join('')}</div>
   <p class="sub" style="margin-top:6px">Liberar a Escrita Fiscal também libera os dados de "Apuração, guias e notas" no mesmo nível, e a Folha os de "Demandas, admissões e folha".</p></div>
   <div class="form-sec"><h3>Módulos do painel</h3><p class="sub">"Padrão" segue a função escolhida. Ajuste só o que for diferente para esta pessoa.</p>
@@ -2730,7 +2730,8 @@ FORM['empresa360']=async(fd,form)=>{const antes=S.empresas.length;await formEmpr
 const SITE_PAINEL=!!(window.MF&&window.MF.site==='painel');
 const APP_FISCAL=!!(window.MF&&window.MF.app==='fiscal');      // fiscal.omeufiscal.com.br: escrita fiscal (v27)
 const APP_CONTABIL=!!(window.MF&&window.MF.app==='contabil');  // contabil.omeufiscal.com.br: contabilidade (v30)
-const APP_DP=!!(window.MF&&window.MF.app==='dp');   // dp.omeufiscal.com.br: departamento pessoal (v28)   // contabil.omeufiscal.com.br: o sistema de escrituração (v27)
+const APP_DP=!!(window.MF&&window.MF.app==='dp');const APP_SOC=!!(window.MF&&window.MF.app==='societario');   // societario.omeufiscal.com.br: legalização (v47)
+   // dp.omeufiscal.com.br: departamento pessoal (v28)   // contabil.omeufiscal.com.br: o sistema de escrituração (v27)
 
 /* ---------- menu do painel: documentos e certificados passam para o cadastro do cliente ---------- */
 for(const v of ['a-docs','a-cert']){const i=NAV_A.findIndex(n=>n[0]===v);if(i>=0)NAV_A.splice(i,1)}
@@ -5688,7 +5689,7 @@ FORM['cad-ativ']=async(fd,form)=>{
   if(g('voucher')&&!(UI.cadVoucher&&UI.cadVoucher.codigo===g('voucher').toUpperCase())){toast('Clique em "Aplicar" para conferir o voucher antes de cadastrar.',true);return}
   if(MODO!=='api'){toast('O cadastro com ativação funciona na versão publicada.',true);return}
   const corpo={empresa:{cnpj,razao:g('razao'),fantasia:g('fantasia'),regime:g('regime'),municipio:g('municipio'),uf:g('uf').toUpperCase(),endereco:{cep:soDig(g('cep')),logradouro:g('logradouro'),numero:g('numero'),complemento:g('complemento'),bairro:g('bairro')},abertura:form.dataset.abertura||'',ibge:form.dataset.ibge||'',cnae:form.dataset.cnae||'',atividade:form.dataset.atividade||'',socios:JSON.parse(form.dataset.socios||'[]'),contatoNome:g('contatoNome'),representanteCpf:soDig(g('representanteCpf')),telefone:g('telefone'),email:g('email')},
-    plano:{nome:g('planoNome')||g('planoSel'),valor:Number(g('valor')),diaVenc:Number(g('diaVenc'))||10},metodo:'bolepix',voucher:g('voucher'),leadId:form.dataset.lead||null,avisar:!!fd.get('avisar')};
+    plano:{nome:g('planoNome')||g('planoSel'),valor:Number(g('valor')),diaVenc:Number(g('diaVenc'))||10,...(g('planoSel')!=='__outro'&&typeof planoExtras==='function'?planoExtras(g('planoSel')):{})},metodo:'bolepix',voucher:g('voucher'),leadId:form.dataset.lead||null,avisar:!!fd.get('avisar')};
   try{const r=await MF.api('POST','/api/ativacao/cadastrar',corpo);UI.cadVoucher=null;closeModal();
     if(r.status==='ativo'){toast('Cliente cadastrado e ativado com o voucher. 🎉')}
     else{openModal(`${mHead('Cadastro aguardando pagamento')}<div class="modal-body"><p>Cobrança de <b>${brl(r.total)}</b>${r.desconto?' (com '+brl(r.desconto)+' de desconto)':''} gerada no banco (boleto + PIX). O cadastro ativa sozinho quando o pagamento for confirmado.</p>
@@ -9617,6 +9618,347 @@ ACT['hol-copiar']=el=>{const h=holDe(el.dataset.id);if(!h)return;const c=JSON.pa
 ACT['hol-excluir']=el=>{const h=holDe(el.dataset.id);if(!h)return;confirmar('Excluir do histórico',`<p>Excluir "<b>${esc(h.desc||h.nome)}</b>"? Os PDFs já entregues não são afetados.</p>`,'Excluir',()=>mut('holerites',()=>{S.holerites=S.holerites.filter(z=>z.id!==h.id)},['Pessoal','Excluiu '+(h.desc||h.nome),emp(h.empresaId)?.razao||'']))};
 const dpConteudoV46=dpConteudo;dpConteudo=function(){if(UI.view==='d-avulso'&&podeMod('sis_dp','ver')&&podeMod('dem','ver')){const e=emp(UI.fsn?.emp);if(e)return dpAvulso(e,UI.fsn?.comp||compAtual())}return dpConteudoV46()};
 /* ==== v46 (fim) ==== */
+/* ==== v47: tabela de preços dos planos (Financeiro) e sistema Societário (societario.omeufiscal.com.br) ==== */
+/* ---------- tabela de planos: preço, funcionários inclusos e adicional, editáveis no Financeiro ---------- */
+const PLANOS_BASE=PLANOS_CAD.map(p=>p.slice());
+const idPlano=n=>String(n||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().trim().replace(/\s+/g,'-');
+const FOLHA_BASE={'mei-servicos':0,'mei-comercio':0,'essencial':0,'profissional':5,'premium':10,'essencial-comercio':3,'profissional-comercio':5,'premium-comercio':10};
+function planoTab(nome){const id=idPlano(nome);const b=PLANOS_BASE.find(p=>idPlano(p[0])===id);if(!b)return null;const o=(cfg().planosPrecos||{})[id]||{};
+  return {id,nome:b[0],grupo:b[1],precoBase:b[2],preco:Number(o.preco)>0?r2(o.preco):b[2],folha:o.folha!=null&&o.folha!==''?Math.max(0,Math.round(+o.folha)||0):(FOLHA_BASE[id]||0),adicional:Math.max(0,r2(o.adicional)),em:o.em||'',por:o.por||''}}
+function syncPlanos(){PLANOS_CAD.forEach(p=>{const t=planoTab(p[0]);if(t)p[2]=t.preco})}
+const abrirCadastroAtivV47=abrirCadastroAtiv;abrirCadastroAtiv=function(pre){syncPlanos();return abrirCadastroAtivV47(pre)};
+const conteudoV47=conteudo;conteudo=function(){syncPlanos();return conteudoV47()};
+// ao escolher um plano na troca de plano, traz também os funcionários inclusos e o adicional da tabela
+document.addEventListener('change',ev=>{const s=ev.target;if(!s.matches||!s.matches('[data-plano-alt]'))return;const t=planoTab(s.value);const f=s.form;if(!t||!f)return;
+  if(f.funcInclusos)f.funcInclusos.value=t.folha;if(f.adicionalFunc&&t.adicional)f.adicionalFunc.value=t.adicional});
+const planoExtras=n=>{const t=planoTab(n);return t?{funcInclusos:t.folha,adicionalFunc:t.adicional}:{}};
+const podePrecos=()=>ehMaster()||podeMod('config','editar');
+const ativosDoPlano=t=>S.empresas.filter(e=>e.status!=='inativo'&&e.status!=='aguardando_pagamento'&&idPlano(e.plano?.nome)===t.id);
+
+const aHonV47=aHon;
+aHon=function(){if(UI.tab.fin2!=='planos'||!podeFinC()){let h=aHonV47();if(podeFinC())h=h.replace(/(<button role="tab" aria-selected="(?:true|false)" data-act="tab" data-k="fin2" data-v="auto">)/,`<button role="tab" aria-selected="false" data-act="tab" data-k="fin2" data-v="planos">Planos e preços</button>$1`);return h}
+  UI.tab.fin2='visao';let h=aHonV47();UI.tab.fin2='planos';
+  h=h.replace(/aria-selected="true"(\s+data-act="tab" data-k="fin2" data-v="visao")/,'aria-selected="false"$1').replace(/(<button role="tab" aria-selected="false" data-act="tab" data-k="fin2" data-v="auto">)/,`<button role="tab" aria-selected="true" data-act="tab" data-k="fin2" data-v="planos">Planos e preços</button>$1`);
+  const i=h.indexOf('</div>',h.indexOf('role="tablist"'))+6;return h.slice(0,i)+planosFinView()};
+function planosFinView(){syncPlanos();const ed=podePrecos();const reaj=podeCadastrarC();const L=PLANOS_BASE.map(p=>planoTab(p[0]));
+  const inp=(n,v,extra)=>ed?`<input name="${n}" value="${esc(v)}" inputmode="decimal" style="width:110px;text-align:right" ${extra||''}>`:`<span class="num">${esc(v)}</span>`;
+  const hist=(cfg().planosPrecosHist||[]).slice().reverse().slice(0,12);
+  const ult=L.filter(t=>t.em).sort((a,b)=>String(b.em).localeCompare(String(a.em)))[0];
+  return `<div class="panel"><div class="panel-head"><div><h2>Tabela de planos</h2><p class="small muted" style="margin:4px 0 0">É o preço de tabela usado no cadastro de clientes novos e na troca de plano. Mudar aqui <b>não altera</b> quem já é cliente: para isso use "Reajustar clientes" em cada plano.${ed?'':' Só o master ou quem tem acesso a Configurações altera a tabela.'}</p></div></div>
+   <form data-form="planos-precos"><div class="table-wrap"><table><thead><tr><th>Plano</th><th>Tipo</th><th class="r">Preço original</th><th class="r">Preço de tabela (R$)</th><th class="r">Funcionários inclusos</th><th class="r">Adicional por funcionário (R$)</th><th class="r">Clientes ativos</th><th></th></tr></thead><tbody>
+   ${L.map(t=>{const cs=ativosDoPlano(t);const abaixo=cs.filter(e=>Number(e.plano?.valor||0)<t.preco).length;
+     return `<tr><td><b>${esc(t.nome)}</b>${t.preco!==t.precoBase?`<div class="small muted">alterado${t.por?' por '+esc(t.por):''}${t.em?' em '+fmtData(t.em.slice(0,10)):''}</div>`:''}</td><td class="small">${esc(t.grupo)}</td><td class="r num small muted">${brl(t.precoBase)}</td>
+      <td class="r">${inp('p_'+t.id,fmtValIn(t.preco))}</td><td class="r">${ed?`<input name="f_${t.id}" type="number" min="0" max="999" value="${t.folha}" style="width:80px;text-align:right">`:t.folha}</td><td class="r">${inp('a_'+t.id,fmtValIn(t.adicional))}</td>
+      <td class="r">${cs.length}${abaixo?`<div class="small" style="color:var(--warn)">${abaixo} abaixo da tabela</div>`:''}</td>
+      <td class="r">${reaj&&cs.length?`<button type="button" class="btn sm" data-act="plano-reaj" data-id="${t.id}">Reajustar clientes</button>`:''}</td></tr>`}).join('')}
+   </tbody></table></div>
+   ${ed?`<div class="actions" style="justify-content:space-between;margin-top:12px"><span class="small muted">${ult?'Última alteração: '+esc(ult.por||'')+' em '+fmtData(ult.em.slice(0,10)):'Usando os preços originais.'} Os preços da página de vendas do site são atualizados à parte.</span><button class="btn primary">Salvar tabela</button></div>`:''}</form></div>
+   ${hist.length?`<div class="panel"><h2>Histórico da tabela</h2><div class="list">${hist.map(x=>`<div class="row"><div class="grow"><b>${esc(x.plano)}</b> · ${x.de!=null?brl(x.de)+' → ':''}<b>${brl(x.para)}</b>${x.folha!=null?` · ${x.folha} funcionário(s) inclusos`:''}<div class="small muted">${esc(x.por||'')} · ${fmtData(String(x.em).slice(0,10))}</div></div></div>`).join('')}</div></div>`:''}`}
+FORM['planos-precos']=(fd)=>{if(!podePrecos()){toast('Seu acesso não permite alterar a tabela.',true);return}
+  const novos={...(cfg().planosPrecos||{})};const hist=[];const em=agora();let erro='';
+  PLANOS_BASE.forEach(p=>{const t=planoTab(p[0]);const preco=valBR(fd.get('p_'+t.id));const folha=Math.max(0,Math.round(Number(fd.get('f_'+t.id))||0));const adic=valBR(fd.get('a_'+t.id));
+    if(!(preco>0)){erro='Informe o preço de '+t.nome+'.';return}
+    if(preco===t.preco&&folha===t.folha&&adic===t.adicional)return;
+    novos[t.id]={preco,folha,adicional:adic,em,por:ME.nome||''};hist.push({plano:t.nome,de:t.preco,para:preco,folha,em,por:ME.nome||''})});
+  if(erro){toast(erro,true);return}
+  if(!hist.length){toast('Nada mudou na tabela.');return}
+  mut('config',()=>{if(!S.config[0])S.config.push({id:'cfg'});const c=S.config[0];c.planosPrecos=novos;c.planosPrecosHist=[...(c.planosPrecosHist||[]),...hist].slice(-60)},['Financeiro','Atualizou a tabela de planos: '+hist.map(x=>x.plano+' '+brl(x.para)).join(', '),'']);
+  toast('Tabela de planos salva. Vale para os próximos cadastros e trocas de plano.')};
+
+/* reajuste em lote: agenda a troca para o 1º dia do mês seguinte, cliente a cliente, com novo contrato (mesmo caminho da troca individual) */
+ACT['plano-reaj']=el=>{const t=planoTab(PLANOS_BASE.find(p=>idPlano(p[0])===el.dataset.id)?.[0]);if(!t)return;const cs=ativosDoPlano(t).sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
+  openModal(mHead('Reajustar clientes · '+t.nome)+`<form data-form="plano-reaj" data-id="${t.id}"><div class="modal-body">
+   <p class="small muted" style="margin-top:0">Para cada cliente marcado, o sistema agenda o novo valor a partir de <b>${fmtData(proxComp()+'-01')}</b>, gera o novo contrato para assinatura e atualiza as mensalidades a partir de ${fmtComp(proxComp())}. É o mesmo processo da troca de plano feita no cadastro do cliente.</p>
+   <div class="grid-f"><label class="f"><span>Novo honorário mensal (R$)</span><input name="valor" required inputmode="decimal" value="${fmtValIn(t.preco)}"></label>
+   <label class="f full"><span>Motivo (vai no contrato)</span><input name="motivo" maxlength="200" value="Reajuste da tabela de preços"></label></div>
+   <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th style="width:32px"><input type="checkbox" data-reaj-todos checked aria-label="Marcar todos"></th><th>Cliente</th><th class="r">Hoje</th><th>Situação</th></tr></thead><tbody>
+   ${cs.map(e=>{const v=Number(e.plano?.valor||0);const ag=e.planoAgendado;return `<tr><td><input type="checkbox" name="e" value="${e.id}" ${ag||v>=t.preco?'':'checked'}></td><td><b>${esc(e.fantasia||e.razao)}</b><div class="small muted">${fmtCNPJ(e.cnpj||'')}</div></td><td class="r num">${brl(v)}</td><td class="small">${ag?pill('Já tem alteração agendada ('+brl(ag.valor)+')','warn'):v>=t.preco?'Já paga a tabela ou mais':''}</td></tr>`}).join('')}
+   </tbody></table></div><div id="reaj-res"></div></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Fechar</button><button class="btn primary">Agendar reajuste</button></div></form>`,true)};
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-reaj-todos]'))s.form.querySelectorAll('input[name=e]').forEach(c=>c.checked=s.checked)});
+FORM['plano-reaj']=async(fd,form)=>{if(MODO!=='api'){toast('O reajuste em lote funciona na versão publicada.',true);return}
+  const t=planoTab(PLANOS_BASE.find(p=>idPlano(p[0])===form.dataset.id)?.[0]);const v=valBR(fd.get('valor'));const ids=fd.getAll('e');
+  if(!(v>0)){toast('Informe o novo valor.',true);return}if(!ids.length){toast('Marque pelo menos um cliente.',true);return}
+  if(!window.confirm(`Agendar ${t.nome} a ${brl(v)}/mês para ${ids.length} cliente(s) a partir de ${fmtData(proxComp()+'-01')}? Cada um recebe um novo contrato para assinar.`))return;
+  const box=form.querySelector('#reaj-res');const ok=[],falha=[];
+  for(const id of ids){const e=emp(id);if(!e)continue;if(box)box.innerHTML=`<p class="small">Agendando ${esc(e.fantasia||e.razao)}… (${ok.length+falha.length+1}/${ids.length})</p>`;
+    try{const p=e.plano||{};await MF.api('POST',`/api/planos/${encodeURIComponent(id)}/alterar`,{tipo:'reajuste',nome:p.nome||t.nome,valor:v,funcInclusos:Number(p.funcInclusos||0),adicionalFunc:Number(p.adicionalFunc||0),diaVenc:Number(p.diaVenc||10),motivo:String(fd.get('motivo')||'').slice(0,200)});ok.push(e)}
+    catch(er){falha.push([e,er.message||'erro'])}}
+  if(box)box.innerHTML=`<div class="banner ${falha.length?'warn':'ok'}" style="display:block;margin-top:10px"><b>${ok.length} reajuste(s) agendado(s)</b>${falha.length?`<br>${falha.length} não agendado(s):<br>${falha.map(([e,m])=>esc(e.fantasia||e.razao)+': '+esc(m)).join('<br>')}`:''}</div>`;
+  audit('Financeiro',`Reajuste em lote ${t.nome}: ${ok.length} cliente(s) para ${brl(v)}`,'');toast(ok.length+' reajuste(s) agendado(s).',!!falha.length)};
+
+/* ======================= Societário ======================= */
+if(!COLS.includes('processos'))COLS.push('processos');if(!Array.isArray(S.processos))S.processos=[];
+if(!COLS.includes('licencas'))COLS.push('licencas');if(!Array.isArray(S.licencas))S.licencas=[];
+const URL_SOC=String((window.MF&&MF.societarioUrl)||'https://societario.omeufiscal.com.br').replace(/\/$/,'');
+const NAV_SOC=[
+  ['Painel',[['s-painel','Visão geral','home','Processos em andamento, licenças vencendo e pendências']]],
+  ['Processos',[['s-proc','Abertura, alteração e baixa','briefcase','Etapas, documentos, protocolos e pendências de cada processo']]],
+  ['Alvarás e licenças',[['s-lic','Alvarás e licenças','shield','Funcionamento, sanitária, bombeiros, meio ambiente e outras'],['s-venc','Vencimentos','bell','Licenças, certificados digitais, prazos e pendências por data']]],
+  ['Controle',[['s-pend','Pendências','checksq','Tudo que falta: do cliente, do escritório e dos órgãos'],['s-docs','Documentação','folder','Documentos societários por empresa']]],
+];
+const podeSoc=n=>podeMod('sis_societario',n||'ver');
+const TIPO_PROC={abertura:'Abertura',alteracao:'Alteração',baixa:'Baixa',regularizacao:'Regularização'};
+const ST_SOCP={andamento:['Em andamento','info'],cliente:['Aguardando cliente','warn'],orgao:['Aguardando órgão','warn'],exigencia:['Em exigência','crit'],concluido:['Concluído','ok'],cancelado:['Cancelado','']};
+const ETAPAS_PROC={
+  abertura:['Coleta de documentos e informações dos sócios','Consulta de viabilidade (nome e endereço)','Coleta web / DBE na Receita Federal (REDESIM)','Contrato social ou requerimento de empresário','Registro na Junta Comercial (NIRE)','CNPJ emitido','Inscrição estadual (SEFAZ), se houver','Inscrição municipal e alvará de funcionamento','Licenças: sanitária, bombeiros e ambiental, quando exigidas','Opção pelo Simples Nacional / enquadramento','Certificado digital e acesso aos emissores de nota','Entrega da documentação ao cliente e cadastro no sistema'],
+  alteracao:['Definição das alterações com o cliente','Coleta de documentos','Consulta de viabilidade (endereço, atividade ou nome)','Coleta web / DBE na Receita Federal (REDESIM)','Alteração contratual ou requerimento','Registro na Junta Comercial','CNPJ atualizado','Inscrição estadual e municipal atualizadas','Alvará e licenças atualizados','Cadastro atualizado no sistema e entrega ao cliente'],
+  baixa:['Levantamento de débitos e pendências (federal, estadual, municipal e FGTS)','Regularização das obrigações em atraso','Distrato social ou requerimento de extinção','Coleta web / DBE de baixa (REDESIM)','Registro do distrato na Junta Comercial','Baixa do CNPJ','Baixa da inscrição estadual','Baixa da inscrição municipal e do alvará','Declarações de encerramento (situação especial)','Encerramento no sistema e entrega da documentação'],
+  regularizacao:['Diagnóstico da situação cadastral e fiscal','Coleta de documentos','Regularização nos órgãos','Emissão das certidões','Entrega ao cliente'],
+};
+const DOCS_PROC={
+  abertura:['Documento de identidade (RG ou CNH) e CPF dos sócios','Comprovante de residência dos sócios','Certidão de casamento dos sócios casados','Número do recibo do IRPF ou título de eleitor dos sócios','IPTU ou inscrição imobiliária do local','Contrato de locação ou escritura do imóvel','Descrição das atividades da empresa','Capital social e participação de cada sócio'],
+  alteracao:['Contrato social consolidado e última alteração','Documentos dos sócios que entram ou saem','IPTU do novo endereço (se mudar de endereço)','Contrato de locação do novo endereço','Descrição das novas atividades (se mudar atividade)'],
+  baixa:['Contrato social e alterações','Certidões negativas (federal, estadual, municipal e FGTS)','Comprovante de quitação dos débitos ou parcelamento','Livros e documentos fiscais para guarda'],
+  regularizacao:['Contrato social e alterações','Documentos dos sócios','Comprovantes relacionados à pendência'],
+};
+const ALT_ITENS=['Endereço','Sócios / quadro societário','Capital social','Atividades (CNAE)','Nome empresarial','Administrador','Natureza jurídica / tipo','Porte ou enquadramento'];
+const RESP_PEND={cliente:'Cliente',escritorio:'Escritório',orgao:'Órgão público'};
+const TIPOS_LIC=[['funcionamento','Alvará de funcionamento','Prefeitura'],['sanitaria','Licença sanitária','Vigilância Sanitária'],['bombeiros','Bombeiros (AVCB / CLCB)','Corpo de Bombeiros'],['ambiental','Licença ambiental','Órgão ambiental'],['publicidade','Licença de publicidade','Prefeitura'],['outro','Outra licença','']];
+const nomeLic=t=>(TIPOS_LIC.find(x=>x[0]===t)||[0,'Licença'])[1];
+const procDe=id=>S.processos.find(p=>p.id===id);
+const licDe=id=>S.licencas.find(l=>l.id===id);
+const nomeProc=p=>{const e=p.empresaId&&emp(p.empresaId);return e?(e.fantasia||e.razao):(p.nome||'Empresa a constituir')};
+const abertoProc=p=>p.status!=='concluido'&&p.status!=='cancelado';
+const plural=(n,s,p)=>n+' '+(n===1?s:(p||s+'s'));
+function stLic(l){if(l.dispensada)return ['Dispensada','',99999];
+  const d=l.validade?diasAte(l.validade):null;
+  if(l.renovando)return ['Em renovação'+(d!=null&&d<0?' · vencida':''),d!=null&&d<0?'warn':'info',d??99998];
+  if(!l.validade)return l.semValidade?['Sem vencimento','ok',99999]:['Sem validade informada','warn',99997];
+  const al=Number(l.alerta||60);
+  return d<0?['Vencida há '+plural(-d,'dia'),'crit',d]:d<=al?['Vence em '+plural(d,'dia'),'warn',d]:['Vigente','ok',d]}
+const progProc=p=>{const t=(p.etapas||[]).length;const f=(p.etapas||[]).filter(x=>x.feito).length;return [f,t]};
+const barraSoc=(f,t)=>`<span style="display:inline-block;width:90px;height:6px;border-radius:4px;background:var(--line,#e2e8f0);vertical-align:middle;overflow:hidden"><i style="display:block;height:100%;width:${t?Math.round(f/t*100):0}%;background:var(--ok,#10b981)"></i></span> <span class="small muted">${f}/${t}</span>`;
+const empOpts=(sel,todas)=>`${todas?`<option value="">${esc(todas)}</option>`:''}${S.empresas.filter(e=>e.status!=='inativo').slice().sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR')).map(e=>`<option value="${e.id}" ${e.id===sel?'selected':''}>${esc(e.fantasia||e.razao)}</option>`).join('')}`;
+
+/* tudo que vence, numa lista só (licenças, certificados, prazos de processo e pendências) */
+function socVencimentos(){const L=[];
+  S.licencas.forEach(l=>{if(l.dispensada||!l.validade)return;const e=emp(l.empresaId);L.push({data:l.validade,tipo:'Licença',titulo:nomeLic(l.tipo)+(l.numero?' nº '+l.numero:''),emp:e?(e.fantasia||e.razao):'—',st:stLic(l),act:'lic-abrir',id:l.id,renov:!!l.renovando})});
+  if(podeMod('cert','ver'))(S.certificados||[]).forEach(c=>{if(!c.validade||c.substituido||c.inativo)return;const e=emp(c.empresaId);const d=diasAte(c.validade);L.push({data:c.validade,tipo:'Certificado digital',titulo:c.titular||'Certificado',emp:e?(e.fantasia||e.razao):'—',st:d<0?['Vencido','crit',d]:d<=30?['Vence em '+plural(d,'dia'),'warn',d]:['Vigente','ok',d]})});
+  S.processos.filter(abertoProc).forEach(p=>{if(p.prazo){const d=diasAte(p.prazo);L.push({data:p.prazo,tipo:'Prazo do processo',titulo:TIPO_PROC[p.tipo]+' · '+(ST_SOCP[p.status]||['—'])[0],emp:nomeProc(p),st:d<0?['Atrasado '+plural(-d,'dia'),'crit',d]:d<=7?['Faltam '+plural(d,'dia'),'warn',d]:['No prazo','ok',d],act:'proc-abrir',id:p.id})}
+    (p.pend||[]).filter(x=>!x.ok&&x.prazo).forEach(x=>{const d=diasAte(x.prazo);L.push({data:x.prazo,tipo:'Pendência ('+RESP_PEND[x.resp]+')',titulo:x.desc,emp:nomeProc(p),st:d<0?['Atrasada '+plural(-d,'dia'),'crit',d]:d<=7?['Faltam '+plural(d,'dia'),'warn',d]:['No prazo','ok',d],act:'proc-abrir',id:p.id})})});
+  return L.sort((a,b)=>a.data.localeCompare(b.data))}
+/* tudo que está faltando */
+function socPendencias(){const L=[];
+  S.processos.filter(abertoProc).forEach(p=>{(p.pend||[]).filter(x=>!x.ok).forEach(x=>L.push({resp:x.resp||'escritorio',desc:x.desc,emp:nomeProc(p),origem:TIPO_PROC[p.tipo],prazo:x.prazo,act:'proc-abrir',id:p.id,pid:p.id,xid:x.id}));
+    const falta=(p.docs||[]).filter(d=>!d.ok);if(falta.length)L.push({resp:'cliente',desc:'Documentos: '+falta.map(d=>d.nome).slice(0,3).join('; ')+(falta.length>3?' e mais '+(falta.length-3):''),emp:nomeProc(p),origem:TIPO_PROC[p.tipo],act:'proc-abrir',id:p.id})});
+  S.licencas.forEach(l=>{if(l.dispensada)return;const s=stLic(l);const e=emp(l.empresaId);const base={emp:e?(e.fantasia||e.razao):'—',origem:nomeLic(l.tipo),act:'lic-abrir',id:l.id,resp:'escritorio'};
+    if(s[1]==='crit'&&!l.renovando)L.push({...base,desc:'Licença vencida: providenciar a renovação',prazo:l.validade});
+    else if(s[1]==='warn'&&l.validade&&!l.renovando)L.push({...base,desc:'Licença vencendo: iniciar a renovação',prazo:l.validade});
+    if(!l.validade&&!l.semValidade)L.push({...base,desc:'Informar número e validade'});
+    if(!l.arquivo&&(l.numero||l.validade))L.push({...base,desc:'Anexar o documento da licença'})});
+  return L}
+
+function socConteudo(){
+  if(!podeSoc())return semSistema('o Societário','Sistema · Societário (legalização)');
+  const v=UI.view;
+  if(v==='s-proc')return socProcessos();if(v==='s-lic')return socLicencas();if(v==='s-venc')return socVencView();if(v==='s-pend')return socPendView();if(v==='s-docs')return socDocs();
+  return socPainel()}
+function socCard(){const ab=S.processos.filter(abertoProc).length;const venc=S.licencas.filter(l=>!l.dispensada&&stLic(l)[1]==='crit').length;
+  return `<div class="ctb-card-comp" style="padding:12px;border-bottom:1px solid rgba(148,163,184,.16)"><div class="small muted">Legalização</div><div style="margin:4px 0 8px"><b>${plural(ab,'processo')} em aberto</b>${venc?`<div class="small" style="color:var(--crit,#dc2626)">${plural(venc,'licença vencida','licenças vencidas')}</div>`:''}</div>${podeSoc('editar')?`<button class="btn sm primary" data-act="proc-novo">Novo processo</button>`:''}</div>`}
+function socCtx(){const ab=S.processos.filter(abertoProc);const ex=ab.filter(p=>p.status==='exigencia'||p.status==='cliente').length;const lv=S.licencas.filter(l=>!l.dispensada&&stLic(l)[1]==='crit').length;const lw=S.licencas.filter(l=>!l.dispensada&&stLic(l)[1]==='warn').length;
+  const c=(t,v)=>`<div class="ctb-campo"><span>${t}</span><b class="ctb-val">${v}</b></div>`;
+  return `<div class="ctb-ctx">${c('Processos em aberto',ab.length)}${c('Em exigência ou aguardando cliente',ex)}${c('Licenças vencidas',lv)}${c('Licenças vencendo',lw)}</div>`}
+
+/* ---------- visão geral ---------- */
+function socPainel(){const ab=S.processos.filter(abertoProc);const V=socVencimentos().filter(x=>x.st[2]<=60);const P=socPendencias();
+  const k=(t,v,s)=>`<div class="kpi"><span class="eyebrow">${t}</span><b>${v}</b><small>${s||''}</small></div>`;
+  const porTipo=Object.keys(TIPO_PROC).map(t=>ab.filter(p=>p.tipo===t).length);
+  return head('Societário','Abertura, alteração e baixa de empresas, alvarás e licenças, vencimentos, pendências e documentação.',podeSoc('editar')?`<button class="btn" data-act="lic-nova">${svg('plus')}Nova licença</button><button class="btn primary" data-act="proc-novo">${svg('plus')}Novo processo</button>`:'')+
+  `<div class="kpis">${k('Processos em aberto',ab.length,Object.keys(TIPO_PROC).map((t,i)=>porTipo[i]?plural(porTipo[i],TIPO_PROC[t].toLowerCase(),{abertura:'aberturas',alteracao:'alterações',baixa:'baixas',regularizacao:'regularizações'}[t]):'').filter(Boolean).join(' · ')||'nenhum')}${k('Licenças vencidas',S.licencas.filter(l=>!l.dispensada&&stLic(l)[1]==='crit').length,'de '+S.licencas.length+' cadastradas')}${k('Vencem em 60 dias',V.filter(x=>x.st[2]>=0).length,'licenças, certificados e prazos')}${k('Pendências',P.length,P.filter(x=>x.resp==='cliente').length+' com o cliente')}</div>
+  <div class="cols-2-1" style="align-items:start;margin-top:16px"><div class="panel"><div class="panel-head"><h2>Processos em andamento</h2><a class="btn sm" href="#s-proc">Ver todos</a></div>${ab.length?`<div class="list">${ab.slice().sort((a,b)=>String(a.prazo||'9').localeCompare(String(b.prazo||'9'))).slice(0,10).map(p=>{const [f,t]=progProc(p);return `<div class="row" style="cursor:pointer" data-act="proc-abrir" data-id="${p.id}"><div class="grow"><b>${esc(nomeProc(p))}</b> · ${esc(TIPO_PROC[p.tipo])}<div class="small muted">${p.prazo?'prazo '+fmtData(p.prazo)+' · ':''}${esc(p.responsavel||'sem responsável')}</div></div>${pill(...ST_SOCP[p.status]||['—',''])} ${barraSoc(f,t)}</div>`}).join('')}</div>`:vazio('Nenhum processo em aberto.')}</div>
+   <div class="panel"><div class="panel-head"><h2>Próximos 60 dias</h2><a class="btn sm" href="#s-venc">Vencimentos</a></div>${V.length?`<div class="list">${V.slice(0,12).map(x=>`<div class="row" ${x.act?`style="cursor:pointer" data-act="${x.act}" data-id="${x.id}"`:''}><div class="grow"><b>${esc(x.titulo)}</b><div class="small muted">${esc(x.emp)} · ${esc(x.tipo)} · ${fmtData(x.data)}</div></div>${pill(x.st[0],x.st[1])}</div>`).join('')}</div>`:vazio('Nada vencendo nos próximos 60 dias.')}</div></div>`}
+
+/* ---------- processos ---------- */
+function socProcessos(){const F=UI.socP||(UI.socP={tipo:'',st:'abertos',q:''});const n=normP(F.q||'');
+  const L=S.processos.filter(p=>(!F.tipo||p.tipo===F.tipo)&&(F.st==='todos'||(F.st==='abertos'?abertoProc(p):!abertoProc(p)))&&(!n||normP([nomeProc(p),p.cnpj,p.municipio,p.responsavel,(p.protocolos||[]).map(x=>x.numero).join(' ')].join(' ')).includes(n)))
+    .sort((a,b)=>abertoProc(a)!==abertoProc(b)?(abertoProc(a)?-1:1):String(a.prazo||'9999').localeCompare(String(b.prazo||'9999')));
+  const tabs=[['','Todos'],...Object.entries(TIPO_PROC)].map(([k,t])=>`<button role="tab" aria-selected="${F.tipo===k}" data-act="socp-f" data-k="tipo" data-v="${k}">${t} (${S.processos.filter(p=>(!k||p.tipo===k)&&abertoProc(p)).length})</button>`).join('');
+  return head('Abertura, alteração e baixa','Cada processo tem etapas, documentos do cliente, protocolos nos órgãos e pendências. Clique para abrir.',podeSoc('editar')?`<button class="btn primary" data-act="proc-novo">${svg('plus')}Novo processo</button>`:'')+
+  `<div class="tabs" role="tablist">${tabs}</div><div class="panel"><div class="panel-head" style="gap:8px;flex-wrap:wrap"><input type="search" data-socp-q value="${esc(F.q||'')}" placeholder="Empresa, CNPJ, cidade, responsável ou protocolo" style="max-width:340px" id="socp-q" data-live><select data-socp-st style="width:auto">${[['abertos','Em aberto'],['fechados','Concluídos e cancelados'],['todos','Todos']].map(([k,t])=>`<option value="${k}" ${F.st===k?'selected':''}>${t}</option>`).join('')}</select></div>
+   ${L.length?`<div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Tipo</th><th>Etapas</th><th>Pendências</th><th>Prazo</th><th>Responsável</th><th>Situação</th></tr></thead><tbody>${L.map(p=>{const [f,t]=progProc(p);const pe=(p.pend||[]).filter(x=>!x.ok).length;const d=p.prazo&&abertoProc(p)?diasAte(p.prazo):null;
+     return `<tr style="cursor:pointer" data-act="proc-abrir" data-id="${p.id}"><td><b>${esc(nomeProc(p))}</b><div class="small muted">${p.cnpj?fmtCNPJ(p.cnpj)+' · ':''}${esc([p.municipio,p.uf].filter(Boolean).join('/'))}</div></td><td>${esc(TIPO_PROC[p.tipo])}${p.tipo==='alteracao'&&(p.alteracoes||[]).length?`<div class="small muted">${esc(p.alteracoes.join(', '))}</div>`:''}</td><td>${barraSoc(f,t)}</td><td>${pe?pill(String(pe),'warn'):'<span class="small muted">—</span>'}</td><td class="small">${p.prazo?fmtData(p.prazo):'—'}${d!=null&&d<0?`<div style="color:var(--crit,#dc2626)">atrasado</div>`:''}</td><td class="small">${esc(p.responsavel||'—')}</td><td>${pill(...ST_SOCP[p.status]||['—',''])}</td></tr>`}).join('')}</tbody></table></div>`:vazio(S.processos.length?'Nenhum processo com esses filtros.':'Nenhum processo ainda. Comece por "Novo processo".')}</div>`}
+ACT['socp-f']=el=>{const F=UI.socP||(UI.socP={tipo:'',st:'abertos',q:''});F[el.dataset.k]=el.dataset.v;render()};
+document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-socp-q]')){(UI.socP||(UI.socP={tipo:'',st:'abertos'})).q=s.value;render()}});
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-socp-st]')){(UI.socP||(UI.socP={tipo:''})).st=s.value;render()}});
+
+function procForm(p){const novo=!p.id;const ops=S.operadores||[];
+  return mHead(novo?'Novo processo':'Dados do processo')+`<form data-form="proc-salvar" data-id="${esc(p.id||'')}"><div class="modal-body"><div class="grid-f">
+   <label class="f"><span>Tipo *</span><select name="tipo" ${novo?'':'disabled'} data-proc-tipo>${Object.entries(TIPO_PROC).map(([k,t])=>`<option value="${k}" ${p.tipo===k?'selected':''}>${t}</option>`).join('')}</select></label>
+   <label class="f"><span>Empresa da carteira</span><select name="empresaId"><option value="">${'Empresa nova / fora da carteira'}</option>${empOpts(p.empresaId)}</select></label>
+   <label class="f full"><span>Nome empresarial (ou pretendido, na abertura)</span><input name="nome" maxlength="160" value="${esc(p.nome||'')}" placeholder="Preenchido pela carteira quando a empresa já é cliente"></label>
+   <label class="f"><span>CNPJ</span><input name="cnpj" inputmode="numeric" maxlength="18" value="${esc(p.cnpj?fmtCNPJ(p.cnpj):'')}"></label>
+   <label class="f"><span>Município / UF</span><span style="display:flex;gap:6px"><input name="municipio" maxlength="80" value="${esc(p.municipio||'')}"><input name="uf" maxlength="2" style="width:64px;text-transform:uppercase" value="${esc(p.uf||'')}"></span></label>
+   <label class="f"><span>Responsável no escritório</span><input name="responsavel" maxlength="80" list="soc-ops" value="${esc(p.responsavel||ME.nome||'')}"><datalist id="soc-ops">${ops.map(o=>`<option value="${esc(o.nome)}">`).join('')}</datalist></label>
+   <label class="f"><span>Prazo combinado</span><input name="prazo" type="date" value="${esc(p.prazo||'')}"></label>
+   <label class="f"><span>Honorário do serviço (R$)</span><input name="valor" inputmode="decimal" value="${p.valor?fmtValIn(p.valor):''}" placeholder="opcional"></label>
+   <div class="f full" data-proc-alt ${p.tipo==='alteracao'||(!p.tipo&&false)?'':'hidden'}><span>O que muda (alteração)</span><div style="display:flex;flex-wrap:wrap;gap:6px 14px">${ALT_ITENS.map(a=>`<label class="chk"><input type="checkbox" name="alt" value="${esc(a)}" ${(p.alteracoes||[]).includes(a)?'checked':''}> ${esc(a)}</label>`).join('')}</div></div>
+   <label class="f full"><span>Observações</span><textarea name="obs" rows="2" maxlength="1000">${esc(p.obs||'')}</textarea></label>
+   ${novo?'<p class="small muted full" style="margin:0">As etapas e a lista de documentos do tipo escolhido entram prontas. Dá para acrescentar e marcar depois.</p>':''}
+  </div></div><div class="modal-foot"><button type="button" class="btn" data-act="${novo?'close-modal':'proc-abrir'}" data-id="${esc(p.id||'')}">${novo?'Cancelar':'Voltar'}</button><button class="btn primary">${novo?'Criar processo':'Salvar'}</button></div></form>`}
+ACT['proc-novo']=()=>{if(!podeSoc('editar'))return;openModal(procForm({tipo:'abertura'}),true)};
+ACT['proc-editar']=el=>{const p=procDe(el.dataset.id);if(p)openModal(procForm(p),true)};
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-proc-tipo]')){const b=s.form.querySelector('[data-proc-alt]');if(b)b.hidden=s.value!=='alteracao'}});
+FORM['proc-salvar']=(fd,form)=>{if(!podeSoc('editar')){toast('Seu acesso não permite editar processos.',true);return}
+  const id=form.dataset.id;const ex=id&&procDe(id);const empresaId=fd.get('empresaId')||null;const e=empresaId&&emp(empresaId);
+  const dados={empresaId,nome:String(fd.get('nome')||'').trim()||(e?e.razao:''),cnpj:soDig(fd.get('cnpj')||'')||(e?soDig(e.cnpj||''):''),municipio:String(fd.get('municipio')||'').trim()||(e?.municipio||''),uf:String(fd.get('uf')||'').trim().toUpperCase()||(e?.uf||''),
+    responsavel:String(fd.get('responsavel')||'').trim(),prazo:fd.get('prazo')||'',valor:valBR(fd.get('valor')),alteracoes:fd.getAll('alt'),obs:String(fd.get('obs')||'').trim()};
+  if(!dados.empresaId&&!dados.nome){toast('Escolha a empresa ou informe o nome empresarial.',true);return}
+  if(ex){mut('processos',()=>{Object.assign(ex,dados,{atualizadoEm:agora()})},['Societário','Alterou o processo de '+TIPO_PROC[ex.tipo].toLowerCase()+' de '+nomeProc({...ex,...dados}),e?.razao||dados.nome]);procAbrir(ex.id);return}
+  const tipo=fd.get('tipo');const nid=uid();
+  const p={id:nid,tipo,status:'andamento',...dados,inicio:hoje(),criadoEm:agora(),por:ME.nome||'',
+    etapas:ETAPAS_PROC[tipo].map(n=>({id:uid(),nome:n,feito:false})),docs:DOCS_PROC[tipo].map(n=>({id:uid(),nome:n,ok:false})),pend:[],protocolos:[],notas:[]};
+  mut('processos',()=>S.processos.push(p),['Societário','Abriu processo de '+TIPO_PROC[tipo].toLowerCase()+': '+nomeProc(p),e?.razao||dados.nome]);procAbrir(nid)};
+
+function procHtml(p){const ed=podeSoc('editar');const [f,t]=progProc(p);const e=p.empresaId&&emp(p.empresaId);
+  const sec=(tit,corpo,extra)=>`<div class="panel" style="margin:0 0 12px"><div class="panel-head"><h2 style="font-size:15px">${tit}</h2>${extra||''}</div>${corpo}</div>`;
+  const etapas=`<div class="list">${(p.etapas||[]).map((x,i)=>`<div class="row" style="padding:6px 0;flex-wrap:nowrap"><label class="chk grow" style="align-items:flex-start"><input type="checkbox" ${x.feito?'checked':''} ${ed?`data-act="proc-etapa" data-id="${p.id}" data-x="${x.id}"`:'disabled'}> <span><b style="font-weight:${x.feito?'400':'600'}">${i+1}. ${esc(x.nome)}</b>${x.feito?`<span class="small muted"> · feito ${x.em?fmtData(x.em.slice(0,10)):''}${x.por?' por '+esc(x.por):''}</span>`:''}</span></label></div>`).join('')}</div>
+   ${ed?`<form data-form="proc-etapa-add" data-id="${p.id}" style="display:flex;gap:6px;margin-top:6px"><input name="nome" maxlength="160" placeholder="Acrescentar etapa" required><button class="btn sm">Acrescentar</button></form>`:''}`;
+  const pend=`${(p.pend||[]).length?`<div class="list">${p.pend.slice().sort((a,b)=>(a.ok-b.ok)||String(a.prazo||'9').localeCompare(String(b.prazo||'9'))).map(x=>{const d=x.prazo&&!x.ok?diasAte(x.prazo):null;return `<div class="row" style="padding:6px 0;flex-wrap:nowrap"><label class="chk grow" style="align-items:flex-start"><input type="checkbox" ${x.ok?'checked':''} ${ed?`data-act="proc-pend-ok" data-id="${p.id}" data-x="${x.id}"`:'disabled'}> <span style="${x.ok?'text-decoration:line-through;opacity:.6':''}">${esc(x.desc)}<span class="small muted"> · ${RESP_PEND[x.resp]||'—'}${x.prazo?' · até '+fmtData(x.prazo):''}</span>${d!=null&&d<0?' '+pill('atrasada','crit'):''}</span></label>${ed?`<button type="button" class="btn sm ghost" data-act="proc-pend-rm" data-id="${p.id}" data-x="${x.id}" title="Remover">×</button>`:''}</div>`}).join('')}</div>`:'<p class="small muted" style="margin:0">Nenhuma pendência.</p>'}
+   ${ed?`<form data-form="proc-pend-add" data-id="${p.id}" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><input name="desc" maxlength="240" placeholder="Nova pendência (ex.: assinatura do contrato social)" required style="flex:1 1 100%"><select name="resp" style="flex:1 1 120px;width:auto" title="Com quem está">${Object.entries(RESP_PEND).map(([k,t])=>`<option value="${k}">${t}</option>`).join('')}</select><input name="prazo" type="date" title="Prazo" style="flex:1 1 130px;width:auto"><button class="btn sm">Incluir</button></form>`:''}`;
+  const docs=`<div class="list">${(p.docs||[]).map(x=>`<div class="row" style="padding:6px 0;flex-wrap:nowrap"><label class="chk grow" style="align-items:flex-start"><input type="checkbox" ${x.ok?'checked':''} ${ed?`data-act="proc-doc-ok" data-id="${p.id}" data-x="${x.id}"`:'disabled'}> <span>${esc(x.nome)}${x.ok&&x.em?`<span class="small muted"> · recebido ${fmtData(x.em.slice(0,10))}</span>`:''}</span></label>
+     ${x.arquivo?linkArq(x.arquivo,'Abrir'):''}${ed?`<label class="btn sm" style="cursor:pointer">${x.arquivo?'Trocar':'Anexar'}<input type="file" hidden data-proc-arq data-id="${p.id}" data-x="${x.id}" accept=".pdf,.jpg,.jpeg,.png,.zip"></label> <button type="button" class="btn sm ghost" data-act="proc-doc-rm" data-id="${p.id}" data-x="${x.id}" title="Remover da lista">×</button>`:''}</div>`).join('')||'<p class="small muted" style="margin:0">Nenhum documento na lista.</p>'}</div>
+   ${ed?`<form data-form="proc-doc-add" data-id="${p.id}" style="display:flex;gap:6px;margin-top:6px"><input name="nome" maxlength="160" placeholder="Acrescentar documento à lista" required><button class="btn sm">Acrescentar</button></form>`:''}`;
+  const prot=`${(p.protocolos||[]).length?`<div class="list">${p.protocolos.map(x=>`<div class="row" style="padding:6px 0;flex-wrap:nowrap"><div class="grow"><b>${esc(x.orgao)}</b> · nº <span class="mono">${esc(x.numero)}</span><span class="small muted"> · ${fmtData(x.data)}</span></div>${ed?`<button type="button" class="btn sm ghost" data-act="proc-prot-rm" data-id="${p.id}" data-x="${x.id}" title="Remover">×</button>`:''}</div>`).join('')}</div>`:'<p class="small muted" style="margin:0">Nenhum protocolo registrado.</p>'}
+   ${ed?`<form data-form="proc-prot-add" data-id="${p.id}" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px"><input name="orgao" maxlength="80" placeholder="Órgão (Junta, Receita, Prefeitura…)" required list="soc-orgaos" style="flex:1 1 100%"><datalist id="soc-orgaos">${['Junta Comercial','Receita Federal (REDESIM)','SEFAZ','Prefeitura','Vigilância Sanitária','Corpo de Bombeiros','Órgão ambiental','Cartório de Registro Civil de Pessoas Jurídicas','OAB / conselho de classe'].map(o=>`<option value="${o}">`).join('')}</datalist><input name="numero" maxlength="60" placeholder="Número do protocolo" required style="flex:1 1 140px;width:auto"><input name="data" type="date" value="${hoje()}" style="flex:1 1 130px;width:auto"><button class="btn sm">Registrar</button></form>`:''}`;
+  const notas=`${(p.notas||[]).length?`<div class="list">${p.notas.slice().reverse().map(x=>`<div class="row" style="padding:6px 0;display:block"><div class="small muted">${esc(x.por||'')} · ${fmtData(String(x.em).slice(0,10))}</div><div style="white-space:pre-wrap">${esc(x.texto)}</div></div>`).join('')}</div>`:'<p class="small muted" style="margin:0">Sem anotações.</p>'}
+   ${ed?`<form data-form="proc-nota" data-id="${p.id}" style="display:flex;gap:6px;margin-top:6px;align-items:flex-end"><textarea name="texto" rows="2" maxlength="2000" placeholder="Anotação, andamento, retorno do órgão…" required></textarea><button class="btn sm">Anotar</button></form>`:''}`;
+  const fim=f===t&&t>0&&abertoProc(p);
+  return mHead(TIPO_PROC[p.tipo]+' · '+nomeProc(p))+`<div class="modal-body">
+   <div style="display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin-bottom:12px">
+    ${ed?`<label class="small" style="display:flex;gap:6px;align-items:center">Situação <select data-proc-st data-id="${p.id}" style="width:auto">${Object.entries(ST_SOCP).map(([k,[r]])=>`<option value="${k}" ${p.status===k?'selected':''}>${r}</option>`).join('')}</select></label>`:pill(...ST_SOCP[p.status]||['—',''])}
+    <span class="small">${barraSoc(f,t)} etapas</span>
+    <span class="small muted">${p.cnpj?'CNPJ '+fmtCNPJ(p.cnpj)+' · ':''}${esc([p.municipio,p.uf].filter(Boolean).join('/'))}</span>
+    <span class="small muted">Responsável: ${esc(p.responsavel||'—')} · início ${fmtData(p.inicio)}${p.prazo?' · prazo <b>'+fmtData(p.prazo)+'</b>':''}${p.valor?' · honorário '+brl(p.valor):''}</span>
+   </div>
+   ${p.tipo==='alteracao'&&(p.alteracoes||[]).length?`<p class="small" style="margin:0 0 10px"><b>Alterações:</b> ${esc(p.alteracoes.join(', '))}</p>`:''}
+   ${p.obs?`<p class="small" style="margin:0 0 10px;white-space:pre-wrap">${esc(p.obs)}</p>`:''}
+   ${fim?`<div class="banner ok" style="display:block;margin-bottom:12px">Todas as etapas foram feitas. ${ed?'Marque a situação como <b>Concluído</b> para fechar o processo.':''}${p.tipo==='abertura'&&!p.empresaId?' Depois cadastre a empresa na carteira, pelo painel, e vincule aqui em "Editar dados".':''}${p.tipo==='baixa'&&p.empresaId?' Depois inative a empresa na carteira, pelo painel.':''}</div>`:''}
+   <div class="cols-2-1" style="align-items:start;gap:12px"><div>${sec('Etapas',etapas)}${sec('Documentos do cliente',docs,`<span class="small muted">${(p.docs||[]).filter(d=>d.ok).length}/${(p.docs||[]).length} recebidos</span>`)}</div>
+   <div>${sec('Pendências',pend)}${sec('Protocolos nos órgãos',prot)}${sec('Anotações',notas)}</div></div></div>
+   <div class="modal-foot">${ed&&podeSoc('excluir')?`<button type="button" class="btn ghost danger" data-act="proc-excluir" data-id="${p.id}" style="margin-right:auto">Excluir</button>`:''}${ed?`<button type="button" class="btn" data-act="proc-editar" data-id="${p.id}">Editar dados</button>`:''}<button type="button" class="btn primary" data-act="close-modal">Fechar</button></div>`}
+function procAbrir(id){const p=procDe(id);if(!p)return;const ov=document.getElementById('overlay');const m=ov&&ov.querySelector('.modal');const b=ov&&ov.querySelector('.modal-body');const s1=m?m.scrollTop:0,s2=b?b.scrollTop:0;const mesmo=UI.modal&&UI.modal.procId===id;
+  openModal(procHtml(p),true);UI.modal.procId=id;
+  if(mesmo)setTimeout(()=>{const ov2=document.getElementById('overlay');const m2=ov2&&ov2.querySelector('.modal');const b2=ov2&&ov2.querySelector('.modal-body');if(document.activeElement&&document.activeElement.blur&&ov2&&ov2.contains(document.activeElement))document.activeElement.blur();if(m2)m2.scrollTop=s1;if(b2)b2.scrollTop=s2},40)}
+ACT['proc-abrir']=el=>procAbrir(el.dataset.id);
+const procMut=(p,fn,txt)=>{mut('processos',()=>{fn(p);p.atualizadoEm=agora()},txt?['Societário',txt+' · '+TIPO_PROC[p.tipo].toLowerCase()+' de '+nomeProc(p),emp(p.empresaId)?.razao||p.nome||'']:null);procAbrir(p.id)};
+const itemDe=(el,lista)=>{const p=procDe(el.dataset.id);return p?[p,(p[lista]||[]).find(x=>x.id===el.dataset.x)]:[null,null]};
+ACT['proc-etapa']=el=>{const [p,x]=itemDe(el,'etapas');if(!x)return;procMut(p,()=>{x.feito=el.checked;x.em=el.checked?agora():'';x.por=el.checked?(ME.nome||''):''},(el.checked?'Concluiu':'Reabriu')+' a etapa "'+x.nome+'"')};
+ACT['proc-pend-ok']=el=>{const [p,x]=itemDe(el,'pend');if(!x)return;procMut(p,()=>{x.ok=el.checked;x.okEm=el.checked?agora():''},(el.checked?'Resolveu':'Reabriu')+' a pendência "'+x.desc+'"')};
+ACT['proc-pend-rm']=el=>{const [p,x]=itemDe(el,'pend');if(!x)return;procMut(p,()=>{p.pend=p.pend.filter(z=>z!==x)},'Removeu a pendência "'+x.desc+'"')};
+ACT['proc-doc-ok']=el=>{const [p,x]=itemDe(el,'docs');if(!x)return;procMut(p,()=>{x.ok=el.checked;x.em=el.checked?agora():''},null)};
+ACT['proc-doc-rm']=el=>{const [p,x]=itemDe(el,'docs');if(!x)return;procMut(p,()=>{p.docs=p.docs.filter(z=>z!==x)},'Tirou da lista o documento "'+x.nome+'"')};
+ACT['proc-prot-rm']=el=>{const [p,x]=itemDe(el,'protocolos');if(!x)return;procMut(p,()=>{p.protocolos=p.protocolos.filter(z=>z!==x)},'Removeu o protocolo '+x.numero)};
+FORM['proc-etapa-add']=(fd,form)=>{const p=procDe(form.dataset.id);const n=String(fd.get('nome')||'').trim();if(p&&n)procMut(p,()=>{(p.etapas||(p.etapas=[])).push({id:uid(),nome:n,feito:false})},'Acrescentou a etapa "'+n+'"')};
+FORM['proc-doc-add']=(fd,form)=>{const p=procDe(form.dataset.id);const n=String(fd.get('nome')||'').trim();if(p&&n)procMut(p,()=>{(p.docs||(p.docs=[])).push({id:uid(),nome:n,ok:false})},null)};
+FORM['proc-pend-add']=(fd,form)=>{const p=procDe(form.dataset.id);const d=String(fd.get('desc')||'').trim();if(p&&d)procMut(p,()=>{(p.pend||(p.pend=[])).push({id:uid(),desc:d,resp:fd.get('resp')||'escritorio',prazo:fd.get('prazo')||'',ok:false,em:agora(),por:ME.nome||''})},'Incluiu a pendência "'+d+'"')};
+FORM['proc-prot-add']=(fd,form)=>{const p=procDe(form.dataset.id);const o=String(fd.get('orgao')||'').trim(),n=String(fd.get('numero')||'').trim();if(p&&o&&n)procMut(p,()=>{(p.protocolos||(p.protocolos=[])).push({id:uid(),orgao:o,numero:n,data:fd.get('data')||hoje(),por:ME.nome||''})},'Registrou o protocolo '+n+' ('+o+')')};
+FORM['proc-nota']=(fd,form)=>{const p=procDe(form.dataset.id);const t=String(fd.get('texto')||'').trim();if(p&&t)procMut(p,()=>{(p.notas||(p.notas=[])).push({em:agora(),por:ME.nome||'',texto:t})},null)};
+document.addEventListener('change',ev=>{const s=ev.target;if(!s.matches||!s.matches('[data-proc-st]'))return;const p=procDe(s.dataset.id);if(!p)return;const v=s.value;
+  procMut(p,()=>{p.status=v;if(v==='concluido'||v==='cancelado')p.concluidoEm=p.concluidoEm||hoje();else p.concluidoEm=''},'Mudou a situação para "'+ST_SOCP[v][0]+'"')});
+document.addEventListener('change',async ev=>{const inp=ev.target;if(!inp.matches||!inp.matches('[data-proc-arq]'))return;const [p,x]=itemDe(inp,'docs');const file=inp.files&&inp.files[0];inp.value='';if(!x||!file)return;
+  const v=await validarArquivo(file,['pdf','jpg','jpeg','png','zip']);if(!v.ok){toast(v.msg,true);return}
+  const antes=UI.empresaId;UI.empresaId=null;try{const arq=await enviarArquivo(file);procMut(p,()=>{x.arquivo=arq;x.ok=true;x.em=x.em||agora()},'Anexou "'+x.nome+'"');toast('Documento anexado.')}catch(er){toast(er.message,true)}finally{UI.empresaId=antes}});
+ACT['proc-excluir']=el=>{const p=procDe(el.dataset.id);if(!p||!podeSoc('excluir'))return;confirmar('Excluir processo',`Excluir o processo de <b>${esc(TIPO_PROC[p.tipo].toLowerCase())}</b> de <b>${esc(nomeProc(p))}</b>, com etapas, pendências, protocolos e anotações? Isso não pode ser desfeito. Os arquivos anexados continuam guardados.`,'Excluir',()=>{mut('processos',()=>{S.processos=S.processos.filter(z=>z.id!==p.id)},['Societário','Excluiu o processo de '+TIPO_PROC[p.tipo].toLowerCase()+' de '+nomeProc(p),emp(p.empresaId)?.razao||p.nome||'']);closeModal()},true)};
+
+/* ---------- alvarás e licenças ---------- */
+function socLicencas(){const F=UI.socL||(UI.socL={emp:'',tipo:'',st:''});const ed=podeSoc('editar');
+  const L=S.licencas.filter(l=>(!F.emp||l.empresaId===F.emp)&&(!F.tipo||l.tipo===F.tipo)&&(!F.st||(F.st==='problema'?['crit','warn'].includes(stLic(l)[1]):F.st==='renov'?l.renovando:stLic(l)[1]===F.st))).sort((a,b)=>stLic(a)[2]-stLic(b)[2]);
+  const semLic=S.empresas.filter(e=>e.status!=='inativo'&&e.status!=='aguardando_pagamento'&&!S.licencas.some(l=>l.empresaId===e.id)).length;
+  return head('Alvarás e licenças','Alvará de funcionamento, licença sanitária, bombeiros (AVCB/CLCB), licença ambiental e outras, com validade, renovação e documento anexado.',ed?`<button class="btn primary" data-act="lic-nova">${svg('plus')}Nova licença</button>`:'')+
+  `<div class="panel"><div class="panel-head" style="gap:8px;flex-wrap:wrap"><select data-socl="emp" style="width:auto;max-width:280px">${empOpts(F.emp,'Todas as empresas')}</select><select data-socl="tipo" style="width:auto"><option value="">Todos os tipos</option>${TIPOS_LIC.map(([k,t])=>`<option value="${k}" ${F.tipo===k?'selected':''}>${t}</option>`).join('')}</select><select data-socl="st" style="width:auto">${[['','Todas as situações'],['problema','Vencidas ou vencendo'],['crit','Vencidas'],['warn','Vencendo ou sem validade'],['renov','Em renovação'],['ok','Vigentes']].map(([k,t])=>`<option value="${k}" ${F.st===k?'selected':''}>${t}</option>`).join('')}</select>${semLic?`<span class="small muted">${plural(semLic,'empresa ativa','empresas ativas')} sem nenhuma licença cadastrada</span>`:''}</div>
+   ${L.length?`<div class="table-wrap"><table><thead><tr><th>Empresa</th><th>Licença</th><th>Número</th><th>Validade</th><th>Situação</th><th>Documento</th><th></th></tr></thead><tbody>${L.map(l=>{const e=emp(l.empresaId);const s=stLic(l);
+     return `<tr><td><b>${esc(e?(e.fantasia||e.razao):'—')}</b><div class="small muted">${esc(e?[e.municipio,e.uf].filter(Boolean).join('/'):'')}</div></td><td>${esc(l.tipo==='outro'&&l.nomeOutro?l.nomeOutro:nomeLic(l.tipo))}<div class="small muted">${esc(l.orgao||'')}</div></td><td class="mono small">${esc(l.numero||'—')}</td><td class="small">${l.validade?fmtData(l.validade):l.semValidade?'não vence':'—'}${l.renovando&&l.protocoloRenov?`<div class="muted">protocolo ${esc(l.protocoloRenov)}</div>`:''}</td><td>${pill(s[0],s[1])}</td><td>${l.arquivo?linkArq(l.arquivo,'Abrir'):'<span class="small muted">—</span>'}</td>
+      <td class="r" style="white-space:nowrap"><button class="btn sm" data-act="lic-abrir" data-id="${l.id}">${ed?'Editar':'Ver'}</button>${ed&&!l.dispensada?` <button class="btn sm" data-act="lic-renovar" data-id="${l.id}" title="Registrar a licença renovada">Renovada</button>`:''}</td></tr>`}).join('')}</tbody></table></div>`:vazio(S.licencas.length?'Nenhuma licença com esses filtros.':'Nenhuma licença cadastrada ainda.')}</div>`}
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-socl]')){(UI.socL||(UI.socL={}))[s.dataset.socl]=s.value;render()}});
+function licForm(l){const novo=!l.id;
+  return mHead(novo?'Nova licença':nomeLic(l.tipo)+' · '+((emp(l.empresaId)||{}).fantasia||(emp(l.empresaId)||{}).razao||''))+`<form data-form="lic-salvar" data-id="${esc(l.id||'')}"><div class="modal-body"><div class="grid-f">
+   <label class="f"><span>Empresa *</span><select name="empresaId" required>${novo?'<option value="">Escolha</option>':''}${empOpts(l.empresaId)}</select></label>
+   <label class="f"><span>Tipo *</span><select name="tipo" data-lic-tipo>${TIPOS_LIC.map(([k,t])=>`<option value="${k}" ${l.tipo===k?'selected':''}>${t}</option>`).join('')}</select></label>
+   <label class="f" data-lic-outro ${l.tipo==='outro'?'':'hidden'}><span>Nome da licença</span><input name="nomeOutro" maxlength="80" value="${esc(l.nomeOutro||'')}" placeholder="ex.: licença do conselho de classe"></label>
+   <label class="f"><span>Órgão emissor</span><input name="orgao" maxlength="80" value="${esc(l.orgao||(TIPOS_LIC.find(x=>x[0]===(l.tipo||'funcionamento'))||[])[2]||'')}"></label>
+   <label class="f"><span>Número</span><input name="numero" maxlength="60" value="${esc(l.numero||'')}"></label>
+   <label class="f"><span>Emissão</span><input name="emissao" type="date" value="${esc(l.emissao||'')}"></label>
+   <label class="f"><span>Validade</span><input name="validade" type="date" value="${esc(l.validade||'')}"></label>
+   <label class="f"><span>Avisar com antecedência de (dias)</span><input name="alerta" type="number" min="1" max="365" value="${Number(l.alerta||60)}"></label>
+   <label class="chk"><input type="checkbox" name="semValidade" ${l.semValidade?'checked':''}> Não tem vencimento</label>
+   <label class="chk"><input type="checkbox" name="dispensada" ${l.dispensada?'checked':''}> Dispensada (atividade de baixo risco, por exemplo)</label>
+   <label class="chk full"><input type="checkbox" name="renovando" ${l.renovando?'checked':''}> Renovação em andamento</label>
+   <label class="f"><span>Protocolo da renovação</span><input name="protocoloRenov" maxlength="60" value="${esc(l.protocoloRenov||'')}"></label>
+   <label class="f"><span>Data do protocolo</span><input name="dataRenov" type="date" value="${esc(l.dataRenov||'')}"></label>
+   <div class="f full"><span>Documento (PDF ou imagem)</span><span style="display:flex;gap:8px;align-items:center">${l.arquivo?linkArq(l.arquivo,'Abrir atual'):''}<input type="file" name="arq" accept=".pdf,.jpg,.jpeg,.png"></span></div>
+   <label class="f full"><span>Observações</span><textarea name="obs" rows="2" maxlength="1000">${esc(l.obs||'')}</textarea></label>
+   ${(l.hist||[]).length?`<div class="f full"><span>Licenças anteriores</span><div class="list">${l.hist.slice().reverse().map(h=>`<div class="row" style="padding:4px 0"><div class="grow small">nº ${esc(h.numero||'—')} · ${h.emissao?fmtData(h.emissao)+' a ':''}${h.validade?fmtData(h.validade):'—'}</div>${h.arquivo?linkArq(h.arquivo,'Abrir'):''}</div>`).join('')}</div></div>`:''}
+  </div></div><div class="modal-foot">${!novo&&podeSoc('excluir')?`<button type="button" class="btn ghost danger" data-act="lic-excluir" data-id="${l.id}" style="margin-right:auto">Excluir</button>`:''}<button type="button" class="btn" data-act="close-modal">Cancelar</button>${podeSoc('editar')?'<button class="btn primary">Salvar</button>':''}</div></form>`}
+ACT['lic-nova']=()=>{if(podeSoc('editar'))openModal(licForm({tipo:'funcionamento',empresaId:(UI.socL||{}).emp||''}),true)};
+ACT['lic-abrir']=el=>{const l=licDe(el.dataset.id);if(l)openModal(licForm(l),true)};
+document.addEventListener('change',ev=>{const s=ev.target;if(!s.matches||!s.matches('[data-lic-tipo]'))return;const f=s.form;const o=f.querySelector('[data-lic-outro]');if(o)o.hidden=s.value!=='outro';const org=(TIPOS_LIC.find(x=>x[0]===s.value)||[])[2];if(org!==undefined&&(!f.orgao.value||TIPOS_LIC.some(x=>x[2]===f.orgao.value)))f.orgao.value=org});
+FORM['lic-salvar']=async(fd,form)=>{if(!podeSoc('editar')){toast('Seu acesso não permite editar licenças.',true);return}
+  const id=form.dataset.id;const ex=id&&licDe(id);const e=emp(fd.get('empresaId'));if(!e){toast('Escolha a empresa.',true);return}
+  const dados={empresaId:e.id,tipo:fd.get('tipo'),nomeOutro:String(fd.get('nomeOutro')||'').trim(),orgao:String(fd.get('orgao')||'').trim(),numero:String(fd.get('numero')||'').trim(),emissao:fd.get('emissao')||'',validade:fd.get('validade')||'',alerta:Math.min(365,Math.max(1,Number(fd.get('alerta'))||60)),
+    semValidade:!!fd.get('semValidade'),dispensada:!!fd.get('dispensada'),renovando:!!fd.get('renovando'),protocoloRenov:String(fd.get('protocoloRenov')||'').trim(),dataRenov:fd.get('dataRenov')||'',obs:String(fd.get('obs')||'').trim()};
+  if(dados.emissao&&dados.validade&&dados.validade<dados.emissao){toast('A validade é anterior à emissão.',true);return}
+  const file=fd.get('arq');if(file&&file.size){const v=await validarArquivo(file,['pdf','jpg','jpeg','png']);if(!v.ok){toast(v.msg,true);return}
+    const antes=UI.empresaId;UI.empresaId=null;try{dados.arquivo=await enviarArquivo(file)}catch(er){toast(er.message,true);return}finally{UI.empresaId=antes}}
+  const nome=(dados.tipo==='outro'&&dados.nomeOutro)||nomeLic(dados.tipo);
+  if(ex)mut('licencas',()=>Object.assign(ex,dados,{atualizadoEm:agora(),por:ME.nome||''}),['Societário','Alterou '+nome,e.razao]);
+  else mut('licencas',()=>S.licencas.push({id:uid(),...dados,criadoEm:agora(),por:ME.nome||''}),['Societário','Cadastrou '+nome,e.razao]);
+  closeModal();toast(nome+' salva.')};
+ACT['lic-renovar']=el=>{const l=licDe(el.dataset.id);if(!l)return;const e=emp(l.empresaId);
+  openModal(mHead('Licença renovada · '+nomeLic(l.tipo))+`<form data-form="lic-renovada" data-id="${l.id}"><div class="modal-body"><p class="small muted" style="margin-top:0">${esc(e?(e.fantasia||e.razao):'')} · a licença atual (nº ${esc(l.numero||'—')}, validade ${l.validade?fmtData(l.validade):'—'}) vai para o histórico.</p><div class="grid-f">
+   <label class="f"><span>Novo número</span><input name="numero" maxlength="60" value="${esc(l.numero||'')}"></label><label class="f"><span>Emissão</span><input name="emissao" type="date" value="${hoje()}"></label>
+   <label class="f"><span>Nova validade *</span><input name="validade" type="date" required></label><div class="f full"><span>Documento novo</span><input type="file" name="arq" accept=".pdf,.jpg,.jpeg,.png"></div></div></div>
+   <div class="modal-foot"><button type="button" class="btn" data-act="close-modal">Cancelar</button><button class="btn primary">Registrar renovação</button></div></form>`)};
+FORM['lic-renovada']=async(fd,form)=>{const l=licDe(form.dataset.id);if(!l||!podeSoc('editar'))return;const val=fd.get('validade');if(!val){toast('Informe a nova validade.',true);return}
+  let arq=null;const file=fd.get('arq');if(file&&file.size){const v=await validarArquivo(file,['pdf','jpg','jpeg','png']);if(!v.ok){toast(v.msg,true);return}const antes=UI.empresaId;UI.empresaId=null;try{arq=await enviarArquivo(file)}catch(er){toast(er.message,true);return}finally{UI.empresaId=antes}}
+  mut('licencas',()=>{l.hist=[...(l.hist||[]),{numero:l.numero,emissao:l.emissao,validade:l.validade,arquivo:l.arquivo||null,ate:hoje()}].slice(-20);l.numero=String(fd.get('numero')||'').trim();l.emissao=fd.get('emissao')||hoje();l.validade=val;l.arquivo=arq;l.renovando=false;l.protocoloRenov='';l.dataRenov='';l.atualizadoEm=agora()},['Societário','Registrou a renovação de '+nomeLic(l.tipo)+' até '+fmtData(val),emp(l.empresaId)?.razao||'']);
+  closeModal();toast('Renovação registrada.')};
+ACT['lic-excluir']=el=>{const l=licDe(el.dataset.id);if(!l||!podeSoc('excluir'))return;confirmar('Excluir licença',`Excluir <b>${esc(nomeLic(l.tipo))}</b> de <b>${esc((emp(l.empresaId)||{}).razao||'')}</b>, com o histórico de renovações? Isso não pode ser desfeito. Os arquivos anexados continuam guardados.`,'Excluir',()=>{mut('licencas',()=>{S.licencas=S.licencas.filter(z=>z.id!==l.id)},['Societário','Excluiu '+nomeLic(l.tipo),(emp(l.empresaId)||{}).razao||'']);closeModal()},true)};
+
+/* ---------- vencimentos ---------- */
+function socVencView(){const H=UI.socV||(UI.socV='90');const lim=H==='todos'?1e9:Number(H);const L=socVencimentos().filter(x=>x.st[2]<=lim);const venc=L.filter(x=>x.st[2]<0);const prox=L.filter(x=>x.st[2]>=0);
+  const porMes={};prox.forEach(x=>(porMes[x.data.slice(0,7)]=porMes[x.data.slice(0,7)]||[]).push(x));
+  const linha=x=>`<div class="row" ${x.act?`style="cursor:pointer" data-act="${x.act}" data-id="${x.id}"`:''}><div style="width:86px" class="small"><b>${fmtData(x.data)}</b></div><div class="grow"><b>${esc(x.titulo)}</b><div class="small muted">${esc(x.emp)} · ${esc(x.tipo)}${x.renov?' · em renovação':''}</div></div>${pill(x.st[0],x.st[1])}</div>`;
+  return head('Vencimentos','Licenças e alvarás, certificados digitais, prazos de processos e pendências, em ordem de data.')+
+  `<div class="tabs" role="tablist">${[['30','30 dias'],['60','60 dias'],['90','90 dias'],['180','6 meses'],['365','12 meses'],['todos','Tudo']].map(([k,t])=>`<button role="tab" aria-selected="${H===k}" data-act="socv" data-v="${k}">${t}</button>`).join('')}</div>
+  ${venc.length?`<div class="panel"><div class="panel-head"><h2 style="color:var(--crit,#dc2626)">Vencidos e atrasados (${venc.length})</h2></div><div class="list">${venc.map(linha).join('')}</div></div>`:''}
+  ${Object.keys(porMes).sort().map(m=>`<div class="panel"><div class="panel-head"><h2>${fmtComp(m)}</h2><span class="small muted">${porMes[m].length}</span></div><div class="list">${porMes[m].map(linha).join('')}</div></div>`).join('')}
+  ${!L.length?vazio('Nada vence nesse período.'):''}`}
+ACT['socv']=el=>{UI.socV=el.dataset.v;render()};
+
+/* ---------- pendências ---------- */
+function socPendView(){const F=UI.socPe||(UI.socPe='');const L=socPendencias().filter(x=>!F||x.resp===F).sort((a,b)=>String(a.prazo||'9999').localeCompare(String(b.prazo||'9999')));const T=socPendencias();
+  return head('Pendências','O que falta para andar: com o cliente, com o escritório e com os órgãos. Vem dos processos (pendências e documentos não recebidos) e das licenças (vencidas, vencendo, sem validade ou sem documento).')+
+  `<div class="tabs" role="tablist">${[['','Todas'],...Object.entries(RESP_PEND)].map(([k,t])=>`<button role="tab" aria-selected="${F===k}" data-act="socpe" data-v="${k}">${t} (${T.filter(x=>!k||x.resp===k).length})</button>`).join('')}</div>
+  <div class="panel">${L.length?`<div class="table-wrap"><table><thead><tr><th>Pendência</th><th>Empresa</th><th>Origem</th><th>Com quem</th><th>Prazo</th><th></th></tr></thead><tbody>${L.map(x=>{const d=x.prazo?diasAte(x.prazo):null;return `<tr><td>${esc(x.desc)}</td><td class="small"><b>${esc(x.emp)}</b></td><td class="small">${esc(x.origem)}</td><td class="small">${RESP_PEND[x.resp]||'—'}</td><td class="small">${x.prazo?fmtData(x.prazo):'—'}${d!=null&&d<0?' '+pill('atrasada','crit'):''}</td>
+     <td class="r" style="white-space:nowrap">${x.xid&&podeSoc('editar')?`<button class="btn sm" data-act="socpe-ok" data-id="${x.pid}" data-x="${x.xid}">Resolvida</button> `:''}<button class="btn sm" data-act="${x.act}" data-id="${x.id}">Abrir</button></td></tr>`}).join('')}</tbody></table></div>`:vazio('Nenhuma pendência.')}</div>`}
+ACT['socpe']=el=>{UI.socPe=el.dataset.v;render()};
+ACT['socpe-ok']=el=>{const [p,x]=itemDe(el,'pend');if(!x)return;mut('processos',()=>{x.ok=true;x.okEm=agora();p.atualizadoEm=agora()},['Societário','Resolveu a pendência "'+x.desc+'"',emp(p.empresaId)?.razao||p.nome||''])};
+
+/* ---------- documentação ---------- */
+function socDocs(){const F=UI.socD||(UI.socD={emp:''});const e=emp(F.emp);const edDoc=podeMod('docs','editar');
+  const sel=`<select data-socd style="width:auto;max-width:320px">${empOpts(F.emp,'Escolha a empresa')}</select>`;
+  if(!e)return head('Documentação','Pasta societária de cada empresa: contrato social e alterações, cartão CNPJ, inscrições, alvarás e licenças, e os documentos recebidos nos processos.')+`<div class="panel"><div class="panel-head">${sel}</div>${vazio('Escolha a empresa para ver a documentação.')}</div>`;
+  const ints=(S.docsinternos||[]).filter(d=>d.empresaId===e.id&&(d.depto==='Legalização'||d.depto==='Todos os departamentos')).sort((a,b)=>String(b.em).localeCompare(String(a.em)));
+  const lics=S.licencas.filter(l=>l.empresaId===e.id);
+  const procs=S.processos.filter(p=>p.empresaId===e.id);
+  const docsProc=procs.flatMap(p=>(p.docs||[]).filter(d=>d.arquivo).map(d=>({...d,proc:p})));
+  return head('Documentação · '+esc(e.fantasia||e.razao),'Pasta societária: documentos da equipe (departamento Legalização), alvarás e licenças, e o que chegou nos processos.')+
+  `<div class="panel"><div class="panel-head" style="flex-wrap:wrap;gap:8px">${sel}<span class="small muted">${fmtCNPJ(e.cnpj||'')} · ${esc(nomeRegime(e))}</span></div>
+   ${edDoc?`<form data-form="soc-doc" data-id="${e.id}" class="grid-f" style="grid-template-columns:2fr 1fr auto;align-items:end"><label class="f"><span>Nome do documento</span><input name="nome" maxlength="120" placeholder="ex.: Contrato social consolidado 2026" list="soc-docnomes"><datalist id="soc-docnomes">${['Contrato social','Alteração contratual','Contrato social consolidado','Cartão CNPJ','Certidão simplificada da Junta','Inscrição estadual','Inscrição municipal','Requerimento de empresário','Certificado MEI (CCMEI)','Distrato social','Procuração'].map(n=>`<option value="${n}">`).join('')}</datalist></label><label class="f"><span>Arquivo</span><input type="file" name="arq" accept=".pdf,.jpg,.jpeg,.png,.zip" required></label><button class="btn primary">Guardar</button></form>`:''}</div>
+  <div class="cols-2-1" style="align-items:start"><div class="panel"><h2>Documentos societários</h2>${ints.length?`<div class="list">${ints.map(d=>`<div class="row"><div class="grow"><b>${esc(d.nome)}</b><div class="small muted">${esc(d.nomeUsuario||'')} · ${fmtData(String(d.em).slice(0,10))}${d.depto!=='Legalização'?' · '+esc(d.depto):''}</div></div>${linkArq(d.arquivo)}</div>`).join('')}</div>`:vazio('Nenhum documento guardado para esta empresa.')}
+   ${docsProc.length?`<h3 style="margin:14px 0 6px">Recebidos nos processos</h3><div class="list">${docsProc.map(d=>`<div class="row"><div class="grow"><b>${esc(d.nome)}</b><div class="small muted">${esc(TIPO_PROC[d.proc.tipo])} · ${d.em?fmtData(d.em.slice(0,10)):''}</div></div>${linkArq(d.arquivo)}</div>`).join('')}</div>`:''}</div>
+   <div><div class="panel"><div class="panel-head"><h2>Alvarás e licenças</h2>${podeSoc('editar')?`<button class="btn sm" data-act="lic-nova-emp" data-id="${e.id}">${svg('plus')}Nova</button>`:''}</div>${lics.length?`<div class="list">${lics.map(l=>{const s=stLic(l);return `<div class="row" style="cursor:pointer" data-act="lic-abrir" data-id="${l.id}"><div class="grow"><b>${esc(nomeLic(l.tipo))}</b><div class="small muted">${l.numero?'nº '+esc(l.numero)+' · ':''}${l.validade?'até '+fmtData(l.validade):''}</div></div>${pill(s[0],s[1])}</div>`}).join('')}</div>`:vazio('Nenhuma licença cadastrada.')}</div>
+   <div class="panel"><h2>Processos</h2>${procs.length?`<div class="list">${procs.map(p=>`<div class="row" style="cursor:pointer" data-act="proc-abrir" data-id="${p.id}"><div class="grow"><b>${esc(TIPO_PROC[p.tipo])}</b><div class="small muted">início ${fmtData(p.inicio)}${p.concluidoEm?' · concluído '+fmtData(p.concluidoEm):''}</div></div>${pill(...ST_SOCP[p.status]||['—',''])}</div>`).join('')}</div>`:vazio('Nenhum processo desta empresa.')}</div></div></div>`}
+document.addEventListener('change',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-socd]')){(UI.socD||(UI.socD={})).emp=s.value;render()}});
+ACT['lic-nova-emp']=el=>{if(podeSoc('editar'))openModal(licForm({tipo:'funcionamento',empresaId:el.dataset.id}),true)};
+FORM['soc-doc']=async(fd,form)=>{const e=emp(form.dataset.id);const file=fd.get('arq');if(!e||!file||!file.size){toast('Escolha o arquivo.',true);return}
+  const v=await validarArquivo(file,['pdf','jpg','jpeg','png','zip']);if(!v.ok){toast(v.msg,true);return}
+  const nome=String(fd.get('nome')||'').trim()||file.name.replace(/\.[^.]+$/,'');const antes=UI.empresaId;UI.empresaId=null;
+  try{const arq=await enviarArquivo(file);mut('docsinternos',()=>S.docsinternos.push({id:uid(),empresaId:e.id,nome,depto:'Legalização',arquivo:arq,em:agora(),uid:ME.id,nomeUsuario:ME.nome||'',noPortal:false}),['Documentos','Anexou '+nome+' para Legalização',e.razao]);toast('Documento guardado.')}
+  catch(er){toast(er.message,true)}finally{UI.empresaId=antes}};
+const ctbCardCompV47=ctbCardComp;ctbCardComp=function(){return APP_SOC?socCard():ctbCardCompV47()};
+/* ==== v47 (fim) ==== */
 /* CRC nos arquivos SPED: campo de até 15 posições, só letras e números ("CRC/MS 016636/O-0" → "MS016636O0") */
 function crcSped(c){return String(c||'').toUpperCase().replace(/^\s*CRC/,'').replace(/[^A-Z0-9]/g,'').slice(0,15)}
 
@@ -9628,19 +9970,19 @@ const URL_CONTABIL=String((window.MF&&MF.contabilUrl)||'https://contabil.omeufis
 const URL_FISCAL=String((window.MF&&MF.fiscalUrl)||'https://fiscal.omeufiscal.com.br').replace(/\/$/,'');
 const URL_PAINEL=String((window.MF&&MF.painelUrl)||'https://painel.omeufiscal.com.br').replace(/\/$/,'');
 const URL_DP=String((window.MF&&MF.dpUrl)||'https://dp.omeufiscal.com.br').replace(/\/$/,'');
-const APP_SIS=APP_FISCAL||APP_CONTABIL||APP_DP;   // os três sistemas de departamento (fiscal, contábil e DP) usam o mesmo "casco" de sistema contábil
+const APP_SIS=APP_FISCAL||APP_CONTABIL||APP_DP||APP_SOC;   // os três sistemas de departamento (fiscal, contábil e DP) usam o mesmo "casco" de sistema contábil
 if(!APP_SIS){
   /* painel: Apuração do Simples, notas de saída e notas de entrada passam a existir só no sistema contábil */
   for(const v of ['a-simples','a-nfe']){const i=NAV_A.findIndex(n=>n[0]===v);if(i>=0)NAV_A.splice(i,1)}
   const sidebarV27=sidebar;
-  sidebar=function(){const h=sidebarV27();if(UI.modo!=='painel'||!(podeMod('sis_fiscal','ver')||podeMod('sis_contabil','ver')||podeMod('sis_dp','ver')))return h;
+  sidebar=function(){const h=sidebarV27();if(UI.modo!=='painel'||!(podeMod('sis_fiscal','ver')||podeMod('sis_contabil','ver')||podeMod('sis_dp','ver')||podeMod('sis_societario','ver')))return h;
     const L=[podeMod('sis_fiscal','ver')?['receipt','Sistema fiscal',URL_FISCAL]:null,podeMod('sis_contabil','ver')?['calc','Sistema contábil',URL_CONTABIL]:null].filter(Boolean);
-    return h.replace('</nav>',`${L.map(([i,t,u],k)=>`<a href="${esc(u)}" target="_blank" rel="noopener" class="nav-ext${k?' nav-ext2':''}">${svg(i)}<span class="lbl">${t}</span><span class="ext" aria-hidden="true">↗</span></a>`).join('')}${podeMod('sis_dp','ver')?`<a href="${esc(URL_DP)}" target="_blank" rel="noopener" class="nav-ext${L.length?' nav-ext2':''}">${svg('users')}<span class="lbl">Departamento pessoal</span><span class="ext" aria-hidden="true">↗</span></a>`:''}</nav>`)};
+    return h.replace('</nav>',`${L.map(([i,t,u],k)=>`<a href="${esc(u)}" target="_blank" rel="noopener" class="nav-ext${k?' nav-ext2':''}">${svg(i)}<span class="lbl">${t}</span><span class="ext" aria-hidden="true">↗</span></a>`).join('')}${podeMod('sis_dp','ver')?`<a href="${esc(URL_DP)}" target="_blank" rel="noopener" class="nav-ext${L.length?' nav-ext2':''}">${svg('users')}<span class="lbl">Departamento pessoal</span><span class="ext" aria-hidden="true">↗</span></a>`:''}${podeMod('sis_societario','ver')?`<a href="${esc(URL_SOC)}" target="_blank" rel="noopener" class="nav-ext${L.length||podeMod('sis_dp','ver')?' nav-ext2':''}">${svg('briefcase')}<span class="lbl">Societário</span><span class="ext" aria-hidden="true">↗</span></a>`:''}</nav>`)};
   (()=>{const st=document.createElement('style');st.textContent=`.nav-ext{margin-top:10px;border-top:1px solid rgba(148,163,184,.16);padding-top:12px!important}.nav-ext2{margin-top:0;border-top:0;padding-top:9px!important}.nav-ext .ext{margin-left:auto;opacity:.6;font-size:.85em}`;document.head.appendChild(st)})();
 }
 if(APP_SIS){
-  const MODS=[['fiscal','Escrita Fiscal',URL_FISCAL+'/escrita'],['contabil','Contabilidade',URL_CONTABIL+'/contabil'],['folha','Folha de Pagamento',URL_DP+'/folha'],['anuais','Obrigações anuais',null]];
-  const MOD_ATIVO=APP_DP?'folha':APP_CONTABIL?'contabil':'fiscal';
+  const MODS=[['fiscal','Escrita Fiscal',URL_FISCAL+'/escrita'],['contabil','Contabilidade',URL_CONTABIL+'/contabil'],['folha','Folha de Pagamento',URL_DP+'/folha'],['societario','Societário',URL_SOC+'/societario'],['anuais','Obrigações anuais',null]];
+  const MOD_ATIVO=APP_SOC?'societario':APP_DP?'folha':APP_CONTABIL?'contabil':'fiscal';
   const NAV_FISCAL=[
     ['Competência',[['f-central','Central da competência','checksq','Todas as empresas no mês: movimento, apuração e guia, com apuração em lote']]],
     ['Movimento',[['f-saidas','Notas fiscais de saída','upload','Importação de XML (NF-e, NFC-e, NFS-e), receita por CFOP e CST'],['f-entradas','Notas fiscais de entrada','filetext','Busca automática na SEFAZ e XML dos fornecedores'],['f-nfse-p','Serviços prestados','upload','NFS-e emitidas: XML padrão nacional/ABRASF e busca no Ambiente Nacional'],['f-nfse-t','Serviços tomados','filetext','NFS-e recebidas com retenções (ISS, INSS, IRRF, CSRF): XML e busca no Ambiente Nacional'],['f-lanc','Lançamentos fiscais','receipt','Saídas, serviços, entradas, serviços tomados com retenções e outros documentos, com acumuladores']]],
@@ -9648,26 +9990,26 @@ if(APP_SIS){
     ['Obrigações',[['f-arq','Arquivos fiscais','download','EFD ICMS/IPI, EFD-Contribuições, EFD-Reinf e DeSTDA'],['f-ibs','IBS e CBS nas notas','checksq','Conferência da reforma tributária nas NF-e e NFC-e']]],
     ['Relatórios',[['f-rel','Livros e relatórios','chart','Livros fiscais, apurações, faturamento, movimento e impostos pagos, para todos os regimes']]],
   ];
-  const NAV_F=APP_DP?NAV_DP:APP_CONTABIL?NAV_CTB:NAV_FISCAL;
+  const NAV_F=APP_SOC?NAV_SOC:APP_DP?NAV_DP:APP_CONTABIL?NAV_CTB:NAV_FISCAL;
   const F_VIEWS=NAV_F.flatMap(g=>g[1].map(i=>i[0]));
   const V_PADRAO=APP_CONTABIL?'c-lanc':F_VIEWS[0];
-  const COM_PERIODO=APP_DP?[]:APP_CONTABIL?CTB_PERIODO:['f-saidas','f-entradas','f-rel','f-lanc','f-nfse-p','f-nfse-t'];
+  const COM_PERIODO=APP_DP||APP_SOC?[]:APP_CONTABIL?CTB_PERIODO:['f-saidas','f-entradas','f-rel','f-lanc','f-nfse-p','f-nfse-t'];
   const empsCtb=()=>empresasVisiveis().slice().sort((a,b)=>String(a.fantasia||a.razao).localeCompare(String(b.fantasia||b.razao),'pt-BR'));
   function ctbEstado(){const es=empsCtb();const F=UI.fsn||(UI.fsn={emp:null,comp:addMes(compAtual(),APP_DP?0:-1)});
     if(!F.comp)F.comp=addMes(compAtual(),APP_DP?0:-1);
     if(!es.some(e=>e.id===F.emp)){const lemb=(()=>{try{return localStorage.getItem('mf-ctb-emp')}catch(e){return null}})();F.emp=(es.find(e=>e.id===lemb)||(APP_DP?es.find(e=>S.funcionarios.some(f=>f.empresaId===e.id&&!f.desligado)):es.find(e=>e.regime==='SN'||e.regime==='MEI'))||es[0])?.id||null}
     const F2=UI.fnf||(UI.fnf={});if(!F2.ate||F2.ate<F.comp)F2.ate=F.comp;return F}
   const lembrarEmp=id=>{try{localStorage.setItem('mf-ctb-emp',id)}catch(e){}};
-  const HOME_SIS=APP_DP?'/folha':APP_CONTABIL?'/contabil':'/escrita';
+  const HOME_SIS=APP_SOC?'/societario':APP_DP?'/folha':APP_CONTABIL?'/contabil':'/escrita';
 
   lerHash=function(){const h=(location.hash||'').slice(1);UI.modo='painel';if(F_VIEWS.includes(h)||h==='a-perfil')UI.view=h;else if(!F_VIEWS.includes(UI.view)&&UI.view!=='a-perfil')UI.view=V_PADRAO};
   if(!F_VIEWS.includes((location.hash||'').slice(1))&&location.hash!=='#a-perfil')history.replaceState(null,'','#'+V_PADRAO);
 
   function ctbTopo(){return `<header class="ctb-top">
-    <a class="ctb-marca" href="#${V_PADRAO}"><span class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></span><b><span class="wm-meu">meu</span>fiscal</b><span class="ctb-sis">${APP_DP?'DP':APP_CONTABIL?'Contábil':'Fiscal'}</span></a>
-    <nav class="ctb-mods" aria-label="Módulos">${MODS.filter(([k])=>k===MOD_ATIVO||!{fiscal:'sis_fiscal',contabil:'sis_contabil',folha:'sis_dp'}[k]||podeMod({fiscal:'sis_fiscal',contabil:'sis_contabil',folha:'sis_dp'}[k],'ver')).map(([k,t,url])=>k===MOD_ATIVO?`<a href="#${V_PADRAO}" class="on" aria-current="true">${t}</a>`:url?`<a href="${esc(url)}" title="Abre o sistema de ${esc(t)}">${t}</a>`:`<span class="off" title="Em desenvolvimento">${t}<small>em breve</small></span>`).join('')}</nav>
+    <a class="ctb-marca" href="#${V_PADRAO}"><span class="brand-mark"><svg viewBox="0 0 64 64" aria-hidden="true"><g transform="translate(32 32) scale(0.72) translate(-32 -31)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="7"><path d="M13 48V32a6 6 0 0 1 12 0v16M25 32a6 6 0 0 1 12 0M37 48V22a8 8 0 0 1 8-8h6" stroke="#fff"/><path d="M37 30H50" stroke="#34D399"/></g></svg></span><b><span class="wm-meu">meu</span>fiscal</b><span class="ctb-sis">${APP_SOC?'Societário':APP_DP?'DP':APP_CONTABIL?'Contábil':'Fiscal'}</span></a>
+    <nav class="ctb-mods" aria-label="Módulos">${MODS.filter(([k])=>k===MOD_ATIVO||!{fiscal:'sis_fiscal',contabil:'sis_contabil',folha:'sis_dp',societario:'sis_societario'}[k]||podeMod({fiscal:'sis_fiscal',contabil:'sis_contabil',folha:'sis_dp',societario:'sis_societario'}[k],'ver')).map(([k,t,url])=>k===MOD_ATIVO?`<a href="#${V_PADRAO}" class="on" aria-current="true">${t}</a>`:url?`<a href="${esc(url)}" title="Abre o sistema de ${esc(t)}">${t}</a>`:`<span class="off" title="Em desenvolvimento">${t}<small>em breve</small></span>`).join('')}</nav>
     <div class="ctb-usr"><a href="${esc(URL_PAINEL)}" target="_blank" rel="noopener">Painel ↗</a><a href="#a-perfil">${esc(ME.nome||'Meu perfil')}</a><a href="#" data-act="mf-sair">Sair</a></div></header>`}
-  function ctbContexto(){const F=ctbEstado();const e=emp(F.emp);const meses=[];for(let i=-1;i<36;i++)meses.push(addMes(compAtual(),-i));
+  function ctbContexto(){if(APP_SOC)return socCtx();const F=ctbEstado();const e=emp(F.emp);const meses=[];for(let i=-1;i<36;i++)meses.push(addMes(compAtual(),-i));
     const per=COM_PERIODO.includes(UI.view);
     const selMes=(attr,v)=>`<select ${attr} aria-label="Competência">${meses.map(c=>`<option value="${c}" ${c===v?'selected':''}>${fmtComp(c)}</option>`).join('')}</select>`;
     return `<div class="ctb-ctx">
@@ -9675,11 +10017,11 @@ if(APP_SIS){
       ${e?`<div class="ctb-campo"><span>Regime</span><b class="ctb-val">${esc(nomeRegime(e))}${e.fatorR?' · Fator R':''}</b></div>`:''}
       ${per?`<div class="ctb-campo"><span>Período</span><div class="ctb-per"><em>de</em><b class="ctb-val" style="padding:0 4px">${fmtComp(F.comp)}</b><em>até</em>${selMes('data-nf="ate"',UI.fnf.ate)}</div></div>`:''}
     </div>`}
-  function ctbMenu(){return `<aside class="ctb-nav" aria-label="${APP_DP?'Folha de Pagamento':APP_CONTABIL?'Contabilidade':'Escrita Fiscal'}">${ctbCardComp()}${NAV_F.map(([g,its])=>`<div class="ctb-grp"><span>${g}</span>${its.map(([v,t,ic,dica])=>`<a href="#${v}" title="${esc(dica)}" ${UI.view===v?'aria-current="page"':''}>${svg(ic)}<span>${t}</span></a>`).join('')}</div>`).join('')}
-    <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>${APP_DP?'Envio ao eSocial (S-1200, S-1210, S-2299) e DCTFWeb, e importação de ponto eletrônico (AFD).':APP_CONTABIL?'ECD, ECF, DMPL e notas explicativas entram aqui, uma de cada vez.':'Transmissão direta (PGDAS-D, EFD, Reinf e DeSTDA) quando o Integra Contador e os certificados estiverem ligados.'}</p></div></aside>`}
+  function ctbMenu(){return `<aside class="ctb-nav" aria-label="${APP_SOC?'Societário':APP_DP?'Folha de Pagamento':APP_CONTABIL?'Contabilidade':'Escrita Fiscal'}">${ctbCardComp()}${NAV_F.map(([g,its])=>`<div class="ctb-grp"><span>${g}</span>${its.map(([v,t,ic,dica])=>`<a href="#${v}" title="${esc(dica)}" ${UI.view===v?'aria-current="page"':''}>${svg(ic)}<span>${t}</span></a>`).join('')}</div>`).join('')}
+    <div class="ctb-grp ctb-breve"><span>Próximas etapas</span><p>${APP_SOC?'Consulta automática de situação na Junta e na REDESIM e aviso ao cliente das pendências pelo portal e WhatsApp.':APP_DP?'Envio ao eSocial (S-1200, S-1210, S-2299) e DCTFWeb, e importação de ponto eletrônico (AFD).':APP_CONTABIL?'ECD, ECF, DMPL e notas explicativas entram aqui, uma de cada vez.':'Transmissão direta (PGDAS-D, EFD, Reinf e DeSTDA) quando o Integra Contador e os certificados estiverem ligados.'}</p></div></aside>`}
   function ctbStatus(){const F=UI.fsn||{};const e=emp(F.emp);
     const txt=MODO!=='api'?'Modo local':MF.estado==='online'?'Tempo real · conectado':MF.estado==='reconectando'?'Reconectando…':'Conectando…';
-    return `<footer class="ctb-status"><span class="conn ${MODO!=='api'||MF.estado==='online'?'ok':''}" id="mf-selo"><i></i>${txt}</span><span>${esc(cfg().escritorio||'')}</span>${e?`<span>${esc(e.fantasia||e.razao)}</span>`:''}${F.comp?`<span>Competência ${fmtComp(F.comp)}</span>`:''}<span class="grow"></span><span class="ctb-atalhos">F8 trocar empresa · PgUp/PgDn competência</span>${cfg().crc?`<span>${esc(cfg().crc)}</span>`:''}</footer>`}
+    return `<footer class="ctb-status"><span class="conn ${MODO!=='api'||MF.estado==='online'?'ok':''}" id="mf-selo"><i></i>${txt}</span><span>${esc(cfg().escritorio||'')}</span>${e&&!APP_SOC?`<span>${esc(e.fantasia||e.razao)}</span>`:''}${F.comp&&!APP_SOC?`<span>Competência ${fmtComp(F.comp)}</span>`:''}<span class="grow"></span>${APP_SOC?'':'<span class="ctb-atalhos">F8 trocar empresa · PgUp/PgDn competência</span>'}${cfg().crc?`<span>${esc(cfg().crc)}</span>`:''}</footer>`}
 
   renderInterno=function(){
     if(ocupado()||UI.modal){pendRender=true;return}
@@ -9707,6 +10049,7 @@ if(APP_SIS){
   conteudo=function(){
     if(UI.view==='a-perfil')return conteudoV27();
     if(!F_VIEWS.includes(UI.view))UI.view=V_PADRAO;
+    if(APP_SOC)return socConteudo();
     if(APP_DP)return dpConteudo();
     if(APP_CONTABIL)return cbConteudo();
     if(!podeMod('sis_fiscal','ver')||!podeMod('guias','ver'))return semSistema('a Escrita Fiscal','Sistema · Escrita Fiscal');
@@ -9740,15 +10083,15 @@ if(APP_SIS){
   document.addEventListener('input',ev=>{const s=ev.target;if(s.matches&&s.matches('[data-ctb-busca]')){const l=document.getElementById('ctb-lista');if(l)l.innerHTML=htmlTroca(s.value)}});
   document.addEventListener('keydown',ev=>{
     if(ev.target.matches&&ev.target.matches('[data-ctb-busca]')&&ev.key==='Enter'){ev.preventDefault();const b=document.querySelector('#ctb-lista [data-primeira]');if(b)ACT['ctb-emp'](b);return}
-    if(ev.key==='F8'){ev.preventDefault();if(!UI.modal)ACT['ctb-trocar']();return}
+    if(ev.key==='F8'&&!APP_SOC){ev.preventDefault();if(!UI.modal)ACT['ctb-trocar']();return}
     const t=ev.target;const digitando=t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'||t.isContentEditable);
-    if(!digitando&&!UI.modal&&(ev.key==='PageUp'||ev.key==='PageDown')){ev.preventDefault();ACT['ctb-comp']({dataset:{d:ev.key==='PageUp'?'-1':'1'}})}
+    if(!digitando&&!UI.modal&&!APP_SOC&&(ev.key==='PageUp'||ev.key==='PageDown')){ev.preventDefault();ACT['ctb-comp']({dataset:{d:ev.key==='PageUp'?'-1':'1'}})}
   });
   ACT['ctb-comp']=el=>{const F=ctbEstado();const d=+el.dataset.d;const um=UI.fnf.ate===F.comp;F.comp=addMes(F.comp,d);UI.fnf.ate=um?F.comp:(UI.fnf.ate<F.comp?F.comp:UI.fnf.ate);render()};
   // a competência "de" anda junto com o "até" quando o período é de um mês só
   document.addEventListener('change',ev=>{const el=ev.target;if(el.matches&&el.matches('.ctb-ctx [data-sn="comp"]')){const F2=UI.fnf||(UI.fnf={});if(!F2.ate||F2.ate<el.value)F2.ate=el.value}},true);
 
-  document.title=APP_DP?'Departamento Pessoal · Meu Fiscal':APP_CONTABIL?'Contábil · Meu Fiscal':'Fiscal · Meu Fiscal';
+  document.title=APP_SOC?'Societário · Meu Fiscal':APP_DP?'Departamento Pessoal · Meu Fiscal':APP_CONTABIL?'Contábil · Meu Fiscal':'Fiscal · Meu Fiscal';
   (()=>{const st=document.createElement('style');st.textContent=`
 body{background:#EEF2F6;font-size:13.5px}
 .ctb{min-height:100vh;display:grid;grid-template-rows:auto auto 1fr auto}
