@@ -719,3 +719,9 @@ Tudo abaixo rodou contra um PostgreSQL 16 real, com os dois sites em domínios s
 ### Contrato de prestação de serviços (padrão)
 - Contrato só entre contador (CONTRATADO) e cliente (CONTRATANTE), nos termos da Resolução CFC nº 1.590/2020: sem marca de plataforma, sem nome do plano e sem condições comerciais (atendimento, assistente virtual, brindes).
 - Serviços padrão por regime (MEI ou empresa; ICMS quando há IE; folha com o limite de pessoas do cadastro); serviços eventuais sempre por orçamento.
+
+### Etapas, pendências e cofre no processo (Societário)
+- Cada etapa abre um quadro com campo de texto: "Anotar" (nota da etapa), "Incluir pendência" (com responsável e prazo), "Concluir etapa" (o texto vira a observação da entrega) e "Dispensar" (o texto é o motivo, obrigatório). "Reabrir" desfaz.
+- Pendências e anotações incluídas pelos painéis da direita entram na etapa atual.
+- Documento anexado no processo vai na hora para a carteira (Documentos da equipe › Legalização), quando o processo está ligado a um cliente.
+- "Senhas e acessos (cofre)": gov.br dos sócios, e-CAC, Junta, Prefeitura etc. vão direto para o cofre do cliente (criptografia no servidor, `/api/cofre`); o processo não guarda senha.
